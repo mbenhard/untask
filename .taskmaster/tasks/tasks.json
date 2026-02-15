@@ -422,13 +422,13 @@
         "id": "6",
         "title": "Build Task List Components with Drag-and-Drop",
         "description": "Implement the task list UI with inline expansion, checkbox interactions, drag-to-reorder functionality, and project/subtask grouping. Tasks should expand to show markdown body inline.",
-        "details": "1. Install dnd-kit: `npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities`\n2. Create src/renderer/components/tasks/TaskItem.tsx:\n   - 44px row height\n   - Checkbox with smooth fill animation (Framer Motion)\n   - Title with client tag (subtle badge)\n   - Priority indicator (left border shade: none/low/medium/high)\n   - Click to expand inline markdown body\n   - Hover state with subtle background tint\n3. Create src/renderer/components/tasks/TaskList.tsx:\n   - DndContext with SortableContext\n   - Use closestCenter collision detection\n   - Handle drag end: update order in store\n   - Empty state messaging per view\n4. Create src/renderer/components/tasks/ProjectGroup.tsx:\n   - Parent task as header with progress indicator\n   - Collapsible subtask list\n   - Inline \"+ Add task\" at bottom\n5. Create src/renderer/components/tasks/TaskBody.tsx:\n   - Markdown renderer (use react-markdown)\n   - Expand/collapse animation\n   - Edit mode for body content\n6. Implement keyboard navigation:\n   - Up/Down to navigate list\n   - Enter to open selected task\n   - T to toggle today flag\n7. Create src/renderer/components/tasks/InlineTaskInput.tsx:\n   - Quick add within projects\n   - Auto-sets parentId",
+        "details": "1. Install dnd-kit: `npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities`\n2. Create src/renderer/components/tasks/TaskItem.tsx:\n   - 44px row height\n   - Checkbox with smooth fill animation (Framer Motion)\n   - Title with client tag (subtle badge)\n   - Priority indicator (left border shade: none/low/medium/high)\n   - Click to expand inline markdown body\n   - Hover state with subtle background tint\n3. Create src/renderer/components/tasks/TaskList.tsx:\n   - DndContext with SortableContext\n   - Use closestCenter collision detection\n   - Handle drag end: update order in store\n   - Empty state messaging per view\n4. Create src/renderer/components/tasks/ProjectGroup.tsx:\n   - Parent task as header with progress indicator\n   - Collapsible subtask list\n   - Inline \"+ Add task\" at bottom\n5. Create src/renderer/components/tasks/TaskBody.tsx:\n   - Markdown renderer (use react-markdown)\n   - Expand/collapse animation\n   - Edit mode for body content\n6. Implement keyboard navigation:\n   - Up/Down to navigate list\n   - Enter to open selected task\n   - T to toggle today flag\n7. Create src/renderer/components/tasks/InlineTaskInput.tsx:\n   - Quick add within projects\n   - Auto-sets parentId\n<info added on 2026-02-15T20:22:20.264Z>\nBased on my codebase analysis, here is the implementation note to append:\n\nImplementation note (2026-02-15): Follow `docs/plans/2026-02-15-task-list-components-design.md` as the source of truth for Task 6 execution.\n\nCritical constraints discovered from codebase analysis:\n\n1. **Reorder payload must include all tasks**: `taskStore.reorderTasks(ids)` at `flusk/src/renderer/stores/taskStore.ts:214-253` validates that `ids.length === prevTasks.length` and rejects partial lists. Implement scoped reorder via global payload reconciliation: compute scoped `arrayMove`, then rebuild full ID order by walking global IDs and replacing only scope IDs in their new order.\n\n2. **AppShell data flow fix required**: Current `AppShell.tsx:127-130` filters tasks before passing to views. `ProjectsView` must receive `allTasks` (the full unfiltered list) to perform its own grouping and to pass through for nested `TaskList` reorder reconciliation. Update `AppShell` to pass `tasks` (all tasks) to `ProjectsView` instead of just parent-filtered rows.\n\n3. **Today view keeps LiveThought**: Preserve `<LiveThought />` at top of `TodayView.tsx:19` when integrating `TaskList`.\n\n4. **Inbox filter rule**: `status === 'inbox' && parentId === null && today !== true`. Current selector at `taskStore.ts:328-329` only checks `status === 'inbox'`; fix filtering when building inbox-scoped `TaskList`.\n\n5. **Active views hide done tasks**: Existing selectors at `taskStore.ts:324-329` correctly filter `status !== 'done'` for Today and Projects. Verify `TaskList` components maintain this.\n\n6. **Use existing theme tokens only**: Use `bg-accent/40` for hover, `ring-1 ring-ring` for focus, `text-muted-foreground` for secondary text. Do not introduce `--hover` or `--interactive` variables.\n\n7. **TaskBody edit mode shortcuts**: Support both `Cmd+Enter` (macOS) and `Ctrl+Enter` (cross-platform) for save in TaskBody edit mode.\n</info added on 2026-02-15T20:22:20.264Z>",
         "testStrategy": "1. Render task list - verify 44px row heights\n2. Click checkbox - verify smooth fill animation and task completes\n3. Click task - verify inline expansion shows markdown body\n4. Drag task - verify reorder works and persists\n5. Verify priority border colors render correctly\n6. Test project groups show progress (e.g., \"3/5 done\")\n7. Add subtask via inline input - verify parentId is set\n8. Test keyboard navigation (Up/Down/Enter/T)",
         "priority": "high",
         "dependencies": [
           "5"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -436,9 +436,10 @@
             "description": "Build the core TaskItem component with 44px row height, Framer Motion checkbox fill animation, priority indicator borders, client tag badges, and hover states.",
             "dependencies": [],
             "details": "Create src/renderer/components/tasks/TaskItem.tsx implementing: 1) Fixed 44px row height with proper vertical centering, 2) Checkbox using Framer Motion for smooth fill animation on completion with scale effect, 3) Left border color based on priority (transparent for none, light gray for low, medium gray for medium, dark for high), 4) Title display with optional client tag as subtle Badge component from @guestroom/ui, 5) Hover state with subtle background tint (100ms transition), 6) onClick handler to toggle expanded state for inline body display, 7) useSortable hook integration from dnd-kit for drag handle. Use cn() utility for conditional class merging. Component should accept task data, onComplete, onExpand, and isExpanded props.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Render TaskItem with various priority levels and verify correct border colors. Click checkbox and confirm smooth fill animation plays. Hover over item and verify background tint appears. Verify 44px height is consistent. Test with and without client tag to ensure proper rendering.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T20:35:25.392Z"
           },
           {
             "id": 2,
@@ -447,10 +448,11 @@
             "dependencies": [
               1
             ],
-            "details": "Install dnd-kit packages: @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities. Create src/renderer/components/tasks/TaskList.tsx implementing: 1) DndContext wrapper with PointerSensor and KeyboardSensor configured, 2) SortableContext with verticalListSortingStrategy for task items, 3) closestCenter collision detection algorithm, 4) handleDragEnd function that calculates new order using arrayMove utility and updates Zustand store, 5) Empty state component with appropriate messaging based on current view (Today/All/Project), 6) CSS for drag overlay styling with subtle shadow and opacity. Ensure drag operations update task.order field in store and trigger persistence to SQLite via IPC.",
-            "status": "pending",
+            "details": "Install dnd-kit packages: @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities. Create src/renderer/components/tasks/TaskList.tsx implementing: 1) DndContext wrapper with PointerSensor and KeyboardSensor configured, 2) SortableContext with verticalListSortingStrategy for task items, 3) closestCenter collision detection algorithm, 4) handleDragEnd function that calculates new order using arrayMove utility and updates Zustand store, 5) Empty state component with appropriate messaging based on current view (Today/All/Project), 6) CSS for drag overlay styling with subtle shadow and opacity. Ensure drag operations update task.order field in store and trigger persistence to SQLite via IPC.\n<info added on 2026-02-15T20:36:03.875Z>\nLet me first explore the codebase to understand the implementation details before generating the update.Now let me check the keyboard hook that was mentioned:Now I have a complete understanding of the implementation. Here is the update text:\n\nImplementation complete at flusk/src/renderer/components/tasks/TaskList.tsx (270 lines). Features: DndContext with PointerSensor (8px activation distance) and KeyboardSensor using sortableKeyboardCoordinates. SortableContext uses verticalListSortingStrategy. closestCenter collision detection. DragOverlay renders task title with shadow/opacity styling. reconcileScopedReorder helper merges scoped reorder into full ordered ID array before calling taskStore.reorderTasks. Single expandedTaskId state ensures only one row expanded. Empty state renders dashed border card with emptyMessage and optional emptyAction. listbox role with aria-label and screen-reader hint for keyboard navigation. useTaskListKeyboard hook (flusk/src/renderer/hooks/useTaskListKeyboard.ts) provides Arrow Up/Down focus, Enter expand, T toggle today, Escape collapse/blur. TaskItem interactions wired for complete/today toggles with body edit mode tracking to disable keyboard nav during editing.\n</info added on 2026-02-15T20:36:03.875Z>",
+            "status": "done",
             "testStrategy": "Render list with multiple tasks. Drag task from position 1 to position 3 and verify visual reorder. Confirm Zustand store reflects new order. Refresh app and verify order persists. Test empty state renders correctly when no tasks exist.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T20:36:38.265Z"
           },
           {
             "id": 3,
@@ -460,10 +462,11 @@
               1,
               2
             ],
-            "details": "Create src/renderer/components/tasks/ProjectGroup.tsx implementing: 1) Parent task displayed as header row with chevron toggle icon, 2) Progress indicator showing completed/total subtasks (e.g., '3/5' or progress bar), 3) Collapsible subtask list using Framer Motion for smooth expand/collapse animation, 4) Nested SortableContext for subtask reordering within the group, 5) Visual indentation (16-24px) for subtasks to show hierarchy, 6) Placeholder for InlineTaskInput at bottom when expanded, 7) Integration with TaskItem component for rendering individual subtasks. Handle edge cases: no subtasks, all subtasks complete, mixed completion states. Store collapsed/expanded state in local component state or Zustand.",
-            "status": "pending",
+            "details": "Create src/renderer/components/tasks/ProjectGroup.tsx implementing: 1) Parent task displayed as header row with chevron toggle icon, 2) Progress indicator showing completed/total subtasks (e.g., '3/5' or progress bar), 3) Collapsible subtask list using Framer Motion for smooth expand/collapse animation, 4) Nested SortableContext for subtask reordering within the group, 5) Visual indentation (16-24px) for subtasks to show hierarchy, 6) Placeholder for InlineTaskInput at bottom when expanded, 7) Integration with TaskItem component for rendering individual subtasks. Handle edge cases: no subtasks, all subtasks complete, mixed completion states. Store collapsed/expanded state in local component state or Zustand.\n<info added on 2026-02-15T20:39:34.263Z>\nImplemented ProjectGroup.tsx (lines 1-81) with: chevron toggle button for expand/collapse, progress display showing completedCount/totalCount, Framer Motion AnimatePresence with height/opacity animations respecting reduced motion preferences, nested TaskList using scopeId project:<parentId> for scoped drag-and-drop reordering, 20px visual indentation for subtasks via indentPx prop, and InlineTaskInput positioned at bottom when expanded with parentId passed for subtask creation. Refactored view components: TodayView.tsx filters tasks where today===true and status!==done, InboxView.tsx filters status===inbox and parentId===null and today!==true, ProjectsView.tsx computes projectGroups by finding active parents (non-inbox, non-done, no parent) and mapping their subtasks with completion counts, then renders ProjectGroup components passing allTasks for cross-scope reconciliation. AppShell.tsx (lines 67-180) fetches tasks via useTaskStore and passes allTasks prop to all three views enabling unified drag-and-drop state across scopes.\n</info added on 2026-02-15T20:39:34.263Z>",
+            "status": "done",
             "testStrategy": "Render ProjectGroup with parent task and 3 subtasks. Click header to collapse/expand and verify animation. Verify progress shows correct ratio. Complete a subtask and verify progress updates. Drag subtask within group and verify reorder works. Test with 0 subtasks edge case.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T20:40:03.230Z"
           },
           {
             "id": 4,
@@ -472,10 +475,11 @@
             "dependencies": [
               1
             ],
-            "details": "Install react-markdown if not present. Create src/renderer/components/tasks/TaskBody.tsx implementing: 1) ReactMarkdown component with appropriate styling for headers, lists, code blocks, links, 2) Framer Motion AnimatePresence for smooth expand/collapse height animation, 3) Edit mode toggle that switches from rendered markdown to Textarea component, 4) Save/Cancel buttons in edit mode with keyboard shortcuts (Cmd+Enter to save, Escape to cancel), 5) Empty state when no body content exists with 'Add notes...' placeholder, 6) Proper overflow handling for long content, 7) onBodyUpdate callback prop for persisting changes. Style markdown output to match app's monochrome design system with proper typography scale.",
-            "status": "pending",
+            "details": "Install react-markdown if not present. Create src/renderer/components/tasks/TaskBody.tsx implementing: 1) ReactMarkdown component with appropriate styling for headers, lists, code blocks, links, 2) Framer Motion AnimatePresence for smooth expand/collapse height animation, 3) Edit mode toggle that switches from rendered markdown to Textarea component, 4) Save/Cancel buttons in edit mode with keyboard shortcuts (Cmd+Enter to save, Escape to cancel), 5) Empty state when no body content exists with 'Add notes...' placeholder, 6) Proper overflow handling for long content, 7) onBodyUpdate callback prop for persisting changes. Style markdown output to match app's monochrome design system with proper typography scale.\n<info added on 2026-02-15T20:29:36.513Z>\nImplemented TaskBody baseline per design doc batch 1 step 3. Added flusk/src/renderer/components/tasks/TaskBody.tsx with: ReactMarkdown for read mode display with styled headers/lists/code, Textarea edit mode using new ui/textarea primitive (shadcn-style component at flusk/src/renderer/components/ui/textarea.tsx), save via Cmd+Enter or Ctrl+Enter, cancel via Escape, useReducedMotion-aware expand/collapse animation using Framer Motion AnimatePresence, empty state placeholder 'Add notes...', and optional onBodyEditModeChange callback for parent component coordination. Exported Textarea from ui/index.ts. Installed react-markdown (^10.1.0) and dnd-kit packages (@dnd-kit/core ^6.3.1, @dnd-kit/sortable ^10.0.0, @dnd-kit/utilities ^3.2.2) as per design doc package list. Component integrates with taskStore.updateTask for persistence and resets draft on task change or edit cancel.\n</info added on 2026-02-15T20:29:36.513Z>",
+            "status": "done",
             "testStrategy": "Render TaskBody with markdown containing headers, lists, and code blocks. Verify proper rendering. Click to expand and verify smooth animation. Enter edit mode, modify content, save, and verify persistence. Test escape key cancels edit. Verify empty state displays correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T20:29:43.676Z"
           },
           {
             "id": 5,
@@ -487,9 +491,10 @@
               3
             ],
             "details": "Create src/renderer/hooks/useTaskListKeyboard.ts implementing:\n1. Keydown handling on task list container\n2. Up/Down arrows move focus between TaskItems using focusedIndex\n3. Enter toggles expansion/open for focused task\n4. T toggles today flag on focused task\n5. Escape clears focus/collapses expanded content\n6. Tab follows natural focus order\n7. Use roving tabindex and visible focus rings\n\nHandle edge cases: boundaries, empty list, and edit mode inside expanded TaskBody.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Focus task list and press Down arrow 3 times - verify focus moves to 4th item. Press Up - verify focus moves up. Press Enter - verify task expands. Press T - verify today flag toggles. Tab through list - verify logical order. Test with screen reader to verify announcements.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T20:36:40.524Z"
           },
           {
             "id": 6,
@@ -498,15 +503,17 @@
             "dependencies": [
               3
             ],
-            "details": "Create src/renderer/components/tasks/InlineTaskInput.tsx implementing: 1) Compact input field that appears at bottom of ProjectGroup when expanded, 2) '+ Add subtask' button/text that reveals input on click, 3) Input component from @guestroom/ui with placeholder 'Add subtask...', 4) Auto-focus when input appears, 5) Enter key creates task with parentId automatically set from ProjectGroup context, 6) Escape key or blur hides input and clears value, 7) Immediate Zustand store update and SQLite persistence via IPC, 8) Optimistic UI update showing new task immediately. Props should include parentId, onTaskCreated callback. Keep input minimal - just title, inherit project/priority from parent.",
-            "status": "pending",
+            "details": "Create src/renderer/components/tasks/InlineTaskInput.tsx implementing: 1) Compact input field that appears at bottom of ProjectGroup when expanded, 2) '+ Add subtask' button/text that reveals input on click, 3) Input component from @guestroom/ui with placeholder 'Add subtask...', 4) Auto-focus when input appears, 5) Enter key creates task with parentId automatically set from ProjectGroup context, 6) Escape key or blur hides input and clears value, 7) Immediate Zustand store update and SQLite persistence via IPC, 8) Optimistic UI update showing new task immediately. Props should include parentId, onTaskCreated callback. Keep input minimal - just title, inherit project/priority from parent.\n<info added on 2026-02-15T20:39:00.546Z>\nImplementation complete at flusk/src/renderer/components/tasks/InlineTaskInput.tsx. Component structure: collapsed trigger button with Plus icon and 'Add subtask' label; expanded Input (from @guestroom/ui) with auto-focus via useRef/useEffect. State management: isOpen boolean controls collapsed/expanded, title stores input value, isCreating prevents double-submit. Key handlers: Enter calls handleSubmit which validates non-empty title, sets isCreating true, calls taskStore.createTask with { title, parentId, status: 'active', priority: 'none' }, then resets state on success; Escape clears title and collapses; blur collapses only when input is empty. Visual: 8-unit height (h-8), text-xs sizing, disabled state shows 'Creating...' placeholder. All requirements met: quick inline add, parentId inheritance, optimistic UX with loading state.\n</info added on 2026-02-15T20:39:00.546Z>",
+            "status": "done",
             "testStrategy": "Click '+ Add subtask' in ProjectGroup - verify input appears and is focused. Type title and press Enter - verify task appears in subtask list with correct parentId. Press Escape - verify input hides without creating task. Create task and verify it persists after app refresh.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T20:40:05.476Z"
           }
         ],
         "complexity": 8,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: 1) Create TaskItem component with 44px rows, checkbox animations, priority borders, and hover states, 2) Implement TaskList with dnd-kit DndContext and SortableContext for reordering, 3) Build ProjectGroup component with collapsible subtasks and progress indicators, 4) Create TaskBody with markdown rendering (react-markdown) and expand/collapse animations, 5) Implement keyboard navigation (Up/Down/Enter/T) with focus management, 6) Create InlineTaskInput for quick subtask creation. Focus on dnd-kit integration with Zustand state."
+        "expansionPrompt": "Break down into: 1) Create TaskItem component with 44px rows, checkbox animations, priority borders, and hover states, 2) Implement TaskList with dnd-kit DndContext and SortableContext for reordering, 3) Build ProjectGroup component with collapsible subtasks and progress indicators, 4) Create TaskBody with markdown rendering (react-markdown) and expand/collapse animations, 5) Implement keyboard navigation (Up/Down/Enter/T) with focus management, 6) Create InlineTaskInput for quick subtask creation. Focus on dnd-kit integration with Zustand state.",
+        "updatedAt": "2026-02-15T20:40:05.476Z"
       },
       {
         "id": "13",
@@ -1096,9 +1103,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T19:56:20.388Z",
+      "lastModified": "2026-02-15T20:40:05.477Z",
       "taskCount": 13,
-      "completedCount": 6,
+      "completedCount": 7,
       "tags": [
         "master"
       ]

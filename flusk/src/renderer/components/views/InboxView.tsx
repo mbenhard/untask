@@ -1,16 +1,31 @@
+import { useMemo } from 'react';
+
 import type { Task } from '../../../types/models';
 
+import { TaskList } from '../tasks/TaskList';
+
 type InboxViewProps = {
-  tasks: Task[];
+  allTasks: Task[];
   isLoading: boolean;
   error: string | null;
 };
 
 export const InboxView = ({
-  tasks,
+  allTasks,
   isLoading,
   error,
 }: InboxViewProps): JSX.Element => {
+  const inboxTasks = useMemo(
+    () =>
+      allTasks.filter(
+        (task) =>
+          task.status === 'inbox' &&
+          task.parentId === null &&
+          task.today !== true,
+      ),
+    [allTasks],
+  );
+
   return (
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -24,23 +39,14 @@ export const InboxView = ({
           </p>
         ) : null}
 
-        {!isLoading && tasks.length === 0 ? (
-          <div className="grid min-h-44 place-items-center rounded-lg border border-dashed border-border bg-card/40">
-            <p className="text-sm text-muted-foreground">Inbox is empty.</p>
-          </div>
-        ) : null}
-
-        {tasks.length > 0 ? (
-          <ul className="space-y-2">
-            {tasks.map((task) => (
-              <li
-                key={task.id}
-                className="rounded-lg border border-border bg-card/60 px-3 py-2"
-              >
-                <p className="text-sm text-foreground">{task.title}</p>
-              </li>
-            ))}
-          </ul>
+        {!isLoading ? (
+          <TaskList
+            tasks={inboxTasks}
+            allTasks={allTasks}
+            emptyMessage="Inbox is empty."
+            ariaLabel="Inbox tasks"
+            scopeId="inbox"
+          />
         ) : null}
       </div>
     </div>

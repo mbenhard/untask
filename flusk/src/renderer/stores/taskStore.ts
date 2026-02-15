@@ -322,10 +322,14 @@ export const selectTasks = (s: TaskStore) => s.tasks;
 export const selectSelectedTask = (s: TaskStore) =>
   s.tasks.find((t) => t.id === s.selectedTaskId) ?? null;
 export const selectTodayTasks = (s: TaskStore) =>
-  s.tasks.filter((t) => t.today && t.status !== 'done');
+  s.tasks.filter((t) => t.today === true && t.status !== 'done');
 export const selectProjectTasks = (s: TaskStore) =>
-  s.tasks.filter((t) => t.parentId === null && t.status !== 'inbox');
+  s.tasks.filter(
+    (t) => t.parentId === null && t.status !== 'inbox' && t.status !== 'done',
+  );
 export const selectInboxTasks = (s: TaskStore) =>
-  s.tasks.filter((t) => t.status === 'inbox');
+  s.tasks.filter(
+    (t) => t.status === 'inbox' && t.parentId === null && t.today !== true,
+  );
 export const selectIsLoading = (s: TaskStore) => s.isLoading;
 export const selectError = (s: TaskStore) => s.error;

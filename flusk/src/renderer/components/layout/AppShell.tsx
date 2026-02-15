@@ -123,23 +123,15 @@ export const AppShell = (): JSX.Element => {
       };
 
   const activeViewComponent = useMemo((): JSX.Element => {
-    const todayTasks = tasks.filter((task) => task.today && task.status !== 'done');
-    const projectTasks = tasks.filter(
-      (task) => task.parentId === null && task.status !== 'inbox',
-    );
-    const inboxTasks = tasks.filter((task) => task.status === 'inbox');
-
     if (activeView === 'today') {
-      return <TodayView tasks={todayTasks} isLoading={isLoading} error={error} />;
+      return <TodayView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
 
     if (activeView === 'projects') {
-      return (
-        <ProjectsView tasks={projectTasks} isLoading={isLoading} error={error} />
-      );
+      return <ProjectsView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
 
-    return <InboxView tasks={inboxTasks} isLoading={isLoading} error={error} />;
+    return <InboxView allTasks={tasks} isLoading={isLoading} error={error} />;
   }, [activeView, error, isLoading, tasks]);
 
   return (

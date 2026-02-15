@@ -1,0 +1,270 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  type DragStartEvent,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+
+import type { Task } from '../../../types/models';
+import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
+import { cn } from '../../lib/utils';
+import { useTaskStore } from '../../stores/taskStore';
+import { TaskItem } from './TaskItem';
+
+export interface TaskListProps {
+  tasks: Task[];
+  allTasks: Task[];
+  emptyMessage: string;
+  emptyAction?: string;
+  ariaLabel: string;
+  scopeId: string;
+  indentPx?: number;
+}
+
+const reconcileScopedReorder = (
+  globalIds: string[],
+  scopedIds: string[],
+  reorderedScopedIds: string[],
+): string[] => {
+  if (scopedIds.length === 0) {
+    return globalIds;
+  }
+
+  const scopedSet = new Set(scopedIds);
+  let reorderedIndex = 0;
+
+  return globalIds.map((id) => {
+    if (!scopedSet.has(id)) {
+      return id;
+    }
+
+    const nextId = reorderedScopedIds[reorderedIndex];
+    reorderedIndex += 1;
+    return nextId ?? id;
+  });
+};
+
+export const TaskList = ({
+  tasks,
+  allTasks,
+  emptyMessage,
+  emptyAction,
+  ariaLabel,
+  scopeId,
+  indentPx = 0,
+}: TaskListProps): JSX.Element => {
+  const completeTask = useTaskStore((state) => state.completeTask);
+  const toggleToday = useTaskStore((state) => state.toggleToday);
+  const reorderTasks = useTaskStore((state) => state.reorderTasks);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [isAnyBodyEditing, setIsAnyBodyEditing] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
+  const activeDragTask = useMemo(
+    () => tasks.find((task) => task.id === activeDragId) ?? null,
+    [activeDragId, tasks],
+  );
+
+  useEffect(() => {
+    setFocusedIndex((previous) => {
+      if (tasks.length === 0) {
+        return 0;
+      }
+      return Math.min(previous, tasks.length - 1);
+    });
+  }, [tasks.length]);
+
+  useEffect(() => {
+    if (expandedTaskId && !taskIds.includes(expandedTaskId)) {
+      setExpandedTaskId(null);
+      setIsAnyBodyEditing(false);
+    }
+  }, [expandedTaskId, taskIds]);
+
+  useEffect(() => {
+    const focusedTaskId = tasks[focusedIndex]?.id;
+    if (!focusedTaskId) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    const container = containerRef.current;
+    if (!container || !activeElement || !container.contains(activeElement)) {
+      return;
+    }
+
+    const nextFocused = container.querySelector<HTMLElement>(
+      `[data-task-id="${focusedTaskId}"]`,
+    );
+    if (nextFocused && nextFocused !== activeElement) {
+      nextFocused.focus();
+    }
+  }, [focusedIndex, tasks]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleToggleExpand = useCallback((taskId: string): void => {
+    setExpandedTaskId((current) => (current === taskId ? null : taskId));
+    setIsAnyBodyEditing(false);
+  }, []);
+
+  const handleComplete = useCallback(
+    (taskId: string): void => {
+      void completeTask(taskId);
+      if (expandedTaskId === taskId) {
+        setExpandedTaskId(null);
+      }
+    },
+    [completeTask, expandedTaskId],
+  );
+
+  const handleToggleToday = useCallback(
+    (taskId: string): void => {
+      void toggleToday(taskId);
+    },
+    [toggleToday],
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent): void => {
+    setActiveDragId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent): void => {
+      setActiveDragId(null);
+
+      const { active, over } = event;
+      if (!over) {
+        return;
+      }
+
+      const activeId = String(active.id);
+      const overId = String(over.id);
+      if (activeId === overId) {
+        return;
+      }
+
+      const oldIndex = taskIds.indexOf(activeId);
+      const newIndex = taskIds.indexOf(overId);
+      if (oldIndex < 0 || newIndex < 0) {
+        // Cross-scope drag and unknown IDs are intentionally ignored.
+        return;
+      }
+
+      const reorderedScopedIds = arrayMove(taskIds, oldIndex, newIndex);
+      const fullOrderedIds = reconcileScopedReorder(
+        allTasks.map((task) => task.id),
+        taskIds,
+        reorderedScopedIds,
+      );
+
+      setFocusedIndex(newIndex);
+      void reorderTasks(fullOrderedIds);
+    },
+    [allTasks, reorderTasks, taskIds],
+  );
+
+  const onKeyDown = useTaskListKeyboard({
+    tasks,
+    focusedIndex,
+    onFocusedIndexChange: setFocusedIndex,
+    expandedTaskId,
+    onToggleExpand: handleToggleExpand,
+    onToggleToday: handleToggleToday,
+    isAnyBodyEditing,
+    isDragActive: activeDragId !== null,
+    containerRef,
+  });
+
+  if (tasks.length === 0) {
+    return (
+      <div className="grid min-h-44 place-items-center rounded-lg border border-dashed border-border bg-card/40 px-4 text-center">
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          {emptyAction ? (
+            <p className="text-xs text-muted-foreground">{emptyAction}</p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={indentPx > 0 ? { paddingLeft: indentPx } : undefined}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDragId(null)}
+      >
+        <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+          <div
+            ref={containerRef}
+            role="listbox"
+            aria-label={ariaLabel}
+            aria-describedby={`${scopeId}-hint`}
+            tabIndex={0}
+            onKeyDown={onKeyDown}
+            className="space-y-2 outline-none"
+          >
+            <p id={`${scopeId}-hint`} className="sr-only">
+              Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
+              Press T to toggle today.
+            </p>
+            {tasks.map((task, index) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                isExpanded={expandedTaskId === task.id}
+                isFocused={focusedIndex === index}
+                onToggleExpand={handleToggleExpand}
+                onComplete={handleComplete}
+                onToggleToday={handleToggleToday}
+                onBodyEditModeChange={setIsAnyBodyEditing}
+                onFocus={() => setFocusedIndex(index)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+
+        <DragOverlay>
+          {activeDragTask ? (
+            <div
+              className={cn(
+                'min-h-11 rounded-md border border-border bg-card/95 px-3 py-2 shadow-xl',
+                'text-sm text-foreground',
+              )}
+            >
+              {activeDragTask.title}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
+  );
+};

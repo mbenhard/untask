@@ -1,0 +1,108 @@
+import { useCallback, type KeyboardEvent, type RefObject } from 'react';
+
+import type { Task } from '../../types/models';
+
+type UseTaskListKeyboardOptions = {
+  tasks: Task[];
+  focusedIndex: number;
+  onFocusedIndexChange: (index: number) => void;
+  expandedTaskId: string | null;
+  onToggleExpand: (id: string) => void;
+  onToggleToday: (id: string) => void;
+  isAnyBodyEditing: boolean;
+  isDragActive: boolean;
+  containerRef: RefObject<HTMLDivElement | null>;
+};
+
+const isTextInputElement = (element: Element | null): boolean => {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    element.tagName === 'INPUT' ||
+    element.tagName === 'TEXTAREA' ||
+    element.isContentEditable
+  );
+};
+
+export const useTaskListKeyboard = ({
+  tasks,
+  focusedIndex,
+  onFocusedIndexChange,
+  expandedTaskId,
+  onToggleExpand,
+  onToggleToday,
+  isAnyBodyEditing,
+  isDragActive,
+  containerRef,
+}: UseTaskListKeyboardOptions) =>
+  useCallback(
+    (event: KeyboardEvent<HTMLDivElement>): void => {
+      if (tasks.length === 0) {
+        return;
+      }
+
+      if (isDragActive || isAnyBodyEditing) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (isTextInputElement(document.activeElement)) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        onFocusedIndexChange(Math.min(focusedIndex + 1, tasks.length - 1));
+        return;
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        onFocusedIndexChange(Math.max(focusedIndex - 1, 0));
+        return;
+      }
+
+      const focusedTask = tasks[focusedIndex];
+      if (!focusedTask) {
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        onToggleExpand(focusedTask.id);
+        return;
+      }
+
+      if (event.key.toLowerCase() === 't') {
+        event.preventDefault();
+        onToggleToday(focusedTask.id);
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (expandedTaskId) {
+          onToggleExpand(expandedTaskId);
+          return;
+        }
+
+        containerRef.current?.blur();
+      }
+    },
+    [
+      tasks,
+      isDragActive,
+      isAnyBodyEditing,
+      onFocusedIndexChange,
+      focusedIndex,
+      onToggleExpand,
+      onToggleToday,
+      expandedTaskId,
+      containerRef,
+    ],
+  );

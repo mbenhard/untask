@@ -1,18 +1,26 @@
+import { useMemo } from 'react';
+
 import type { Task } from '../../../types/models';
 
 import { LiveThought } from '../layout/LiveThought';
+import { TaskList } from '../tasks/TaskList';
 
 type TodayViewProps = {
-  tasks: Task[];
+  allTasks: Task[];
   isLoading: boolean;
   error: string | null;
 };
 
 export const TodayView = ({
-  tasks,
+  allTasks,
   isLoading,
   error,
 }: TodayViewProps): JSX.Element => {
+  const todayTasks = useMemo(
+    () => allTasks.filter((task) => task.today === true && task.status !== 'done'),
+    [allTasks],
+  );
+
   return (
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -28,25 +36,15 @@ export const TodayView = ({
           </p>
         ) : null}
 
-        {!isLoading && tasks.length === 0 ? (
-          <div className="grid min-h-44 place-items-center rounded-lg border border-dashed border-border bg-card/40">
-            <p className="text-sm text-muted-foreground">
-              Nothing planned. Ask AI to suggest your day.
-            </p>
-          </div>
-        ) : null}
-
-        {tasks.length > 0 ? (
-          <ul className="space-y-2">
-            {tasks.map((task) => (
-              <li
-                key={task.id}
-                className="rounded-lg border border-border bg-card/60 px-3 py-2"
-              >
-                <p className="text-sm text-foreground">{task.title}</p>
-              </li>
-            ))}
-          </ul>
+        {!isLoading ? (
+          <TaskList
+            tasks={todayTasks}
+            allTasks={allTasks}
+            emptyMessage="Nothing planned for today."
+            emptyAction="Ask AI to suggest your day."
+            ariaLabel="Today tasks"
+            scopeId="today"
+          />
         ) : null}
       </div>
     </div>
