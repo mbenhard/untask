@@ -11,6 +11,18 @@ import type {
   ProactiveTriggerRequest,
   ProactiveTriggerResult,
 } from './assistant';
+import type {
+  ChatModelCatalogEntry,
+  ChatRetentionPayload,
+  ChatSendRequestPayload,
+  ChatSendResultPayload,
+  ChatSelectedModelPayload,
+  ChatSetModelPayload,
+  ChatSetRetentionPayload,
+  ChatStreamEvent,
+  ChatUndoRequestPayload,
+  ChatUndoResultPayload,
+} from './chat';
 
 export const IPC_CHANNELS = {
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
@@ -30,8 +42,15 @@ export const IPC_CHANNELS = {
   TASK_COMPLETE: 'task:complete',
   TASK_TOGGLE_TODAY: 'task:toggle-today',
   CHAT_SEND: 'chat:send',
+  CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_HISTORY: 'chat:history',
   CHAT_CLEAR: 'chat:clear',
+  CHAT_GET_MODELS: 'chat:get-models',
+  CHAT_GET_SELECTED_MODEL: 'chat:get-selected-model',
+  CHAT_SET_SELECTED_MODEL: 'chat:set-selected-model',
+  CHAT_UNDO_LAST_ACTION: 'chat:undo-last-action',
+  CHAT_GET_RETENTION_MODE: 'chat:get-retention-mode',
+  CHAT_SET_RETENTION_MODE: 'chat:set-retention-mode',
   SCRATCHPAD_GET: 'scratchpad:get',
   SCRATCHPAD_SAVE: 'scratchpad:save',
   SETTINGS_GET: 'settings:get',
@@ -59,3 +78,14 @@ export type ChatKernelStatusResultPayload = IdentityKernelStatus;
 export type ChatKernelOrchestrationRequestPayload =
   ChatKernelOrchestrationRequest;
 export type ChatKernelOrchestrationResultPayload = ChatKernelOrchestrationResult;
+
+export type ChatSendRequest = ChatSendRequestPayload;
+export type ChatSendResult = ChatSendResultPayload;
+export type ChatStreamEventPayload = ChatStreamEvent;
+export type ChatModelCatalogResult = ChatModelCatalogEntry[];
+export type ChatSelectedModelResult = ChatSelectedModelPayload;
+export type ChatSetModelRequest = ChatSetModelPayload;
+export type ChatUndoRequest = ChatUndoRequestPayload;
+export type ChatUndoResult = ChatUndoResultPayload;
+export type ChatRetentionResult = ChatRetentionPayload;
+export type ChatSetRetentionRequest = ChatSetRetentionPayload;

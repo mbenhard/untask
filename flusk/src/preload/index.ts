@@ -1,9 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import {
+  type ChatModelCatalogResult,
   type ChatKernelOrchestrationRequestPayload,
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
+  type ChatRetentionResult,
+  type ChatSelectedModelResult,
+  type ChatSendRequest,
+  type ChatSendResult,
+  type ChatSetModelRequest,
+  type ChatSetRetentionRequest,
+  type ChatStreamEventPayload,
+  type ChatUndoRequest,
+  type ChatUndoResult,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -65,10 +75,38 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_TOGGLE_TODAY, id),
   },
   chat: {
-    send: (message: { content: string; toolCalls?: string }) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SEND, { role: 'user', ...message }),
+    send: (message: ChatSendRequest): Promise<ChatSendResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SEND, message),
+    onStreamEvent: (
+      listener: (event: ChatStreamEventPayload) => void,
+    ): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, payload: ChatStreamEventPayload) =>
+        listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.CHAT_STREAM_EVENT, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.CHAT_STREAM_EVENT, wrapped);
+      };
+    },
     history: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_HISTORY),
     clear: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CLEAR),
+    getModels: (): Promise<ChatModelCatalogResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_MODELS),
+    getSelectedModel: (): Promise<ChatSelectedModelResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_SELECTED_MODEL),
+    setSelectedModel: (
+      payload: ChatSetModelRequest,
+    ): Promise<ChatSelectedModelResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SET_SELECTED_MODEL, payload),
+    undoLastAction: (payload?: ChatUndoRequest): Promise<ChatUndoResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_UNDO_LAST_ACTION, payload),
+    getRetentionMode: (): Promise<ChatRetentionResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_RETENTION_MODE),
+    setRetentionMode: (
+      payload: ChatSetRetentionRequest,
+    ): Promise<ChatRetentionResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SET_RETENTION_MODE, payload),
   },
   scratchpad: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SCRATCHPAD_GET),

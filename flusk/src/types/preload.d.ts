@@ -1,7 +1,17 @@
 import type {
+  ChatModelCatalogResult,
   ChatKernelOrchestrationRequestPayload,
   ChatKernelOrchestrationResultPayload,
   ChatKernelStatusResultPayload,
+  ChatRetentionResult,
+  ChatSelectedModelResult,
+  ChatSendRequest,
+  ChatSendResult,
+  ChatSetModelRequest,
+  ChatSetRetentionRequest,
+  ChatStreamEventPayload,
+  ChatUndoRequest,
+  ChatUndoResult,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   MemoryPromotionConfirmRequestPayload,
@@ -46,9 +56,18 @@ export type FluskApi = {
     toggleToday: (id: string) => Promise<Task>;
   };
   chat: {
-    send: (message: { content: string; toolCalls?: string }) => Promise<ChatMessage>;
+    send: (message: ChatSendRequest) => Promise<ChatSendResult>;
+    onStreamEvent: (
+      listener: (event: ChatStreamEventPayload) => void,
+    ) => () => void;
     history: () => Promise<ChatMessage[]>;
     clear: () => Promise<void>;
+    getModels: () => Promise<ChatModelCatalogResult>;
+    getSelectedModel: () => Promise<ChatSelectedModelResult>;
+    setSelectedModel: (payload: ChatSetModelRequest) => Promise<ChatSelectedModelResult>;
+    undoLastAction: (payload?: ChatUndoRequest) => Promise<ChatUndoResult>;
+    getRetentionMode: () => Promise<ChatRetentionResult>;
+    setRetentionMode: (payload: ChatSetRetentionRequest) => Promise<ChatRetentionResult>;
   };
   scratchpad: {
     get: () => Promise<Scratchpad>;

@@ -1,8 +1,8 @@
-import { eq, asc, isNull, and, inArray, type SQL } from 'drizzle-orm';
+import { eq, asc, desc, isNull, and, inArray, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '../db';
-import { tasks, taskEvents, type Task, type NewTask } from '../db/schema';
+import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
 
 // ─── Validation schemas ─────────────────────────────────────
 export const createTaskSchema = z.object({
@@ -34,16 +34,45 @@ function logTaskEvent(
   source: 'user' | 'ai',
   before: Task | null,
   after: Task | null,
-): void {
+): TaskEvent {
   const db = getDb();
-  db.insert(taskEvents).values({
+  const [created] = db.insert(taskEvents).values({
     taskId,
     action,
     source,
     before: before ? JSON.stringify(before) : null,
     after: after ? JSON.stringify(after) : null,
-  }).run();
+  }).returning().all();
+  return created;
 }
+
+const parseTaskSnapshot = (snapshot: string | null): Task | null => {
+  if (!snapshot) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(snapshot) as Task;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const updateTaskFromSnapshot = (id: string, snapshot: Task): Task => {
+  const db = getDb();
+  const { id: snapshotId, ...restoredValues } = snapshot;
+  void snapshotId;
+
+  const [updated] = db
+    .update(tasks)
+    .set(restoredValues)
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+
+  return updated;
+};
 
 export function listTasks(filter?: {
   status?: 'inbox' | 'active' | 'in_progress' | 'done';
@@ -73,6 +102,163 @@ export function listTasks(filter?: {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(tasks.order))
     .all();
+}
+
+export function getTaskById(id: string): Task | null {
+  const db = getDb();
+  const [row] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  return row ?? null;
+}
+
+export function getLastTaskEventForTask(taskId: string): TaskEvent | null {
+  const db = getDb();
+  const [row] = db
+    .select()
+    .from(taskEvents)
+    .where(eq(taskEvents.taskId, taskId))
+    .orderBy(desc(taskEvents.createdAt))
+    .all();
+  return row ?? null;
+}
+
+export function getLastAiTaskEvent(): TaskEvent | null {
+  const db = getDb();
+  const [row] = db
+    .select()
+    .from(taskEvents)
+    .where(eq(taskEvents.source, 'ai'))
+    .orderBy(desc(taskEvents.createdAt))
+    .all();
+  return row ?? null;
+}
+
+export type UndoTaskEventResult = {
+  undone: boolean;
+  targetTaskId: string;
+  originalEventId: string;
+  originalAction: TaskEvent['action'];
+  undoEventId?: string;
+  reason?: string;
+};
+
+export function undoTaskEvent(
+  eventId: string,
+  source: 'user' | 'ai' = 'user',
+): UndoTaskEventResult {
+  const db = getDb();
+  const [targetEvent] = db
+    .select()
+    .from(taskEvents)
+    .where(eq(taskEvents.id, eventId))
+    .all();
+
+  if (!targetEvent) {
+    throw new Error(`Task event not found: ${eventId}`);
+  }
+
+  const before = parseTaskSnapshot(targetEvent.before);
+  const after = parseTaskSnapshot(targetEvent.after);
+
+  if (targetEvent.action === 'create') {
+    const existing = getTaskById(targetEvent.taskId);
+    if (!existing) {
+      return {
+        undone: false,
+        targetTaskId: targetEvent.taskId,
+        originalEventId: targetEvent.id,
+        originalAction: targetEvent.action,
+        reason: 'Task no longer exists.',
+      };
+    }
+
+    db.delete(tasks).where(eq(tasks.id, targetEvent.taskId)).run();
+    const undoEvent = logTaskEvent(
+      targetEvent.taskId,
+      'delete',
+      source,
+      existing,
+      null,
+    );
+
+    return {
+      undone: true,
+      targetTaskId: targetEvent.taskId,
+      originalEventId: targetEvent.id,
+      originalAction: targetEvent.action,
+      undoEventId: undoEvent.id,
+    };
+  }
+
+  if (targetEvent.action === 'delete') {
+    if (!before) {
+      throw new Error(`Cannot undo delete event ${eventId}: missing before snapshot.`);
+    }
+
+    const existing = getTaskById(targetEvent.taskId);
+    const restored = existing
+      ? updateTaskFromSnapshot(targetEvent.taskId, before)
+      : db
+          .insert(tasks)
+          .values(before as NewTask)
+          .returning()
+          .all()[0];
+
+    const undoEvent = logTaskEvent(
+      targetEvent.taskId,
+      'create',
+      source,
+      existing,
+      restored,
+    );
+
+    return {
+      undone: true,
+      targetTaskId: targetEvent.taskId,
+      originalEventId: targetEvent.id,
+      originalAction: targetEvent.action,
+      undoEventId: undoEvent.id,
+    };
+  }
+
+  if (!before) {
+    throw new Error(`Cannot undo event ${eventId}: missing before snapshot.`);
+  }
+
+  const existing = getTaskById(targetEvent.taskId);
+  const restored = existing
+    ? updateTaskFromSnapshot(targetEvent.taskId, before)
+    : db
+        .insert(tasks)
+        .values(before as NewTask)
+        .returning()
+        .all()[0];
+
+  const undoEvent = logTaskEvent(
+    targetEvent.taskId,
+    'update',
+    source,
+    existing ?? after,
+    restored,
+  );
+
+  return {
+    undone: true,
+    targetTaskId: targetEvent.taskId,
+    originalEventId: targetEvent.id,
+    originalAction: targetEvent.action,
+    undoEventId: undoEvent.id,
+  };
+}
+
+export function undoLastAiTaskEvent(
+  source: 'user' | 'ai' = 'user',
+): UndoTaskEventResult | null {
+  const latestAiEvent = getLastAiTaskEvent();
+  if (!latestAiEvent) {
+    return null;
+  }
+
+  return undoTaskEvent(latestAiEvent.id, source);
 }
 
 export function createTask(

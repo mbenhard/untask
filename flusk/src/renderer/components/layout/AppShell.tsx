@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { MessageSquareText } from 'lucide-react';
 
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import {
@@ -18,6 +17,8 @@ import {
   selectTasks,
   useTaskStore,
 } from '../../stores/taskStore';
+import { useChatStore } from '../../stores/chatStore';
+import { ChatView } from '../chat/ChatView';
 import { InboxView } from '../views/InboxView';
 import { ProjectsView } from '../views/ProjectsView';
 import { TodayView } from '../views/TodayView';
@@ -36,34 +37,6 @@ const getDirection = (activeView: AppView, previousViewIndex: number): number =>
   return activeViewIndex > previousViewIndex ? 1 : -1;
 };
 
-type ChatConversationPlaceholderProps = {
-  draft: string;
-};
-
-const ChatConversationPlaceholder = ({
-  draft,
-}: ChatConversationPlaceholderProps): JSX.Element => {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-      <div className="rounded-xl border border-border bg-card/60 p-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MessageSquareText className="size-4" />
-          Chat mode placeholder
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Conversation history and streaming responses will be integrated in Task 7.
-        </p>
-      </div>
-
-      {draft.trim().length > 0 ? (
-        <div className="ml-auto max-w-[85%] rounded-xl border border-border bg-secondary px-3 py-2">
-          <p className="text-sm text-foreground">{draft}</p>
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
 export const AppShell = (): JSX.Element => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [chatInputValue, setChatInputValue] = useState('');
@@ -76,10 +49,16 @@ export const AppShell = (): JSX.Element => {
   const tasks = useTaskStore(selectTasks);
   const isLoading = useTaskStore(selectIsLoading);
   const error = useTaskStore(selectError);
+  const initializeChat = useChatStore((state) => state.initialize);
+  const sendMessage = useChatStore((state) => state.sendMessage);
 
   useEffect(() => {
     void fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    void initializeChat();
+  }, [initializeChat]);
 
   const clearInput = useCallback(() => {
     setChatInputValue('');
@@ -92,12 +71,15 @@ export const AppShell = (): JSX.Element => {
   });
 
   const handleSubmit = useCallback(() => {
-    if (chatInputValue.trim().length === 0) {
+    const content = chatInputValue.trim();
+
+    if (content.length === 0) {
       return;
     }
 
     setChatInputValue('');
-  }, [chatInputValue]);
+    void sendMessage(content);
+  }, [chatInputValue, sendMessage]);
 
   const transitionDirection = useMemo(
     () => getDirection(activeView, previousViewIndex),
@@ -149,7 +131,7 @@ export const AppShell = (): JSX.Element => {
               transition={transition}
               className="h-full overflow-y-auto p-4"
             >
-              <ChatConversationPlaceholder draft={chatInputValue} />
+              <ChatView />
             </motion.section>
           ) : (
             <motion.section

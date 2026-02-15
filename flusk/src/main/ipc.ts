@@ -5,9 +5,18 @@ import type {
   AssistantMemorySnapshot,
 } from '../types/assistant';
 import {
+  type ChatModelCatalogResult,
   type ChatKernelOrchestrationRequestPayload,
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
+  type ChatRetentionResult,
+  type ChatSendRequest,
+  type ChatSendResult,
+  type ChatSelectedModelResult,
+  type ChatSetModelRequest,
+  type ChatSetRetentionRequest,
+  type ChatUndoRequest,
+  type ChatUndoResult,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -40,10 +49,19 @@ import {
   completeTask,
   toggleToday,
   reorderTasks,
+  undoLastAiTaskEvent,
+  undoTaskEvent,
 } from './services/taskService';
-import { getChatHistory, saveChatMessage, clearChatHistory } from './services/chatService';
+import {
+  clearChatHistory,
+  getChatHistory,
+  getChatRetentionMode,
+  setChatRetentionMode,
+} from './services/chatService';
 import { getScratchpad, saveScratchpad } from './services/scratchpadService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
+import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
+import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
 
 const EMPTY_MEMORY: AssistantMemorySnapshot = {
   profile: '',
@@ -57,27 +75,8 @@ const EMPTY_LIVE_CONTEXT: AssistantLiveContext = {
 };
 
 type ChatSendInput = {
-  role: 'user' | 'assistant';
   content: string;
-  toolCalls?: string;
-};
-
-const assertKernelReadyForChatSend = async (
-  userMessage: string,
-): Promise<void> => {
-  const kernelResult = await orchestrateChatWithIdentityKernel({
-    userMessage,
-    memory: EMPTY_MEMORY,
-    liveContext: EMPTY_LIVE_CONTEXT,
-  });
-
-  if (!kernelResult.ok) {
-    throw new Error(
-      `Identity kernel unavailable for chat send: ${kernelResult.diagnostics.join(
-        '; ',
-      )}`,
-    );
-  }
+  modelId?: string | null;
 };
 
 export const registerIpcHandlers = (): void => {
@@ -192,16 +191,12 @@ export const registerIpcHandlers = (): void => {
   });
 
   // ─── Chat handlers ───────────────────────────────────────
-  ipcMain.handle(IPC_CHANNELS.CHAT_SEND, async (_event, message: ChatSendInput) => {
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_SEND,
+    async (event, message: ChatSendInput): Promise<ChatSendResult> => {
     try {
       if (!message || typeof message.content !== 'string') {
-        throw new Error('Invalid chat payload: expected { role, content }.');
-      }
-
-      if (message.role !== 'user') {
-        throw new Error(
-          'chat:send accepts only user-authored messages to prevent kernel bypass.',
-        );
+        throw new Error('Invalid chat payload: expected { content, modelId? }.');
       }
 
       const content = message.content.trim();
@@ -209,24 +204,134 @@ export const registerIpcHandlers = (): void => {
         throw new Error('Chat content cannot be empty.');
       }
 
-      await assertKernelReadyForChatSend(content);
-
-      return saveChatMessage({
-        role: 'user',
+      const payload: ChatSendRequest = {
         content,
-        toolCalls: message.toolCalls,
+        modelId: message.modelId,
+      };
+
+      return startChatTurn({
+        ...payload,
+        emit: (streamEvent): void => {
+          if (event.sender.isDestroyed()) {
+            return;
+          }
+
+          event.sender.send(IPC_CHANNELS.CHAT_STREAM_EVENT, streamEvent);
+        },
       });
     }
     catch (e) { console.error('[ipc] CHAT_SEND:', e); throw e; }
-  });
+    },
+  );
+
   ipcMain.handle(IPC_CHANNELS.CHAT_HISTORY, () => {
     try { return getChatHistory(); }
     catch (e) { console.error('[ipc] CHAT_HISTORY:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.CHAT_CLEAR, () => {
-    try { clearChatHistory(); }
+    try {
+      cancelActiveChatTurns();
+      clearChatHistory();
+    }
     catch (e) { console.error('[ipc] CHAT_CLEAR:', e); throw e; }
   });
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_GET_MODELS,
+    (): ChatModelCatalogResult => {
+      try {
+        const selectedModelId = getSelectedModelId();
+
+        return getModels().map((model) => ({
+          id: model.id,
+          label: model.label,
+          inputCostPerMillion: model.inputCostPerMillion,
+          outputCostPerMillion: model.outputCostPerMillion,
+          defaultSelected: model.defaultSelected,
+          selected: model.id === selectedModelId,
+        }));
+      }
+      catch (e) { console.error('[ipc] CHAT_GET_MODELS:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_GET_SELECTED_MODEL,
+    (): ChatSelectedModelResult => {
+      try {
+        return { modelId: getSelectedModelId() };
+      }
+      catch (e) { console.error('[ipc] CHAT_GET_SELECTED_MODEL:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_SET_SELECTED_MODEL,
+    (_event, request: ChatSetModelRequest): ChatSelectedModelResult => {
+      try {
+        if (!request || typeof request.modelId !== 'string') {
+          throw new Error('Invalid model selection payload.');
+        }
+
+        return { modelId: setSelectedModelId(request.modelId) };
+      }
+      catch (e) { console.error('[ipc] CHAT_SET_SELECTED_MODEL:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_UNDO_LAST_ACTION,
+    (_event, request?: ChatUndoRequest): ChatUndoResult => {
+      try {
+        const result = request?.taskEventId
+          ? undoTaskEvent(request.taskEventId, 'user')
+          : undoLastAiTaskEvent('user');
+
+        if (!result) {
+          return {
+            ok: true,
+            undone: false,
+            message: 'No AI action available to undo.',
+          };
+        }
+
+        return {
+          ok: true,
+          undone: result.undone,
+          message: result.undone
+            ? 'Undid AI action successfully.'
+            : (result.reason ?? 'No changes were made by undo.'),
+          targetTaskId: result.targetTaskId,
+          originalEventId: result.originalEventId,
+          undoEventId: result.undoEventId,
+        };
+      }
+      catch (e) { console.error('[ipc] CHAT_UNDO_LAST_ACTION:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_GET_RETENTION_MODE,
+    (): ChatRetentionResult => {
+      try {
+        return { mode: getChatRetentionMode() };
+      }
+      catch (e) { console.error('[ipc] CHAT_GET_RETENTION_MODE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_SET_RETENTION_MODE,
+    (_event, request: ChatSetRetentionRequest): ChatRetentionResult => {
+      try {
+        if (
+          !request ||
+          (request.mode !== 'session' &&
+            request.mode !== '30d' &&
+            request.mode !== 'forever')
+        ) {
+          throw new Error('Invalid chat retention mode payload.');
+        }
+
+        return { mode: setChatRetentionMode(request.mode) };
+      }
+      catch (e) { console.error('[ipc] CHAT_SET_RETENTION_MODE:', e); throw e; }
+    },
+  );
 
   // ─── Scratchpad handlers ─────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.SCRATCHPAD_GET, () => {
