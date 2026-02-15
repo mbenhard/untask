@@ -1,0 +1,109 @@
+{
+	"meta": {
+		"generatedAt": "2026-02-15T16:21:58.998Z",
+		"tasksAnalyzed": 12,
+		"totalTasks": 12,
+		"analysisCount": 12,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Initialize Electron Forge Project with Vite",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down the Electron Forge + Vite + React 19 initialization into: 1) Project scaffolding with electron-forge vite-typescript template, 2) Configuring frameless window with custom dimensions and LSUIElement for Dock hiding, 3) Setting up Vite with SWC and path aliases, 4) Creating the directory structure for main/renderer/preload processes, 5) TypeScript configuration with Electron types. Focus on macOS-specific configuration challenges.",
+			"reasoning": "Greenfield setup combining Electron Forge with Vite is well-documented but has several moving parts: frameless window configuration, hiding from Dock via Info.plist, React 19 compatibility, and path aliases. The native module rebuild setup for better-sqlite3 (Task 3) will build on this foundation. Not overly complex for someone experienced with Electron, but multiple configuration files need alignment."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Configure Tailwind v4 and shadcn/ui Design System",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: 1) Tailwind v4 installation with @tailwindcss/vite plugin and CSS-first configuration, 2) Custom theme tokens for dark/light modes with system preference detection, 3) shadcn/ui initialization with New York style and custom component paths, 4) Font setup (Inter) and animation libraries (Framer Motion, Lucide). Include testing theme switching functionality.",
+			"reasoning": "Tailwind v4's new CSS-first approach is straightforward, but integrating it with Vite in Electron requires attention. shadcn/ui initialization is wizard-based but needs custom path configuration for the project structure. The monochrome color palette is well-defined in the design doc. System theme detection adds minor complexity."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Implement SQLite Database with Drizzle ORM",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Install better-sqlite3 and configure electron-rebuild for native module compilation, 2) Define Drizzle schema for tasks table with all 16 fields including enums and references, 3) Define schemas for scratchpad, chat_messages, task_events, ai_journal, and settings tables, 4) Create database initialization with Application Support path handling, 5) Set up drizzle-kit migrations and auto-run on app start, 6) Create base IPC handlers structure for database operations. Focus on native module compilation challenges with Electron.",
+			"reasoning": "Native SQLite in Electron requires electron-rebuild which can be finicky. The schema is comprehensive (6 tables, 20+ fields total with enums, foreign keys, JSON columns). Database path handling for macOS Application Support, migrations setup, and IPC bridge for main process database access all add complexity. Self-referential foreign key (parentId) needs care."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Build Core Task Management State and IPC Layer",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Define TypeScript types for Task entity and API bridge in shared directory, 2) Create Zustand store with all task actions and view state, 3) Implement preload script with contextBridge exposing safe IPC methods, 4) Create main process IPC handlers wrapping Drizzle queries with mutation logging to task_events, 5) Implement optimistic updates pattern in Zustand store with rollback handling. Include type safety across process boundaries.",
+			"reasoning": "The IPC layer requires careful type management across main/renderer/preload boundaries. Zustand setup is straightforward, but optimistic updates with proper rollback are non-trivial. Logging all mutations to task_events for undo functionality adds complexity. The preload script security model (contextBridge) requires attention to avoid exposing unsafe APIs."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Implement Main UI Layout and View Navigation",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Create AppShell with frameless window chrome and draggable regions, 2) Implement custom traffic lights positioning and integration, 3) Build TitleBar with tab navigation and keyboard shortcuts (1/2/3), 4) Create ChatInput component with Cmd+K focus and chat mode transition trigger, 5) Implement view components (TodayView, ProjectsView, InboxView) with Framer Motion transitions, 6) Create LiveThought component with dismissal state and action buttons. Focus on Electron-specific window chrome behavior.",
+			"reasoning": "Custom traffic lights in frameless Electron windows require careful handling (CSS regions, native integration). The three-zone navigation is straightforward but the chat mode transition (task list slides up) involves coordinated Framer Motion animations. Keyboard shortcuts need proper focus management. The layered Escape behavior adds complexity."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Build Task List Components with Drag-and-Drop",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Create TaskItem component with 44px rows, checkbox animations, priority borders, and hover states, 2) Implement TaskList with dnd-kit DndContext and SortableContext for reordering, 3) Build ProjectGroup component with collapsible subtasks and progress indicators, 4) Create TaskBody with markdown rendering (react-markdown) and expand/collapse animations, 5) Implement keyboard navigation (Up/Down/Enter/T) with focus management, 6) Create InlineTaskInput for quick subtask creation. Focus on dnd-kit integration with Zustand state.",
+			"reasoning": "dnd-kit integration with Zustand requires careful state management during drag operations. The component tree is deep (TaskList > ProjectGroup > TaskItem > TaskBody). Markdown rendering with inline editing adds complexity. Keyboard navigation across expandable items needs proper focus handling. The checkbox completion animation coordinated with state changes requires attention."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Integrate AI Chat with Vercel AI SDK and OpenRouter",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break down into: 1) Set up OpenRouter provider with Vercel AI SDK using custom base URL, 2) Create model configuration for three models (minimax, kimi, glm) with selection logic, 3) Implement core AI tools (create_task, update_task, complete_task, delete_task, move_task, set_today), 4) Implement planning/parsing tools (suggest_daily_plan, parse_notes, undo_last_action), 5) Build dynamic system prompt context builder with token budgeting, 6) Create chat IPC handlers with streaming support, 7) Build ChatView component with streaming display and action cards, 8) Implement chat message persistence with retention policy. Focus on tool calling execution and error handling.",
+			"reasoning": "This is the most complex task. Tool calling requires implementing 15+ tools that mutate database state. The streaming chat UI needs to handle partial responses and inline action cards. The system prompt must dynamically inject relevant context while staying within token budget. IPC streaming from main to renderer process requires careful handling. Error handling for AI failures, tool execution failures, and network issues adds significant complexity."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Implement AI Memory System (Soul, Profile, Patterns, Journal)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Create memory storage functions for Soul, Profile, and Patterns in settings table, 2) Implement AI tools (update_user_profile, update_patterns, write_journal, read_journal), 3) Build context builder that selects relevant memory snippets within token budget, 4) Create weekly digest generation logic with scheduling, 5) Build SettingsMemory page with markdown editors and journal browser. Focus on memory retrieval relevance scoring.",
+			"reasoning": "The memory system extends Task 7's AI infrastructure. Storage is straightforward (settings table), but the context builder must intelligently select relevant snippets from potentially large memory stores. The weekly digest scheduling uses cron-like logic. The generate_live_thought tool must synthesize multiple inputs (time, tasks, patterns). Journal browser UI with filtering adds moderate complexity."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Build Menu Bar Integration and Global Shortcuts",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Create Tray with template icon and dynamic badge showing today count, 2) Implement global shortcuts (Cmd+Shift+Space, Cmd+Shift+A) with window toggle logic, 3) Create clipboard-aware capture with URL detection and AI title suggestion, 4) Implement window positioning (center on first summon, remember position), 5) Configure launch at login and single instance handling. Include click-outside-to-hide behavior.",
+			"reasoning": "macOS-specific tray functionality is well-documented in Electron. Global shortcuts require attention to conflicts with other apps. The badge updating in real-time requires IPC from renderer. Click-outside-to-hide needs blur event handling. Clipboard detection and AI title suggestion adds a small AI integration point. Overall moderately complex for macOS-focused developer."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Implement Scratchpad, Search, and Settings",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: 1) Create Scratchpad component with markdown editor and slide-up animation, 2) Implement 'Send to AI' functionality that triggers parse_notes tool, 3) Build SearchModal with full-text search across tasks (SQLite FTS or LIKE queries), 4) Create Settings page structure with tabbed sections, 5) Implement backup system (daily auto-backup, export/import with optional encryption), 6) Create settings IPC handlers and state persistence. Focus on search performance with large datasets.",
+			"reasoning": "Three distinct features combined. Scratchpad is straightforward with markdown editor integration. Search needs efficient querying (SQLite FTS5 or careful LIKE optimization). Settings page has many sections but each is relatively simple. Backup with encryption (passphrase-based AES) adds cryptographic complexity. The combination of features in one task increases scope."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Implement AI Autonomy Modes and Action Cards",
+			"complexityScore": 8,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Define action risk classification system (low/medium/high/critical) with rules, 2) Implement autonomy mode logic (manual/safe/autopilot) that gates AI tool execution, 3) Create ActionCard component with pending/executed/undone states and confirm/reject buttons, 4) Build ConfirmationDialog for high/critical actions, 5) Implement undo system using task_events snapshots with Cmd+Z integration. Focus on state machine for action lifecycle.",
+			"reasoning": "This requires modifying the AI tool execution flow from Task 7 to intercept actions based on risk level. The action lifecycle (pending -> confirmed -> executed or rejected) is a state machine. Undo via snapshots needs careful implementation to handle complex mutations. The UI components (ActionCard, ConfirmationDialog) are moderately complex. Integration with existing chat flow adds coupling."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Polish UI Animations and Accessibility",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: 1) Create centralized animation variants with consistent easing and reduced-motion support, 2) Implement remaining animations (checkbox fill, task creation fade, scratchpad slide), 3) Add comprehensive ARIA attributes (roles, states, live regions) across all components, 4) Implement focus management (traps, return focus, visible rings) and VoiceOver testing. Focus on prefers-reduced-motion handling.",
+			"reasoning": "Animations are well-specified in the design doc, making implementation straightforward. Accessibility work requires touching many existing components but changes are additive (ARIA attributes, focus handlers). VoiceOver testing is time-consuming but not technically complex. The task consolidates polishing work that should be done after core features are complete."
+		}
+	]
+}
