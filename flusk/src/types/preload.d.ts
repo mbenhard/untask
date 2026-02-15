@@ -46,7 +46,7 @@ export type FluskApi = {
     toggleToday: (id: string) => Promise<Task>;
   };
   chat: {
-    send: (message: { role: string; content: string; toolCalls?: string }) => Promise<ChatMessage>;
+    send: (message: { content: string; toolCalls?: string }) => Promise<ChatMessage>;
     history: () => Promise<ChatMessage[]>;
     clear: () => Promise<void>;
   };

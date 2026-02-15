@@ -65,8 +65,8 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_TOGGLE_TODAY, id),
   },
   chat: {
-    send: (message: { role: string; content: string; toolCalls?: string }) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SEND, message),
+    send: (message: { content: string; toolCalls?: string }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SEND, { role: 'user', ...message }),
     history: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_HISTORY),
     clear: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CLEAR),
   },

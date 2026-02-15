@@ -1,81 +1,130 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────
+   Light mode (default base for shadcn compat)
+   ────────────────────────────────────────────── */
 :root {
-  color-scheme: dark;
-  font-family:
-    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --background: #F5F5F5;
+  --foreground: #171717;
+  --card: #FFFFFF;
+  --card-foreground: #171717;
+  --popover: #FFFFFF;
+  --popover-foreground: #171717;
+  --primary: #262626;
+  --primary-foreground: #F5F5F5;
+  --secondary: #EFEFEF;
+  --secondary-foreground: #262626;
+  --muted: #EFEFEF;
+  --muted-foreground: #737373;
+  --accent: #EFEFEF;
+  --accent-foreground: #262626;
+  --destructive: #DC2626;
+  --destructive-foreground: #F5F5F5;
+  --border: #E5E5E5;
+  --input: #E5E5E5;
+  --ring: #737373;
+  --radius: 0.5rem;
 }
 
-* {
-  box-sizing: border-box;
+/* ──────────────────────────────────────────────
+   Dark mode (Flusk default)
+   ────────────────────────────────────────────── */
+.dark {
+  --background: #1A1A1A;
+  --foreground: #F5F5F5;
+  --card: #262626;
+  --card-foreground: #F5F5F5;
+  --popover: #262626;
+  --popover-foreground: #F5F5F5;
+  --primary: #E5E5E5;
+  --primary-foreground: #1A1A1A;
+  --secondary: #2E2E2E;
+  --secondary-foreground: #F5F5F5;
+  --muted: #2E2E2E;
+  --muted-foreground: #8A8A8A;
+  --accent: #2E2E2E;
+  --accent-foreground: #F5F5F5;
+  --destructive: #7F1D1D;
+  --destructive-foreground: #F5F5F5;
+  --border: #333333;
+  --input: #333333;
+  --ring: #8A8A8A;
 }
 
-html,
-body,
-#root {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  border-radius: 12px;
-  overflow: hidden;
-  background: transparent;
+/* ──────────────────────────────────────────────
+   Bridge CSS vars to Tailwind v4 theme tokens
+   ────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-window: 12px;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
 }
 
-.app-shell {
-  width: 100%;
-  height: 100%;
-  border: 1px solid #1e1e1e;
-  border-radius: 12px;
-  background: #0d0d0d;
-  color: #f2f2f2;
-  display: flex;
-  flex-direction: column;
+/* ──────────────────────────────────────────────
+   Base styles
+   ────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    border-radius: var(--radius-window);
+    background: transparent;
+  }
 }
 
+/* ──────────────────────────────────────────────
+   Electron window chrome
+   ────────────────────────────────────────────── */
 .drag-region {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border-bottom: 1px solid #1e1e1e;
-  background: #111111;
   -webkit-app-region: drag;
 }
 
 .no-drag {
   -webkit-app-region: no-drag;
-}
-
-.window-title {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #c8c8c8;
-}
-
-.window-context {
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  background: #1f1f1f;
-  color: #b2b2b2;
-}
-
-.app-content {
-  padding: 24px;
-  display: grid;
-  gap: 8px;
-}
-
-.app-content h1 {
-  margin: 0;
-  font-size: 24px;
-}
-
-.app-content p {
-  margin: 0;
-  color: #b2b2b2;
-}
-
-.status-row strong {
-  color: #f2f2f2;
 }

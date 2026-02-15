@@ -56,6 +56,30 @@ const EMPTY_LIVE_CONTEXT: AssistantLiveContext = {
   inboxCount: 0,
 };
 
+type ChatSendInput = {
+  role: 'user' | 'assistant';
+  content: string;
+  toolCalls?: string;
+};
+
+const assertKernelReadyForChatSend = async (
+  userMessage: string,
+): Promise<void> => {
+  const kernelResult = await orchestrateChatWithIdentityKernel({
+    userMessage,
+    memory: EMPTY_MEMORY,
+    liveContext: EMPTY_LIVE_CONTEXT,
+  });
+
+  if (!kernelResult.ok) {
+    throw new Error(
+      `Identity kernel unavailable for chat send: ${kernelResult.diagnostics.join(
+        '; ',
+      )}`,
+    );
+  }
+};
+
 export const registerIpcHandlers = (): void => {
   if (ipcMain.listenerCount(IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_STATE) > 0) {
     return;
@@ -168,8 +192,31 @@ export const registerIpcHandlers = (): void => {
   });
 
   // ─── Chat handlers ───────────────────────────────────────
-  ipcMain.handle(IPC_CHANNELS.CHAT_SEND, (_event, message) => {
-    try { return saveChatMessage(message); }
+  ipcMain.handle(IPC_CHANNELS.CHAT_SEND, async (_event, message: ChatSendInput) => {
+    try {
+      if (!message || typeof message.content !== 'string') {
+        throw new Error('Invalid chat payload: expected { role, content }.');
+      }
+
+      if (message.role !== 'user') {
+        throw new Error(
+          'chat:send accepts only user-authored messages to prevent kernel bypass.',
+        );
+      }
+
+      const content = message.content.trim();
+      if (content.length === 0) {
+        throw new Error('Chat content cannot be empty.');
+      }
+
+      await assertKernelReadyForChatSend(content);
+
+      return saveChatMessage({
+        role: 'user',
+        content,
+        toolCalls: message.toolCalls,
+      });
+    }
     catch (e) { console.error('[ipc] CHAT_SEND:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.CHAT_HISTORY, () => {
