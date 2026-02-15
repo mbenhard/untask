@@ -517,10 +517,11 @@
             "dependencies": [
               1
             ],
-            "details": "Create main-process context builder module with token budgeting and slice selection. Include timestamps, active tasks, overdue risk, and relevant memory snippets.",
-            "status": "pending",
+            "details": "Create main-process context builder module with token budgeting and slice selection. Include timestamps, active tasks, overdue risk, and relevant memory snippets.\n<info added on 2026-02-15T17:32:23.744Z>\nDeterministic identity context compiler at flusk/src/main/assistant/contextCompiler.ts. Loads SOUL.md and CHARTER.md from docs/assistant/ with fallback defaults. Compiles ordered sections: meta -> soul -> charter -> live-context -> request -> profile-snippets -> pattern-snippets -> journal-snippets. Token budgeting (default 1600) with slice selection using keyword overlap (request + task titles/clients) and journal recency scoring (exponential decay over 21 days). Live context builds active/overdue task slices (sorted by today flag, due date, priority), computes overdue risk signal (low/medium/high based on count, stale clients, value-at-risk thresholds). Types at flusk/src/types/assistant.ts (AssistantTaskSnapshot, AssistantMemorySnapshot, AssistantLiveContext, IdentityContextDebugSnapshot). IPC handler settings:get-identity-context-snapshot in src/main/ipc.ts exposes compiler via preload. Debug startup hook in src/main/index.ts via FLUSK_DEBUG_IDENTITY_CONTEXT=1. Validation: lint passes, tsc --noEmit passes, app launches, direct Node smoke test confirms deterministic section order.\n</info added on 2026-02-15T17:32:23.744Z>",
+            "status": "done",
             "testStrategy": "Enable debug snapshot for a request and verify expected sections and ordering in compiled context.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:32:32.328Z"
           },
           {
             "id": 3,
@@ -565,7 +566,7 @@
         "complexity": 8,
         "recommendedSubtasks": 5,
         "expansionPrompt": "Break down assistant identity kernel into: 1) Soul/Charter contracts, 2) identity-aware context compiler, 3) memory promotion/confirmation policy, 4) proactive policy trigger engine, 5) chat/tool orchestration gating. Focus on deterministic behavior and regression tests.",
-        "updatedAt": "2026-02-15T17:00:42.990Z"
+        "updatedAt": "2026-02-15T17:32:32.328Z"
       },
       {
         "id": "7",
@@ -1073,7 +1074,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T17:20:07.137Z",
+      "lastModified": "2026-02-15T17:32:32.328Z",
       "taskCount": 13,
       "completedCount": 1,
       "tags": [

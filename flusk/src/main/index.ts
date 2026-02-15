@@ -2,6 +2,10 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
+import {
+  compileIdentityContext,
+  loadIdentityContracts,
+} from './assistant/contextCompiler';
 import { registerIpcHandlers } from './ipc';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { setupTray } from './tray';
@@ -56,11 +60,38 @@ const bootstrap = (): void => {
   registerGlobalShortcuts(mainWindow);
 };
 
+const emitIdentityContextDebugSnapshot = async (): Promise<void> => {
+  if (process.env.FLUSK_DEBUG_IDENTITY_CONTEXT !== '1') {
+    return;
+  }
+
+  const contracts = await loadIdentityContracts(process.cwd());
+  const snapshot = compileIdentityContext({
+    contracts,
+    memory: {
+      profile: '',
+      patterns: '',
+      journalEntries: [],
+    },
+    liveContext: {
+      tasks: [],
+      inboxCount: 0,
+    },
+    request: 'debug identity context snapshot',
+  });
+
+  // eslint-disable-next-line no-console
+  console.info(
+    `[identity-context] section order: ${snapshot.sectionOrder.join(' -> ')}`,
+  );
+};
+
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) {
     app.dock.hide();
   }
 
+  void emitIdentityContextDebugSnapshot();
   bootstrap();
 
   app.on('activate', () => {
