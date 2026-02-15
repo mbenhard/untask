@@ -91,7 +91,7 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -99,9 +99,10 @@
             "description": "Install Tailwind CSS v4 and configure the @tailwindcss/vite plugin in the Vite configuration for the Electron renderer process.",
             "dependencies": [],
             "details": "Install tailwindcss@^4.0.0 and @tailwindcss/vite packages. Update vite.config.ts to include the Tailwind Vite plugin in the plugins array. Create the initial src/renderer/styles/globals.css file with the @import 'tailwindcss' directive. Ensure the CSS file is imported in the renderer entry point. Verify Tailwind utility classes work by adding a test element with basic Tailwind classes.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create a test div with Tailwind classes (e.g., bg-blue-500 p-4 text-white) and verify styles are applied correctly when running the app in dev mode.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T18:00:53.741Z"
           },
           {
             "id": 2,
@@ -111,9 +112,10 @@
               1
             ],
             "details": "Extend globals.css with the @theme block defining custom CSS variables: --color-bg (#1A1A1A), --color-surface (#262626), --color-border (#333333), --color-text-primary (#F5F5F5), --color-text-secondary (#8A8A8A), --color-interactive (#E5E5E5), --color-hover (#2E2E2E), --radius-window (12px). Add @media (prefers-color-scheme: light) block with inverted light mode values. Configure 8px spacing grid using --spacing-* tokens. Create a ThemeProvider component in src/renderer/components/providers/ThemeProvider.tsx that detects system preference using window.matchMedia and provides theme context.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Toggle macOS system appearance between dark/light mode and verify the app automatically updates colors. Check that --color-bg shows #1A1A1A in dark mode and the light equivalent in light mode.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T18:00:53.748Z"
           },
           {
             "id": 3,
@@ -124,9 +126,10 @@
               2
             ],
             "details": "Run npx shadcn@latest init and select: New York style, neutral base color, CSS variables for colors. Configure components.json to use custom paths: components at src/renderer/components/ui, utils at src/renderer/lib/utils. Install initial base components: Button, Input, Card for testing. Update the generated cn() utility to work with the custom theme tokens. Verify components inherit the monochrome theme colors correctly. Create src/renderer/components/ui/index.ts for centralized exports.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Render shadcn Button, Input, and Card components. Verify they display with correct monochrome styling matching the design system. Test hover states use --color-hover token.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T18:00:53.751Z"
           },
           {
             "id": 4,
@@ -136,14 +139,16 @@
               1
             ],
             "details": "Install @fontsource/inter or configure Google Fonts link for Inter. Add font-face declarations to globals.css and set --font-sans to 'Inter', system-ui, sans-serif. Configure base font size to 14px in the CSS. Install framer-motion and lucide-react packages. Create src/renderer/lib/animations.ts with shared animation variants for common transitions (fade, slide, scale). Verify Lucide icons render correctly by testing a few common icons (Check, X, ChevronRight). Test Framer Motion by adding a simple animated component.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify Inter font renders throughout the app at 14px base size. Test a Framer Motion animation (e.g., opacity fade on mount). Render multiple Lucide icons and confirm they display correctly with proper sizing.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T18:00:53.753Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Tailwind v4 installation with @tailwindcss/vite plugin and CSS-first configuration, 2) Custom theme tokens for dark/light modes with system preference detection, 3) shadcn/ui initialization with New York style and custom component paths, 4) Font setup (Inter) and animation libraries (Framer Motion, Lucide). Include testing theme switching functionality."
+        "expansionPrompt": "Break down into: 1) Tailwind v4 installation with @tailwindcss/vite plugin and CSS-first configuration, 2) Custom theme tokens for dark/light modes with system preference detection, 3) shadcn/ui initialization with New York style and custom component paths, 4) Font setup (Inter) and animation libraries (Framer Motion, Lucide). Include testing theme switching functionality.",
+        "updatedAt": "2026-02-15T18:00:53.753Z"
       },
       {
         "id": "3",
@@ -155,7 +160,7 @@
         "dependencies": [
           "1"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -230,7 +235,8 @@
         ],
         "complexity": 7,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: 1) Install better-sqlite3 and configure electron-rebuild for native module compilation, 2) Define Drizzle schema for tasks table with all 16 fields including enums and references, 3) Define schemas for scratchpad, chat_messages, task_events, ai_journal, and settings tables, 4) Create database initialization with Application Support path handling, 5) Set up drizzle-kit migrations and auto-run on app start, 6) Create base IPC handlers structure for database operations. Focus on native module compilation challenges with Electron."
+        "expansionPrompt": "Break down into: 1) Install better-sqlite3 and configure electron-rebuild for native module compilation, 2) Define Drizzle schema for tasks table with all 16 fields including enums and references, 3) Define schemas for scratchpad, chat_messages, task_events, ai_journal, and settings tables, 4) Create database initialization with Application Support path handling, 5) Set up drizzle-kit migrations and auto-run on app start, 6) Create base IPC handlers structure for database operations. Focus on native module compilation challenges with Electron.",
+        "updatedAt": "2026-02-15T18:48:40.435Z"
       },
       {
         "id": "4",
@@ -497,7 +503,7 @@
         "testStrategy": "1. Send the same intent across multiple sessions; verify stable voice and decision style consistent with SOUL + CHARTER.\n2. Validate context compiler output includes soul/charter/profile/patterns/journal slices within budget.\n3. Attempt high-impact memory write without confirmation; verify it is blocked pending user confirmation.\n4. Simulate overdue + stale-client context; verify proactive suggestions trigger with concrete actions.\n5. Verify destructive and financial-risk actions still require confirmation regardless of mode.\n6. Run regression prompts and confirm responses stay concise, actionable, and non-generic.",
         "priority": "high",
         "dependencies": [],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -530,10 +536,11 @@
             "dependencies": [
               2
             ],
-            "details": "Implement confidence thresholds and confirmation gates for high-impact assumptions (financial, client commitments, hard deadlines, user identity preferences).",
-            "status": "pending",
+            "details": "Implement confidence thresholds and confirmation gates for high-impact assumptions (financial, client commitments, hard deadlines, user identity preferences).\n<info added on 2026-02-15T17:38:32.659Z>\nImplementation complete in flusk/src/main/assistant/memoryPolicy.ts (281 lines). Core features: Deterministic confidence thresholds for auto-promotion (profile >= 0.86, patterns >= 0.90). Ambiguity detection via regex markers (maybe, might, probably, I think, guess, seems, not sure) that suppress auto-promotion and bias observations to journal. High-impact signal detection for financial, client_commitment, hard_deadline, and identity_preference using keyword regex matching. Mandatory confirmation flow: high-impact candidates return action=needs_confirmation with confirmationId and prompt; pending decisions stored in in-memory Map<confirmationId, PendingMemoryDecision>; resolveMemoryPromotionConfirmation API resolves approved entries to promote_profile/promote_patterns and rejected entries to journal_only with user_rejected reason. IPC layer: settings:evaluate-memory-promotion and settings:confirm-memory-promotion channels defined in src/types/ipc.ts (lines 14-15), handlers registered in src/main/ipc.ts (lines 77-93), preload exposure via window.flusk.evaluateMemoryPromotion and window.flusk.confirmMemoryPromotion in src/preload/index.ts (lines 24-31), and FluskApi window typing extended in src/types/preload.d.ts (lines 16-21). Type definitions for MemoryLayer, MemoryImpactSignal, MemoryPromotionAction, MemoryPromotionReason, MemoryPromotionEvaluationRequest, MemoryPromotionDecision, MemoryPromotionConfirmRequest, and MemoryPromotionConfirmResult added to src/types/assistant.ts (lines 67-118). Validation: npm run lint passes, npx tsc --noEmit passes, npm run start launches without errors. Smoke-tested evaluation logic: ambiguous low-impact observations return journal_only with reasons [ambiguous_statement, low_confidence]; high-impact observations return needs_confirmation with confirmationId; rejected confirmations return journal_only with reason [user_rejected].\n</info added on 2026-02-15T17:38:32.659Z>",
+            "status": "done",
             "testStrategy": "Feed ambiguous user statements and verify they stay in journal until confirmed.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:38:44.701Z"
           },
           {
             "id": 4,
@@ -543,10 +550,11 @@
               2,
               3
             ],
-            "details": "Add trigger engine for empty today list, overdue accumulation, stale client touchpoints, and value-at-risk idleness with bounded frequency.",
-            "status": "pending",
+            "details": "Add trigger engine for empty today list, overdue accumulation, stale client touchpoints, and value-at-risk idleness with bounded frequency.\n<info added on 2026-02-15T17:42:54.934Z>\nLet me first explore the codebase to understand the implementation that was done.Based on my analysis of the implementation, here is the update text:\n\nImplemented proactive trigger engine in flusk/src/main/assistant/proactivePolicy.ts (347 lines). Core function evaluateProactiveTriggerPolicy accepts ProactiveTriggerRequest with liveContext, optional applyCooldown/recordSelection flags, and optional now/timezone overrides.\n\nFour trigger rules implemented with deterministic scoring:\n- empty_today_list: Fires when no tasks flagged for today during working hours (Mon-Fri 8-18 local time), base score 0.45 with task count scaling\n- overdue_accumulation: Fires when 2+ overdue tasks OR overdue value-at-risk >= $1500, base score 0.85, severity high\n- stale_client_touchpoint: Fires when client tasks have no touchpoint for 7+ days, base score 0.62\n- value_at_risk_idle: Fires when tasks with >= $1000 value-at-risk have no touchpoint for 5+ days or never touched, base score 0.72\n\nEngine filters to active tasks only, computes trigger scores with severity levels, and emits single highest-priority recommendation with actionable command buttons (suggest_daily_plan, open_inbox, show_overdue, draft_client_update, prioritize_value_at_risk, set_today).\n\nBounded frequency via per-trigger cooldown windows stored in in-memory triggerCooldownMap: empty_today_list (90min), overdue_accumulation (120min), stale_client_touchpoint (180min), value_at_risk_idle (180min). If top trigger is cooling down, next unsuppressed trigger is selected.\n\nType definitions added to flusk/src/types/assistant.ts (lines 120-158): ProactiveTriggerType, ProactiveTriggerAction, ProactiveTriggerRecommendation, ProactiveTriggerEvaluation, ProactiveTriggerRequest, ProactiveTriggerResult.\n\nIPC integration: Channel SETTINGS_EVALUATE_PROACTIVE_TRIGGERS added to flusk/src/types/ipc.ts (line 18), handler registered in flusk/src/main/ipc.ts (lines 98-105), preload API window.flusk.evaluateProactiveTriggers exposed in flusk/src/preload/index.ts (lines 34-40), typed in flusk/src/types/preload.d.ts (lines 24-26).\n\nValidation: npm run lint passes, npx tsc --noEmit passes, npm run start launches without errors. Scenario simulations confirmed correct trigger selection and cooldown suppression behavior.\n</info added on 2026-02-15T17:42:54.934Z>",
+            "status": "done",
             "testStrategy": "Simulate each trigger condition and verify one concise, actionable recommendation appears.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:43:06.908Z"
           },
           {
             "id": 5,
@@ -557,16 +565,17 @@
               3,
               4
             ],
-            "details": "Enforce kernel dependency in chat pipeline and fail closed if soul/charter/context compiler is unavailable.",
-            "status": "pending",
+            "details": "Enforce kernel dependency in chat pipeline and fail closed if soul/charter/context compiler is unavailable.\n<info added on 2026-02-15T17:46:42.011Z>\nImplemented identity-kernel gating in flusk/src/main/assistant/identityKernel.ts with fail-closed guard using IdentityKernelUnavailableError. Environment variable FLUSK_DISABLE_IDENTITY_KERNEL=1 disables the kernel explicitly. Kernel readiness is validated via validateContracts() which loads Soul/Charter via loadIdentityContracts(), verifies non-empty content, and test-compiles identity context with compileIdentityContext(). Exported getIdentityKernelStatus() returns IdentityKernelStatus with ready boolean and diagnostics array. Exported orchestrateChatWithIdentityKernel() is the required chat entrypoint: compiles full identity context, runs evaluateProactiveTriggerPolicy() and optional evaluateMemoryPromotion(), returns ChatKernelOrchestrationSuccess with context snapshot, proactive trigger evaluation/recommendation, and optional memory promotion decision; on any kernel failure returns ChatKernelOrchestrationFailure with errorCode IDENTITY_KERNEL_UNAVAILABLE, message, and diagnostics array. Added IPC channels CHAT_GET_KERNEL_STATUS and CHAT_ORCHESTRATE_WITH_KERNEL in src/types/ipc.ts (lines 22-23) with typed payloads ChatKernelStatusResultPayload and ChatKernelOrchestrationRequestPayload/ChatKernelOrchestrationResultPayload (lines 42-45). IPC handlers registered in src/main/ipc.ts (lines 114-126). Preload exposure added in src/preload/index.ts: getChatKernelStatus() and orchestrateChatWithKernel() methods (lines 44-49). FluskApi interface extended in src/types/preload.d.ts (lines 30-33). Type contracts added to src/types/assistant.ts: IdentityKernelStatus (lines 160-163), ChatKernelOrchestrationRequest (lines 165-171), ChatKernelOrchestrationSuccess (lines 173-180), ChatKernelOrchestrationFailure (lines 182-187), and union ChatKernelOrchestrationResult (lines 189-191). Validation: npm run lint passes, npx tsc --noEmit passes, npm run start launches. Smoke tests confirmed ready-state orchestration returns ok=true with compiled context sections; with kernel disabled via environment flag orchestration returns ok=false with IDENTITY_KERNEL_UNAVAILABLE and diagnostic message.\n</info added on 2026-02-15T17:46:42.011Z>",
+            "status": "done",
             "testStrategy": "Disable kernel module and verify chat orchestration is blocked with explicit diagnostic error.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:46:55.321Z"
           }
         ],
         "complexity": 8,
         "recommendedSubtasks": 5,
         "expansionPrompt": "Break down assistant identity kernel into: 1) Soul/Charter contracts, 2) identity-aware context compiler, 3) memory promotion/confirmation policy, 4) proactive policy trigger engine, 5) chat/tool orchestration gating. Focus on deterministic behavior and regression tests.",
-        "updatedAt": "2026-02-15T17:32:32.328Z"
+        "updatedAt": "2026-02-15T17:46:55.321Z"
       },
       {
         "id": "7",
@@ -1074,9 +1083,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T17:32:32.328Z",
+      "lastModified": "2026-02-15T18:48:40.435Z",
       "taskCount": 13,
-      "completedCount": 1,
+      "completedCount": 4,
       "tags": [
         "master"
       ]

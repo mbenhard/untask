@@ -1,18 +1,34 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import type { Task } from '../db/schema';
 import type {
   AssistantLiveContext,
   AssistantMemorySnapshot,
-  AssistantTaskPriority,
-  AssistantTaskSnapshot,
   IdentityContextDebugSnapshot,
   IdentityContextSectionSnapshot,
 } from '../../types/assistant';
 
-type IdentityContracts = {
+export type IdentityContracts = {
   soul: string;
   charter: string;
+};
+
+type IdentityContractReadResult = {
+  content: string;
+  source: 'file' | 'fallback';
+  resolvedPath?: string;
+};
+
+export type IdentityContractsLoadResult = IdentityContracts & {
+  source: {
+    soul: IdentityContractReadResult['source'];
+    charter: IdentityContractReadResult['source'];
+  };
+  resolvedPaths: {
+    soul?: string;
+    charter?: string;
+  };
 };
 
 type CompileIdentityContextInput = {
@@ -86,7 +102,7 @@ const STOP_WORDS = new Set([
   'with',
 ]);
 
-const PRIORITY_RANK: Record<AssistantTaskPriority, number> = {
+const PRIORITY_RANK: Record<NonNullable<Task['priority']>, number> = {
   high: 0,
   medium: 1,
   low: 2,
@@ -148,7 +164,7 @@ const readContract = async (
   fileName: 'SOUL.md' | 'CHARTER.md',
   fallback: string,
   baseDir?: string,
-): Promise<string> => {
+): Promise<IdentityContractReadResult> => {
   const candidates = resolveAssistantDocsDir(baseDir);
 
   for (const docsDir of candidates) {
@@ -159,25 +175,54 @@ const readContract = async (
       const trimmed = content.trim();
 
       if (trimmed.length > 0) {
-        return trimmed;
+        return {
+          content: trimmed,
+          source: 'file',
+          resolvedPath: target,
+        };
       }
     } catch {
       // Try the next location.
     }
   }
 
-  return fallback;
+  return {
+    content: fallback,
+    source: 'fallback',
+  };
 };
 
-export const loadIdentityContracts = async (
+export const loadIdentityContractsWithSources = async (
   baseDir?: string,
-): Promise<IdentityContracts> => {
+): Promise<IdentityContractsLoadResult> => {
   const [soul, charter] = await Promise.all([
     readContract('SOUL.md', DEFAULT_SOUL_CONTRACT, baseDir),
     readContract('CHARTER.md', DEFAULT_CHARTER_CONTRACT, baseDir),
   ]);
 
-  return { soul, charter };
+  return {
+    soul: soul.content,
+    charter: charter.content,
+    source: {
+      soul: soul.source,
+      charter: charter.source,
+    },
+    resolvedPaths: {
+      soul: soul.resolvedPath,
+      charter: charter.resolvedPath,
+    },
+  };
+};
+
+export const loadIdentityContracts = async (
+  baseDir?: string,
+): Promise<IdentityContracts> => {
+  const contracts = await loadIdentityContractsWithSources(baseDir);
+
+  return {
+    soul: contracts.soul,
+    charter: contracts.charter,
+  };
 };
 
 const parseMarkdownSnippets = (
@@ -264,7 +309,7 @@ const toIsoDate = (value: string | undefined | null): number | null => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
-const taskSortKey = (task: AssistantTaskSnapshot): [number, number, number, string] => {
+const taskSortKey = (task: Task): [number, number, number, string] => {
   const dueAt = toIsoDate(task.dueDate) ?? Number.POSITIVE_INFINITY;
   const priority = task.priority ?? 'none';
 
@@ -276,7 +321,7 @@ const taskSortKey = (task: AssistantTaskSnapshot): [number, number, number, stri
   ];
 };
 
-const sortTasks = (tasks: AssistantTaskSnapshot[]): AssistantTaskSnapshot[] =>
+const sortTasks = (tasks: Task[]): Task[] =>
   [...tasks].sort((left, right) => {
     const a = taskSortKey(left);
     const b = taskSortKey(right);
@@ -540,7 +585,7 @@ export const compileIdentityContext = (
     id: `journal-${index + 1}`,
     source: 'journal' as const,
     text: entry.content.trim(),
-    createdAt: entry.createdAt,
+    createdAt: entry.createdAt ?? undefined,
     score: 0,
   }));
 

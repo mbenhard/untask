@@ -6,6 +6,8 @@ import {
   compileIdentityContext,
   loadIdentityContracts,
 } from './assistant/contextCompiler';
+import { initDatabase, closeDatabase } from './db';
+import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { setupTray } from './tray';
@@ -53,6 +55,8 @@ const createMainWindow = (): BrowserWindow => {
 };
 
 const bootstrap = (): void => {
+  initDatabase();
+  runMigrations();
   registerIpcHandlers();
 
   mainWindow = createMainWindow();
@@ -103,6 +107,7 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   unregisterGlobalShortcuts();
+  closeDatabase();
 });
 
 app.on('window-all-closed', () => {

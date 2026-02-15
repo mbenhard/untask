@@ -90,3 +90,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# SQLite Database
+dev.db

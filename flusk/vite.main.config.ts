@@ -6,4 +6,9 @@ export default defineConfig({
   resolve: {
     alias: viteAliases,
   },
+  build: {
+    rollupOptions: {
+      external: ['better-sqlite3'],
+    },
+  },
 });
