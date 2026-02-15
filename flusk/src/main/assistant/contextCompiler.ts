@@ -594,6 +594,7 @@ export const compileIdentityContext = (
   const scoredJournal = scoreMemorySnippets(journalSnippets, contextTerms, nowMs);
 
   const liveContextSection = buildLiveContextSection(input.liveContext, now);
+  const soulOverlay = input.memory.soul.trim();
   const sections: SectionDraft[] = [
     {
       id: 'meta',
@@ -614,6 +615,19 @@ export const compileIdentityContext = (
       maxTokens: 250,
       required: true,
     },
+  ];
+
+  if (soulOverlay.length > 0) {
+    sections.push({
+      id: 'soul-overlay',
+      title: 'Soul Overlay',
+      content: soulOverlay,
+      maxTokens: 180,
+      required: false,
+    });
+  }
+
+  sections.push(
     {
       id: 'charter',
       title: 'Charter Contract',
@@ -628,7 +642,7 @@ export const compileIdentityContext = (
       maxTokens: 420,
       required: true,
     },
-  ];
+  );
 
   if (input.request && input.request.trim().length > 0) {
     sections.push({

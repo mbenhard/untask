@@ -8,6 +8,7 @@ import {
   type AppView,
   selectActiveView,
   selectIsChatMode,
+  selectIsMemorySettingsOpen,
   selectPreviousViewIndex,
   useAppStore,
 } from '../../stores/appStore';
@@ -19,6 +20,7 @@ import {
 } from '../../stores/taskStore';
 import { useChatStore } from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
+import { SettingsMemory } from '../settings/SettingsMemory';
 import { InboxView } from '../views/InboxView';
 import { ProjectsView } from '../views/ProjectsView';
 import { TodayView } from '../views/TodayView';
@@ -44,6 +46,8 @@ export const AppShell = (): JSX.Element => {
   const activeView = useAppStore(selectActiveView);
   const previousViewIndex = useAppStore(selectPreviousViewIndex);
   const isChatMode = useAppStore(selectIsChatMode);
+  const isMemorySettingsOpen = useAppStore(selectIsMemorySettingsOpen);
+  const closeMemorySettings = useAppStore((state) => state.closeMemorySettings);
 
   const fetchTasks = useTaskStore((state) => state.fetchTasks);
   const tasks = useTaskStore(selectTasks);
@@ -157,6 +161,8 @@ export const AppShell = (): JSX.Element => {
           onSubmit={handleSubmit}
         />
       </div>
+
+      {isMemorySettingsOpen ? <SettingsMemory onClose={closeMemorySettings} /> : null}
     </div>
   );
 };

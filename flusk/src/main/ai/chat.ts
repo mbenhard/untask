@@ -9,11 +9,11 @@ import type {
   ChatToolExecutionSummary,
   PersistedChatToolMetadata,
 } from '../../types/chat';
-import { getSetting } from '../services/settingsService';
-import { readJournalEntries } from '../services/journalService';
-import { listTasks } from '../services/taskService';
 import { saveChatMessage, sweepChatRetention } from '../services/chatService';
+import { writeJournalEntry } from '../services/journalService';
+import { getSetting, setSetting } from '../services/settingsService';
 
+import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { createOpenRouterProviderFromEnv } from './openrouter';
 import type { ChatModelId } from './models';
 import { getSelectedModelId, resolveModelId } from './models';
@@ -21,10 +21,21 @@ import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolExecutionResult, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall } from './tools';
 
-const PROFILE_MEMORY_KEY = 'assistant.memory.profile';
-const PATTERN_MEMORY_KEY = 'assistant.memory.patterns';
 const activeChatRequestIds = new Set<string>();
 const canceledChatRequestIds = new Set<string>();
+const AUTO_JOURNAL_LAST_WRITE_AT_KEY = 'ai_journal_last_auto_write_at';
+const AUTO_JOURNAL_COOLDOWN_MS = 20 * 60 * 1000;
+const TOOL_MUTATION_NAMES = new Set([
+  'create_task',
+  'update_task',
+  'complete_task',
+  'move_task',
+  'set_today',
+  'parse_notes',
+  'undo_last_action',
+  'update_user_profile',
+  'update_patterns',
+]);
 
 const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unknown chat orchestration error.';
@@ -87,22 +98,86 @@ const inferFallbackToolCall = (userMessage: string): AiToolCall | null => {
   return null;
 };
 
-const buildLiveContextSnapshot = (): AssistantLiveContext => {
-  const tasks = listTasks();
+const truncate = (value: string, max: number): string =>
+  value.length <= max ? value : `${value.slice(0, max - 3).trimEnd()}...`;
 
-  return {
-    tasks,
-    inboxCount: tasks.filter((task) => task.status === 'inbox').length,
-    now: new Date().toISOString(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
+const isPlanningIntent = (message: string): boolean =>
+  /\b(plan|prioriti[sz]e|today|next step|focus|schedule)\b/i.test(message);
+
+const isPreferenceIntent = (message: string): boolean =>
+  /\b(i prefer|i usually|i tend to|my style|works best for me|i hate|i dislike)\b/i.test(
+    message,
+  );
+
+const hasToolMutation = (executions: ChatToolExecutionSummary[]): boolean =>
+  executions.some(
+    (execution) =>
+      execution.status === 'success' && TOOL_MUTATION_NAMES.has(execution.toolName),
+  );
+
+const shouldSkipAutoJournal = (nowMs: number): boolean => {
+  const lastWrittenAt = getSetting(AUTO_JOURNAL_LAST_WRITE_AT_KEY);
+  if (!lastWrittenAt) {
+    return false;
+  }
+
+  const parsed = Date.parse(lastWrittenAt);
+  if (Number.isNaN(parsed)) {
+    return false;
+  }
+
+  return nowMs - parsed < AUTO_JOURNAL_COOLDOWN_MS;
 };
 
-const buildMemorySnapshot = (): AssistantMemorySnapshot => ({
-  profile: getSetting(PROFILE_MEMORY_KEY) ?? '',
-  patterns: getSetting(PATTERN_MEMORY_KEY) ?? '',
-  journalEntries: readJournalEntries({ limit: 24 }),
-});
+const maybeWriteMeaningfulInteractionJournal = (input: {
+  userMessage: string;
+  assistantText: string;
+  toolExecutions: ChatToolExecutionSummary[];
+}): void => {
+  const normalizedMessage = input.userMessage.trim();
+  if (normalizedMessage.length === 0) {
+    return;
+  }
+
+  const planningIntent = isPlanningIntent(normalizedMessage);
+  const preferenceIntent = isPreferenceIntent(normalizedMessage);
+  const toolMutation = hasToolMutation(input.toolExecutions);
+  const meaningful = planningIntent || preferenceIntent || toolMutation;
+
+  if (!meaningful) {
+    return;
+  }
+
+  const now = Date.now();
+  if (shouldSkipAutoJournal(now)) {
+    return;
+  }
+
+  const successfulTools = input.toolExecutions
+    .filter((execution) => execution.status === 'success')
+    .map((execution) => execution.toolName);
+  const category: 'pattern' | 'progress' | 'preference' | 'summary' =
+    preferenceIntent ? 'preference' : toolMutation ? 'progress' : 'pattern';
+  const toolSummary =
+    successfulTools.length > 0 ? `Tools: ${successfulTools.join(', ')}.` : '';
+  const content = [
+    `Meaningful turn: ${truncate(normalizedMessage, 180)}`,
+    toolSummary,
+    `Assistant outcome: ${truncate(input.assistantText.trim(), 180)}`,
+  ]
+    .filter((line) => line.trim().length > 0)
+    .join(' ');
+
+  try {
+    writeJournalEntry({
+      category,
+      content,
+    });
+    setSetting(AUTO_JOURNAL_LAST_WRITE_AT_KEY, new Date(now).toISOString());
+  } catch {
+    // Never block chat completion on auto-journal failures.
+  }
+};
 
 export type PrepareChatTurnInput = {
   userMessage: string;
@@ -136,14 +211,11 @@ export const prepareChatTurn = async (
   }
 
   const modelId = input.modelId ? resolveModelId(input.modelId) : getSelectedModelId();
-  const memory = {
-    ...buildMemorySnapshot(),
-    ...(input.memory ?? {}),
-  };
-  const liveContext = {
-    ...buildLiveContextSnapshot(),
-    ...(input.liveContext ?? {}),
-  };
+  const { memory, liveContext } = buildCanonicalRuntimeContext({
+    memory: input.memory,
+    liveContext: input.liveContext,
+    journalLimit: 24,
+  });
 
   const built = await buildSystemPrompt({
     userMessage: trimmedMessage,
@@ -174,8 +246,9 @@ const runAssistantStream = async (
   const emit = input.emit;
 
   try {
-    const memory = buildMemorySnapshot();
-    const liveContext = buildLiveContextSnapshot();
+    const { memory, liveContext } = buildCanonicalRuntimeContext({
+      journalLimit: 24,
+    });
     const builtPrompt = await buildSystemPrompt({
       userMessage: input.userMessage,
       tokenBudget: input.tokenBudget,
@@ -395,6 +468,12 @@ const runAssistantStream = async (
           ? finalizedText
           : 'No assistant text was generated for this turn.',
       toolCalls: JSON.stringify(metadata),
+    });
+
+    maybeWriteMeaningfulInteractionJournal({
+      userMessage: input.userMessage,
+      assistantText: finalizedText,
+      toolExecutions,
     });
 
     if (isChatRequestCanceled(input.requestId)) {

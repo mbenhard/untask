@@ -20,9 +20,11 @@ import type {
   ChatSetModelPayload,
   ChatSetRetentionPayload,
   ChatStreamEvent,
+  ChatLiveThoughtPayload,
   ChatUndoRequestPayload,
   ChatUndoResultPayload,
 } from './chat';
+import type { AiJournal } from './models';
 
 export const IPC_CHANNELS = {
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
@@ -51,11 +53,16 @@ export const IPC_CHANNELS = {
   CHAT_UNDO_LAST_ACTION: 'chat:undo-last-action',
   CHAT_GET_RETENTION_MODE: 'chat:get-retention-mode',
   CHAT_SET_RETENTION_MODE: 'chat:set-retention-mode',
+  CHAT_GET_LIVE_THOUGHT: 'chat:get-live-thought',
   SCRATCHPAD_GET: 'scratchpad:get',
   SCRATCHPAD_SAVE: 'scratchpad:save',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_GET_ALL: 'settings:get-all',
+  SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
+  SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
+  SETTINGS_RESET_SOUL: 'settings:reset-soul',
+  SETTINGS_READ_JOURNAL: 'settings:read-journal',
 } as const;
 
 export type SettingsBootstrapState = {
@@ -89,3 +96,23 @@ export type ChatUndoRequest = ChatUndoRequestPayload;
 export type ChatUndoResult = ChatUndoResultPayload;
 export type ChatRetentionResult = ChatRetentionPayload;
 export type ChatSetRetentionRequest = ChatSetRetentionPayload;
+export type ChatLiveThoughtResult = ChatLiveThoughtPayload;
+
+export type SettingsMemoryStatePayload = {
+  soul: string;
+  profile: string;
+  patterns: string;
+};
+
+export type SettingsMemoryUpdateRequestPayload = Partial<SettingsMemoryStatePayload>;
+
+export type SettingsReadJournalRequestPayload = {
+  category?: 'pattern' | 'progress' | 'preference' | 'summary';
+  limit?: number;
+  days_back?: number;
+  daysBack?: number;
+};
+
+export type SettingsReadJournalResultPayload = {
+  entries: AiJournal[];
+};

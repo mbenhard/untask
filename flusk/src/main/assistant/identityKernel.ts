@@ -17,6 +17,7 @@ import { evaluateProactiveTriggerPolicy } from './proactivePolicy';
 const IDENTITY_KERNEL_UNAVAILABLE = 'IDENTITY_KERNEL_UNAVAILABLE';
 
 const EMPTY_MEMORY: AssistantMemorySnapshot = {
+  soul: '',
   profile: '',
   patterns: '',
   journalEntries: [],

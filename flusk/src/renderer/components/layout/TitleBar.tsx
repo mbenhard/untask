@@ -5,6 +5,7 @@ import {
   APP_VIEW_ORDER,
   type AppView,
   selectActiveView,
+  selectIsMemorySettingsOpen,
   useAppStore,
 } from '../../stores/appStore';
 
@@ -17,6 +18,8 @@ const TAB_LABELS: Record<AppView, string> = {
 export const TitleBar = (): JSX.Element => {
   const activeView = useAppStore(selectActiveView);
   const setView = useAppStore((state) => state.setView);
+  const isMemorySettingsOpen = useAppStore(selectIsMemorySettingsOpen);
+  const toggleMemorySettings = useAppStore((state) => state.toggleMemorySettings);
 
   return (
     <header className="drag-region flex h-10 items-end border-b border-border bg-card/80 px-3 backdrop-blur-sm">
@@ -51,6 +54,22 @@ export const TitleBar = (): JSX.Element => {
           );
         })}
       </nav>
+
+      <div className="no-drag ml-auto flex h-full items-center">
+        <button
+          type="button"
+          onClick={toggleMemorySettings}
+          className={cn(
+            'h-7 rounded-md px-2 text-[11px] font-medium tracking-[0.02em] transition-colors',
+            isMemorySettingsOpen
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+          )}
+          aria-pressed={isMemorySettingsOpen}
+        >
+          Memory
+        </button>
+      </div>
     </header>
   );
 };

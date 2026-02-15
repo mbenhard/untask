@@ -8,9 +8,13 @@ type AppStore = {
   activeView: AppView;
   previousViewIndex: number;
   isChatMode: boolean;
+  isMemorySettingsOpen: boolean;
   setView: (view: AppView) => void;
   enterChatMode: () => void;
   exitChatMode: () => void;
+  openMemorySettings: () => void;
+  closeMemorySettings: () => void;
+  toggleMemorySettings: () => void;
 };
 
 const getViewIndex = (view: AppView): number => APP_VIEW_ORDER.indexOf(view);
@@ -19,6 +23,7 @@ export const useAppStore = create<AppStore>((set) => ({
   activeView: 'today',
   previousViewIndex: getViewIndex('today'),
   isChatMode: false,
+  isMemorySettingsOpen: false,
   setView: (view) =>
     set((state) => {
       if (state.activeView === view) {
@@ -32,9 +37,15 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
   enterChatMode: () => set({ isChatMode: true }),
   exitChatMode: () => set({ isChatMode: false }),
+  openMemorySettings: () => set({ isMemorySettingsOpen: true }),
+  closeMemorySettings: () => set({ isMemorySettingsOpen: false }),
+  toggleMemorySettings: () =>
+    set((state) => ({ isMemorySettingsOpen: !state.isMemorySettingsOpen })),
 }));
 
 export const selectActiveView = (state: AppStore) => state.activeView;
 export const selectPreviousViewIndex = (state: AppStore) =>
   state.previousViewIndex;
 export const selectIsChatMode = (state: AppStore) => state.isChatMode;
+export const selectIsMemorySettingsOpen = (state: AppStore) =>
+  state.isMemorySettingsOpen;

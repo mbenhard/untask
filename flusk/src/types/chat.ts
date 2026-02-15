@@ -111,3 +111,10 @@ export type ChatSetRetentionPayload = {
 export type ChatRetentionPayload = {
   mode: ChatRetentionMode;
 };
+
+export type ChatLiveThoughtPayload = {
+  thought: string;
+  actionLabel: string;
+  suggestedPrompt: string;
+  generatedAt: string;
+};

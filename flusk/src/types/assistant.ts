@@ -2,6 +2,7 @@ export type { Task, AiJournal } from './models';
 import type { Task, AiJournal } from './models';
 
 export type AssistantMemorySnapshot = {
+  soul: string;
   profile: string;
   patterns: string;
   journalEntries: AiJournal[];

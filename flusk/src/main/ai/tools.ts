@@ -23,10 +23,8 @@ import {
   writeJournalEntry,
   writeJournalEntrySchema,
 } from '../services/journalService';
-import { getSetting, setSetting } from '../services/settingsService';
-
-const PROFILE_MEMORY_KEY = 'assistant.memory.profile';
-const PATTERN_MEMORY_KEY = 'assistant.memory.patterns';
+import { generateLiveThought } from './liveThought';
+import { appendPatternEntry, appendProfileEntry } from './memory';
 
 const priorityScore: Record<'none' | 'low' | 'medium' | 'high', number> = {
   high: 0,
@@ -97,29 +95,6 @@ const extractTaskTitlesFromNotes = (raw: string): string[] => {
   });
 
   return deduped;
-};
-
-const appendMemoryEntry = (settingKey: string, entry: string): string => {
-  const normalized = entry.trim();
-  if (normalized.length === 0) {
-    throw new Error('Memory entry cannot be empty.');
-  }
-
-  const existing = getSetting(settingKey) ?? '';
-  const lines = existing
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  const bullet = normalized.startsWith('- ') ? normalized : `- ${normalized}`;
-
-  if (lines.some((line) => line.toLowerCase() === bullet.toLowerCase())) {
-    return existing;
-  }
-
-  const next = existing.trim().length === 0 ? bullet : `${existing.trimEnd()}\n${bullet}`;
-  setSetting(settingKey, next);
-  return next;
 };
 
 const summarizeTask = (task: {
@@ -636,22 +611,16 @@ const generateLiveThoughtTool = {
   description: 'Generate a concise, outcome-focused live thought for the current context.',
   schema: generateLiveThoughtInputSchema,
   execute: async (input) => {
-    const activeTasks = listTasks().filter((task) => task.status !== 'done');
-    const overdue = activeTasks.filter((task) => parseIso(task.dueDate) < Date.now());
-
-    const thought =
-      overdue.length > 0
-        ? `Overdue pressure is rising (${overdue.length} tasks). Clear one blocker now before adding new scope.`
-        : activeTasks.length === 0
-          ? 'No active tasks detected. Capture the next client-facing deliverable first.'
-          : `Current load: ${activeTasks.length} active tasks. Pick one revenue-critical task and move it forward before context-switching.`;
+    const liveThought = generateLiveThought({
+      focus: input.focus ?? null,
+    });
 
     return {
       status: 'success',
       message: 'Generated live thought.',
       data: {
         focus: input.focus ?? null,
-        thought,
+        ...liveThought,
       },
     };
   },
@@ -662,7 +631,7 @@ const updateUserProfileTool = {
   description: 'Append a confirmed profile memory entry.',
   schema: updateUserProfileInputSchema,
   execute: async (input) => {
-    const content = appendMemoryEntry(PROFILE_MEMORY_KEY, input.entry);
+    const content = appendProfileEntry(input.entry);
 
     return {
       status: 'success',
@@ -679,7 +648,7 @@ const updatePatternsTool = {
   description: 'Append a confirmed workflow pattern entry.',
   schema: updatePatternsInputSchema,
   execute: async (input) => {
-    const content = appendMemoryEntry(PATTERN_MEMORY_KEY, input.entry);
+    const content = appendPatternEntry(input.entry);
 
     return {
       status: 'success',

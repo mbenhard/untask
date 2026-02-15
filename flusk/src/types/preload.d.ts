@@ -3,6 +3,7 @@ import type {
   ChatKernelOrchestrationRequestPayload,
   ChatKernelOrchestrationResultPayload,
   ChatKernelStatusResultPayload,
+  ChatLiveThoughtResult,
   ChatRetentionResult,
   ChatSelectedModelResult,
   ChatSendRequest,
@@ -20,6 +21,10 @@ import type {
   MemoryPromotionEvaluationResultPayload,
   ProactiveTriggerEvaluationRequestPayload,
   ProactiveTriggerEvaluationResultPayload,
+  SettingsMemoryStatePayload,
+  SettingsMemoryUpdateRequestPayload,
+  SettingsReadJournalRequestPayload,
+  SettingsReadJournalResultPayload,
   SettingsBootstrapState,
 } from './ipc';
 
@@ -68,6 +73,7 @@ export type FluskApi = {
     undoLastAction: (payload?: ChatUndoRequest) => Promise<ChatUndoResult>;
     getRetentionMode: () => Promise<ChatRetentionResult>;
     setRetentionMode: (payload: ChatSetRetentionRequest) => Promise<ChatRetentionResult>;
+    getLiveThought: () => Promise<ChatLiveThoughtResult>;
   };
   scratchpad: {
     get: () => Promise<Scratchpad>;
@@ -77,6 +83,10 @@ export type FluskApi = {
     get: (key: string) => Promise<string | null>;
     set: (key: string, value: string) => Promise<Setting>;
     getAll: () => Promise<Setting[]>;
+    getMemoryState: () => Promise<SettingsMemoryStatePayload>;
+    updateMemoryState: (payload: SettingsMemoryUpdateRequestPayload) => Promise<SettingsMemoryStatePayload>;
+    resetSoul: () => Promise<SettingsMemoryStatePayload>;
+    readJournal: (payload?: SettingsReadJournalRequestPayload) => Promise<SettingsReadJournalResultPayload>;
   };
 };
 

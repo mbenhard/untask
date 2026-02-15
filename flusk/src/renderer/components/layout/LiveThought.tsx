@@ -1,12 +1,46 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { motion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 
+import type { ChatLiveThoughtResult } from '../../../types/ipc';
+import { useChatStore } from '../../stores/chatStore';
 import { Button } from '../ui/button';
 
-export const LiveThought = (): JSX.Element => {
+type LiveThoughtProps = {
+  refreshKey?: string;
+};
+
+export const LiveThought = ({ refreshKey }: LiveThoughtProps): JSX.Element => {
   const [isVisible, setIsVisible] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [thought, setThought] = useState<ChatLiveThoughtResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const sendMessage = useChatStore((state) => state.sendMessage);
+
+  const loadLiveThought = useCallback(async () => {
+    if (!window.flusk) {
+      setError('Flusk API is unavailable.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const next = await window.flusk.chat.getLiveThought();
+      setThought(next);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load live thought.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setIsVisible(true);
+    void loadLiveThought();
+  }, [loadLiveThought, refreshKey]);
 
   if (!isVisible) {
     return null;
@@ -23,7 +57,11 @@ export const LiveThought = (): JSX.Element => {
       <Sparkles className="size-4 text-muted-foreground" />
 
       <p className="flex-1 text-[13px] text-muted-foreground">
-        3 overdue items and nothing planned for today yet.
+        {isLoading
+          ? 'Loading live thought...'
+          : error
+            ? 'Live thought unavailable. Use chat to get a quick focus recommendation.'
+            : thought?.thought ?? 'Live thought unavailable.'}
       </p>
 
       <Button
@@ -31,8 +69,16 @@ export const LiveThought = (): JSX.Element => {
         variant="ghost"
         size="sm"
         className="h-7 px-2 text-[11px] text-muted-foreground"
+        disabled={!thought || isLoading}
+        onClick={() => {
+          if (!thought?.suggestedPrompt) {
+            return;
+          }
+
+          void sendMessage(thought.suggestedPrompt);
+        }}
       >
-        Plan my day
+        {thought?.actionLabel ?? 'Act'}
       </Button>
 
       <Button

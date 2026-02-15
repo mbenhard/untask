@@ -5,6 +5,7 @@ import {
   type ChatKernelOrchestrationRequestPayload,
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
+  type ChatLiveThoughtResult,
   type ChatRetentionResult,
   type ChatSelectedModelResult,
   type ChatSendRequest,
@@ -23,6 +24,10 @@ import {
   type MemoryPromotionEvaluationResultPayload,
   type ProactiveTriggerEvaluationRequestPayload,
   type ProactiveTriggerEvaluationResultPayload,
+  type SettingsMemoryStatePayload,
+  type SettingsMemoryUpdateRequestPayload,
+  type SettingsReadJournalRequestPayload,
+  type SettingsReadJournalResultPayload,
   type SettingsBootstrapState,
 } from '../types/ipc';
 
@@ -107,6 +112,8 @@ const fluskApi = {
       payload: ChatSetRetentionRequest,
     ): Promise<ChatRetentionResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_SET_RETENTION_MODE, payload),
+    getLiveThought: (): Promise<ChatLiveThoughtResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_LIVE_THOUGHT),
   },
   scratchpad: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SCRATCHPAD_GET),
@@ -116,6 +123,18 @@ const fluskApi = {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
     set: (key: string, value: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, key, value),
     getAll: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_ALL),
+    getMemoryState: (): Promise<SettingsMemoryStatePayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_MEMORY_STATE),
+    updateMemoryState: (
+      payload: SettingsMemoryUpdateRequestPayload,
+    ): Promise<SettingsMemoryStatePayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE_MEMORY_STATE, payload),
+    resetSoul: (): Promise<SettingsMemoryStatePayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_RESET_SOUL),
+    readJournal: (
+      payload?: SettingsReadJournalRequestPayload,
+    ): Promise<SettingsReadJournalResultPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_READ_JOURNAL, payload),
   },
 };
 

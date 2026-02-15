@@ -1,14 +1,11 @@
 import { ipcMain } from 'electron';
-
-import type {
-  AssistantLiveContext,
-  AssistantMemorySnapshot,
-} from '../types/assistant';
+import { z } from 'zod';
 import {
   type ChatModelCatalogResult,
   type ChatKernelOrchestrationRequestPayload,
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
+  type ChatLiveThoughtResult,
   type ChatRetentionResult,
   type ChatSendRequest,
   type ChatSendResult,
@@ -27,20 +24,19 @@ import {
   type ProactiveTriggerEvaluationRequestPayload,
   type ProactiveTriggerEvaluationResultPayload,
   type SettingsBootstrapState,
+  type SettingsMemoryStatePayload,
+  type SettingsMemoryUpdateRequestPayload,
+  type SettingsReadJournalRequestPayload,
+  type SettingsReadJournalResultPayload,
 } from '../types/ipc';
-import {
-  compileIdentityContext,
-  loadIdentityContracts,
-} from './assistant/contextCompiler';
+import { buildIdentityContext } from './ai/contextBuilder';
+import { getPatterns, getProfile, getSoul, resetSoul, setPatterns, setProfile, setSoul } from './ai/memory';
 import {
   evaluateMemoryPromotion,
   resolveMemoryPromotionConfirmation,
 } from './assistant/memoryPolicy';
 import { evaluateProactiveTriggerPolicy } from './assistant/proactivePolicy';
-import {
-  getIdentityKernelStatus,
-  orchestrateChatWithIdentityKernel,
-} from './assistant/identityKernel';
+import { getIdentityKernelStatus, orchestrateChatWithIdentityKernel } from './assistant/identityKernel';
 import {
   listTasks,
   createTask,
@@ -58,26 +54,46 @@ import {
   getChatRetentionMode,
   setChatRetentionMode,
 } from './services/chatService';
+import { readJournalEntries } from './services/journalService';
 import { getScratchpad, saveScratchpad } from './services/scratchpadService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
+import { generateLiveThought } from './ai/liveThought';
 import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
-
-const EMPTY_MEMORY: AssistantMemorySnapshot = {
-  profile: '',
-  patterns: '',
-  journalEntries: [],
-};
-
-const EMPTY_LIVE_CONTEXT: AssistantLiveContext = {
-  tasks: [],
-  inboxCount: 0,
-};
 
 type ChatSendInput = {
   content: string;
   modelId?: string | null;
 };
+
+const settingsMemoryUpdateSchema = z
+  .object({
+    soul: z.string().optional(),
+    profile: z.string().optional(),
+    patterns: z.string().optional(),
+  })
+  .refine(
+    (value) =>
+      value.soul !== undefined ||
+      value.profile !== undefined ||
+      value.patterns !== undefined,
+    {
+      message: 'At least one memory field must be provided.',
+    },
+  );
+
+const settingsReadJournalSchema = z.object({
+  category: z.enum(['pattern', 'progress', 'preference', 'summary']).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+  days_back: z.number().int().min(1).max(90).optional(),
+  daysBack: z.number().int().min(1).max(90).optional(),
+});
+
+const getMemoryState = (): SettingsMemoryStatePayload => ({
+  soul: getSoul(),
+  profile: getProfile(),
+  patterns: getPatterns(),
+});
 
 export const registerIpcHandlers = (): void => {
   if (ipcMain.listenerCount(IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_STATE) > 0) {
@@ -97,24 +113,12 @@ export const registerIpcHandlers = (): void => {
       _event,
       request?: IdentityContextSnapshotRequest,
     ): Promise<IdentityContextSnapshotResult> => {
-      const contracts = await loadIdentityContracts(process.cwd());
-      const memory: AssistantMemorySnapshot = {
-        ...EMPTY_MEMORY,
-        ...request?.memory,
-        journalEntries: request?.memory?.journalEntries ?? EMPTY_MEMORY.journalEntries,
-      };
-      const liveContext: AssistantLiveContext = {
-        ...EMPTY_LIVE_CONTEXT,
-        ...request?.liveContext,
-        tasks: request?.liveContext?.tasks ?? EMPTY_LIVE_CONTEXT.tasks,
-      };
-
-      return compileIdentityContext({
-        contracts,
-        memory,
-        liveContext,
-        request: request?.request,
+      return buildIdentityContext({
+        baseDir: process.cwd(),
+        userMessage: request?.request,
         tokenBudget: request?.tokenBudget,
+        memory: request?.memory,
+        liveContext: request?.liveContext,
       });
     },
   );
@@ -332,6 +336,15 @@ export const registerIpcHandlers = (): void => {
       catch (e) { console.error('[ipc] CHAT_SET_RETENTION_MODE:', e); throw e; }
     },
   );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_GET_LIVE_THOUGHT,
+    (): ChatLiveThoughtResult => {
+      try {
+        return generateLiveThought();
+      }
+      catch (e) { console.error('[ipc] CHAT_GET_LIVE_THOUGHT:', e); throw e; }
+    },
+  );
 
   // ─── Scratchpad handlers ─────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.SCRATCHPAD_GET, () => {
@@ -356,4 +369,60 @@ export const registerIpcHandlers = (): void => {
     try { return getAllSettings(); }
     catch (e) { console.error('[ipc] SETTINGS_GET_ALL:', e); throw e; }
   });
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_MEMORY_STATE,
+    (): SettingsMemoryStatePayload => {
+      try { return getMemoryState(); }
+      catch (e) { console.error('[ipc] SETTINGS_GET_MEMORY_STATE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_UPDATE_MEMORY_STATE,
+    (_event, payload: SettingsMemoryUpdateRequestPayload): SettingsMemoryStatePayload => {
+      try {
+        const validated = settingsMemoryUpdateSchema.parse(payload ?? {});
+
+        if (validated.soul !== undefined) {
+          setSoul(validated.soul);
+        }
+        if (validated.profile !== undefined) {
+          setProfile(validated.profile);
+        }
+        if (validated.patterns !== undefined) {
+          setPatterns(validated.patterns);
+        }
+
+        return getMemoryState();
+      }
+      catch (e) { console.error('[ipc] SETTINGS_UPDATE_MEMORY_STATE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_RESET_SOUL,
+    (): SettingsMemoryStatePayload => {
+      try {
+        resetSoul();
+        return getMemoryState();
+      }
+      catch (e) { console.error('[ipc] SETTINGS_RESET_SOUL:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_READ_JOURNAL,
+    (_event, payload?: SettingsReadJournalRequestPayload): SettingsReadJournalResultPayload => {
+      try {
+        const validated = settingsReadJournalSchema.parse(payload ?? {});
+
+        return {
+          entries: readJournalEntries({
+            category: validated.category,
+            limit: validated.limit,
+            days_back: validated.days_back,
+            daysBack: validated.daysBack,
+          }),
+        };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_READ_JOURNAL:', e); throw e; }
+    },
+  );
 };

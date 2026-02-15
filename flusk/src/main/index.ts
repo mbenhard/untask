@@ -6,6 +6,7 @@ import {
   compileIdentityContext,
   loadIdentityContracts,
 } from './assistant/contextCompiler';
+import { checkAndGenerateWeeklyDigest } from './ai/weeklyDigest';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
@@ -85,6 +86,7 @@ const emitIdentityContextDebugSnapshot = async (): Promise<void> => {
   const snapshot = compileIdentityContext({
     contracts,
     memory: {
+      soul: '',
       profile: '',
       patterns: '',
       journalEntries: [],
@@ -102,6 +104,21 @@ const emitIdentityContextDebugSnapshot = async (): Promise<void> => {
   );
 };
 
+const runWeeklyDigestStartupCheck = (): void => {
+  setTimeout(() => {
+    try {
+      const result = checkAndGenerateWeeklyDigest();
+      if (result.status === 'generated') {
+        // eslint-disable-next-line no-console
+        console.info('[weekly-digest] generated startup digest entry');
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[weekly-digest] startup check failed', error);
+    }
+  }, 0);
+};
+
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) {
     app.dock.hide();
@@ -109,6 +126,7 @@ app.whenReady().then(() => {
 
   void emitIdentityContextDebugSnapshot();
   bootstrap();
+  runWeeklyDigestStartupCheck();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
