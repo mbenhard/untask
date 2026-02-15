@@ -43,6 +43,13 @@ const isCurrentWeekDigest = (value: string | null, now: Date): boolean => {
   return isSameMondayWeek(parsed, now);
 };
 
+const toLocalDate = (date: Date): string =>
+  [
+    String(date.getFullYear()),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+
 const formatWeekWindow = (now: Date): string => {
   const weekStart = startOfMondayWeek(now);
   const previousWeekStart = new Date(weekStart);
@@ -50,7 +57,7 @@ const formatWeekWindow = (now: Date): string => {
   const previousWeekEnd = new Date(weekStart);
   previousWeekEnd.setDate(previousWeekEnd.getDate() - 1);
 
-  return `${previousWeekStart.toISOString().slice(0, 10)} to ${previousWeekEnd.toISOString().slice(0, 10)}`;
+  return `${toLocalDate(previousWeekStart)} to ${toLocalDate(previousWeekEnd)}`;
 };
 
 const categoryCounts = (entries: AiJournal[]): Record<AiJournal['category'], number> => ({
