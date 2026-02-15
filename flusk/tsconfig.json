@@ -1,15 +1,8 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "commonjs",
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "noImplicitAny": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "outDir": "dist",
-    "moduleResolution": "node",
-    "resolveJsonModule": true
-  }
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.main.json" },
+    { "path": "./tsconfig.preload.json" },
+    { "path": "./tsconfig.renderer.json" }
+  ]
 }

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node", "electron", "@electron-forge/plugin-vite/forge-vite-env"]
+  },
+  "include": [
+    "vite.aliases.ts",
+    "vite.preload.config.ts",
+    "src/preload/**/*.ts",
+    "src/types/**/*.ts",
+    "forge.env.d.ts"
+  ]
+}

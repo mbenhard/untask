@@ -9,7 +9,7 @@
         "testStrategy": "1. Run `npm run start` - app should launch frameless window\n2. Verify window dimensions are correct (680x720)\n3. Confirm window is resizable within min/max bounds\n4. Verify no Dock icon appears (menu bar only)\n5. Test hot reload works when editing React components\n6. Verify TypeScript compilation succeeds with no errors",
         "priority": "high",
         "dependencies": [],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -29,10 +29,11 @@
             "dependencies": [
               1
             ],
-            "details": "1. Edit forge.config.ts to configure BrowserWindow options:\n   - Set `frame: false` for frameless window\n   - Set `titleBarStyle: 'hidden'` for macOS integration\n   - Set `width: 680, height: 720` for default size\n   - Set `minWidth: 480, minHeight: 520` for minimum bounds\n   - Set `maxWidth: 900, maxHeight: 900` for maximum bounds\n   - Set `transparent: true` if needed for border radius\n   - Set `vibrancy: 'under-window'` or similar for macOS visual effects (optional)\n2. Create/modify entitlements.plist for macOS signing\n3. Configure Info.plist customization in forge.config.ts packagerConfig:\n   - Add `extendInfo: { LSUIElement: true }` to hide from Dock\n4. Add CSS for 12px border radius in the renderer: `html, body { border-radius: 12px; overflow: hidden; }`\n5. Implement window drag region using `-webkit-app-region: drag` on a custom title bar component\n6. Test on macOS that window appears without Dock icon and is frameless",
-            "status": "pending",
+            "details": "1. Edit forge.config.ts to configure BrowserWindow options:\n   - Set `frame: false` for frameless window\n   - Set `titleBarStyle: 'hidden'` for macOS integration\n   - Set `width: 680, height: 720` for default size\n   - Set `minWidth: 480, minHeight: 520` for minimum bounds\n   - Set `maxWidth: 900, maxHeight: 900` for maximum bounds\n   - Set `transparent: true` if needed for border radius\n   - Set `vibrancy: 'under-window'` or similar for macOS visual effects (optional)\n2. Create/modify entitlements.plist for macOS signing\n3. Configure Info.plist customization in forge.config.ts packagerConfig:\n   - Add `extendInfo: { LSUIElement: true }` to hide from Dock\n4. Add CSS for 12px border radius in the renderer: `html, body { border-radius: 12px; overflow: hidden; }`\n5. Implement window drag region using `-webkit-app-region: drag` on a custom title bar component\n6. Test on macOS that window appears without Dock icon and is frameless\n<info added on 2026-02-15T17:17:45.720Z>\nBased on my analysis of the codebase, here is the implementation summary to append:\n\nCOMPLETED: Frameless window with size constraints and Dock hiding implemented across main process and renderer.\n\nMain process (src/main/index.ts:15-34):\n- BrowserWindow configured with frame:false, titleBarStyle:'hidden', transparent:true, backgroundColor:'#00000000'\n- Size constraints: 680x720 default, 480x520 min, 900x900 max\n- Runtime Dock hiding via app.dock.hide() on darwin (lines 60-62)\n\nForge config (forge.config.ts:12-15):\n- packagerConfig.extendInfo.LSUIElement=true for persistent Dock hiding in packaged app\n\nRenderer styles (src/renderer/styles/index.css):\n- html/body/#root: 12px border-radius with overflow:hidden and transparent background (lines 11-20)\n- .app-shell: 1px border, 12px radius, dark background (#0d0d0d) for visible window frame (lines 22-31)\n\nDrag region (src/renderer/components/DragBar.tsx + index.css:33-46):\n- Header component with -webkit-app-region:drag class\n- Interactive elements use .no-drag to remain clickable\n</info added on 2026-02-15T17:17:45.720Z>",
+            "status": "done",
             "testStrategy": "Launch app and verify: 1) Window has no native title bar, 2) Window dimensions are 680x720, 3) Cannot resize below 480x520 or above 900x900, 4) App icon does NOT appear in macOS Dock, 5) Window corners appear rounded with 12px radius, 6) Window is draggable via custom drag region.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:20:00.570Z"
           },
           {
             "id": 3,
@@ -41,10 +42,11 @@
             "dependencies": [
               1
             ],
-            "details": "1. Install React 19 and SWC plugin:\n   - `npm install react@^19.0.0 react-dom@^19.0.0`\n   - `npm install -D @vitejs/plugin-react-swc @types/react@^19.0.0 @types/react-dom@^19.0.0`\n2. Update vite.renderer.config.ts:\n   - Replace default React plugin with `@vitejs/plugin-react-swc`\n   - Configure SWC options if needed (e.g., jsxImportSource)\n3. Add path alias configuration to all Vite configs:\n   ```typescript\n   resolve: {\n     alias: {\n       '@': path.resolve(__dirname, 'src'),\n       '@main': path.resolve(__dirname, 'src/main'),\n       '@renderer': path.resolve(__dirname, 'src/renderer'),\n       '@preload': path.resolve(__dirname, 'src/preload'),\n     }\n   }\n   ```\n4. Verify aliases work in both development and production builds\n5. Test that React 19 features (use, Actions, etc.) are available\n6. Ensure HMR (Hot Module Replacement) works correctly with SWC",
-            "status": "pending",
+            "details": "1. Install React 19 and SWC plugin:\n   - `npm install react@^19.0.0 react-dom@^19.0.0`\n   - `npm install -D @vitejs/plugin-react-swc @types/react@^19.0.0 @types/react-dom@^19.0.0`\n2. Update vite.renderer.config.ts:\n   - Replace default React plugin with `@vitejs/plugin-react-swc`\n   - Configure SWC options if needed (e.g., jsxImportSource)\n3. Add path alias configuration to all Vite configs:\n   ```typescript\n   resolve: {\n     alias: {\n       '@': path.resolve(__dirname, 'src'),\n       '@main': path.resolve(__dirname, 'src/main'),\n       '@renderer': path.resolve(__dirname, 'src/renderer'),\n       '@preload': path.resolve(__dirname, 'src/preload'),\n     }\n   }\n   ```\n4. Verify aliases work in both development and production builds\n5. Test that React 19 features (use, Actions, etc.) are available\n6. Ensure HMR (Hot Module Replacement) works correctly with SWC\n<info added on 2026-02-15T17:18:21.714Z>\nImplementation complete. Installed @vitejs/plugin-react-swc (v4.2.3), react (v19.2.4), react-dom (v19.2.4), @types/react (v19.2.14), and @types/react-dom (v19.2.3). Created vite.aliases.ts at flusk/vite.aliases.ts defining four path aliases: @ → src, @main → src/main, @renderer → src/renderer, @preload → src/preload. Updated vite.renderer.config.ts to use async config function with dynamic import of @vitejs/plugin-react-swc for Electron Forge compatibility, applying react() plugin and viteAliases. Updated vite.main.config.ts and vite.preload.config.ts to import and apply viteAliases via resolve.alias. All three Vite configs now share centralized alias resolution.\n</info added on 2026-02-15T17:18:21.714Z>",
+            "status": "done",
             "testStrategy": "1) Create a test component using React 19's `use` hook and verify it compiles, 2) Import a file using each path alias (@/, @main/, @renderer/) and verify no resolution errors, 3) Make a change to a React component and confirm HMR updates without full reload, 4) Run production build and verify aliases resolve correctly in bundled output.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:20:02.760Z"
           },
           {
             "id": 4,
@@ -53,10 +55,11 @@
             "dependencies": [
               1
             ],
-            "details": "1. Create the directory structure:\n   ```\n   src/\n     main/\n       index.ts        # Main process entry point\n       tray.ts         # Menu bar/tray integration\n       shortcuts.ts    # Global keyboard shortcuts (Cmd+Shift+Space)\n       ipc.ts          # IPC handler registrations\n       db/             # Database modules (for Task 3)\n     renderer/\n       main.tsx        # React entry point with createRoot\n       App.tsx         # Root React component\n       components/     # UI components directory\n       hooks/          # Custom React hooks\n       lib/            # Utility functions\n       styles/         # CSS/Tailwind files\n     preload/\n       index.ts        # Preload script exposing safe APIs\n   ```\n2. Update main/index.ts to import from tray.ts, shortcuts.ts, ipc.ts\n3. Set up basic React 19 entry in renderer/main.tsx with createRoot\n4. Create minimal preload/index.ts with contextBridge setup\n5. Update Vite entry points in forge.config.ts to point to new locations\n6. Ensure all placeholder files export at least a stub function to prevent import errors",
-            "status": "pending",
+            "details": "1. Create the directory structure:\n   ```\n   src/\n     main/\n       index.ts        # Main process entry point\n       tray.ts         # Menu bar/tray integration\n       shortcuts.ts    # Global keyboard shortcuts (Cmd+Shift+Space)\n       ipc.ts          # IPC handler registrations\n       db/             # Database modules (for Task 3)\n     renderer/\n       main.tsx        # React entry point with createRoot\n       App.tsx         # Root React component\n       components/     # UI components directory\n       hooks/          # Custom React hooks\n       lib/            # Utility functions\n       styles/         # CSS/Tailwind files\n     preload/\n       index.ts        # Preload script exposing safe APIs\n   ```\n2. Update main/index.ts to import from tray.ts, shortcuts.ts, ipc.ts\n3. Set up basic React 19 entry in renderer/main.tsx with createRoot\n4. Create minimal preload/index.ts with contextBridge setup\n5. Update Vite entry points in forge.config.ts to point to new locations\n6. Ensure all placeholder files export at least a stub function to prevent import errors\n<info added on 2026-02-15T17:19:05.011Z>\nImplementation verified and complete. Directory structure created with the following files:\n\nMain process (src/main/):\n- index.ts: Entry point with frameless BrowserWindow (680x720, min 480x520, max 900x900), transparent background, hidden dock on macOS, imports and wires tray, shortcuts, and IPC modules in bootstrap()\n- tray.ts: Stub that tracks mainWindow reference for later tray implementation\n- shortcuts.ts: Global shortcut Cmd+Shift+Space to toggle window visibility\n- ipc.ts: Registers settings:get-bootstrap-state handler returning { status: 'ready' }\n- db/.gitkeep: Placeholder for database modules (Task 3)\n\nRenderer process (src/renderer/):\n- main.tsx: React 19 entry using createRoot with StrictMode, mounts to #root\n- App.tsx: Root component with DragBar and IPC bootstrap status display\n- components/DragBar.tsx: Custom traffic light area\n- hooks/useBootstrapState.ts: Hook calling window.flusk.getBootstrapState()\n- lib/noop.ts: Utility placeholder\n- styles/index.css: Base styles\n\nPreload (src/preload/):\n- index.ts: contextBridge exposing flusk API with getBootstrapState method\n\nShared types (src/types/):\n- ipc.ts: IPC_CHANNELS constant and SettingsBootstrapState type\n- preload.d.ts: FluskApi type and global Window augmentation\n\nforge.config.ts updated with entry points src/main/index.ts and src/preload/index.ts. index.html loads /src/renderer/main.tsx as module and mounts React at #root div.\n</info added on 2026-02-15T17:19:05.011Z>",
+            "status": "done",
             "testStrategy": "1) Run `npm run start` and verify app launches without import/path errors, 2) Verify main process logs from each module (index, tray, shortcuts, ipc), 3) Verify React app renders in the window, 4) Check DevTools console for any module resolution errors, 5) Verify preload script executes (add console.log to confirm).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:20:04.940Z"
           },
           {
             "id": 5,
@@ -66,16 +69,17 @@
               3,
               4
             ],
-            "details": "1. Update tsconfig.json with strict mode settings:\n   ```json\n   {\n     \"compilerOptions\": {\n       \"strict\": true,\n       \"strictNullChecks\": true,\n       \"noImplicitAny\": true,\n       \"noUnusedLocals\": true,\n       \"noUnusedParameters\": true,\n       \"esModuleInterop\": true,\n       \"skipLibCheck\": true,\n       \"forceConsistentCasingInFileNames\": true\n     }\n   }\n   ```\n2. Configure path aliases matching Vite:\n   ```json\n   \"paths\": {\n     \"@/*\": [\"src/*\"],\n     \"@main/*\": [\"src/main/*\"],\n     \"@renderer/*\": [\"src/renderer/*\"],\n     \"@preload/*\": [\"src/preload/*\"]\n   }\n   ```\n3. Install Electron types: `npm install -D @electron-forge/plugin-vite`\n4. Create separate tsconfig files if needed:\n   - tsconfig.main.json (Node.js environment)\n   - tsconfig.renderer.json (DOM environment)\n   - tsconfig.preload.json (restricted Electron preload)\n5. Add custom type declarations in src/types/ for IPC channels\n6. Ensure typescript@^5.5.0 is installed for latest features\n7. Run `npx tsc --noEmit` to verify no type errors in the project",
-            "status": "pending",
+            "details": "1. Update tsconfig.json with strict mode settings:\n   ```json\n   {\n     \"compilerOptions\": {\n       \"strict\": true,\n       \"strictNullChecks\": true,\n       \"noImplicitAny\": true,\n       \"noUnusedLocals\": true,\n       \"noUnusedParameters\": true,\n       \"esModuleInterop\": true,\n       \"skipLibCheck\": true,\n       \"forceConsistentCasingInFileNames\": true\n     }\n   }\n   ```\n2. Configure path aliases matching Vite:\n   ```json\n   \"paths\": {\n     \"@/*\": [\"src/*\"],\n     \"@main/*\": [\"src/main/*\"],\n     \"@renderer/*\": [\"src/renderer/*\"],\n     \"@preload/*\": [\"src/preload/*\"]\n   }\n   ```\n3. Install Electron types: `npm install -D @electron-forge/plugin-vite`\n4. Create separate tsconfig files if needed:\n   - tsconfig.main.json (Node.js environment)\n   - tsconfig.renderer.json (DOM environment)\n   - tsconfig.preload.json (restricted Electron preload)\n5. Add custom type declarations in src/types/ for IPC channels\n6. Ensure typescript@^5.5.0 is installed for latest features\n7. Run `npx tsc --noEmit` to verify no type errors in the project\n<info added on 2026-02-15T17:19:48.293Z>\nImplemented TypeScript project references architecture with strict type safety. Created tsconfig.base.json containing shared strict settings (strict, strictNullChecks, noImplicitAny, noUnusedLocals, noUnusedParameters, forceConsistentCasingInFileNames) and path aliases (@/*, @main/*, @renderer/*, @preload/*). Configured three context-specific configs: tsconfig.main.json (Node.js with NodeNext module resolution, Electron types), tsconfig.preload.json (restricted Electron preload with Node/Electron types), and tsconfig.renderer.json (DOM environment with ESNext module, react-jsx, vite/client types). Root tsconfig.json now uses project references pointing to all three configs. Custom type declarations created in src/types/ including ipc.ts (IPC channel constants and types) and preload.d.ts (Window.flusk API typing). TypeScript ^5.9.3 installed. Verified type safety via npx tsc --noEmit with no errors.\n</info added on 2026-02-15T17:19:48.293Z>",
+            "status": "done",
             "testStrategy": "1) Run `npx tsc --noEmit` with no errors, 2) Verify IDE (VS Code) shows proper type inference for Electron APIs in main process, 3) Verify React component types work correctly with React 19, 4) Test that path aliases resolve in IDE with proper IntelliSense, 5) Intentionally add a type error and confirm TypeScript catches it, 6) Verify preload script has restricted DOM/Node types as appropriate.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:20:07.136Z"
           }
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
         "expansionPrompt": "Break down the Electron Forge + Vite + React 19 initialization into: 1) Project scaffolding with electron-forge vite-typescript template, 2) Configuring frameless window with custom dimensions and LSUIElement for Dock hiding, 3) Setting up Vite with SWC and path aliases, 4) Creating the directory structure for main/renderer/preload processes, 5) TypeScript configuration with Electron types. Focus on macOS-specific configuration challenges.",
-        "updatedAt": "2026-02-15T17:05:57.571Z"
+        "updatedAt": "2026-02-15T17:20:07.136Z"
       },
       {
         "id": "2",
@@ -1069,9 +1073,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T17:05:57.572Z",
+      "lastModified": "2026-02-15T17:20:07.137Z",
       "taskCount": 13,
-      "completedCount": 0,
+      "completedCount": 1,
       "tags": [
         "master"
       ]

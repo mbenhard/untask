@@ -1,0 +1,81 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.app-shell {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #1e1e1e;
+  border-radius: 12px;
+  background: #0d0d0d;
+  color: #f2f2f2;
+  display: flex;
+  flex-direction: column;
+}
+
+.drag-region {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #1e1e1e;
+  background: #111111;
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.window-title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c8c8c8;
+}
+
+.window-context {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: #1f1f1f;
+  color: #b2b2b2;
+}
+
+.app-content {
+  padding: 24px;
+  display: grid;
+  gap: 8px;
+}
+
+.app-content h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.app-content p {
+  margin: 0;
+  color: #b2b2b2;
+}
+
+.status-row strong {
+  color: #f2f2f2;
+}
