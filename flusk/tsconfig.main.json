@@ -4,8 +4,8 @@
     "composite": true,
     "noEmit": true,
     "lib": ["ES2022"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "types": ["node", "electron", "@electron-forge/plugin-vite/forge-vite-env"]
   },
   "include": [

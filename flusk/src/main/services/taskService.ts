@@ -1,4 +1,4 @@
-import { eq, asc, isNull, and, type SQL } from 'drizzle-orm';
+import { eq, asc, isNull, and, inArray, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getDb } from '../db';
@@ -25,6 +25,7 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = createTaskSchema.partial().extend({
   id: z.string(),
 });
+const reorderTaskIdsSchema = z.array(z.string().min(1));
 
 // ─── Service functions ──────────────────────────────────────
 function logTaskEvent(
@@ -160,14 +161,61 @@ export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
 
 export function reorderTasks(
   orderedIds: string[],
+  source: 'user' | 'ai' = 'user',
 ): void {
+  const validatedIds = reorderTaskIdsSchema.parse(orderedIds);
   const db = getDb();
 
-  db.transaction((tx) => {
-    for (let i = 0; i < orderedIds.length; i++) {
-      tx.update(tasks)
+  db.transaction((tx): void => {
+    if (validatedIds.length === 0) {
+      return;
+    }
+
+    const uniqueIds = new Set(validatedIds);
+    if (uniqueIds.size !== validatedIds.length) {
+      throw new Error('Task reorder payload contains duplicate task IDs.');
+    }
+
+    const beforeRows = tx
+      .select()
+      .from(tasks)
+      .where(inArray(tasks.id, validatedIds))
+      .all();
+
+    if (beforeRows.length !== validatedIds.length) {
+      const beforeIds = new Set(beforeRows.map((task) => task.id));
+      const missing = validatedIds.filter((id) => !beforeIds.has(id));
+      throw new Error(`Task(s) not found: ${missing.join(', ')}`);
+    }
+
+    const beforeById = new Map(beforeRows.map((task) => [task.id, task]));
+
+    for (let i = 0; i < validatedIds.length; i++) {
+      const id = validatedIds[i];
+      const before = beforeById.get(id);
+      if (!before) {
+        continue;
+      }
+
+      if (before.order === i) {
+        continue;
+      }
+
+      const [updated] = tx
+        .update(tasks)
         .set({ order: i })
-        .where(eq(tasks.id, orderedIds[i]))
+        .where(eq(tasks.id, id))
+        .returning()
+        .all();
+
+      tx.insert(taskEvents)
+        .values({
+          taskId: id,
+          action: 'move',
+          source,
+          before: JSON.stringify(before),
+          after: JSON.stringify(updated),
+        })
         .run();
     }
   });

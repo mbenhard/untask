@@ -1,28 +1,50 @@
 import React from 'react';
 
-import { DragBar } from './components/DragBar';
-import { useBootstrapState } from './hooks/useBootstrapState';
+import { AppShell } from './components/layout/AppShell';
 
-const App = (): React.JSX.Element => {
-  const { status, loading } = useBootstrapState();
-
-  return (
-    <div className="flex h-full w-full flex-col rounded-[var(--radius-window)] border border-border bg-background">
-      <DragBar />
-      <main className="grid gap-2 p-6">
-        <h1 className="text-[15px] font-semibold text-foreground">Flusk</h1>
-        <p className="text-[13px] text-muted-foreground">
-          Personal assistant runtime initialized.
-        </p>
-        <p className="text-[13px] text-muted-foreground">
-          IPC bootstrap:
-          <strong className="text-foreground">
-            {loading ? ' checking...' : ` ${status}`}
-          </strong>
-        </p>
-      </main>
-    </div>
-  );
+type AppErrorBoundaryState = {
+  error: Error | null;
 };
+
+class AppErrorBoundary extends React.Component<
+  React.PropsWithChildren,
+  AppErrorBoundaryState
+> {
+  state: AppErrorBoundaryState = {
+    error: null,
+  };
+
+  static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    // eslint-disable-next-line no-console
+    console.error('[renderer] unhandled render error', error, info.componentStack);
+  }
+
+  render(): JSX.Element {
+    if (!this.state.error) {
+      return <>{this.props.children}</>;
+    }
+
+    return (
+      <main className="flex h-full w-full items-center justify-center p-6">
+        <div className="w-full max-w-xl rounded-lg border border-destructive/40 bg-card p-4">
+          <h1 className="text-sm font-semibold text-foreground">Renderer Error</h1>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {this.state.error.message}
+          </p>
+        </div>
+      </main>
+    );
+  }
+}
+
+const App = (): JSX.Element => (
+  <AppErrorBoundary>
+    <AppShell />
+  </AppErrorBoundary>
+);
 
 export default App;

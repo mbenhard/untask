@@ -248,7 +248,7 @@
         "dependencies": [
           "3"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -256,9 +256,10 @@
             "description": "Create comprehensive TypeScript type definitions that will be shared across main, preload, and renderer processes. This includes the Task entity interface, all IPC channel names as const enums, request/response types for each operation, and the typed API bridge interface that will be exposed via contextBridge.",
             "dependencies": [],
             "details": "Create src/shared/types/task.ts with Task interface aligned to PRD fields:\n- id, parentId, title, body, status, priority, today, client, dueDate, dueType, effort, invoiceStatus, valueAtRisk, lastClientTouchAt, order, createdAt, completedAt\n\nCreate src/shared/ipc.ts defining IPC_CHANNELS for domain channels:\n- task:list, task:create, task:update, task:delete, task:reorder, task:complete, task:toggle-today\n\nDefine payload/response types:\n- TaskCreatePayload, TaskUpdatePayload, TaskListFilter\n- Ensure fields use today/client/order (not isToday/clientId/sortOrder)\n- Do not require updatedAt unless schema adds it\n\nCreate src/shared/types/api.ts with typed TasksAPI interface exposed by preload.\nUse const channel names and shared types for compile-time safety across main/preload/renderer.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Import types in main process file - verify no compilation errors. Import same types in renderer file - verify compatibility. Ensure IPC channel names are autocompleted in both processes. Verify Task interface matches Drizzle schema from Task 3.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:03:57.820Z"
           },
           {
             "id": 2,
@@ -268,9 +269,10 @@
               1
             ],
             "details": "Install Zustand: npm install zustand. Create src/renderer/stores/taskStore.ts implementing TaskStore interface.\n\nState includes:\n- tasks array, selectedTaskId, view ('today'|'projects'|'inbox'), isLoading, error\n\nActions:\n- fetchTasks() calls window.api.tasks.list with view filter\n- createTask() adds to store and calls IPC\n- updateTask() patches local state and calls IPC\n- deleteTask() removes from store and calls IPC\n- reorderTasks() updates order locally and persists\n- toggleToday() flips today flag\n- completeTask() sets status='done' with completedAt timestamp\n\nUse immutable updates (immer optional), selectors (getTasksByView/getSelectedTask/getTodayTasks), and mount-time fetch.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create mock window.api object, call store actions, verify state updates correctly. Test each action updates local state as expected. Verify selectors filter tasks correctly by view. Test loading state transitions during async operations.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:07:57.747Z"
           },
           {
             "id": 3,
@@ -280,9 +282,10 @@
               1
             ],
             "details": "Create src/preload/index.ts (or update existing). Import contextBridge and ipcRenderer from 'electron'. Import TasksAPI type from shared types. Implement the api object matching TasksAPI interface: tasks.list(filter) wraps ipcRenderer.invoke('task:list', filter), tasks.create(task) wraps ipcRenderer.invoke('task:create', task), tasks.update(id, updates), tasks.delete(id), tasks.reorder(taskIds), tasks.complete(id), tasks.toggleToday(id). Use contextBridge.exposeInMainWorld('api', api) to expose safely. Create src/renderer/types/global.d.ts declaring Window interface extension with api property typed as the full API bridge. Ensure no nodeIntegration leaks - only expose specific IPC methods, never raw ipcRenderer.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Log window.api in renderer console - verify object exists with all methods. Call window.api.tasks.list({}) - verify IPC is invoked (check main process logs). Verify TypeScript autocomplete works for window.api in renderer code. Confirm contextIsolation is true in webPreferences.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:03:58.584Z"
           },
           {
             "id": 4,
@@ -293,9 +296,10 @@
               3
             ],
             "details": "Create src/main/ipc/taskHandlers.ts. Import ipcMain, database service, and shared task types.\n\nRegister handlers:\n- task:list (filtered reads)\n- task:create\n- task:update\n- task:delete\n- task:reorder (updates order field)\n- task:complete (sets status='done' and completedAt)\n- task:toggle-today (flips today boolean)\n\nMutation handler pattern:\n1. Start transaction\n2. Read previous task state (before snapshot)\n3. Execute mutation\n4. Read updated state (after snapshot)\n5. Insert task_events row with { taskId, action, before, after, source, createdAt }\n6. Commit and return updated task\n\nExport registerTaskHandlers() and call it during main process bootstrap.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Call each IPC handler via window.api, verify database state changes. Check task_events table has entry after create/update/delete. Verify returned task object matches database state. Test error handling - pass invalid ID, verify graceful error response. Test transaction rollback on failure.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:03:59.364Z"
           },
           {
             "id": 5,
@@ -306,27 +310,29 @@
               4
             ],
             "details": "Update src/renderer/stores/taskStore.ts actions to implement optimistic updates with rollback.\n\n- createTask: add temp task locally, replace with persisted task on success, remove on failure\n- updateTask: snapshot previous task, patch locally, restore on failure\n- deleteTask: remove locally, restore on failure\n- reorderTasks: optimistically update order, rollback on persistence failure\n\nMaintain rollback snapshots keyed by action/request id and surface failures with toast/error state.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create task with slow network simulation - verify appears immediately. Fail the IPC call intentionally - verify task disappears and error shows. Update task, fail IPC - verify reverts to original state. Rapid-fire updates - verify final state is consistent. Reorder tasks, fail - verify order reverts.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:07:58.873Z"
           }
         ],
         "complexity": 7,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Define TypeScript types for Task entity and API bridge in shared directory, 2) Create Zustand store with all task actions and view state, 3) Implement preload script with contextBridge exposing safe IPC methods, 4) Create main process IPC handlers wrapping Drizzle queries with mutation logging to task_events, 5) Implement optimistic updates pattern in Zustand store with rollback handling. Include type safety across process boundaries."
+        "expansionPrompt": "Break down into: 1) Define TypeScript types for Task entity and API bridge in shared directory, 2) Create Zustand store with all task actions and view state, 3) Implement preload script with contextBridge exposing safe IPC methods, 4) Create main process IPC handlers wrapping Drizzle queries with mutation logging to task_events, 5) Implement optimistic updates pattern in Zustand store with rollback handling. Include type safety across process boundaries.",
+        "updatedAt": "2026-02-15T19:07:58.873Z"
       },
       {
         "id": "5",
         "title": "Implement Main UI Layout and View Navigation",
         "description": "Build the core application shell with the three-zone navigation (Today, Projects, Inbox), frameless window chrome with custom traffic lights, and the persistent chat input at the bottom.",
-        "details": "1. Create src/renderer/components/layout/AppShell.tsx:\n   - Frameless window with -webkit-app-region: drag on title bar\n   - Custom traffic light positioning (top-left, 12px margin)\n   - View tabs: Today | Projects | Inbox\n2. Create src/renderer/components/layout/TitleBar.tsx:\n   - Traffic lights integration (use @electron/remote or custom)\n   - Tab navigation with keyboard shortcuts (1, 2, 3)\n   - Draggable region\n3. Create src/renderer/components/layout/ChatInput.tsx:\n   - Fixed at bottom of window\n   - Placeholder: \"Ask anything...\" with Cmd+K hint\n   - Focus triggers chat mode transition\n4. Create view components:\n   - TodayView.tsx - tasks with today=true\n   - ProjectsView.tsx - parent tasks with subtasks\n   - InboxView.tsx - tasks with status='inbox'\n5. Implement view transitions with Framer Motion:\n   - 200ms slide animation between views\n   - Chat mode: task list slides up, chat fills space\n6. Create src/renderer/components/layout/LiveThought.tsx:\n   - Single contextual line at top of Today view\n   - Dismissable for session\n   - Optional action button\n7. Wire up keyboard navigation:\n   - 1/2/3 for view switching\n   - Cmd+K to focus chat\n   - Escape for layered dismiss",
+        "details": "1. Create src/renderer/components/layout/AppShell.tsx:\n   - Frameless window with -webkit-app-region: drag on title bar\n   - Custom traffic light positioning (top-left, 12px margin)\n   - View tabs: Today | Projects | Inbox\n2. Create src/renderer/components/layout/TitleBar.tsx:\n   - Traffic lights integration (use @electron/remote or custom)\n   - Tab navigation with keyboard shortcuts (1, 2, 3)\n   - Draggable region\n3. Create src/renderer/components/layout/ChatInput.tsx:\n   - Fixed at bottom of window\n   - Placeholder: \"Ask anything...\" with Cmd+K hint\n   - Focus triggers chat mode transition\n4. Create view components:\n   - TodayView.tsx - tasks with today=true\n   - ProjectsView.tsx - parent tasks with subtasks\n   - InboxView.tsx - tasks with status='inbox'\n5. Implement view transitions with Framer Motion:\n   - 200ms slide animation between views\n   - Chat mode: task list slides up, chat fills space\n6. Create src/renderer/components/layout/LiveThought.tsx:\n   - Single contextual line at top of Today view\n   - Dismissable for session\n   - Optional action button\n7. Wire up keyboard navigation:\n   - 1/2/3 for view switching\n   - Cmd+K to focus chat\n   - Escape for layered dismiss\n<info added on 2026-02-15T19:37:52.976Z>\nBased on my analysis of the codebase, here is the implementation summary to append to the task details:\n\nIMPLEMENTATION COMPLETED\n\nFiles created:\n- src/renderer/stores/appStore.ts: Single-source navigation state with activeView, previousViewIndex (for direction-aware transitions), and isChatMode. Exports APP_VIEW_ORDER, setView, enterChatMode, exitChatMode, and typed selectors.\n- src/renderer/hooks/useKeyboardShortcuts.ts: Centralized keyboard handler with Cmd+K focus, 1/2/3 view switching (blocked when inside text inputs), and layered Escape dismiss (clears input first, then exits chat mode).\n- src/renderer/components/layout/AppShell.tsx: Root shell with TitleBar, animated main content area, and fixed ChatInput. Direction-aware Framer Motion transitions using previousViewIndex. Respects prefers-reduced-motion.\n- src/renderer/components/layout/TitleBar.tsx: Draggable title bar (drag-region class) with 72px left spacer for traffic lights. Tab navigation using APP_VIEW_ORDER with animated underline indicator.\n- src/renderer/components/layout/ChatInput.tsx: Fixed footer with Input component, Cmd+K hint, triggers enterChatMode on non-empty input.\n- src/renderer/components/layout/LiveThought.tsx: Session-dismissable placeholder with Sparkles icon, placeholder text, \"Plan my day\" action button, and dismiss X button.\n- src/renderer/components/views/TodayView.tsx: Renders LiveThought slot at top, task list, loading/error/empty states.\n- src/renderer/components/views/ProjectsView.tsx: Project task list with loading/error/empty states.\n- src/renderer/components/views/InboxView.tsx: Inbox task list with loading/error/empty states.\n\nFiles modified:\n- src/main/index.ts: Added trafficLightPosition: { x: 12, y: 12 } to BrowserWindow config.\n- src/renderer/App.tsx: Replaced with AppShell as root component.\n\nFiles deleted:\n- src/renderer/components/DragBar.tsx: Replaced by TitleBar with integrated drag region.\n\nArchitecture notes:\n- taskStore no longer holds view/setView state; navigation state lives only in appStore to prevent drift.\n- Keyboard shortcuts are centralized in useKeyboardShortcuts hook, receiving inputRef, inputValue, and clearInput from AppShell.\n- All 200ms view transitions use direction-aware sliding (left/right based on tab index delta). Chat mode uses opacity fade only.\n\nVerified: npm run lint and npx tsc --noEmit pass with no errors.\n</info added on 2026-02-15T19:37:52.976Z>\n<info added on 2026-02-15T19:55:57.520Z>\nLet me analyze the codebase to understand the changes made for the final stabilization.Based on my analysis of the codebase, here is the stabilization update to append:\n\nFINAL STABILIZATION (2026-02-15)\n\nFixed max update depth loop in renderer:\n- AppShell now subscribes once to selectTasks from taskStore and derives today/projects/inbox lists locally within useMemo (lines 125-143)\n- Previously each view subscribed individually to the store, causing cascading re-renders\n\nFixed hidden window issue in Electron main process:\n- Added revealWindow helper function (lines 43-51) that safely shows window if not destroyed\n- Registered multiple reveal fallbacks: ready-to-show event, did-finish-load event, and 1500ms timeout (lines 53-56)\n- This ensures show:false initial config no longer leaves the app invisible if any single event fails to fire\n\nVerified: lint and typecheck pass after stabilization changes.\n</info added on 2026-02-15T19:55:57.520Z>",
         "testStrategy": "1. Verify traffic lights work (close, minimize, maximize)\n2. Test window dragging via title bar area\n3. Switch views with clicks - verify correct content shows\n4. Switch views with 1/2/3 keys - verify same behavior\n5. Click chat input - verify smooth transition to chat mode\n6. Press Escape - verify returns to task view\n7. Test live thought displays and dismisses correctly",
         "priority": "high",
         "dependencies": [
           "2",
           "4"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -334,9 +340,10 @@
             "description": "Build the root AppShell.tsx component that provides the frameless Electron window container with proper CSS draggable regions (-webkit-app-region: drag), 12px rounded corners, and the overall layout structure that houses TitleBar, main content area, and ChatInput.",
             "dependencies": [],
             "details": "Create src/renderer/components/layout/AppShell.tsx as the root layout component. Configure -webkit-app-region: drag on the title bar area and -webkit-app-region: no-drag on interactive elements (buttons, inputs). Apply the window styling: 12px border-radius, #1A1A1A background, subtle drop shadow. Set up the flex column layout: TitleBar (fixed top), MainContent (flex-1 with overflow), ChatInput (fixed bottom). Ensure the draggable region only covers the title bar and excludes traffic lights and view tabs. The window should be resizable with min 480x520 and max 900x900 dimensions as per the PRD.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Drag the window by the title bar area - should move smoothly. Try clicking buttons in the title bar - should NOT trigger dragging. Verify the rounded corners render correctly on macOS. Resize window and verify min/max constraints are respected.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:56:08.805Z"
           },
           {
             "id": 2,
@@ -346,9 +353,10 @@
               1
             ],
             "details": "In the Electron main process BrowserWindow configuration, set titleBarStyle: 'hidden' and trafficLightPosition: { x: 12, y: 12 } to position native traffic lights. This approach uses native macOS controls rather than custom implementations, ensuring proper accessibility and system integration. The traffic lights should appear at 12px from both top and left edges. Verify that the draggable title bar region accounts for traffic light placement (no overlap). Test that close/minimize/maximize buttons work correctly. For Windows/Linux, implement appropriate fallback behavior (either hide or use custom close/minimize buttons).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Click close button - window should close. Click minimize - window should minimize to dock. Click maximize - window should enter fullscreen or maximize. Verify traffic lights are positioned at 12px from top-left corner. Test that clicking traffic lights doesn't trigger window drag.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:56:11.060Z"
           },
           {
             "id": 3,
@@ -359,9 +367,10 @@
               2
             ],
             "details": "Create src/renderer/components/layout/TitleBar.tsx with a horizontal tab layout positioned to the right of the traffic lights. Use shadcn/ui Button or custom styled tabs with the monochrome design: #E5E5E5 text on active, #8A8A8A on inactive. Active tab should have a subtle bottom border or background highlight. Implement useEffect with keydown listener for '1', '2', '3' keys to switch views (only when not focused on input). Store current view in Zustand store or React context. The title bar should be fully within the -webkit-app-region: drag zone except for the interactive tabs. Ensure tabs are -webkit-app-region: no-drag. Tab order: Today (1) | Projects (2) | Inbox (3).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Click each tab - view should switch and tab should show active state. Press 1/2/3 keys - corresponding view should activate. Verify keyboard shortcuts don't trigger when typing in an input field. Test that tabs are visually distinct when active vs inactive. Verify dragging still works on empty title bar areas.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:56:13.320Z"
           },
           {
             "id": 4,
@@ -371,9 +380,10 @@
               1
             ],
             "details": "Create src/renderer/components/layout/ChatInput.tsx as a fixed-bottom input container. Use shadcn/ui Input or custom styled input with #262626 background, #8A8A8A placeholder text, full-width layout. Implement global Cmd+K (Mac) / Ctrl+K (Windows) shortcut to focus the input. When input receives focus AND user starts typing, trigger 'chat mode' state in global store. Chat mode causes the task list to slide up (handled in view components) and chat conversation to fill the space. Include a subtle border-top separator (#333333). The input should have comfortable padding (12-16px) and match the 44px row height design pattern. Escape key should blur the input and exit chat mode if no message is being composed.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Press Cmd+K anywhere - input should focus. Type in input - chat mode should activate (verify state change). Press Escape - input should blur and chat mode should deactivate. Verify placeholder text shows correctly. Test Ctrl+K on Windows if applicable. Verify input styling matches design spec.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:56:15.826Z"
           },
           {
             "id": 5,
@@ -384,9 +394,10 @@
               4
             ],
             "details": "Create src/renderer/components/views/TodayView.tsx, ProjectsView.tsx, InboxView.tsx as placeholder view components (actual task list implementation is separate). Wrap view switching in Framer Motion AnimatePresence with variants for enter/exit animations. Use 200ms duration with ease-out easing. Direction-aware transitions: switching from Today(1) to Projects(2) slides left, Projects(2) to Today(1) slides right. For chat mode transition, animate the task list container with translateY sliding up while chat conversation fades/slides in from below. Respect prefers-reduced-motion: use opacity-only transitions when motion is reduced. Each view should have basic structure: TodayView includes LiveThought slot at top, ProjectsView shows project groupings, InboxView shows flat task list. Include empty state placeholders.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Switch between views - observe smooth 200ms slide animation. Verify direction-aware sliding (left/right based on tab index). Enable chat mode - verify task list slides up smoothly. Set system to reduced motion - verify animations are subtle/instant. Test rapid view switching doesn't cause animation glitches.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:56:18.192Z"
           },
           {
             "id": 6,
@@ -396,14 +407,16 @@
               5
             ],
             "details": "Create src/renderer/components/layout/LiveThought.tsx as a single-line component shown at the top of TodayView only. Display contextual AI-generated text (placeholder for now, actual AI integration is separate task). Include a dismiss button (X icon) that hides the component for the current session (store in session state, not persisted). Optional action button when AI suggests an action (e.g., 'Add to today' or 'Start this task'). Styling: subtle #262626 background, #8A8A8A text, 8px vertical padding, Lucide icons for dismiss/action. Animate entry with Framer Motion fade-in. The component should be conditionally rendered based on: 1) being in TodayView, 2) AI having something to say, 3) not dismissed this session. Wire up Escape key as part of layered dismiss: if LiveThought is showing and dismissable, Escape dismisses it first before other actions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "View TodayView with LiveThought visible - verify it appears at top with correct styling. Click dismiss (X) - component should hide. Switch away and back to TodayView - LiveThought should remain hidden for session. Refresh app - LiveThought should reappear (session reset). Verify action button triggers callback when clicked. Test Escape key dismisses LiveThought when focused/visible.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T19:56:20.387Z"
           }
         ],
         "complexity": 7,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: 1) Create AppShell with frameless window chrome and draggable regions, 2) Implement custom traffic lights positioning and integration, 3) Build TitleBar with tab navigation and keyboard shortcuts (1/2/3), 4) Create ChatInput component with Cmd+K focus and chat mode transition trigger, 5) Implement view components (TodayView, ProjectsView, InboxView) with Framer Motion transitions, 6) Create LiveThought component with dismissal state and action buttons. Focus on Electron-specific window chrome behavior."
+        "expansionPrompt": "Break down into: 1) Create AppShell with frameless window chrome and draggable regions, 2) Implement custom traffic lights positioning and integration, 3) Build TitleBar with tab navigation and keyboard shortcuts (1/2/3), 4) Create ChatInput component with Cmd+K focus and chat mode transition trigger, 5) Implement view components (TodayView, ProjectsView, InboxView) with Framer Motion transitions, 6) Create LiveThought component with dismissal state and action buttons. Focus on Electron-specific window chrome behavior.",
+        "updatedAt": "2026-02-15T19:56:20.387Z"
       },
       {
         "id": "6",
@@ -1083,9 +1096,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T18:48:40.435Z",
+      "lastModified": "2026-02-15T19:56:20.388Z",
       "taskCount": 13,
-      "completedCount": 4,
+      "completedCount": 6,
       "tags": [
         "master"
       ]

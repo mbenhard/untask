@@ -28,6 +28,7 @@ const createMainWindow = (): BrowserWindow => {
     maxHeight: 900,
     frame: false,
     titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 12, y: 12 },
     transparent: true,
     backgroundColor: '#00000000',
     show: false,
@@ -39,9 +40,20 @@ const createMainWindow = (): BrowserWindow => {
     },
   });
 
-  window.once('ready-to-show', () => {
-    window.show();
-  });
+  const revealWindow = (): void => {
+    if (window.isDestroyed()) {
+      return;
+    }
+
+    if (!window.isVisible()) {
+      window.show();
+    }
+  };
+
+  window.once('ready-to-show', revealWindow);
+  window.webContents.once('did-finish-load', revealWindow);
+
+  setTimeout(revealWindow, 1500);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

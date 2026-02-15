@@ -1,0 +1,188 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { MessageSquareText } from 'lucide-react';
+
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import {
+  APP_VIEW_ORDER,
+  type AppView,
+  selectActiveView,
+  selectIsChatMode,
+  selectPreviousViewIndex,
+  useAppStore,
+} from '../../stores/appStore';
+import {
+  selectError,
+  selectIsLoading,
+  selectTasks,
+  useTaskStore,
+} from '../../stores/taskStore';
+import { InboxView } from '../views/InboxView';
+import { ProjectsView } from '../views/ProjectsView';
+import { TodayView } from '../views/TodayView';
+import { ChatInput } from './ChatInput';
+import { TitleBar } from './TitleBar';
+
+const getViewIndex = (view: AppView): number => APP_VIEW_ORDER.indexOf(view);
+
+const getDirection = (activeView: AppView, previousViewIndex: number): number => {
+  const activeViewIndex = getViewIndex(activeView);
+
+  if (activeViewIndex === previousViewIndex) {
+    return 0;
+  }
+
+  return activeViewIndex > previousViewIndex ? 1 : -1;
+};
+
+type ChatConversationPlaceholderProps = {
+  draft: string;
+};
+
+const ChatConversationPlaceholder = ({
+  draft,
+}: ChatConversationPlaceholderProps): JSX.Element => {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+      <div className="rounded-xl border border-border bg-card/60 p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MessageSquareText className="size-4" />
+          Chat mode placeholder
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Conversation history and streaming responses will be integrated in Task 7.
+        </p>
+      </div>
+
+      {draft.trim().length > 0 ? (
+        <div className="ml-auto max-w-[85%] rounded-xl border border-border bg-secondary px-3 py-2">
+          <p className="text-sm text-foreground">{draft}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+export const AppShell = (): JSX.Element => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [chatInputValue, setChatInputValue] = useState('');
+
+  const activeView = useAppStore(selectActiveView);
+  const previousViewIndex = useAppStore(selectPreviousViewIndex);
+  const isChatMode = useAppStore(selectIsChatMode);
+
+  const fetchTasks = useTaskStore((state) => state.fetchTasks);
+  const tasks = useTaskStore(selectTasks);
+  const isLoading = useTaskStore(selectIsLoading);
+  const error = useTaskStore(selectError);
+
+  useEffect(() => {
+    void fetchTasks();
+  }, [fetchTasks]);
+
+  const clearInput = useCallback(() => {
+    setChatInputValue('');
+  }, []);
+
+  useKeyboardShortcuts({
+    inputRef,
+    inputValue: chatInputValue,
+    clearInput,
+  });
+
+  const handleSubmit = useCallback(() => {
+    if (chatInputValue.trim().length === 0) {
+      return;
+    }
+
+    setChatInputValue('');
+  }, [chatInputValue]);
+
+  const transitionDirection = useMemo(
+    () => getDirection(activeView, previousViewIndex),
+    [activeView, previousViewIndex],
+  );
+
+  const prefersReducedMotion = useReducedMotion();
+
+  const transition = prefersReducedMotion
+    ? { duration: 0.12, ease: 'easeOut' as const }
+    : { duration: 0.2, ease: 'easeOut' as const };
+
+  const viewVariants = prefersReducedMotion
+    ? {
+        enter: { opacity: 0 },
+        center: { opacity: 1 },
+        exit: { opacity: 0 },
+      }
+    : {
+        enter: (direction: number) => ({ x: direction * 200, opacity: 0 }),
+        center: { x: 0, opacity: 1 },
+        exit: (direction: number) => ({ x: direction * -200, opacity: 0 }),
+      };
+
+  const activeViewComponent = useMemo((): JSX.Element => {
+    const todayTasks = tasks.filter((task) => task.today && task.status !== 'done');
+    const projectTasks = tasks.filter(
+      (task) => task.parentId === null && task.status !== 'inbox',
+    );
+    const inboxTasks = tasks.filter((task) => task.status === 'inbox');
+
+    if (activeView === 'today') {
+      return <TodayView tasks={todayTasks} isLoading={isLoading} error={error} />;
+    }
+
+    if (activeView === 'projects') {
+      return (
+        <ProjectsView tasks={projectTasks} isLoading={isLoading} error={error} />
+      );
+    }
+
+    return <InboxView tasks={inboxTasks} isLoading={isLoading} error={error} />;
+  }, [activeView, error, isLoading, tasks]);
+
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-window)] border border-border bg-background">
+      <TitleBar />
+
+      <div className="relative flex-1 overflow-hidden pb-14">
+        <AnimatePresence initial={false} mode="wait">
+          {isChatMode ? (
+            <motion.section
+              key="chat-mode"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={transition}
+              className="h-full overflow-y-auto p-4"
+            >
+              <ChatConversationPlaceholder draft={chatInputValue} />
+            </motion.section>
+          ) : (
+            <motion.section
+              key={activeView}
+              custom={transitionDirection}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={transition}
+              className="h-full"
+            >
+              {activeViewComponent}
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        <ChatInput
+          className="absolute inset-x-0 bottom-0"
+          inputRef={inputRef}
+          value={chatInputValue}
+          onChange={setChatInputValue}
+          onSubmit={handleSubmit}
+        />
+      </div>
+    </div>
+  );
+};
