@@ -1,9 +1,9 @@
 {
 	"meta": {
 		"generatedAt": "2026-02-15T16:21:58.998Z",
-		"tasksAnalyzed": 12,
-		"totalTasks": 12,
-		"analysisCount": 12,
+		"tasksAnalyzed": 13,
+		"totalTasks": 13,
+		"analysisCount": 13,
 		"thresholdScore": 5,
 		"projectName": "Taskmaster",
 		"usedResearch": true
@@ -104,6 +104,14 @@
 			"recommendedSubtasks": 4,
 			"expansionPrompt": "Break down into: 1) Create centralized animation variants with consistent easing and reduced-motion support, 2) Implement remaining animations (checkbox fill, task creation fade, scratchpad slide), 3) Add comprehensive ARIA attributes (roles, states, live regions) across all components, 4) Implement focus management (traps, return focus, visible rings) and VoiceOver testing. Focus on prefers-reduced-motion handling.",
 			"reasoning": "Animations are well-specified in the design doc, making implementation straightforward. Accessibility work requires touching many existing components but changes are additive (ARIA attributes, focus handlers). VoiceOver testing is time-consuming but not technically complex. The task consolidates polishing work that should be done after core features are complete."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Build Assistant Identity Kernel (Soul + Charter + Memory Policy)",
+			"complexityScore": 8,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down assistant identity kernel into: 1) Soul/Charter contracts, 2) identity-aware context compiler, 3) memory promotion/confirmation policy, 4) proactive policy trigger engine, 5) chat/tool orchestration gating. Focus on deterministic behavior and regression tests.",
+			"reasoning": "This is a cross-cutting foundation task that determines assistant quality. It touches prompt assembly, memory governance, behavior policy, and safety gating. Complexity is high because consistency must persist across sessions and be testable; weak implementation here degrades all later AI chat/autonomy features."
 		}
 	]
 }

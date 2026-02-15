@@ -2,23 +2,25 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Initialize Electron Forge Project with Vite",
         "description": "Set up the foundational Electron project using Electron Forge with the Vite plugin, configured for React 19 and TypeScript. Establish the monorepo-style structure with main and renderer processes.",
         "details": "1. Initialize project with `npm init electron-app@latest flusk -- --template=vite-typescript`\n2. Configure electron-forge.config.ts for:\n   - Frameless window (frame: false, titleBarStyle: 'hidden')\n   - Default window size 680x720, min 480x520, max 900x900\n   - 12px border radius via CSS\n   - Hide from Dock (LSUIElement in Info.plist for macOS)\n3. Set up Vite config for React 19 with SWC:\n   - Install @vitejs/plugin-react-swc\n   - Configure path aliases (@/, @main/, @renderer/)\n4. Directory structure:\n   ```\n   src/\n     main/           # Electron main process\n       index.ts      # Main entry\n       tray.ts       # Menu bar integration\n       shortcuts.ts  # Global shortcuts\n       ipc.ts        # IPC handlers\n     renderer/       # React app\n       main.tsx      # React entry\n       App.tsx\n     preload/        # Preload scripts\n       index.ts\n   ```\n5. Configure TypeScript with strict mode, paths, and Electron types\n6. Install core dependencies:\n   - electron@^33.0.0 (latest stable)\n   - react@^19.0.0, react-dom@^19.0.0\n   - typescript@^5.5.0\n7. Set up electron-builder or forge packaging config for macOS distribution",
         "testStrategy": "1. Run `npm run start` - app should launch frameless window\n2. Verify window dimensions are correct (680x720)\n3. Confirm window is resizable within min/max bounds\n4. Verify no Dock icon appears (menu bar only)\n5. Test hot reload works when editing React components\n6. Verify TypeScript compilation succeeds with no errors",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
             "title": "Scaffold Electron Forge project with vite-typescript template",
             "description": "Initialize the base Electron project using the official Electron Forge vite-typescript template, establishing the foundation for the Flusk app with proper npm configuration and initial dependencies.",
             "dependencies": [],
-            "details": "1. Run `npm init electron-app@latest flusk -- --template=vite-typescript` to scaffold the project\n2. Navigate into the created directory and verify the initial structure\n3. Run `npm install` to ensure all base dependencies are installed correctly\n4. Verify the project starts with `npm run start` - should show default Electron window\n5. Review generated files: forge.config.ts, vite.main.config.ts, vite.renderer.config.ts, vite.preload.config.ts\n6. Update package.json with project metadata (name: 'flusk', description, author)\n7. Ensure electron@^33.0.0 is installed (upgrade if template uses older version)\n8. Commit initial scaffold before making customizations",
-            "status": "pending",
-            "testStrategy": "Run `npm run start` and verify a default Electron window appears. Check that hot module replacement works by editing the renderer index.html. Verify `npm run make` produces a working macOS .app bundle."
+            "details": "1. Run `npm init electron-app@latest flusk -- --template=vite-typescript` to scaffold the project\n2. Navigate into the created directory and verify the initial structure\n3. Run `npm install` to ensure all base dependencies are installed correctly\n4. Verify the project starts with `npm run start` - should show default Electron window\n5. Review generated files: forge.config.ts, vite.main.config.ts, vite.renderer.config.ts, vite.preload.config.ts\n6. Update package.json with project metadata (name: 'flusk', description, author)\n7. Ensure electron@^33.0.0 is installed (upgrade if template uses older version)\n8. Commit initial scaffold before making customizations\n<info added on 2026-02-15T17:05:22.974Z>\nScaffolded Electron Forge Vite-TypeScript project in flusk/ directory using --skip-git flag. Verified structure includes forge.config.ts with VitePlugin (main, preload, renderer targets) and FusesPlugin for security hardening. Config files present: vite.main.config.ts, vite.preload.config.ts, vite.renderer.config.ts. Updated package.json with description \"AI-powered task management assistant for solo freelancers\" and author metadata. Template uses Electron 40.4.1 (exceeds minimum ^33.0.0 requirement). Lint check passed via npm run lint. Startup smoke test confirmed electron-forge start launches Vite dev server and opens default Electron window. Note: Current Electron version is 40.4.1, no upgrade needed.\n</info added on 2026-02-15T17:05:22.974Z>",
+            "status": "done",
+            "testStrategy": "Run `npm run start` and verify a default Electron window appears. Check that hot module replacement works by editing the renderer index.html. Verify `npm run make` produces a working macOS .app bundle.",
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:05:57.571Z"
           },
           {
             "id": 2,
@@ -29,7 +31,8 @@
             ],
             "details": "1. Edit forge.config.ts to configure BrowserWindow options:\n   - Set `frame: false` for frameless window\n   - Set `titleBarStyle: 'hidden'` for macOS integration\n   - Set `width: 680, height: 720` for default size\n   - Set `minWidth: 480, minHeight: 520` for minimum bounds\n   - Set `maxWidth: 900, maxHeight: 900` for maximum bounds\n   - Set `transparent: true` if needed for border radius\n   - Set `vibrancy: 'under-window'` or similar for macOS visual effects (optional)\n2. Create/modify entitlements.plist for macOS signing\n3. Configure Info.plist customization in forge.config.ts packagerConfig:\n   - Add `extendInfo: { LSUIElement: true }` to hide from Dock\n4. Add CSS for 12px border radius in the renderer: `html, body { border-radius: 12px; overflow: hidden; }`\n5. Implement window drag region using `-webkit-app-region: drag` on a custom title bar component\n6. Test on macOS that window appears without Dock icon and is frameless",
             "status": "pending",
-            "testStrategy": "Launch app and verify: 1) Window has no native title bar, 2) Window dimensions are 680x720, 3) Cannot resize below 480x520 or above 900x900, 4) App icon does NOT appear in macOS Dock, 5) Window corners appear rounded with 12px radius, 6) Window is draggable via custom drag region."
+            "testStrategy": "Launch app and verify: 1) Window has no native title bar, 2) Window dimensions are 680x720, 3) Cannot resize below 480x520 or above 900x900, 4) App icon does NOT appear in macOS Dock, 5) Window corners appear rounded with 12px radius, 6) Window is draggable via custom drag region.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -40,7 +43,8 @@
             ],
             "details": "1. Install React 19 and SWC plugin:\n   - `npm install react@^19.0.0 react-dom@^19.0.0`\n   - `npm install -D @vitejs/plugin-react-swc @types/react@^19.0.0 @types/react-dom@^19.0.0`\n2. Update vite.renderer.config.ts:\n   - Replace default React plugin with `@vitejs/plugin-react-swc`\n   - Configure SWC options if needed (e.g., jsxImportSource)\n3. Add path alias configuration to all Vite configs:\n   ```typescript\n   resolve: {\n     alias: {\n       '@': path.resolve(__dirname, 'src'),\n       '@main': path.resolve(__dirname, 'src/main'),\n       '@renderer': path.resolve(__dirname, 'src/renderer'),\n       '@preload': path.resolve(__dirname, 'src/preload'),\n     }\n   }\n   ```\n4. Verify aliases work in both development and production builds\n5. Test that React 19 features (use, Actions, etc.) are available\n6. Ensure HMR (Hot Module Replacement) works correctly with SWC",
             "status": "pending",
-            "testStrategy": "1) Create a test component using React 19's `use` hook and verify it compiles, 2) Import a file using each path alias (@/, @main/, @renderer/) and verify no resolution errors, 3) Make a change to a React component and confirm HMR updates without full reload, 4) Run production build and verify aliases resolve correctly in bundled output."
+            "testStrategy": "1) Create a test component using React 19's `use` hook and verify it compiles, 2) Import a file using each path alias (@/, @main/, @renderer/) and verify no resolution errors, 3) Make a change to a React component and confirm HMR updates without full reload, 4) Run production build and verify aliases resolve correctly in bundled output.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -51,7 +55,8 @@
             ],
             "details": "1. Create the directory structure:\n   ```\n   src/\n     main/\n       index.ts        # Main process entry point\n       tray.ts         # Menu bar/tray integration\n       shortcuts.ts    # Global keyboard shortcuts (Cmd+Shift+Space)\n       ipc.ts          # IPC handler registrations\n       db/             # Database modules (for Task 3)\n     renderer/\n       main.tsx        # React entry point with createRoot\n       App.tsx         # Root React component\n       components/     # UI components directory\n       hooks/          # Custom React hooks\n       lib/            # Utility functions\n       styles/         # CSS/Tailwind files\n     preload/\n       index.ts        # Preload script exposing safe APIs\n   ```\n2. Update main/index.ts to import from tray.ts, shortcuts.ts, ipc.ts\n3. Set up basic React 19 entry in renderer/main.tsx with createRoot\n4. Create minimal preload/index.ts with contextBridge setup\n5. Update Vite entry points in forge.config.ts to point to new locations\n6. Ensure all placeholder files export at least a stub function to prevent import errors",
             "status": "pending",
-            "testStrategy": "1) Run `npm run start` and verify app launches without import/path errors, 2) Verify main process logs from each module (index, tray, shortcuts, ipc), 3) Verify React app renders in the window, 4) Check DevTools console for any module resolution errors, 5) Verify preload script executes (add console.log to confirm)."
+            "testStrategy": "1) Run `npm run start` and verify app launches without import/path errors, 2) Verify main process logs from each module (index, tray, shortcuts, ipc), 3) Verify React app renders in the window, 4) Check DevTools console for any module resolution errors, 5) Verify preload script executes (add console.log to confirm).",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -63,19 +68,24 @@
             ],
             "details": "1. Update tsconfig.json with strict mode settings:\n   ```json\n   {\n     \"compilerOptions\": {\n       \"strict\": true,\n       \"strictNullChecks\": true,\n       \"noImplicitAny\": true,\n       \"noUnusedLocals\": true,\n       \"noUnusedParameters\": true,\n       \"esModuleInterop\": true,\n       \"skipLibCheck\": true,\n       \"forceConsistentCasingInFileNames\": true\n     }\n   }\n   ```\n2. Configure path aliases matching Vite:\n   ```json\n   \"paths\": {\n     \"@/*\": [\"src/*\"],\n     \"@main/*\": [\"src/main/*\"],\n     \"@renderer/*\": [\"src/renderer/*\"],\n     \"@preload/*\": [\"src/preload/*\"]\n   }\n   ```\n3. Install Electron types: `npm install -D @electron-forge/plugin-vite`\n4. Create separate tsconfig files if needed:\n   - tsconfig.main.json (Node.js environment)\n   - tsconfig.renderer.json (DOM environment)\n   - tsconfig.preload.json (restricted Electron preload)\n5. Add custom type declarations in src/types/ for IPC channels\n6. Ensure typescript@^5.5.0 is installed for latest features\n7. Run `npx tsc --noEmit` to verify no type errors in the project",
             "status": "pending",
-            "testStrategy": "1) Run `npx tsc --noEmit` with no errors, 2) Verify IDE (VS Code) shows proper type inference for Electron APIs in main process, 3) Verify React component types work correctly with React 19, 4) Test that path aliases resolve in IDE with proper IntelliSense, 5) Intentionally add a type error and confirm TypeScript catches it, 6) Verify preload script has restricted DOM/Node types as appropriate."
+            "testStrategy": "1) Run `npx tsc --noEmit` with no errors, 2) Verify IDE (VS Code) shows proper type inference for Electron APIs in main process, 3) Verify React component types work correctly with React 19, 4) Test that path aliases resolve in IDE with proper IntelliSense, 5) Intentionally add a type error and confirm TypeScript catches it, 6) Verify preload script has restricted DOM/Node types as appropriate.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down the Electron Forge + Vite + React 19 initialization into: 1) Project scaffolding with electron-forge vite-typescript template, 2) Configuring frameless window with custom dimensions and LSUIElement for Dock hiding, 3) Setting up Vite with SWC and path aliases, 4) Creating the directory structure for main/renderer/preload processes, 5) TypeScript configuration with Electron types. Focus on macOS-specific configuration challenges.",
+        "updatedAt": "2026-02-15T17:05:57.571Z"
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "Configure Tailwind v4 and shadcn/ui Design System",
         "description": "Set up Tailwind CSS v4 with the CSS-first configuration and integrate shadcn/ui components. Implement the custom monochrome color palette for dark/light modes as specified in the design document.",
         "details": "1. Install Tailwind v4 (now CSS-native):\n   - `npm install tailwindcss@^4.0.0 @tailwindcss/vite`\n   - Configure in vite.config.ts with `@tailwindcss/vite` plugin\n2. Create src/renderer/styles/globals.css with @theme directive:\n   ```css\n   @import 'tailwindcss';\n   @theme {\n     --color-bg: #1A1A1A;\n     --color-surface: #262626;\n     --color-border: #333333;\n     --color-text-primary: #F5F5F5;\n     --color-text-secondary: #8A8A8A;\n     --color-interactive: #E5E5E5;\n     --color-hover: #2E2E2E;\n     --radius-window: 12px;\n     --font-sans: 'Inter', system-ui, sans-serif;\n   }\n   ```\n3. Set up light mode variables using @media (prefers-color-scheme: light)\n4. Initialize shadcn/ui:\n   - `npx shadcn@latest init` (select New York style, neutral colors)\n   - Configure components.json for custom paths\n5. Install Inter font via @fontsource/inter or Google Fonts\n6. Create base components:\n   - src/renderer/components/ui/ (shadcn components)\n   - Custom theme provider that syncs with system preference\n7. Add Framer Motion: `npm install framer-motion`\n8. Add Lucide React: `npm install lucide-react`\n9. Configure 8px spacing grid in Tailwind theme",
         "testStrategy": "1. Verify dark mode colors render correctly (#1A1A1A background)\n2. Toggle system appearance - app should follow macOS setting\n3. Test shadcn Button, Input, Card components render with correct styling\n4. Verify Inter font loads and displays at 14px base size\n5. Check spacing adheres to 8px grid (inspect element measurements)\n6. Test Framer Motion animation on a test component",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "pending",
         "subtasks": [
@@ -86,7 +96,8 @@
             "dependencies": [],
             "details": "Install tailwindcss@^4.0.0 and @tailwindcss/vite packages. Update vite.config.ts to include the Tailwind Vite plugin in the plugins array. Create the initial src/renderer/styles/globals.css file with the @import 'tailwindcss' directive. Ensure the CSS file is imported in the renderer entry point. Verify Tailwind utility classes work by adding a test element with basic Tailwind classes.",
             "status": "pending",
-            "testStrategy": "Create a test div with Tailwind classes (e.g., bg-blue-500 p-4 text-white) and verify styles are applied correctly when running the app in dev mode."
+            "testStrategy": "Create a test div with Tailwind classes (e.g., bg-blue-500 p-4 text-white) and verify styles are applied correctly when running the app in dev mode.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -97,7 +108,8 @@
             ],
             "details": "Extend globals.css with the @theme block defining custom CSS variables: --color-bg (#1A1A1A), --color-surface (#262626), --color-border (#333333), --color-text-primary (#F5F5F5), --color-text-secondary (#8A8A8A), --color-interactive (#E5E5E5), --color-hover (#2E2E2E), --radius-window (12px). Add @media (prefers-color-scheme: light) block with inverted light mode values. Configure 8px spacing grid using --spacing-* tokens. Create a ThemeProvider component in src/renderer/components/providers/ThemeProvider.tsx that detects system preference using window.matchMedia and provides theme context.",
             "status": "pending",
-            "testStrategy": "Toggle macOS system appearance between dark/light mode and verify the app automatically updates colors. Check that --color-bg shows #1A1A1A in dark mode and the light equivalent in light mode."
+            "testStrategy": "Toggle macOS system appearance between dark/light mode and verify the app automatically updates colors. Check that --color-bg shows #1A1A1A in dark mode and the light equivalent in light mode.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -109,7 +121,8 @@
             ],
             "details": "Run npx shadcn@latest init and select: New York style, neutral base color, CSS variables for colors. Configure components.json to use custom paths: components at src/renderer/components/ui, utils at src/renderer/lib/utils. Install initial base components: Button, Input, Card for testing. Update the generated cn() utility to work with the custom theme tokens. Verify components inherit the monochrome theme colors correctly. Create src/renderer/components/ui/index.ts for centralized exports.",
             "status": "pending",
-            "testStrategy": "Render shadcn Button, Input, and Card components. Verify they display with correct monochrome styling matching the design system. Test hover states use --color-hover token."
+            "testStrategy": "Render shadcn Button, Input, and Card components. Verify they display with correct monochrome styling matching the design system. Test hover states use --color-hover token.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -120,19 +133,23 @@
             ],
             "details": "Install @fontsource/inter or configure Google Fonts link for Inter. Add font-face declarations to globals.css and set --font-sans to 'Inter', system-ui, sans-serif. Configure base font size to 14px in the CSS. Install framer-motion and lucide-react packages. Create src/renderer/lib/animations.ts with shared animation variants for common transitions (fade, slide, scale). Verify Lucide icons render correctly by testing a few common icons (Check, X, ChevronRight). Test Framer Motion by adding a simple animated component.",
             "status": "pending",
-            "testStrategy": "Verify Inter font renders throughout the app at 14px base size. Test a Framer Motion animation (e.g., opacity fade on mount). Render multiple Lucide icons and confirm they display correctly with proper sizing."
+            "testStrategy": "Verify Inter font renders throughout the app at 14px base size. Test a Framer Motion animation (e.g., opacity fade on mount). Render multiple Lucide icons and confirm they display correctly with proper sizing.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down into: 1) Tailwind v4 installation with @tailwindcss/vite plugin and CSS-first configuration, 2) Custom theme tokens for dark/light modes with system preference detection, 3) shadcn/ui initialization with New York style and custom component paths, 4) Font setup (Inter) and animation libraries (Framer Motion, Lucide). Include testing theme switching functionality."
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "Implement SQLite Database with Drizzle ORM",
         "description": "Set up better-sqlite3 with Drizzle ORM in the Electron main process. Define the complete schema for tasks, scratchpad, chat_messages, task_events, ai_journal, and settings tables as specified in the PRD.",
         "details": "1. Install dependencies:\n   - `npm install better-sqlite3 drizzle-orm`\n   - `npm install -D drizzle-kit @types/better-sqlite3`\n   - Note: better-sqlite3 requires native rebuild for Electron\n2. Configure electron-rebuild in package.json scripts\n3. Create src/main/db/schema.ts with Drizzle schema:\n   ```typescript\n   export const tasks = sqliteTable('tasks', {\n     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),\n     parentId: text('parent_id').references(() => tasks.id),\n     title: text('title').notNull(),\n     body: text('body'),\n     status: text('status', { enum: ['inbox', 'active', 'in_progress', 'done'] }).default('inbox'),\n     priority: text('priority', { enum: ['none', 'low', 'medium', 'high'] }).default('none'),\n     today: integer('today', { mode: 'boolean' }).default(false),\n     client: text('client'),\n     dueDate: text('due_date'),\n     dueType: text('due_type', { enum: ['hard', 'soft'] }),\n     effort: text('effort', { enum: ['unknown', 'tiny', 'small', 'medium', 'deep'] }).default('unknown'),\n     invoiceStatus: text('invoice_status', { enum: ['none', 'draft', 'sent', 'paid', 'overdue'] }),\n     valueAtRisk: real('value_at_risk'),\n     lastClientTouchAt: text('last_client_touch_at'),\n     order: integer('order').default(0),\n     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),\n     completedAt: text('completed_at'),\n   });\n   ```\n4. Define all other tables: scratchpad, chat_messages, task_events, ai_journal, settings\n5. Create src/main/db/index.ts with database initialization:\n   - Store in `~/Library/Application Support/Flusk/flusk.db`\n   - Run migrations on app start\n6. Create drizzle.config.ts for migrations\n7. Set up IPC handlers for database operations in main process",
         "testStrategy": "1. Run app - database file should be created in Application Support\n2. Insert a test task via IPC - verify it persists\n3. Restart app - verify data persists\n4. Test all CRUD operations for each table\n5. Verify foreign key constraints work (parentId references)\n6. Test migrations run successfully on fresh install\n7. Verify indexes are created for common queries (by_hotel_type pattern)",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "pending",
         "subtasks": [
@@ -143,7 +160,8 @@
             "dependencies": [],
             "details": "1. Install production dependencies:\n   ```bash\n   npm install better-sqlite3 drizzle-orm\n   ```\n2. Install dev dependencies:\n   ```bash\n   npm install -D drizzle-kit @types/better-sqlite3 electron-rebuild\n   ```\n3. Add rebuild scripts to package.json:\n   ```json\n   {\n     \"scripts\": {\n       \"rebuild\": \"electron-rebuild -f -w better-sqlite3\",\n       \"postinstall\": \"electron-rebuild -f -w better-sqlite3\"\n     }\n   }\n   ```\n4. Run the rebuild command to compile better-sqlite3 for Electron's Node version:\n   ```bash\n   npm run rebuild\n   ```\n5. If using electron-builder, add rebuild config to ensure native modules are rebuilt during packaging:\n   ```json\n   {\n     \"build\": {\n       \"npmRebuild\": true,\n       \"nodeGypRebuild\": false\n     }\n   }\n   ```\n6. Verify installation by creating a simple test in main process that imports better-sqlite3 and creates an in-memory database.",
             "status": "pending",
-            "testStrategy": "1. Run npm run rebuild - should complete without errors\n2. Start Electron app - should not crash with native module errors\n3. Add temporary test code in main.ts: `import Database from 'better-sqlite3'; const db = new Database(':memory:'); console.log('SQLite version:', db.pragma('sqlite_version', { simple: true }));`\n4. Check console output shows SQLite version (e.g., 3.45.x)\n5. Verify no NODE_MODULE_VERSION mismatch errors"
+            "testStrategy": "1. Run npm run rebuild - should complete without errors\n2. Start Electron app - should not crash with native module errors\n3. Add temporary test code in main.ts: `import Database from 'better-sqlite3'; const db = new Database(':memory:'); console.log('SQLite version:', db.pragma('sqlite_version', { simple: true }));`\n4. Check console output shows SQLite version (e.g., 3.45.x)\n5. Verify no NODE_MODULE_VERSION mismatch errors",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -154,7 +172,8 @@
             ],
             "details": "1. Create src/main/db/schema.ts file\n2. Import required Drizzle SQLite types:\n   ```typescript\n   import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';\n   import { relations } from 'drizzle-orm';\n   ```\n3. Define the tasks table with all 17 fields:\n   ```typescript\n   export const tasks = sqliteTable('tasks', {\n     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),\n     parentId: text('parent_id'),\n     title: text('title').notNull(),\n     body: text('body'),\n     status: text('status', { enum: ['inbox', 'active', 'in_progress', 'done'] }).default('inbox'),\n     priority: text('priority', { enum: ['none', 'low', 'medium', 'high'] }).default('none'),\n     today: integer('today', { mode: 'boolean' }).default(false),\n     client: text('client'),\n     dueDate: text('due_date'),\n     dueType: text('due_type', { enum: ['hard', 'soft'] }),\n     effort: text('effort', { enum: ['unknown', 'tiny', 'small', 'medium', 'deep'] }).default('unknown'),\n     invoiceStatus: text('invoice_status', { enum: ['none', 'draft', 'sent', 'paid', 'overdue'] }),\n     valueAtRisk: real('value_at_risk'),\n     lastClientTouchAt: text('last_client_touch_at'),\n     order: integer('order').default(0),\n     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),\n     completedAt: text('completed_at'),\n   });\n   ```\n4. Define self-referential relation for subtasks:\n   ```typescript\n   export const tasksRelations = relations(tasks, ({ one, many }) => ({\n     parent: one(tasks, { fields: [tasks.parentId], references: [tasks.id] }),\n     subtasks: many(tasks),\n   }));\n   ```\n5. Export TypeScript types for insert/select operations:\n   ```typescript\n   export type Task = typeof tasks.$inferSelect;\n   export type NewTask = typeof tasks.$inferInsert;\n   ```",
             "status": "pending",
-            "testStrategy": "1. TypeScript compilation should pass with no errors on schema file\n2. Enum values should be type-checked (e.g., status only accepts 'inbox' | 'active' | 'in_progress' | 'done')\n3. Create test insert with minimal fields (just title) - should work with defaults\n4. Create test insert with parentId pointing to existing task - should work\n5. Query task with subtasks relation - should return nested structure\n6. Verify $defaultFn generates UUIDs and ISO timestamps correctly"
+            "testStrategy": "1. TypeScript compilation should pass with no errors on schema file\n2. Enum values should be type-checked (e.g., status only accepts 'inbox' | 'active' | 'in_progress' | 'done')\n3. Create test insert with minimal fields (just title) - should work with defaults\n4. Create test insert with parentId pointing to existing task - should work\n5. Query task with subtasks relation - should return nested structure\n6. Verify $defaultFn generates UUIDs and ISO timestamps correctly",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -165,7 +184,8 @@
             ],
             "details": "1. Add scratchpad table in schema.ts:\n   - id: text primary key (single-row usage)\n   - content: text not null default ''\n   - updatedAt: text ISO timestamp\n\n2. Add chat_messages table exactly per PRD:\n   - id: text primary key\n   - role: enum ['user', 'assistant']\n   - content: text not null\n   - toolCalls: json nullable (AI actions executed)\n   - createdAt: text ISO timestamp\n\n3. Add task_events table exactly per PRD for undo/audit:\n   - id: text primary key\n   - taskId: text references tasks.id (not null)\n   - action: enum ['create', 'update', 'move', 'complete', 'delete']\n   - before: json nullable (snapshot before mutation)\n   - after: json nullable (snapshot after mutation)\n   - source: enum ['user', 'ai']\n   - createdAt: text ISO timestamp\n\n4. Add ai_journal table exactly per PRD:\n   - id: text primary key\n   - content: text not null\n   - category: enum ['pattern', 'progress', 'preference', 'summary']\n   - createdAt: text ISO timestamp\n\n5. Add settings table:\n   - key: text primary key\n   - value: text not null (JSON stringified)\n\n6. Add pragmatic indexes:\n   - tasks(parent_id), tasks(status), tasks(today), tasks(due_date)\n   - task_events(task_id), task_events(created_at)\n   - chat_messages(created_at), ai_journal(created_at)\n\n7. Export infer types for all tables and keep naming consistent with PRD fields.",
             "status": "pending",
-            "testStrategy": "1. Verify all 6 tables compile with TypeScript and match PRD field names exactly.\n2. Insert assistant/user messages with optional toolCalls JSON and read them back.\n3. Insert task_events with action/before/after/source and verify JSON serialization.\n4. Insert ai_journal rows with category='summary' and category='pattern'.\n5. Validate foreign key behavior for task_events.taskId (valid task passes, invalid task fails).\n6. Verify indexes exist via sqlite_master query."
+            "testStrategy": "1. Verify all 6 tables compile with TypeScript and match PRD field names exactly.\n2. Insert assistant/user messages with optional toolCalls JSON and read them back.\n3. Insert task_events with action/before/after/source and verify JSON serialization.\n4. Insert ai_journal rows with category='summary' and category='pattern'.\n5. Validate foreign key behavior for task_events.taskId (valid task passes, invalid task fails).\n6. Verify indexes exist via sqlite_master query.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -176,7 +196,8 @@
             ],
             "details": "1. Create src/main/db/index.ts:\n   ```typescript\n   import Database from 'better-sqlite3';\n   import { drizzle } from 'drizzle-orm/better-sqlite3';\n   import { app } from 'electron';\n   import { existsSync, mkdirSync } from 'fs';\n   import path from 'path';\n   import * as schema from './schema';\n   ```\n2. Implement getDbPath function:\n   ```typescript\n   export function getDbPath(): string {\n     const userDataPath = app.getPath('userData');\n     // On macOS: ~/Library/Application Support/Flusk\n     const dbDir = path.join(userDataPath);\n     if (!existsSync(dbDir)) {\n       mkdirSync(dbDir, { recursive: true });\n     }\n     return path.join(dbDir, 'flusk.db');\n   }\n   ```\n3. Create database connection with pragmas for performance:\n   ```typescript\n   let _db: ReturnType<typeof drizzle> | null = null;\n   let _sqlite: Database.Database | null = null;\n\n   export function initDatabase(): ReturnType<typeof drizzle> {\n     if (_db) return _db;\n     const dbPath = getDbPath();\n     _sqlite = new Database(dbPath);\n     // Enable WAL mode for better concurrent performance\n     _sqlite.pragma('journal_mode = WAL');\n     // Enable foreign keys\n     _sqlite.pragma('foreign_keys = ON');\n     _db = drizzle(_sqlite, { schema });\n     return _db;\n   }\n\n   export function getDb() {\n     if (!_db) throw new Error('Database not initialized');\n     return _db;\n   }\n\n   export function closeDatabase() {\n     if (_sqlite) {\n       _sqlite.close();\n       _sqlite = null;\n       _db = null;\n     }\n   }\n   ```\n4. Export schema types for IPC handlers\n5. Call initDatabase() early in main process startup (before window creation)\n6. Call closeDatabase() on app quit event",
             "status": "pending",
-            "testStrategy": "1. Start app - verify ~/Library/Application Support/Flusk/ directory is created\n2. Verify flusk.db file exists in that directory\n3. Check WAL mode is enabled: query `pragma journal_mode` returns 'wal'\n4. Check foreign keys enabled: query `pragma foreign_keys` returns 1\n5. Restart app - verify it connects to existing database without error\n6. Quit app - verify database connection closes cleanly (no lock files left)\n7. Test getDb() before init - should throw meaningful error"
+            "testStrategy": "1. Start app - verify ~/Library/Application Support/Flusk/ directory is created\n2. Verify flusk.db file exists in that directory\n3. Check WAL mode is enabled: query `pragma journal_mode` returns 'wal'\n4. Check foreign keys enabled: query `pragma foreign_keys` returns 1\n5. Restart app - verify it connects to existing database without error\n6. Quit app - verify database connection closes cleanly (no lock files left)\n7. Test getDb() before init - should throw meaningful error",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -187,7 +208,8 @@
             ],
             "details": "1. Create drizzle.config.ts in project root:\n   ```typescript\n   import type { Config } from 'drizzle-kit';\n\n   export default {\n     schema: './src/main/db/schema.ts',\n     out: './drizzle',\n     dialect: 'sqlite',\n     dbCredentials: {\n       url: './dev.db', // For development migration generation only\n     },\n   } satisfies Config;\n   ```\n2. Add migration scripts to package.json:\n   ```json\n   {\n     \"scripts\": {\n       \"db:generate\": \"drizzle-kit generate\",\n       \"db:migrate\": \"drizzle-kit migrate\",\n       \"db:studio\": \"drizzle-kit studio\"\n     }\n   }\n   ```\n3. Generate initial migration:\n   ```bash\n   npm run db:generate\n   ```\n4. Create src/main/db/migrate.ts for runtime migrations:\n   ```typescript\n   import { migrate } from 'drizzle-orm/better-sqlite3/migrator';\n   import { getDb } from './index';\n   import path from 'path';\n   import { app } from 'electron';\n\n   export function runMigrations() {\n     const db = getDb();\n     // In production, migrations are bundled with the app\n     const migrationsFolder = app.isPackaged\n       ? path.join(process.resourcesPath, 'drizzle')\n       : path.join(__dirname, '../../../drizzle');\n     migrate(db, { migrationsFolder });\n   }\n   ```\n5. Update main.ts to run migrations after database init:\n   ```typescript\n   import { initDatabase } from './db';\n   import { runMigrations } from './db/migrate';\n\n   app.whenReady().then(() => {\n     initDatabase();\n     runMigrations();\n     createWindow();\n   });\n   ```\n6. Configure electron-builder to include drizzle folder in resources",
             "status": "pending",
-            "testStrategy": "1. Run npm run db:generate - should create migration files in ./drizzle/\n2. Verify migration SQL files contain CREATE TABLE statements for all 6 tables\n3. Start fresh app (delete existing db) - migrations should create all tables\n4. Query sqlite_master - verify all 6 tables exist\n5. Make schema change, generate new migration - should create incremental migration\n6. Start app with old db - new migration should apply without data loss\n7. Test packaged app - verify migrations folder is included and accessible"
+            "testStrategy": "1. Run npm run db:generate - should create migration files in ./drizzle/\n2. Verify migration SQL files contain CREATE TABLE statements for all 6 tables\n3. Start fresh app (delete existing db) - migrations should create all tables\n4. Query sqlite_master - verify all 6 tables exist\n5. Make schema change, generate new migration - should create incremental migration\n6. Start app with old db - new migration should apply without data loss\n7. Test packaged app - verify migrations folder is included and accessible",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -198,19 +220,23 @@
             ],
             "details": "1. Do NOT expose generic raw DB channels like db:* or window.database to renderer.\n2. Expose only domain-level IPC contracts from main process:\n   - task:list, task:create, task:update, task:delete, task:reorder, task:complete, task:toggle-today\n   - chat:send, chat:history, chat:clear\n   - scratchpad:get, scratchpad:save\n   - settings:get, settings:getAll, settings:set\n   - backup:export, backup:import, backup:list\n3. Keep SQL/Drizzle access private in main process services/repositories.\n4. Validate all IPC inputs with zod before executing writes.\n5. Ensure every task mutation writes task_events with before/after snapshots.\n6. Expose a typed, minimal preload bridge as window.api (not raw ipcRenderer).\n7. Create typed renderer client wrappers that consume window.api only.",
             "status": "pending",
-            "testStrategy": "1. Inspect preload API from renderer and verify only window.api domain methods are available.\n2. Confirm there are no callable db:* raw CRUD channels from renderer.\n3. Call task:create/update/delete via window.api and verify mutations persist.\n4. Confirm task_events receives before/after snapshots for each mutation.\n5. Send invalid payload to a write endpoint and verify zod validation error is returned."
+            "testStrategy": "1. Inspect preload API from renderer and verify only window.api domain methods are available.\n2. Confirm there are no callable db:* raw CRUD channels from renderer.\n3. Call task:create/update/delete via window.api and verify mutations persist.\n4. Confirm task_events receives before/after snapshots for each mutation.\n5. Send invalid payload to a write endpoint and verify zod validation error is returned.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Install better-sqlite3 and configure electron-rebuild for native module compilation, 2) Define Drizzle schema for tasks table with all 16 fields including enums and references, 3) Define schemas for scratchpad, chat_messages, task_events, ai_journal, and settings tables, 4) Create database initialization with Application Support path handling, 5) Set up drizzle-kit migrations and auto-run on app start, 6) Create base IPC handlers structure for database operations. Focus on native module compilation challenges with Electron."
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Build Core Task Management State and IPC Layer",
         "description": "Implement Zustand stores for task state management in the renderer process and create the complete IPC communication layer between main and renderer processes for all task operations.",
         "details": "1. Install Zustand: `npm install zustand`\n2. Create src/renderer/stores/taskStore.ts:\n   ```typescript\n   interface TaskStore {\n     tasks: Task[];\n     selectedTaskId: string | null;\n     view: 'today' | 'projects' | 'inbox';\n     isLoading: boolean;\n     // Actions\n     fetchTasks: () => Promise<void>;\n     createTask: (task: Partial<Task>) => Promise<Task>;\n     updateTask: (id: string, updates: Partial<Task>) => Promise<void>;\n     deleteTask: (id: string) => Promise<void>;\n     reorderTasks: (taskIds: string[]) => Promise<void>;\n     toggleToday: (id: string) => Promise<void>;\n     completeTask: (id: string) => Promise<void>;\n   }\n   ```\n3. Create IPC channel definitions in src/shared/ipc.ts:\n   - task:list, task:create, task:update, task:delete\n   - task:reorder, task:complete, task:toggle-today\n4. Implement main process handlers in src/main/ipc/taskHandlers.ts:\n   - All handlers wrap Drizzle queries\n   - Log mutations to task_events table\n   - Return full task objects after mutations\n5. Create preload script exposing safe IPC bridge:\n   ```typescript\n   contextBridge.exposeInMainWorld('api', {\n     tasks: {\n       list: (filter) => ipcRenderer.invoke('task:list', filter),\n       create: (task) => ipcRenderer.invoke('task:create', task),\n       // ...\n     }\n   });\n   ```\n6. Add TypeScript types for the API bridge\n7. Implement optimistic updates in Zustand store",
         "testStrategy": "1. Create task via store - verify appears in UI and persists to DB\n2. Update task priority - verify optimistic update shows immediately\n3. Delete task - verify removed from UI and DB\n4. Reorder tasks via drag - verify order persists after restart\n5. Toggle today flag - verify task appears/disappears from Today view\n6. Complete task - verify completedAt timestamp is set\n7. Check task_events table logs all mutations correctly",
         "priority": "high",
         "dependencies": [
-          3
+          "3"
         ],
         "status": "pending",
         "subtasks": [
@@ -221,7 +247,8 @@
             "dependencies": [],
             "details": "Create src/shared/types/task.ts with Task interface aligned to PRD fields:\n- id, parentId, title, body, status, priority, today, client, dueDate, dueType, effort, invoiceStatus, valueAtRisk, lastClientTouchAt, order, createdAt, completedAt\n\nCreate src/shared/ipc.ts defining IPC_CHANNELS for domain channels:\n- task:list, task:create, task:update, task:delete, task:reorder, task:complete, task:toggle-today\n\nDefine payload/response types:\n- TaskCreatePayload, TaskUpdatePayload, TaskListFilter\n- Ensure fields use today/client/order (not isToday/clientId/sortOrder)\n- Do not require updatedAt unless schema adds it\n\nCreate src/shared/types/api.ts with typed TasksAPI interface exposed by preload.\nUse const channel names and shared types for compile-time safety across main/preload/renderer.",
             "status": "pending",
-            "testStrategy": "Import types in main process file - verify no compilation errors. Import same types in renderer file - verify compatibility. Ensure IPC channel names are autocompleted in both processes. Verify Task interface matches Drizzle schema from Task 3."
+            "testStrategy": "Import types in main process file - verify no compilation errors. Import same types in renderer file - verify compatibility. Ensure IPC channel names are autocompleted in both processes. Verify Task interface matches Drizzle schema from Task 3.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -232,7 +259,8 @@
             ],
             "details": "Install Zustand: npm install zustand. Create src/renderer/stores/taskStore.ts implementing TaskStore interface.\n\nState includes:\n- tasks array, selectedTaskId, view ('today'|'projects'|'inbox'), isLoading, error\n\nActions:\n- fetchTasks() calls window.api.tasks.list with view filter\n- createTask() adds to store and calls IPC\n- updateTask() patches local state and calls IPC\n- deleteTask() removes from store and calls IPC\n- reorderTasks() updates order locally and persists\n- toggleToday() flips today flag\n- completeTask() sets status='done' with completedAt timestamp\n\nUse immutable updates (immer optional), selectors (getTasksByView/getSelectedTask/getTodayTasks), and mount-time fetch.",
             "status": "pending",
-            "testStrategy": "Create mock window.api object, call store actions, verify state updates correctly. Test each action updates local state as expected. Verify selectors filter tasks correctly by view. Test loading state transitions during async operations."
+            "testStrategy": "Create mock window.api object, call store actions, verify state updates correctly. Test each action updates local state as expected. Verify selectors filter tasks correctly by view. Test loading state transitions during async operations.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -243,7 +271,8 @@
             ],
             "details": "Create src/preload/index.ts (or update existing). Import contextBridge and ipcRenderer from 'electron'. Import TasksAPI type from shared types. Implement the api object matching TasksAPI interface: tasks.list(filter) wraps ipcRenderer.invoke('task:list', filter), tasks.create(task) wraps ipcRenderer.invoke('task:create', task), tasks.update(id, updates), tasks.delete(id), tasks.reorder(taskIds), tasks.complete(id), tasks.toggleToday(id). Use contextBridge.exposeInMainWorld('api', api) to expose safely. Create src/renderer/types/global.d.ts declaring Window interface extension with api property typed as the full API bridge. Ensure no nodeIntegration leaks - only expose specific IPC methods, never raw ipcRenderer.",
             "status": "pending",
-            "testStrategy": "Log window.api in renderer console - verify object exists with all methods. Call window.api.tasks.list({}) - verify IPC is invoked (check main process logs). Verify TypeScript autocomplete works for window.api in renderer code. Confirm contextIsolation is true in webPreferences."
+            "testStrategy": "Log window.api in renderer console - verify object exists with all methods. Call window.api.tasks.list({}) - verify IPC is invoked (check main process logs). Verify TypeScript autocomplete works for window.api in renderer code. Confirm contextIsolation is true in webPreferences.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -255,7 +284,8 @@
             ],
             "details": "Create src/main/ipc/taskHandlers.ts. Import ipcMain, database service, and shared task types.\n\nRegister handlers:\n- task:list (filtered reads)\n- task:create\n- task:update\n- task:delete\n- task:reorder (updates order field)\n- task:complete (sets status='done' and completedAt)\n- task:toggle-today (flips today boolean)\n\nMutation handler pattern:\n1. Start transaction\n2. Read previous task state (before snapshot)\n3. Execute mutation\n4. Read updated state (after snapshot)\n5. Insert task_events row with { taskId, action, before, after, source, createdAt }\n6. Commit and return updated task\n\nExport registerTaskHandlers() and call it during main process bootstrap.",
             "status": "pending",
-            "testStrategy": "Call each IPC handler via window.api, verify database state changes. Check task_events table has entry after create/update/delete. Verify returned task object matches database state. Test error handling - pass invalid ID, verify graceful error response. Test transaction rollback on failure."
+            "testStrategy": "Call each IPC handler via window.api, verify database state changes. Check task_events table has entry after create/update/delete. Verify returned task object matches database state. Test error handling - pass invalid ID, verify graceful error response. Test transaction rollback on failure.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -267,20 +297,24 @@
             ],
             "details": "Update src/renderer/stores/taskStore.ts actions to implement optimistic updates with rollback.\n\n- createTask: add temp task locally, replace with persisted task on success, remove on failure\n- updateTask: snapshot previous task, patch locally, restore on failure\n- deleteTask: remove locally, restore on failure\n- reorderTasks: optimistically update order, rollback on persistence failure\n\nMaintain rollback snapshots keyed by action/request id and surface failures with toast/error state.",
             "status": "pending",
-            "testStrategy": "Create task with slow network simulation - verify appears immediately. Fail the IPC call intentionally - verify task disappears and error shows. Update task, fail IPC - verify reverts to original state. Rapid-fire updates - verify final state is consistent. Reorder tasks, fail - verify order reverts."
+            "testStrategy": "Create task with slow network simulation - verify appears immediately. Fail the IPC call intentionally - verify task disappears and error shows. Update task, fail IPC - verify reverts to original state. Rapid-fire updates - verify final state is consistent. Reorder tasks, fail - verify order reverts.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into: 1) Define TypeScript types for Task entity and API bridge in shared directory, 2) Create Zustand store with all task actions and view state, 3) Implement preload script with contextBridge exposing safe IPC methods, 4) Create main process IPC handlers wrapping Drizzle queries with mutation logging to task_events, 5) Implement optimistic updates pattern in Zustand store with rollback handling. Include type safety across process boundaries."
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Implement Main UI Layout and View Navigation",
         "description": "Build the core application shell with the three-zone navigation (Today, Projects, Inbox), frameless window chrome with custom traffic lights, and the persistent chat input at the bottom.",
         "details": "1. Create src/renderer/components/layout/AppShell.tsx:\n   - Frameless window with -webkit-app-region: drag on title bar\n   - Custom traffic light positioning (top-left, 12px margin)\n   - View tabs: Today | Projects | Inbox\n2. Create src/renderer/components/layout/TitleBar.tsx:\n   - Traffic lights integration (use @electron/remote or custom)\n   - Tab navigation with keyboard shortcuts (1, 2, 3)\n   - Draggable region\n3. Create src/renderer/components/layout/ChatInput.tsx:\n   - Fixed at bottom of window\n   - Placeholder: \"Ask anything...\" with Cmd+K hint\n   - Focus triggers chat mode transition\n4. Create view components:\n   - TodayView.tsx - tasks with today=true\n   - ProjectsView.tsx - parent tasks with subtasks\n   - InboxView.tsx - tasks with status='inbox'\n5. Implement view transitions with Framer Motion:\n   - 200ms slide animation between views\n   - Chat mode: task list slides up, chat fills space\n6. Create src/renderer/components/layout/LiveThought.tsx:\n   - Single contextual line at top of Today view\n   - Dismissable for session\n   - Optional action button\n7. Wire up keyboard navigation:\n   - 1/2/3 for view switching\n   - Cmd+K to focus chat\n   - Escape for layered dismiss",
         "testStrategy": "1. Verify traffic lights work (close, minimize, maximize)\n2. Test window dragging via title bar area\n3. Switch views with clicks - verify correct content shows\n4. Switch views with 1/2/3 keys - verify same behavior\n5. Click chat input - verify smooth transition to chat mode\n6. Press Escape - verify returns to task view\n7. Test live thought displays and dismisses correctly",
         "priority": "high",
         "dependencies": [
-          2,
-          4
+          "2",
+          "4"
         ],
         "status": "pending",
         "subtasks": [
@@ -291,7 +325,8 @@
             "dependencies": [],
             "details": "Create src/renderer/components/layout/AppShell.tsx as the root layout component. Configure -webkit-app-region: drag on the title bar area and -webkit-app-region: no-drag on interactive elements (buttons, inputs). Apply the window styling: 12px border-radius, #1A1A1A background, subtle drop shadow. Set up the flex column layout: TitleBar (fixed top), MainContent (flex-1 with overflow), ChatInput (fixed bottom). Ensure the draggable region only covers the title bar and excludes traffic lights and view tabs. The window should be resizable with min 480x520 and max 900x900 dimensions as per the PRD.",
             "status": "pending",
-            "testStrategy": "Drag the window by the title bar area - should move smoothly. Try clicking buttons in the title bar - should NOT trigger dragging. Verify the rounded corners render correctly on macOS. Resize window and verify min/max constraints are respected."
+            "testStrategy": "Drag the window by the title bar area - should move smoothly. Try clicking buttons in the title bar - should NOT trigger dragging. Verify the rounded corners render correctly on macOS. Resize window and verify min/max constraints are respected.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -302,7 +337,8 @@
             ],
             "details": "In the Electron main process BrowserWindow configuration, set titleBarStyle: 'hidden' and trafficLightPosition: { x: 12, y: 12 } to position native traffic lights. This approach uses native macOS controls rather than custom implementations, ensuring proper accessibility and system integration. The traffic lights should appear at 12px from both top and left edges. Verify that the draggable title bar region accounts for traffic light placement (no overlap). Test that close/minimize/maximize buttons work correctly. For Windows/Linux, implement appropriate fallback behavior (either hide or use custom close/minimize buttons).",
             "status": "pending",
-            "testStrategy": "Click close button - window should close. Click minimize - window should minimize to dock. Click maximize - window should enter fullscreen or maximize. Verify traffic lights are positioned at 12px from top-left corner. Test that clicking traffic lights doesn't trigger window drag."
+            "testStrategy": "Click close button - window should close. Click minimize - window should minimize to dock. Click maximize - window should enter fullscreen or maximize. Verify traffic lights are positioned at 12px from top-left corner. Test that clicking traffic lights doesn't trigger window drag.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -314,7 +350,8 @@
             ],
             "details": "Create src/renderer/components/layout/TitleBar.tsx with a horizontal tab layout positioned to the right of the traffic lights. Use shadcn/ui Button or custom styled tabs with the monochrome design: #E5E5E5 text on active, #8A8A8A on inactive. Active tab should have a subtle bottom border or background highlight. Implement useEffect with keydown listener for '1', '2', '3' keys to switch views (only when not focused on input). Store current view in Zustand store or React context. The title bar should be fully within the -webkit-app-region: drag zone except for the interactive tabs. Ensure tabs are -webkit-app-region: no-drag. Tab order: Today (1) | Projects (2) | Inbox (3).",
             "status": "pending",
-            "testStrategy": "Click each tab - view should switch and tab should show active state. Press 1/2/3 keys - corresponding view should activate. Verify keyboard shortcuts don't trigger when typing in an input field. Test that tabs are visually distinct when active vs inactive. Verify dragging still works on empty title bar areas."
+            "testStrategy": "Click each tab - view should switch and tab should show active state. Press 1/2/3 keys - corresponding view should activate. Verify keyboard shortcuts don't trigger when typing in an input field. Test that tabs are visually distinct when active vs inactive. Verify dragging still works on empty title bar areas.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -325,7 +362,8 @@
             ],
             "details": "Create src/renderer/components/layout/ChatInput.tsx as a fixed-bottom input container. Use shadcn/ui Input or custom styled input with #262626 background, #8A8A8A placeholder text, full-width layout. Implement global Cmd+K (Mac) / Ctrl+K (Windows) shortcut to focus the input. When input receives focus AND user starts typing, trigger 'chat mode' state in global store. Chat mode causes the task list to slide up (handled in view components) and chat conversation to fill the space. Include a subtle border-top separator (#333333). The input should have comfortable padding (12-16px) and match the 44px row height design pattern. Escape key should blur the input and exit chat mode if no message is being composed.",
             "status": "pending",
-            "testStrategy": "Press Cmd+K anywhere - input should focus. Type in input - chat mode should activate (verify state change). Press Escape - input should blur and chat mode should deactivate. Verify placeholder text shows correctly. Test Ctrl+K on Windows if applicable. Verify input styling matches design spec."
+            "testStrategy": "Press Cmd+K anywhere - input should focus. Type in input - chat mode should activate (verify state change). Press Escape - input should blur and chat mode should deactivate. Verify placeholder text shows correctly. Test Ctrl+K on Windows if applicable. Verify input styling matches design spec.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -337,7 +375,8 @@
             ],
             "details": "Create src/renderer/components/views/TodayView.tsx, ProjectsView.tsx, InboxView.tsx as placeholder view components (actual task list implementation is separate). Wrap view switching in Framer Motion AnimatePresence with variants for enter/exit animations. Use 200ms duration with ease-out easing. Direction-aware transitions: switching from Today(1) to Projects(2) slides left, Projects(2) to Today(1) slides right. For chat mode transition, animate the task list container with translateY sliding up while chat conversation fades/slides in from below. Respect prefers-reduced-motion: use opacity-only transitions when motion is reduced. Each view should have basic structure: TodayView includes LiveThought slot at top, ProjectsView shows project groupings, InboxView shows flat task list. Include empty state placeholders.",
             "status": "pending",
-            "testStrategy": "Switch between views - observe smooth 200ms slide animation. Verify direction-aware sliding (left/right based on tab index). Enable chat mode - verify task list slides up smoothly. Set system to reduced motion - verify animations are subtle/instant. Test rapid view switching doesn't cause animation glitches."
+            "testStrategy": "Switch between views - observe smooth 200ms slide animation. Verify direction-aware sliding (left/right based on tab index). Enable chat mode - verify task list slides up smoothly. Set system to reduced motion - verify animations are subtle/instant. Test rapid view switching doesn't cause animation glitches.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -348,19 +387,23 @@
             ],
             "details": "Create src/renderer/components/layout/LiveThought.tsx as a single-line component shown at the top of TodayView only. Display contextual AI-generated text (placeholder for now, actual AI integration is separate task). Include a dismiss button (X icon) that hides the component for the current session (store in session state, not persisted). Optional action button when AI suggests an action (e.g., 'Add to today' or 'Start this task'). Styling: subtle #262626 background, #8A8A8A text, 8px vertical padding, Lucide icons for dismiss/action. Animate entry with Framer Motion fade-in. The component should be conditionally rendered based on: 1) being in TodayView, 2) AI having something to say, 3) not dismissed this session. Wire up Escape key as part of layered dismiss: if LiveThought is showing and dismissable, Escape dismisses it first before other actions.",
             "status": "pending",
-            "testStrategy": "View TodayView with LiveThought visible - verify it appears at top with correct styling. Click dismiss (X) - component should hide. Switch away and back to TodayView - LiveThought should remain hidden for session. Refresh app - LiveThought should reappear (session reset). Verify action button triggers callback when clicked. Test Escape key dismisses LiveThought when focused/visible."
+            "testStrategy": "View TodayView with LiveThought visible - verify it appears at top with correct styling. Click dismiss (X) - component should hide. Switch away and back to TodayView - LiveThought should remain hidden for session. Refresh app - LiveThought should reappear (session reset). Verify action button triggers callback when clicked. Test Escape key dismisses LiveThought when focused/visible.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Create AppShell with frameless window chrome and draggable regions, 2) Implement custom traffic lights positioning and integration, 3) Build TitleBar with tab navigation and keyboard shortcuts (1/2/3), 4) Create ChatInput component with Cmd+K focus and chat mode transition trigger, 5) Implement view components (TodayView, ProjectsView, InboxView) with Framer Motion transitions, 6) Create LiveThought component with dismissal state and action buttons. Focus on Electron-specific window chrome behavior."
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Build Task List Components with Drag-and-Drop",
         "description": "Implement the task list UI with inline expansion, checkbox interactions, drag-to-reorder functionality, and project/subtask grouping. Tasks should expand to show markdown body inline.",
         "details": "1. Install dnd-kit: `npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities`\n2. Create src/renderer/components/tasks/TaskItem.tsx:\n   - 44px row height\n   - Checkbox with smooth fill animation (Framer Motion)\n   - Title with client tag (subtle badge)\n   - Priority indicator (left border shade: none/low/medium/high)\n   - Click to expand inline markdown body\n   - Hover state with subtle background tint\n3. Create src/renderer/components/tasks/TaskList.tsx:\n   - DndContext with SortableContext\n   - Use closestCenter collision detection\n   - Handle drag end: update order in store\n   - Empty state messaging per view\n4. Create src/renderer/components/tasks/ProjectGroup.tsx:\n   - Parent task as header with progress indicator\n   - Collapsible subtask list\n   - Inline \"+ Add task\" at bottom\n5. Create src/renderer/components/tasks/TaskBody.tsx:\n   - Markdown renderer (use react-markdown)\n   - Expand/collapse animation\n   - Edit mode for body content\n6. Implement keyboard navigation:\n   - Up/Down to navigate list\n   - Enter to open selected task\n   - T to toggle today flag\n7. Create src/renderer/components/tasks/InlineTaskInput.tsx:\n   - Quick add within projects\n   - Auto-sets parentId",
         "testStrategy": "1. Render task list - verify 44px row heights\n2. Click checkbox - verify smooth fill animation and task completes\n3. Click task - verify inline expansion shows markdown body\n4. Drag task - verify reorder works and persists\n5. Verify priority border colors render correctly\n6. Test project groups show progress (e.g., \"3/5 done\")\n7. Add subtask via inline input - verify parentId is set\n8. Test keyboard navigation (Up/Down/Enter/T)",
         "priority": "high",
         "dependencies": [
-          5
+          "5"
         ],
         "status": "pending",
         "subtasks": [
@@ -371,7 +414,8 @@
             "dependencies": [],
             "details": "Create src/renderer/components/tasks/TaskItem.tsx implementing: 1) Fixed 44px row height with proper vertical centering, 2) Checkbox using Framer Motion for smooth fill animation on completion with scale effect, 3) Left border color based on priority (transparent for none, light gray for low, medium gray for medium, dark for high), 4) Title display with optional client tag as subtle Badge component from @guestroom/ui, 5) Hover state with subtle background tint (100ms transition), 6) onClick handler to toggle expanded state for inline body display, 7) useSortable hook integration from dnd-kit for drag handle. Use cn() utility for conditional class merging. Component should accept task data, onComplete, onExpand, and isExpanded props.",
             "status": "pending",
-            "testStrategy": "Render TaskItem with various priority levels and verify correct border colors. Click checkbox and confirm smooth fill animation plays. Hover over item and verify background tint appears. Verify 44px height is consistent. Test with and without client tag to ensure proper rendering."
+            "testStrategy": "Render TaskItem with various priority levels and verify correct border colors. Click checkbox and confirm smooth fill animation plays. Hover over item and verify background tint appears. Verify 44px height is consistent. Test with and without client tag to ensure proper rendering.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -382,7 +426,8 @@
             ],
             "details": "Install dnd-kit packages: @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities. Create src/renderer/components/tasks/TaskList.tsx implementing: 1) DndContext wrapper with PointerSensor and KeyboardSensor configured, 2) SortableContext with verticalListSortingStrategy for task items, 3) closestCenter collision detection algorithm, 4) handleDragEnd function that calculates new order using arrayMove utility and updates Zustand store, 5) Empty state component with appropriate messaging based on current view (Today/All/Project), 6) CSS for drag overlay styling with subtle shadow and opacity. Ensure drag operations update task.order field in store and trigger persistence to SQLite via IPC.",
             "status": "pending",
-            "testStrategy": "Render list with multiple tasks. Drag task from position 1 to position 3 and verify visual reorder. Confirm Zustand store reflects new order. Refresh app and verify order persists. Test empty state renders correctly when no tasks exist."
+            "testStrategy": "Render list with multiple tasks. Drag task from position 1 to position 3 and verify visual reorder. Confirm Zustand store reflects new order. Refresh app and verify order persists. Test empty state renders correctly when no tasks exist.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -394,7 +439,8 @@
             ],
             "details": "Create src/renderer/components/tasks/ProjectGroup.tsx implementing: 1) Parent task displayed as header row with chevron toggle icon, 2) Progress indicator showing completed/total subtasks (e.g., '3/5' or progress bar), 3) Collapsible subtask list using Framer Motion for smooth expand/collapse animation, 4) Nested SortableContext for subtask reordering within the group, 5) Visual indentation (16-24px) for subtasks to show hierarchy, 6) Placeholder for InlineTaskInput at bottom when expanded, 7) Integration with TaskItem component for rendering individual subtasks. Handle edge cases: no subtasks, all subtasks complete, mixed completion states. Store collapsed/expanded state in local component state or Zustand.",
             "status": "pending",
-            "testStrategy": "Render ProjectGroup with parent task and 3 subtasks. Click header to collapse/expand and verify animation. Verify progress shows correct ratio. Complete a subtask and verify progress updates. Drag subtask within group and verify reorder works. Test with 0 subtasks edge case."
+            "testStrategy": "Render ProjectGroup with parent task and 3 subtasks. Click header to collapse/expand and verify animation. Verify progress shows correct ratio. Complete a subtask and verify progress updates. Drag subtask within group and verify reorder works. Test with 0 subtasks edge case.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -405,7 +451,8 @@
             ],
             "details": "Install react-markdown if not present. Create src/renderer/components/tasks/TaskBody.tsx implementing: 1) ReactMarkdown component with appropriate styling for headers, lists, code blocks, links, 2) Framer Motion AnimatePresence for smooth expand/collapse height animation, 3) Edit mode toggle that switches from rendered markdown to Textarea component, 4) Save/Cancel buttons in edit mode with keyboard shortcuts (Cmd+Enter to save, Escape to cancel), 5) Empty state when no body content exists with 'Add notes...' placeholder, 6) Proper overflow handling for long content, 7) onBodyUpdate callback prop for persisting changes. Style markdown output to match app's monochrome design system with proper typography scale.",
             "status": "pending",
-            "testStrategy": "Render TaskBody with markdown containing headers, lists, and code blocks. Verify proper rendering. Click to expand and verify smooth animation. Enter edit mode, modify content, save, and verify persistence. Test escape key cancels edit. Verify empty state displays correctly."
+            "testStrategy": "Render TaskBody with markdown containing headers, lists, and code blocks. Verify proper rendering. Click to expand and verify smooth animation. Enter edit mode, modify content, save, and verify persistence. Test escape key cancels edit. Verify empty state displays correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -418,7 +465,8 @@
             ],
             "details": "Create src/renderer/hooks/useTaskListKeyboard.ts implementing:\n1. Keydown handling on task list container\n2. Up/Down arrows move focus between TaskItems using focusedIndex\n3. Enter toggles expansion/open for focused task\n4. T toggles today flag on focused task\n5. Escape clears focus/collapses expanded content\n6. Tab follows natural focus order\n7. Use roving tabindex and visible focus rings\n\nHandle edge cases: boundaries, empty list, and edit mode inside expanded TaskBody.",
             "status": "pending",
-            "testStrategy": "Focus task list and press Down arrow 3 times - verify focus moves to 4th item. Press Up - verify focus moves up. Press Enter - verify task expands. Press T - verify today flag toggles. Tab through list - verify logical order. Test with screen reader to verify announcements."
+            "testStrategy": "Focus task list and press Down arrow 3 times - verify focus moves to 4th item. Press Up - verify focus moves up. Press Enter - verify task expands. Press T - verify today flag toggles. Tab through list - verify logical order. Test with screen reader to verify announcements.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -429,20 +477,103 @@
             ],
             "details": "Create src/renderer/components/tasks/InlineTaskInput.tsx implementing: 1) Compact input field that appears at bottom of ProjectGroup when expanded, 2) '+ Add subtask' button/text that reveals input on click, 3) Input component from @guestroom/ui with placeholder 'Add subtask...', 4) Auto-focus when input appears, 5) Enter key creates task with parentId automatically set from ProjectGroup context, 6) Escape key or blur hides input and clears value, 7) Immediate Zustand store update and SQLite persistence via IPC, 8) Optimistic UI update showing new task immediately. Props should include parentId, onTaskCreated callback. Keep input minimal - just title, inherit project/priority from parent.",
             "status": "pending",
-            "testStrategy": "Click '+ Add subtask' in ProjectGroup - verify input appears and is focused. Type title and press Enter - verify task appears in subtask list with correct parentId. Press Escape - verify input hides without creating task. Create task and verify it persists after app refresh."
+            "testStrategy": "Click '+ Add subtask' in ProjectGroup - verify input appears and is focused. Type title and press Enter - verify task appears in subtask list with correct parentId. Press Escape - verify input hides without creating task. Create task and verify it persists after app refresh.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Create TaskItem component with 44px rows, checkbox animations, priority borders, and hover states, 2) Implement TaskList with dnd-kit DndContext and SortableContext for reordering, 3) Build ProjectGroup component with collapsible subtasks and progress indicators, 4) Create TaskBody with markdown rendering (react-markdown) and expand/collapse animations, 5) Implement keyboard navigation (Up/Down/Enter/T) with focus management, 6) Create InlineTaskInput for quick subtask creation. Focus on dnd-kit integration with Zustand state."
       },
       {
-        "id": 7,
+        "id": "13",
+        "title": "Build Assistant Identity Kernel (Soul + Charter + Memory Policy)",
+        "description": "Establish the assistant as a persistent extension of the user by implementing identity contracts (Soul and Charter), memory rules, proactive decision policy, and runtime context compilation before full chat orchestration.",
+        "details": "1. Create and version assistant identity contracts (`docs/assistant/SOUL.md`, `docs/assistant/CHARTER.md`) with stable tone, priorities, boundaries, and accountability style.\n2. Implement a runtime identity/context compiler in main process that merges: soul + charter + profile + patterns + recent journal + live task context.\n3. Define memory promotion and confirmation policy (what can be auto-learned vs what requires explicit user confirmation).\n4. Add assistant policy middleware for proactivity triggers (empty today list, overdue risk, stale client touchpoints, high value-at-risk inactivity).\n5. Add response-quality checks for personality consistency, actionability, and safety gating before writes.\n6. Expose typed settings/state needed to inspect and edit identity/memory layers without raw DB access.\n7. Ensure all downstream chat/tool flows consume this kernel as required input, not optional prompt text.",
+        "testStrategy": "1. Send the same intent across multiple sessions; verify stable voice and decision style consistent with SOUL + CHARTER.\n2. Validate context compiler output includes soul/charter/profile/patterns/journal slices within budget.\n3. Attempt high-impact memory write without confirmation; verify it is blocked pending user confirmation.\n4. Simulate overdue + stale-client context; verify proactive suggestions trigger with concrete actions.\n5. Verify destructive and financial-risk actions still require confirmation regardless of mode.\n6. Run regression prompts and confirm responses stay concise, actionable, and non-generic.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Soul and Charter contracts as executable system inputs",
+            "description": "Formalize assistant identity docs and ensure they are treated as runtime inputs rather than static documentation.",
+            "dependencies": [],
+            "details": "Create stable markdown contracts for personality, role boundaries, and operating style. Add loader logic that resolves these docs into structured runtime context for each model call.",
+            "status": "done",
+            "testStrategy": "Change a Soul guideline and verify generated assistant responses reflect it in subsequent calls.",
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T17:00:42.990Z"
+          },
+          {
+            "id": 2,
+            "title": "Implement identity-aware context compiler",
+            "description": "Build a deterministic compiler that assembles soul, charter, memory layers, and live task context into the final model prompt pack.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create main-process context builder module with token budgeting and slice selection. Include timestamps, active tasks, overdue risk, and relevant memory snippets.",
+            "status": "pending",
+            "testStrategy": "Enable debug snapshot for a request and verify expected sections and ordering in compiled context.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add memory promotion and confirmation policy",
+            "description": "Define when observations become profile/pattern memory and when explicit user confirmation is mandatory.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement confidence thresholds and confirmation gates for high-impact assumptions (financial, client commitments, hard deadlines, user identity preferences).",
+            "status": "pending",
+            "testStrategy": "Feed ambiguous user statements and verify they stay in journal until confirmed.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement proactive assistant policy triggers",
+            "description": "Create policy rules that trigger assistant-initiated recommendations based on risk and inactivity signals.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Add trigger engine for empty today list, overdue accumulation, stale client touchpoints, and value-at-risk idleness with bounded frequency.",
+            "status": "pending",
+            "testStrategy": "Simulate each trigger condition and verify one concise, actionable recommendation appears.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Gate chat/tool orchestration behind identity kernel",
+            "description": "Require AI chat execution paths to use compiled identity context and policy checks before tool calls.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Enforce kernel dependency in chat pipeline and fail closed if soul/charter/context compiler is unavailable.",
+            "status": "pending",
+            "testStrategy": "Disable kernel module and verify chat orchestration is blocked with explicit diagnostic error.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down assistant identity kernel into: 1) Soul/Charter contracts, 2) identity-aware context compiler, 3) memory promotion/confirmation policy, 4) proactive policy trigger engine, 5) chat/tool orchestration gating. Focus on deterministic behavior and regression tests.",
+        "updatedAt": "2026-02-15T17:00:42.990Z"
+      },
+      {
+        "id": "7",
         "title": "Integrate AI Chat with Vercel AI SDK and OpenRouter",
         "description": "Implement the AI chat interface using Vercel AI SDK with OpenRouter as the provider. Set up streaming responses, the three-model selector, and the complete tool calling infrastructure for task management.",
-        "details": "1. Install AI dependencies:\n   - `npm install ai @ai-sdk/openai`\n2. Create src/main/ai/openrouter.ts:\n   ```typescript\n   import { createOpenAI } from '@ai-sdk/openai';\n   \n   export const createOpenRouterProvider = (apiKey: string) => \n     createOpenAI({\n       baseURL: 'https://openrouter.ai/api/v1',\n       apiKey,\n     });\n   ```\n3. Create src/main/ai/models.ts with three model options:\n   - minimax/minimax-m2.5 (default, cheapest)\n   - moonshotai/kimi-k2.5\n   - z-ai/glm-5\n4. Create src/main/ai/tools.ts with all AI tools:\n   - create_task, update_task, complete_task, delete_task\n   - move_task, set_today, suggest_daily_plan\n   - parse_notes, undo_last_action\n   - write_journal, read_journal, generate_live_thought\n   - update_user_profile, update_patterns, improve_task\n5. Create src/main/ai/systemPrompt.ts:\n   - Dynamic context builder (1-2K token budget)\n   - Inject: date/time, active tasks, today list, inbox count\n   - Include overdue items, recent completions, memory snippets\n6. Create src/main/ai/chat.ts:\n   - Use streamText from ai package\n   - Handle tool calls and execute them\n   - Log messages to chat_messages table\n7. Create src/renderer/components/chat/ChatView.tsx:\n   - Streaming message display\n   - Left-aligned AI messages, indented user messages\n   - Action cards for AI mutations with undo buttons\n8. Implement IPC for chat: chat:send, chat:history, chat:clear",
-        "testStrategy": "1. Send \"Hello\" - verify streaming response appears\n2. Send \"Create a task: Review proposal\" - verify task is created\n3. Send \"Plan my day\" - verify AI suggests tasks with reasoning\n4. Send \"What's overdue?\" - verify AI lists overdue items\n5. Test tool calling produces action cards with undo\n6. Switch AI model in settings - verify different model is used\n7. Clear chat history - verify messages are removed\n8. Test 30-day retention (mock time to verify old messages purge)",
+        "details": "1. Install AI dependencies:\n   - `npm install ai @ai-sdk/openai`\n2. Create src/main/ai/openrouter.ts:\n   ```typescript\n   import { createOpenAI } from '@ai-sdk/openai';\n   \n   export const createOpenRouterProvider = (apiKey: string) => \n     createOpenAI({\n       baseURL: 'https://openrouter.ai/api/v1',\n       apiKey,\n     });\n   ```\n3. Create src/main/ai/models.ts with three model options:\n   - minimax/minimax-m2.5 (default, cheapest)\n   - moonshotai/kimi-k2.5\n   - z-ai/glm-5\n4. Create src/main/ai/tools.ts with all AI tools:\n   - create_task, update_task, complete_task, delete_task\n   - move_task, set_today, suggest_daily_plan\n   - parse_notes, undo_last_action\n   - write_journal, read_journal, generate_live_thought\n   - update_user_profile, update_patterns, improve_task\n5. Create src/main/ai/systemPrompt.ts:\n   - Dynamic context builder (1-2K token budget)\n   - Inject: date/time, active tasks, today list, inbox count\n   - Include overdue items, recent completions, memory snippets\n6. Create src/main/ai/chat.ts:\n   - Use streamText from ai package\n   - Handle tool calls and execute them\n   - Log messages to chat_messages table\n7. Create src/renderer/components/chat/ChatView.tsx:\n   - Streaming message display\n   - Left-aligned AI messages, indented user messages\n   - Action cards for AI mutations with undo buttons\n8. Implement IPC for chat: chat:send, chat:history, chat:clear\n9. Integrate Soul + Charter + memory policy outputs from Task 13 before model invocation and tool execution.",
+        "testStrategy": "1. Send \"Hello\" - verify streaming response appears\n2. Send \"Create a task: Review proposal\" - verify task is created\n3. Send \"Plan my day\" - verify AI suggests tasks with reasoning\n4. Send \"What's overdue?\" - verify AI lists overdue items\n5. Test tool calling produces action cards with undo\n6. Switch AI model in settings - verify different model is used\n7. Clear chat history - verify messages are removed\n8. Test 30-day retention (mock time to verify old messages purge)\n9. Validate response style and decisions align with soul/charter constraints across repeated prompts.",
         "priority": "high",
         "dependencies": [
-          4,
-          5
+          "4",
+          "5",
+          "13"
         ],
         "status": "pending",
         "subtasks": [
@@ -453,7 +584,8 @@
             "dependencies": [],
             "details": "1. Install AI dependencies: `npm install ai @ai-sdk/openai`\n2. Create src/main/ai/openrouter.ts with createOpenAI configured for OpenRouter:\n   ```typescript\n   import { createOpenAI } from '@ai-sdk/openai';\n   \n   export const createOpenRouterProvider = (apiKey: string) => \n     createOpenAI({\n       baseURL: 'https://openrouter.ai/api/v1',\n       apiKey,\n       headers: {\n         'HTTP-Referer': 'https://flusk.app',\n         'X-Title': 'Flusk'\n       }\n     });\n   ```\n3. Add API key retrieval from settings table (ai_openrouter_key)\n4. Implement error handling for invalid/missing API key with user-friendly messages\n5. Export typed provider instance for use in chat module",
             "status": "pending",
-            "testStrategy": "1. Start app without API key - verify helpful error message appears in chat\n2. Set invalid API key - verify proper error handling\n3. Set valid API key - verify successful connection by sending test message\n4. Log request headers to confirm OpenRouter-specific headers are included"
+            "testStrategy": "1. Start app without API key - verify helpful error message appears in chat\n2. Set invalid API key - verify proper error handling\n3. Set valid API key - verify successful connection by sending test message\n4. Log request headers to confirm OpenRouter-specific headers are included",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -464,7 +596,8 @@
             ],
             "details": "1. Create src/main/ai/models.ts with model definitions:\n   ```typescript\n   export const AI_MODELS = {\n     minimax: { id: 'minimax/minimax-m2.5', name: 'MiniMax M2.5', tier: 'economy' },\n     kimi: { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5', tier: 'balanced' },\n     glm: { id: 'z-ai/glm-5', name: 'GLM 5', tier: 'premium' }\n   } as const;\n   ```\n2. Store selected model in settings table (ai_selected_model key)\n3. Create getSelectedModel() function that retrieves from settings with minimax as default\n4. Create setSelectedModel(modelId) function for model switching\n5. Export getModelInstance(provider) function that returns the correctly configured model\n6. Add IPC handlers: ai:get-model, ai:set-model for renderer access\n7. Validate model ID before saving to prevent invalid selections",
             "status": "pending",
-            "testStrategy": "1. Fresh install - verify minimax is selected by default\n2. Switch to kimi model via IPC - verify setting persists after restart\n3. Switch to glm model - verify next chat request uses glm model ID\n4. Attempt to set invalid model ID - verify validation prevents it\n5. Call getModelInstance - verify correct model configuration returned"
+            "testStrategy": "1. Fresh install - verify minimax is selected by default\n2. Switch to kimi model via IPC - verify setting persists after restart\n3. Switch to glm model - verify next chat request uses glm model ID\n4. Attempt to set invalid model ID - verify validation prevents it\n5. Call getModelInstance - verify correct model configuration returned",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -475,7 +608,8 @@
             ],
             "details": "1. Create src/main/ai/tools.ts with Vercel AI SDK tool definitions:\n   ```typescript\n   import { tool } from 'ai';\n   import { z } from 'zod';\n   \n   export const createTaskTool = tool({\n     description: 'Create a new task',\n     parameters: z.object({\n       title: z.string().describe('Task title'),\n       body: z.string().optional().describe('Task body in markdown'),\n       priority: z.enum(['none', 'low', 'medium', 'high']).optional(),\n       parentId: z.string().optional().describe('Parent task ID for subtasks'),\n       dueDate: z.string().optional().describe('Due date in ISO format'),\n       client: z.string().optional()\n     }),\n     execute: async (params) => { /* DB insert + event log */ }\n   });\n   ```\n2. Implement update_task tool with partial updates and field validation\n3. Implement complete_task tool that sets status='done' and completedAt timestamp\n4. Implement delete_task tool with soft delete option and cascade handling\n5. Implement move_task tool for changing parentId (promoting/demoting tasks)\n6. Implement set_today tool to toggle the today flag\n7. Each tool must: log to task_events table, return full task object, handle errors gracefully\n8. Export toolCollection object with all tools for streamText",
             "status": "pending",
-            "testStrategy": "1. AI says 'Create task: Review docs' - verify task created in DB with correct title\n2. AI says 'Mark task X as high priority' - verify update_task changes priority field\n3. AI says 'Complete task X' - verify status=done and completedAt set\n4. AI says 'Delete task X' - verify task removed and task_events logged\n5. AI says 'Make task X a subtask of Y' - verify parentId updated\n6. AI says 'Add task X to today' - verify today=true\n7. Each action should produce an action card in chat with undo button"
+            "testStrategy": "1. AI says 'Create task: Review docs' - verify task created in DB with correct title\n2. AI says 'Mark task X as high priority' - verify update_task changes priority field\n3. AI says 'Complete task X' - verify status=done and completedAt set\n4. AI says 'Delete task X' - verify task removed and task_events logged\n5. AI says 'Make task X a subtask of Y' - verify parentId updated\n6. AI says 'Add task X to today' - verify today=true\n7. Each action should produce an action card in chat with undo button",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -486,7 +620,8 @@
             ],
             "details": "1. Implement suggest_daily_plan tool:\n   - Parameters: optional focus_area, max_tasks (default 5)\n   - Queries active tasks, considers: due dates, priority, effort estimates, patterns\n   - Returns structured plan with reasoning for each suggestion\n   - Does NOT auto-add to today - just suggests for user confirmation\n2. Implement parse_notes tool:\n   - Parameters: notes (markdown string)\n   - Parses freeform text into structured task suggestions\n   - Extracts: tasks, due dates, priorities, clients from natural language\n   - Returns array of suggested tasks (not created yet)\n3. Implement undo_last_action tool:\n   - Queries most recent task_event for current chat session\n   - Reverses the action using stored before/after state\n   - Handles: create (delete), update (restore previous), delete (restore), complete (uncomplete)\n   - Returns confirmation of what was undone\n4. Add session tracking to correlate undos with correct actions\n5. Handle edge cases: nothing to undo, already undone, cascade deletes",
             "status": "pending",
-            "testStrategy": "1. AI says 'Plan my day' - verify suggest_daily_plan returns 3-5 prioritized tasks with reasoning\n2. Send scratchpad content 'Meeting notes: - call john tomorrow, - urgent: fix bug' - verify parse_notes extracts 2 tasks\n3. Create task via AI, then say 'undo' - verify task is deleted\n4. Update task via AI, then undo - verify original values restored\n5. Say 'undo' with no prior actions - verify graceful message\n6. Undo twice in a row - verify second undo handles correctly (either undoes previous action or says nothing to undo)"
+            "testStrategy": "1. AI says 'Plan my day' - verify suggest_daily_plan returns 3-5 prioritized tasks with reasoning\n2. Send scratchpad content 'Meeting notes: - call john tomorrow, - urgent: fix bug' - verify parse_notes extracts 2 tasks\n3. Create task via AI, then say 'undo' - verify task is deleted\n4. Update task via AI, then undo - verify original values restored\n5. Say 'undo' with no prior actions - verify graceful message\n6. Undo twice in a row - verify second undo handles correctly (either undoes previous action or says nothing to undo)",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -498,7 +633,8 @@
             ],
             "details": "1. Create src/main/ai/systemPrompt.ts with buildSystemPrompt(context) function\n2. Implement context sections with priority-based token allocation:\n   - Core identity + Soul personality (always included, ~200 tokens)\n   - Current date/time, timezone (~50 tokens)\n   - Today's tasks list with status (~300-500 tokens)\n   - Inbox count and recent additions (~100 tokens)\n   - Overdue items with urgency indicators (~200 tokens)\n   - Recent completions (last 24h) (~100 tokens)\n   - User Profile snippet (~200 tokens)\n   - Relevant Patterns (~200 tokens)\n   - Recent Journal entries (~200 tokens)\n3. Create tokenEstimate(text) utility using simple word-count heuristic (words * 1.3)\n4. Implement priority-based truncation when budget exceeded:\n   - Always keep: identity, date, today tasks\n   - Truncate first: journal, patterns, older completions\n5. Format output as clean markdown system prompt\n6. Cache context building (invalidate on task changes)",
             "status": "pending",
-            "testStrategy": "1. Build prompt with minimal tasks - verify all sections included under budget\n2. Build prompt with 50+ tasks - verify intelligent truncation keeps most relevant\n3. Verify date/time is current and correctly formatted\n4. Verify overdue items are highlighted with days overdue\n5. Verify token estimate stays within 1500-2000 range\n6. Log system prompt to console - verify it reads naturally and includes key context"
+            "testStrategy": "1. Build prompt with minimal tasks - verify all sections included under budget\n2. Build prompt with 50+ tasks - verify intelligent truncation keeps most relevant\n3. Verify date/time is current and correctly formatted\n4. Verify overdue items are highlighted with days overdue\n5. Verify token estimate stays within 1500-2000 range\n6. Log system prompt to console - verify it reads naturally and includes key context",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -511,7 +647,8 @@
             ],
             "details": "1. Create src/main/ai/chat.ts with core chat logic:\n   ```typescript\n   import { streamText } from 'ai';\n   \n   export async function* sendMessage(content: string, sessionId: string) {\n     const provider = createOpenRouterProvider(apiKey);\n     const model = getModelInstance(provider);\n     const systemPrompt = buildSystemPrompt(await getContext());\n     \n     const result = await streamText({\n       model,\n       system: systemPrompt,\n       messages: await getChatHistory(sessionId),\n       tools: toolCollection,\n     });\n     \n     for await (const chunk of result.textStream) {\n       yield { type: 'text', content: chunk };\n     }\n     // Handle tool calls\n     for (const toolCall of result.toolCalls) {\n       yield { type: 'tool', ...toolCall };\n     }\n   }\n   ```\n2. Create IPC handler chat:send that uses BrowserWindow.webContents.send for streaming chunks\n3. Implement chat:history handler to retrieve messages from chat_messages table\n4. Implement chat:clear handler to delete messages (respecting retention policy)\n5. Log all messages to chat_messages table with role, content, sessionId, timestamp\n6. Handle tool execution: run tool, capture result, continue generation if needed\n7. Add error handling for network failures, rate limits, and tool execution errors\n8. Implement retry logic for transient failures",
             "status": "pending",
-            "testStrategy": "1. Send message - verify streaming chunks arrive in renderer progressively\n2. Verify user message logged to chat_messages before AI response\n3. Verify AI response logged after complete\n4. Call chat:history - verify returns ordered message list\n5. Call chat:clear - verify messages removed\n6. Trigger tool call - verify tool executes and result appears in response\n7. Disconnect network mid-response - verify error handling\n8. Check chat_messages table structure matches schema"
+            "testStrategy": "1. Send message - verify streaming chunks arrive in renderer progressively\n2. Verify user message logged to chat_messages before AI response\n3. Verify AI response logged after complete\n4. Call chat:history - verify returns ordered message list\n5. Call chat:clear - verify messages removed\n6. Trigger tool call - verify tool executes and result appears in response\n7. Disconnect network mid-response - verify error handling\n8. Check chat_messages table structure matches schema",
+            "parentId": "undefined"
           },
           {
             "id": 7,
@@ -522,7 +659,8 @@
             ],
             "details": "1. Create src/renderer/components/chat/ChatView.tsx as main chat container:\n   - Scrollable message list with auto-scroll on new messages\n   - Framer Motion transitions for message entry\n2. Create src/renderer/components/chat/Message.tsx:\n   - AI messages: left-aligned, full width\n   - User messages: right-aligned, indented, subtle background\n   - Streaming indicator (animated dots) while AI is responding\n   - Markdown rendering for AI responses using react-markdown\n3. Create src/renderer/components/chat/ActionCard.tsx:\n   - Compact card showing: action type (created/updated/completed), task title, timestamp\n   - Undo button that calls undo_last_action via IPC\n   - Status states: pending, executed, undone (with visual distinction)\n   - Smooth animation on appearance\n4. Create useChat hook in src/renderer/hooks/useChat.ts:\n   - Manages messages array, streaming state, current response\n   - Handles IPC subscription for streaming chunks\n   - Assembles chunks into complete messages\n5. Wire up to ChatInput from Task 5 for sending messages\n6. Handle loading states, errors, and empty state (welcome message)",
             "status": "pending",
-            "testStrategy": "1. Send message - verify it appears right-aligned with user styling\n2. AI responds - verify streaming text appears progressively\n3. AI response complete - verify left-aligned with full formatting\n4. AI creates task - verify ActionCard appears inline with undo button\n5. Click undo - verify ActionCard updates to 'undone' state\n6. Send multiple messages - verify proper scroll behavior\n7. Trigger error - verify error state displays gracefully\n8. Empty chat - verify welcome message or prompt appears"
+            "testStrategy": "1. Send message - verify it appears right-aligned with user styling\n2. AI responds - verify streaming text appears progressively\n3. AI response complete - verify left-aligned with full formatting\n4. AI creates task - verify ActionCard appears inline with undo button\n5. Click undo - verify ActionCard updates to 'undone' state\n6. Send multiple messages - verify proper scroll behavior\n7. Trigger error - verify error state displays gracefully\n8. Empty chat - verify welcome message or prompt appears",
+            "parentId": "undefined"
           },
           {
             "id": 8,
@@ -533,19 +671,23 @@
             ],
             "details": "1. Create src/main/ai/messageStore.ts for message persistence:\n   - saveMessage(role, content, sessionId, metadata): insert into chat_messages\n   - getMessages(sessionId, limit): retrieve with pagination\n   - deleteSession(sessionId): remove all messages for session\n   - cleanupOldMessages(): remove based on retention policy\n2. Add retention policy setting (ai_chat_retention) with values:\n   - 'session': delete on app quit\n   - '30days': delete after 30 days\n   - 'forever': never auto-delete\n3. Create IPC handlers: chat:save-message, chat:get-history, chat:delete-session\n4. Implement cleanup on app start:\n   - If retention='session', clear all messages\n   - If retention='30days', delete where createdAt < now - 30 days\n5. Store tool call results as separate messages or embedded in AI message metadata\n6. Add sessionId generation (UUID) on chat mode activation\n7. Create migration to add index on chat_messages(createdAt) for efficient cleanup\n8. Handle attachment metadata for action cards (store tool call details)",
             "status": "pending",
-            "testStrategy": "1. Send messages, quit app, reopen with retention='30days' - verify messages persist\n2. Set retention='session', quit and reopen - verify messages cleared\n3. Create messages 31 days ago (mock), run cleanup - verify old messages deleted\n4. Set retention='forever' - verify no messages deleted\n5. Change retention setting - verify takes effect on next cleanup\n6. Query chat:get-history - verify returns messages in correct order with pagination\n7. Delete session - verify all session messages removed\n8. Verify tool call metadata persists and can reconstruct action cards"
+            "testStrategy": "1. Send messages, quit app, reopen with retention='30days' - verify messages persist\n2. Set retention='session', quit and reopen - verify messages cleared\n3. Create messages 31 days ago (mock), run cleanup - verify old messages deleted\n4. Set retention='forever' - verify no messages deleted\n5. Change retention setting - verify takes effect on next cleanup\n6. Query chat:get-history - verify returns messages in correct order with pagination\n7. Delete session - verify all session messages removed\n8. Verify tool call metadata persists and can reconstruct action cards",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 9,
+        "recommendedSubtasks": 8,
+        "expansionPrompt": "Break down into: 1) Set up OpenRouter provider with Vercel AI SDK using custom base URL, 2) Create model configuration for three models (minimax, kimi, glm) with selection logic, 3) Implement core AI tools (create_task, update_task, complete_task, delete_task, move_task, set_today), 4) Implement planning/parsing tools (suggest_daily_plan, parse_notes, undo_last_action), 5) Build dynamic system prompt context builder with token budgeting, 6) Create chat IPC handlers with streaming support, 7) Build ChatView component with streaming display and action cards, 8) Implement chat message persistence with retention policy. Focus on tool calling execution and error handling."
       },
       {
-        "id": 8,
+        "id": "8",
         "title": "Implement AI Memory System (Soul, Profile, Patterns, Journal)",
         "description": "Build the four-layer AI memory system with persistent storage for Soul (personality), User Profile, learned Patterns, and time-based Journal entries. All layers should be human-readable markdown and user-editable.",
         "details": "1. Create src/main/ai/memory.ts:\n   - Functions to read/write each memory layer from settings table\n   - Soul: ai_soul key (user-written personality)\n   - Profile: ai_user_profile key (AI-learned, user-editable)\n   - Patterns: ai_patterns key (learned workflows)\n2. Set default Soul:\n   ```\n   \"You are a direct, helpful productivity assistant for a solo freelancer. \n   Push me to be productive but don't be annoying. Be concise. No corporate fluff.\"\n   ```\n3. Create AI tools for memory updates:\n   - update_user_profile: Add/update knowledge about user\n   - update_patterns: Save learned workflow/preference\n   - write_journal: Write observation to ai_journal table\n   - read_journal: Query past observations\n4. Create src/main/ai/contextBuilder.ts:\n   - Select relevant memory snippets for system prompt\n   - Prioritize by recency and relevance\n   - Stay within 1-2K token budget\n5. Create journal entry logic:\n   - AI writes after meaningful interactions\n   - Categories: pattern, progress, preference, summary\n   - Weekly digest auto-generation (Monday mornings)\n6. Create src/renderer/pages/SettingsMemory.tsx:\n   - Read-only journal browser\n   - Editable Soul, Profile, Patterns fields\n   - Markdown editor for each\n7. Implement generate_live_thought tool:\n   - Generate contextual line for Today view\n   - Consider: time of day, overdue items, progress, patterns",
         "testStrategy": "1. Edit Soul in settings - verify AI behavior changes\n2. Have conversation about work habits - verify Profile updates\n3. Create similar project structure twice - verify Pattern is learned\n4. Check Journal after meaningful interaction - verify entry exists\n5. Wait for Monday (mock) - verify weekly digest generates\n6. Live thought updates based on context (morning vs evening)\n7. Delete journal entries - verify they're removed\n8. Memory context appears in system prompt (debug log)",
         "priority": "medium",
         "dependencies": [
-          7
+          "7"
         ],
         "status": "pending",
         "subtasks": [
@@ -556,7 +698,8 @@
             "dependencies": [],
             "details": "Create memory.ts with the following:\n\n1. Define memory layer keys as constants:\n   - AI_SOUL_KEY = 'ai_soul'\n   - AI_PROFILE_KEY = 'ai_user_profile'\n   - AI_PATTERNS_KEY = 'ai_patterns'\n\n2. Implement CRUD functions:\n   - getSoul(): Promise<string> - Returns soul markdown or default\n   - setSoul(content: string): Promise<void>\n   - getProfile(): Promise<string> - Returns learned profile markdown\n   - setProfile(content: string): Promise<void>\n   - getPatterns(): Promise<string> - Returns patterns markdown\n   - setPatterns(content: string): Promise<void>\n\n3. Set default Soul content:\n   ```\n   You are a direct, helpful productivity assistant for a solo freelancer.\n   Push me to be productive but don't be annoying. Be concise. No corporate fluff.\n   ```\n\n4. Each function should use the settings table via Drizzle:\n   - Use upsert pattern for writes\n   - Return empty string or default for reads when key doesn't exist\n\n5. Export a MemoryService object with all functions for easy importing",
             "status": "pending",
-            "testStrategy": "1. Call getSoul() on fresh DB - verify default soul is returned\n2. Call setSoul() with custom content - verify it persists\n3. Restart app, call getSoul() - verify custom content persists\n4. Test getProfile/setProfile with markdown content\n5. Test getPatterns/setPatterns with workflow examples\n6. Verify all storage is valid markdown that can be edited"
+            "testStrategy": "1. Call getSoul() on fresh DB - verify default soul is returned\n2. Call setSoul() with custom content - verify it persists\n3. Restart app, call getSoul() - verify custom content persists\n4. Test getProfile/setProfile with markdown content\n5. Test getPatterns/setPatterns with workflow examples\n6. Verify all storage is valid markdown that can be edited",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -567,7 +710,8 @@
             ],
             "details": "Create src/main/ai/tools/memoryTools.ts:\n\n1. update_user_profile tool:\n   - Input: { section: string, content: string, operation: 'add' | 'update' | 'remove' }\n   - Reads current profile, applies change, writes back\n   - Sections: work_style, preferences, clients, projects, skills\n   - Returns confirmation of what was updated\n\n2. update_patterns tool:\n   - Input: { pattern_name: string, description: string, trigger: string, action: string }\n   - Appends new pattern or updates existing by name\n   - Format as markdown list with clear structure\n   - Example: \"When user creates project for [client], auto-set billing rate to $X\"\n\n3. write_journal tool:\n   - Input: { category: 'pattern' | 'progress' | 'preference' | 'summary', content: string }\n   - Writes to ai_journal table with timestamp\n   - Include context: current view, recent task IDs referenced\n   - Returns journal entry ID for reference\n\n4. read_journal tool:\n   - Input: { category?: string, days_back?: number, limit?: number }\n   - Queries ai_journal table with filters\n   - Returns entries formatted for context injection\n   - Default: last 7 days, max 10 entries\n\n5. Register all tools in the AI tool registry from Task 7",
             "status": "pending",
-            "testStrategy": "1. Trigger update_user_profile via AI conversation about work habits - verify Profile updates\n2. Create similar project structure twice - trigger update_patterns, verify pattern saved\n3. Have meaningful conversation - verify write_journal creates entry\n4. Query read_journal - verify entries return with correct filters\n5. Check ai_journal table has expected entries after interactions"
+            "testStrategy": "1. Trigger update_user_profile via AI conversation about work habits - verify Profile updates\n2. Create similar project structure twice - trigger update_patterns, verify pattern saved\n3. Have meaningful conversation - verify write_journal creates entry\n4. Query read_journal - verify entries return with correct filters\n5. Check ai_journal table has expected entries after interactions",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -579,7 +723,8 @@
             ],
             "details": "Create contextBuilder.ts with intelligent memory selection:\n\n1. Define token estimation function:\n   - Rough estimate: 1 token ≈ 4 characters\n   - Track budget as snippets are added\n\n2. Create relevance scoring system:\n   - Recency score: Exponential decay based on age\n   - Frequency score: How often pattern/preference has been referenced\n   - Context score: Match against current view, active tasks, recent queries\n   - Combined score = weighted sum (recency: 0.3, frequency: 0.3, context: 0.4)\n\n3. Implement buildContext(currentState: AppState): string:\n   - Always include full Soul (typically small, ~100 tokens)\n   - Select top-N Profile sections by relevance to current context\n   - Select top-N Patterns relevant to current task types\n   - Select recent journal entries matching context\n   - Format as structured markdown sections\n\n4. Memory selection algorithm:\n   - Score all available snippets\n   - Sort by score descending\n   - Add snippets until budget reached\n   - Reserve 200 tokens for Soul (always included)\n\n5. Export buildSystemPrompt(soul: string, context: string): string\n   - Combines Soul personality with selected context\n   - Adds current date/time context",
             "status": "pending",
-            "testStrategy": "1. Build context with empty memory - verify Soul included and valid prompt returned\n2. Build context with large memory store - verify stays within 2K tokens\n3. Query about specific client - verify client-related patterns score higher\n4. Morning query - verify recent journal entries prioritized over old ones\n5. Measure actual token usage with tiktoken - verify budget respected"
+            "testStrategy": "1. Build context with empty memory - verify Soul included and valid prompt returned\n2. Build context with large memory store - verify stays within 2K tokens\n3. Query about specific client - verify client-related patterns score higher\n4. Morning query - verify recent journal entries prioritized over old ones\n5. Measure actual token usage with tiktoken - verify budget respected",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -591,7 +736,8 @@
             ],
             "details": "Create src/main/ai/weeklyDigest.ts:\n\n1. Implement generateWeeklyDigest():\n   - Query journal entries from past 7 days\n   - Group by category (pattern, progress, preference, summary)\n   - Generate AI summary of key observations\n   - Identify recurring patterns worth promoting\n   - Create digest entry in ai_journal with category='summary'\n\n2. Digest content structure:\n   - Week summary (2-3 sentences)\n   - Key accomplishments\n   - Patterns identified\n   - Suggestions for coming week\n\n3. Scheduling logic:\n   - Check on app startup if digest is due\n   - Due if: today is Monday AND no digest exists for current week\n   - Use simple date comparison and store last_digest_date in settings\n\n4. Create checkAndGenerateDigest():\n   - Called on app startup\n   - Runs in background (non-blocking)\n\n5. Add IPC handler for manual digest generation for testing/catch-up.",
             "status": "pending",
-            "testStrategy": "1. Mock date to Monday morning - verify digest generation triggers once.\n2. Run on Tuesday - verify no automatic digest generation.\n3. Generate digest manually - verify summary entry is written.\n4. Verify digest row is stored in ai_journal with category='summary'.\n5. Run twice on same Monday - verify duplicate digest is not created."
+            "testStrategy": "1. Mock date to Monday morning - verify digest generation triggers once.\n2. Run on Tuesday - verify no automatic digest generation.\n3. Generate digest manually - verify summary entry is written.\n4. Verify digest row is stored in ai_journal with category='summary'.\n5. Run twice on same Monday - verify duplicate digest is not created.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -603,21 +749,25 @@
             ],
             "details": "Create SettingsMemory.tsx page component:\n\n1. Layout structure:\n   - Tab navigation: Soul | Profile | Patterns | Journal\n   - Each tab shows full-height content area\n   - Save/Reset buttons for editable tabs\n\n2. Soul tab:\n   - Markdown editor with preview toggle\n   - Use @uiw/react-md-editor or similar\n   - Auto-save on blur with debounce (1s)\n   - \"Reset to Default\" button\n\n3. Profile tab:\n   - Same markdown editor setup\n   - Show when AI last updated (timestamp)\n   - Warning if manually editing AI-generated content\n\n4. Patterns tab:\n   - Same markdown editor setup\n   - Display patterns in readable format\n   - Option to delete individual patterns\n\n5. Journal tab (read-only browser):\n   - Filter by category dropdown\n   - Date range picker (last 7/30/90 days, all)\n   - Search within entries\n   - Paginated list view with entry cards\n   - Each card shows: date, category badge, content preview\n   - Expand card to see full content\n   - Weekly digests highlighted with special styling\n\n6. Add IPC calls to memory service:\n   - Load/save Soul, Profile, Patterns\n   - Query journal with filters",
             "status": "pending",
-            "testStrategy": "1. Open Settings Memory page - verify all tabs render\n2. Edit Soul markdown, blur field - verify auto-saves\n3. Reload page - verify Soul changes persisted\n4. Browse Journal - verify entries display with correct categories\n5. Filter journal by category - verify only matching entries show\n6. Search journal entries - verify full-text search works\n7. View weekly digest entry - verify special highlight styling"
+            "testStrategy": "1. Open Settings Memory page - verify all tabs render\n2. Edit Soul markdown, blur field - verify auto-saves\n3. Reload page - verify Soul changes persisted\n4. Browse Journal - verify entries display with correct categories\n5. Filter journal by category - verify only matching entries show\n6. Search journal entries - verify full-text search works\n7. View weekly digest entry - verify special highlight styling",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into: 1) Create memory storage functions for Soul, Profile, and Patterns in settings table, 2) Implement AI tools (update_user_profile, update_patterns, write_journal, read_journal), 3) Build context builder that selects relevant memory snippets within token budget, 4) Create weekly digest generation logic with scheduling, 5) Build SettingsMemory page with markdown editors and journal browser. Focus on memory retrieval relevance scoring."
       },
       {
-        "id": 9,
+        "id": "9",
         "title": "Build Menu Bar Integration and Global Shortcuts",
         "description": "Implement the macOS menu bar (tray) integration with the template icon, badge for remaining today items, global shortcuts for window toggle and quick add, and clipboard-aware capture.",
         "details": "1. Create src/main/tray.ts:\n   - Create Tray with template icon (monochrome PNG)\n   - Badge showing remaining today count\n   - Update badge in real-time as tasks complete\n   - Hide badge when count reaches 0\n2. Create src/main/shortcuts.ts:\n   - Use globalShortcut.register\n   - Cmd+Shift+Space: toggle window visibility\n   - Cmd+Shift+A: quick add (focus input, read clipboard)\n3. Implement window behavior:\n   - Center on screen first summon, remember position after\n   - Click outside hides window (like Spotlight)\n   - Escape layered dismiss: chat -> view -> hide\n4. Create src/main/clipboard.ts:\n   - Read clipboard on quick add trigger\n   - Detect URLs, text snippets\n   - Pre-fill input with clipboard content\n   - AI suggests task title based on content\n5. Configure launch at login:\n   - Use electron app.setLoginItemSettings\n   - Toggle in settings\n6. Store window position in settings table\n7. Handle single instance (app.requestSingleInstanceLock)\n8. Create template icon assets:\n   - tray-icon.png (16x16, 32x32 @2x)\n   - tray-icon-Template.png for macOS",
         "testStrategy": "1. Launch app - verify icon appears in menu bar, not Dock\n2. Press Cmd+Shift+Space from any app - window toggles\n3. Press Cmd+Shift+A - window opens with input focused\n4. Copy URL, press Cmd+Shift+A - verify URL pre-filled\n5. Complete all today tasks - badge disappears\n6. Add today task - badge appears with count\n7. Click outside window - verify it hides\n8. Press Escape in chat - returns to view, then hides\n9. Relaunch app - verify window position remembered\n10. Enable launch at login - verify app starts on login",
         "priority": "medium",
         "dependencies": [
-          5,
-          6,
-          7
+          "5",
+          "6",
+          "7"
         ],
         "status": "pending",
         "subtasks": [
@@ -628,7 +778,8 @@
             "dependencies": [],
             "details": "Create src/main/tray.ts with the following implementation:\n\n1. Create template icon assets:\n   - tray-icon-Template.png (16x16 for standard displays)\n   - tray-icon-Template@2x.png (32x32 for Retina displays)\n   - Icons must be monochrome (black with transparency) for macOS template behavior\n   - Place in src/assets/ or resources/ folder\n\n2. Initialize Tray in main process:\n   ```typescript\n   import { Tray, nativeImage, app } from 'electron';\n   \n   let tray: Tray | null = null;\n   \n   export function createTray(mainWindow: BrowserWindow): Tray {\n     const iconPath = path.join(__dirname, '../assets/tray-icon-Template.png');\n     const icon = nativeImage.createFromPath(iconPath);\n     icon.setTemplateImage(true);\n     \n     tray = new Tray(icon);\n     tray.setToolTip('TaskFlow');\n     return tray;\n   }\n   ```\n\n3. Implement badge functionality:\n   - Use tray.setTitle() for badge text (macOS shows this next to icon)\n   - Create updateBadge(count: number) function\n   - When count > 0, show the number; when 0, hide badge (empty string)\n   - Badge should reflect incomplete tasks with today=true flag\n\n4. Set up IPC listener for real-time updates:\n   ```typescript\n   ipcMain.on('today-count-changed', (_, count: number) => {\n     updateTrayBadge(count);\n   });\n   ```\n\n5. Add tray click handler to toggle window visibility:\n   ```typescript\n   tray.on('click', () => {\n     if (mainWindow.isVisible()) {\n       mainWindow.hide();\n     } else {\n       mainWindow.show();\n     }\n   });\n   ```\n\n6. Initialize tray after app is ready in main.ts, passing the main window reference.",
             "status": "pending",
-            "testStrategy": "1. Launch app - verify tray icon appears in macOS menu bar\n2. Verify icon adapts to light/dark menu bar (template image behavior)\n3. Add a task with today=true - verify badge shows '1'\n4. Add more today tasks - verify badge count increases\n5. Complete a today task - verify badge decrements in real-time\n6. Complete all today tasks - verify badge disappears (no '0' shown)\n7. Click tray icon - verify main window toggles visibility\n8. Hover over tray icon - verify tooltip shows app name"
+            "testStrategy": "1. Launch app - verify tray icon appears in macOS menu bar\n2. Verify icon adapts to light/dark menu bar (template image behavior)\n3. Add a task with today=true - verify badge shows '1'\n4. Add more today tasks - verify badge count increases\n5. Complete a today task - verify badge decrements in real-time\n6. Complete all today tasks - verify badge disappears (no '0' shown)\n7. Click tray icon - verify main window toggles visibility\n8. Hover over tray icon - verify tooltip shows app name",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -639,7 +790,8 @@
             ],
             "details": "Create src/main/shortcuts.ts with global shortcut registration:\n\n1. Import required modules:\n   ```typescript\n   import { globalShortcut, BrowserWindow } from 'electron';\n   ```\n\n2. Implement registerGlobalShortcuts function:\n   ```typescript\n   export function registerGlobalShortcuts(mainWindow: BrowserWindow): void {\n     // Toggle window visibility\n     globalShortcut.register('CommandOrControl+Shift+Space', () => {\n       toggleWindow(mainWindow);\n     });\n     \n     // Quick add with clipboard\n     globalShortcut.register('CommandOrControl+Shift+A', () => {\n       showQuickAdd(mainWindow);\n     });\n   }\n   ```\n\n3. Implement toggleWindow function:\n   ```typescript\n   function toggleWindow(win: BrowserWindow): void {\n     if (win.isVisible() && win.isFocused()) {\n       win.hide();\n     } else {\n       win.show();\n       win.focus();\n     }\n   }\n   ```\n\n4. Implement showQuickAdd function:\n   - Show window if hidden\n   - Focus window\n   - Send IPC message to renderer to focus chat input and trigger clipboard read\n   ```typescript\n   function showQuickAdd(win: BrowserWindow): void {\n     win.show();\n     win.focus();\n     win.webContents.send('quick-add-triggered');\n   }\n   ```\n\n5. Unregister shortcuts on app quit:\n   ```typescript\n   export function unregisterGlobalShortcuts(): void {\n     globalShortcut.unregisterAll();\n   }\n   ```\n\n6. Call registerGlobalShortcuts in app 'ready' event and unregisterGlobalShortcuts in 'will-quit' event\n\n7. Handle shortcut registration failures gracefully (shortcuts may be taken by other apps):\n   ```typescript\n   const success = globalShortcut.register('CommandOrControl+Shift+Space', callback);\n   if (!success) {\n     console.warn('Shortcut registration failed - may be in use by another app');\n   }\n   ```",
             "status": "pending",
-            "testStrategy": "1. Launch app and hide window manually\n2. Press Cmd+Shift+Space from any other application - verify window appears and is focused\n3. Press Cmd+Shift+Space again - verify window hides\n4. Press Cmd+Shift+A - verify window appears with chat input focused\n5. Quit app and verify no shortcuts remain registered (test with another app)\n6. Test with window already visible - Cmd+Shift+Space should hide it\n7. Test on fresh launch - first Cmd+Shift+Space should show and center window"
+            "testStrategy": "1. Launch app and hide window manually\n2. Press Cmd+Shift+Space from any other application - verify window appears and is focused\n3. Press Cmd+Shift+Space again - verify window hides\n4. Press Cmd+Shift+A - verify window appears with chat input focused\n5. Quit app and verify no shortcuts remain registered (test with another app)\n6. Test with window already visible - Cmd+Shift+Space should hide it\n7. Test on fresh launch - first Cmd+Shift+Space should show and center window",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -650,7 +802,8 @@
             ],
             "details": "Create src/main/clipboard.ts for clipboard operations:\n\n1. Read clipboard text and classify as url/text/empty.\n2. Add IPC handler 'read-clipboard' returning normalized clipboard payload.\n3. In renderer, create useQuickAdd hook that listens to quick-add trigger and pre-fills input.\n4. AI title suggestion path:\n   - If AI stack is available, call suggestion helper for better titles.\n   - If AI is unavailable, use deterministic fallback so quick-add never blocks:\n     - URL => `Review <hostname>`\n     - Text => first actionable line trimmed to safe length\n5. Suggested title must remain editable before save.\n6. Log failures silently and continue with fallback title.",
             "status": "pending",
-            "testStrategy": "1. Copy a URL to clipboard, press Cmd+Shift+A - verify URL is detected and shown in input\n2. Copy plain text to clipboard, press Cmd+Shift+A - verify text is pre-filled\n3. Empty clipboard, press Cmd+Shift+A - verify input is empty/focused normally\n4. Copy a URL, trigger quick add - verify AI suggests relevant task title\n5. Copy a text snippet, trigger quick add - verify AI suggests actionable title\n6. Verify suggested title is editable (not forced)\n7. Test with very long clipboard content - verify graceful truncation"
+            "testStrategy": "1. Copy a URL to clipboard, press Cmd+Shift+A - verify URL is detected and shown in input\n2. Copy plain text to clipboard, press Cmd+Shift+A - verify text is pre-filled\n3. Empty clipboard, press Cmd+Shift+A - verify input is empty/focused normally\n4. Copy a URL, trigger quick add - verify AI suggests relevant task title\n5. Copy a text snippet, trigger quick add - verify AI suggests actionable title\n6. Verify suggested title is editable (not forced)\n7. Test with very long clipboard content - verify graceful truncation",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -662,7 +815,8 @@
             ],
             "details": "Implement window positioning in src/main/windowManager.ts:\n\n1. Create window position manager:\n   ```typescript\n   import { BrowserWindow, screen } from 'electron';\n   import { db } from './db';\n   \n   interface WindowPosition {\n     x: number;\n     y: number;\n     width: number;\n     height: number;\n   }\n   \n   let hasBeenPositioned = false;\n   ```\n\n2. Implement position logic on window show:\n   ```typescript\n   export function positionWindow(win: BrowserWindow): void {\n     const savedPosition = getSavedPosition();\n     \n     if (savedPosition && hasBeenPositioned) {\n       // Use saved position\n       win.setBounds(savedPosition);\n     } else {\n       // Center on primary display\n       const { width, height } = screen.getPrimaryDisplay().workAreaSize;\n       const winBounds = win.getBounds();\n       win.setPosition(\n         Math.round((width - winBounds.width) / 2),\n         Math.round((height - winBounds.height) / 2)\n       );\n       hasBeenPositioned = true;\n     }\n   }\n   ```\n\n3. Save position on window move/resize:\n   ```typescript\n   win.on('moved', () => saveWindowPosition(win));\n   win.on('resized', () => saveWindowPosition(win));\n   \n   function saveWindowPosition(win: BrowserWindow): void {\n     const bounds = win.getBounds();\n     // Save to settings table in SQLite\n     db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', \n       ['windowPosition', JSON.stringify(bounds)]);\n   }\n   ```\n\n4. Implement click-outside-to-hide (Spotlight behavior):\n   ```typescript\n   // In BrowserWindow creation options\n   const mainWindow = new BrowserWindow({\n     // ... other options\n     skipTaskbar: true,  // Don't show in Dock taskbar\n   });\n   \n   // Hide on blur (click outside)\n   mainWindow.on('blur', () => {\n     // Only hide if not in dev tools or dialog\n     if (!mainWindow.webContents.isDevToolsOpened()) {\n       mainWindow.hide();\n     }\n   });\n   ```\n\n5. Implement layered Escape dismiss in renderer:\n   ```typescript\n   // In AppShell.tsx or global key handler\n   useEffect(() => {\n     const handleEscape = (e: KeyboardEvent) => {\n       if (e.key === 'Escape') {\n         if (isChatOpen) {\n           closeChat();\n         } else if (currentView !== 'today') {\n           setView('today');\n         } else {\n           window.electronAPI.hideWindow();\n         }\n       }\n     };\n     window.addEventListener('keydown', handleEscape);\n     return () => window.removeEventListener('keydown', handleEscape);\n   }, [isChatOpen, currentView]);\n   ```\n\n6. Add IPC for hiding window from renderer:\n   ```typescript\n   ipcMain.on('hide-window', () => {\n     mainWindow.hide();\n   });\n   ```",
             "status": "pending",
-            "testStrategy": "1. Fresh app launch, press Cmd+Shift+Space - verify window appears centered on screen\n2. Drag window to corner, hide and show again - verify window appears at last position\n3. Restart app, show window - verify position persists across restarts\n4. Click outside window - verify window hides (blur behavior)\n5. Open chat mode, press Escape - verify chat closes but window stays\n6. Press Escape in Today view - verify window hides\n7. Press Escape in Projects view - verify returns to Today view first\n8. Verify window doesn't hide when dev tools are open and you click dev tools"
+            "testStrategy": "1. Fresh app launch, press Cmd+Shift+Space - verify window appears centered on screen\n2. Drag window to corner, hide and show again - verify window appears at last position\n3. Restart app, show window - verify position persists across restarts\n4. Click outside window - verify window hides (blur behavior)\n5. Open chat mode, press Escape - verify chat closes but window stays\n6. Press Escape in Today view - verify window hides\n7. Press Escape in Projects view - verify returns to Today view first\n8. Verify window doesn't hide when dev tools are open and you click dev tools",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -673,21 +827,25 @@
             ],
             "details": "Create src/main/appLifecycle.ts for app lifecycle management:\n\n1. Implement single instance lock at very start of main.ts:\n   ```typescript\n   const gotTheLock = app.requestSingleInstanceLock();\n   \n   if (!gotTheLock) {\n     app.quit();\n   } else {\n     app.on('second-instance', (event, commandLine, workingDirectory) => {\n       // Someone tried to run a second instance\n       // Focus our window instead\n       if (mainWindow) {\n         if (mainWindow.isMinimized()) mainWindow.restore();\n         mainWindow.show();\n         mainWindow.focus();\n       }\n     });\n   }\n   ```\n\n2. Implement launch at login:\n   ```typescript\n   export function setLaunchAtLogin(enabled: boolean): void {\n     app.setLoginItemSettings({\n       openAtLogin: enabled,\n       openAsHidden: true,  // Start hidden in tray\n       // macOS-specific: use launch agent\n       path: app.getPath('exe'),\n     });\n   }\n   \n   export function getLaunchAtLoginStatus(): boolean {\n     return app.getLoginItemSettings().openAtLogin;\n   }\n   ```\n\n3. Create IPC handlers for settings:\n   ```typescript\n   ipcMain.handle('get-launch-at-login', () => {\n     return getLaunchAtLoginStatus();\n   });\n   \n   ipcMain.handle('set-launch-at-login', (_, enabled: boolean) => {\n     setLaunchAtLogin(enabled);\n     // Also save to settings table for UI state\n     saveSetting('launchAtLogin', enabled);\n   });\n   ```\n\n4. Add setting to renderer settings page:\n   ```typescript\n   // In Settings component\n   const [launchAtLogin, setLaunchAtLogin] = useState(false);\n   \n   useEffect(() => {\n     window.electronAPI.getLaunchAtLogin().then(setLaunchAtLogin);\n   }, []);\n   \n   const handleToggle = async (enabled: boolean) => {\n     await window.electronAPI.setLaunchAtLogin(enabled);\n     setLaunchAtLogin(enabled);\n   };\n   ```\n\n5. Configure app to hide Dock icon (menu bar only):\n   ```typescript\n   // In main.ts after app ready\n   if (process.platform === 'darwin') {\n     app.dock.hide();  // Hide from Dock, show only in menu bar\n   }\n   ```\n\n6. Handle startup visibility:\n   ```typescript\n   // Check if launched at login (hidden) vs manual launch\n   const wasOpenedAsHidden = app.getLoginItemSettings().wasOpenedAsHidden;\n   \n   app.whenReady().then(() => {\n     createTray(mainWindow);\n     registerGlobalShortcuts(mainWindow);\n     \n     if (!wasOpenedAsHidden) {\n       mainWindow.show();\n     }\n   });\n   ```",
             "status": "pending",
-            "testStrategy": "1. Try to launch second instance of app - verify it focuses existing window instead of opening new\n2. Enable launch at login in settings - verify setting persists\n3. Restart Mac (or logout/login) - verify app starts automatically\n4. Verify app starts hidden (in tray) on automatic login launch\n5. Manual launch (clicking app icon) - verify window shows immediately\n6. Disable launch at login - verify app no longer auto-starts\n7. Verify Dock icon is hidden - app only appears in menu bar\n8. Verify single instance works when app is hidden in tray"
+            "testStrategy": "1. Try to launch second instance of app - verify it focuses existing window instead of opening new\n2. Enable launch at login in settings - verify setting persists\n3. Restart Mac (or logout/login) - verify app starts automatically\n4. Verify app starts hidden (in tray) on automatic login launch\n5. Manual launch (clicking app icon) - verify window shows immediately\n6. Disable launch at login - verify app no longer auto-starts\n7. Verify Dock icon is hidden - app only appears in menu bar\n8. Verify single instance works when app is hidden in tray",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into: 1) Create Tray with template icon and dynamic badge showing today count, 2) Implement global shortcuts (Cmd+Shift+Space, Cmd+Shift+A) with window toggle logic, 3) Create clipboard-aware capture with URL detection and AI title suggestion, 4) Implement window positioning (center on first summon, remember position), 5) Configure launch at login and single instance handling. Include click-outside-to-hide behavior."
       },
       {
-        "id": 10,
+        "id": "10",
         "title": "Implement Scratchpad, Search, and Settings",
         "description": "Build the global scratchpad panel with markdown editing and 'Send to AI' functionality, implement search across all tasks (active and completed), and create the settings page with all configuration options.",
         "details": "1. Create src/renderer/components/scratchpad/Scratchpad.tsx:\n   - Slides up as panel (Cmd+N or icon click)\n   - Plain markdown editor (use @uiw/react-md-editor or similar)\n   - One persistent document stored in scratchpad table\n   - \"Send to AI\" button dumps content to chat\n   - Auto-save on blur/close\n2. Create src/renderer/components/search/SearchModal.tsx:\n   - Cmd+F or search icon triggers\n   - Search active and completed tasks\n   - Full-text search on title, body, client\n   - Results grouped by status (active first, then done)\n   - Click result to navigate to task\n3. Create src/renderer/pages/Settings.tsx with sections:\n   - **General**: Launch at login, theme override\n   - **AI**: Model selector (3 models), API key input, autonomy mode\n   - **Memory**: Soul, Profile, Patterns editors, Journal browser\n   - **Shortcuts**: Configurable key bindings\n   - **Backup**: Export/import, manual backup trigger\n   - **Chat**: Retention period (session/30 days/forever)\n4. Implement backup system in src/main/backup.ts:\n   - Daily auto-backup of SQLite file\n   - Keep 30 most recent snapshots\n   - Export with optional passphrase encryption\n   - Restore from backup file\n5. Store all settings in settings table as JSON strings\n6. Create settings IPC handlers",
         "testStrategy": "1. Press Cmd+N - scratchpad slides up\n2. Type content, close, reopen - content persists\n3. Click Send to AI - content appears in chat, AI parses tasks\n4. Search for task by title - verify results appear\n5. Search completed tasks - verify they appear in results\n6. Change AI model in settings - verify next chat uses it\n7. Edit Soul - verify AI behavior changes\n8. Export backup - verify encrypted file downloads\n9. Restore backup - verify data is restored\n10. Change shortcut - verify new key binding works",
         "priority": "medium",
         "dependencies": [
-          6,
-          7,
-          8
+          "6",
+          "7",
+          "8"
         ],
         "status": "pending",
         "subtasks": [
@@ -698,7 +856,8 @@
             "dependencies": [],
             "details": "Create src/renderer/components/scratchpad/Scratchpad.tsx with the following features:\n\n1. Panel animation:\n   - Implement slide-up animation using CSS transforms or Framer Motion\n   - Add overlay backdrop with click-to-close\n   - Support keyboard shortcut Cmd+N (register in global keymap)\n   - Add scratchpad icon button in UI header/toolbar\n\n2. Markdown editor integration:\n   - Install @uiw/react-md-editor: `npm install @uiw/react-md-editor`\n   - Configure editor with syntax highlighting for code blocks\n   - Set appropriate height (60-70% viewport)\n   - Add toolbar for common formatting (bold, italic, code, lists)\n\n3. Persistence:\n   - Create IPC handlers for scratchpad CRUD: 'scratchpad:get', 'scratchpad:save'\n   - Store single document in scratchpad table (id, content, updated_at)\n   - Implement auto-save on blur and panel close events\n   - Load content on panel open\n\n4. State management:\n   - Add scratchpad state to Zustand store (isOpen, content, isDirty)\n   - Track dirty state for unsaved changes indicator",
             "status": "pending",
-            "testStrategy": "1. Press Cmd+N - verify scratchpad slides up smoothly with animation\n2. Click scratchpad icon - same behavior as keyboard shortcut\n3. Type markdown content including headers, code blocks, lists\n4. Close panel, reopen - verify content persists exactly as typed\n5. Edit content, blur focus - verify auto-save triggers (check DB)\n6. Click outside panel on overlay - verify panel closes and saves\n7. Press Escape - verify panel closes"
+            "testStrategy": "1. Press Cmd+N - verify scratchpad slides up smoothly with animation\n2. Click scratchpad icon - same behavior as keyboard shortcut\n3. Type markdown content including headers, code blocks, lists\n4. Close panel, reopen - verify content persists exactly as typed\n5. Edit content, blur focus - verify auto-save triggers (check DB)\n6. Click outside panel on overlay - verify panel closes and saves\n7. Press Escape - verify panel closes",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -709,7 +868,8 @@
             ],
             "details": "Extend the Scratchpad component with AI integration:\n\n1. UI elements:\n   - Add 'Send to AI' button in scratchpad header or footer\n   - Style button prominently (primary action color)\n   - Add loading state while AI processes content\n   - Show success/error toast notifications\n\n2. Integration with chat system:\n   - Create sendToAI action in scratchpad store\n   - Format scratchpad content as a user message\n   - Prepend system instruction: 'Parse the following notes and extract any tasks:'\n   - Call chat IPC to add message and trigger AI response\n\n3. AI tool integration:\n   - Ensure parse_notes tool is available in AI tool definitions\n   - Tool should extract: task titles, descriptions, due dates, priorities\n   - Return structured task objects for user confirmation\n\n4. Post-send behavior:\n   - Option to clear scratchpad after sending (user preference)\n   - Close scratchpad panel after successful send\n   - Navigate to chat view to show AI response\n   - Generated tasks should appear as action cards for confirmation",
             "status": "pending",
-            "testStrategy": "1. Write notes with task-like content in scratchpad\n2. Click 'Send to AI' - verify content appears in chat\n3. Verify AI responds with parsed tasks using parse_notes tool\n4. Check action cards appear for each extracted task\n5. Confirm a task - verify it's created in task list\n6. Test with various note formats: bullet lists, paragraphs, mixed content\n7. Test loading state appears during AI processing\n8. Test error handling when AI fails"
+            "testStrategy": "1. Write notes with task-like content in scratchpad\n2. Click 'Send to AI' - verify content appears in chat\n3. Verify AI responds with parsed tasks using parse_notes tool\n4. Check action cards appear for each extracted task\n5. Confirm a task - verify it's created in task list\n6. Test with various note formats: bullet lists, paragraphs, mixed content\n7. Test loading state appears during AI processing\n8. Test error handling when AI fails",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -718,7 +878,8 @@
             "dependencies": [],
             "details": "Implement comprehensive search functionality:\n\n1. SQLite FTS5 setup (in main process):\n   - Create FTS5 virtual table: tasks_fts (title, body, client)\n   - Add triggers to sync FTS with main tasks table on INSERT/UPDATE/DELETE\n   - Migration script to populate FTS from existing tasks\n   ```sql\n   CREATE VIRTUAL TABLE tasks_fts USING fts5(title, body, client, content=tasks, content_rowid=rowid);\n   ```\n\n2. Create src/renderer/components/search/SearchModal.tsx:\n   - Modal overlay with search input at top\n   - Keyboard shortcut Cmd+F to open (register globally)\n   - Auto-focus search input on open\n   - Debounced search (300ms) as user types\n   - Close on Escape or click outside\n\n3. Search implementation:\n   - IPC handler 'search:query' that runs FTS5 MATCH query\n   - Return results with snippet highlighting\n   - Sort by relevance score, then by status (active first)\n   - Limit results (50 max) for performance\n\n4. Results display:\n   - Group results: 'Active Tasks' section, then 'Completed Tasks'\n   - Show task title, client name, snippet with highlighted match\n   - Keyboard navigation (arrow keys, Enter to select)\n   - Click or Enter navigates to task in main view",
             "status": "pending",
-            "testStrategy": "1. Press Cmd+F - search modal opens with focus on input\n2. Type search term - results appear after debounce delay\n3. Search by task title - verify matching tasks appear\n4. Search by client name - verify client field is searchable\n5. Search by task body content - verify body is indexed\n6. Verify active tasks appear before completed tasks\n7. Click result - modal closes, task is selected/highlighted\n8. Arrow keys + Enter - same navigation behavior\n9. Press Escape - modal closes without navigation\n10. Test with 1000+ tasks - verify search responds within 200ms"
+            "testStrategy": "1. Press Cmd+F - search modal opens with focus on input\n2. Type search term - results appear after debounce delay\n3. Search by task title - verify matching tasks appear\n4. Search by client name - verify client field is searchable\n5. Search by task body content - verify body is indexed\n6. Verify active tasks appear before completed tasks\n7. Click result - modal closes, task is selected/highlighted\n8. Arrow keys + Enter - same navigation behavior\n9. Press Escape - modal closes without navigation\n10. Test with 1000+ tasks - verify search responds within 200ms",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -727,7 +888,8 @@
             "dependencies": [],
             "details": "Create comprehensive Settings UI:\n\n1. Create src/renderer/pages/Settings.tsx:\n   - Route accessible from app header/menu\n   - Vertical tabs on left, content on right (or horizontal tabs for mobile)\n   - Each tab loads corresponding section component\n\n2. Tab sections (create separate components in src/renderer/components/settings/):\n   - GeneralSettings.tsx: Launch at login toggle, theme selector (system/light/dark)\n   - AISettings.tsx: Model dropdown (3 models), API key input (masked), autonomy mode radio\n   - MemorySettings.tsx: Soul/Profile/Patterns text editors, Journal browser with date picker\n   - ShortcutsSettings.tsx: List of actions with editable key binding inputs\n   - BackupSettings.tsx: Export/Import buttons, manual backup trigger, backup history list\n   - ChatSettings.tsx: Retention period radio (session/30 days/forever)\n\n3. Settings state:\n   - Create settingsStore in Zustand with all settings fields\n   - Load settings from DB on app start\n   - Save individual settings on change (no global save button)\n   - Show saving indicator for async operations\n\n4. Form controls:\n   - Use consistent form components (toggles, inputs, selects)\n   - Add validation for API key format\n   - Add confirmation for destructive actions",
             "status": "pending",
-            "testStrategy": "1. Navigate to Settings - page loads with first tab active\n2. Click each tab - corresponding content displays\n3. Toggle 'Launch at login' - verify setting persists after restart\n4. Change theme - verify UI updates immediately\n5. Enter API key - verify it's saved and masked on reload\n6. Change autonomy mode - verify setting persists\n7. Edit Soul text - verify auto-saves on blur\n8. Browse Journal entries - verify entries display correctly\n9. Change retention period - verify setting persists\n10. All settings persist after app restart"
+            "testStrategy": "1. Navigate to Settings - page loads with first tab active\n2. Click each tab - corresponding content displays\n3. Toggle 'Launch at login' - verify setting persists after restart\n4. Change theme - verify UI updates immediately\n5. Enter API key - verify it's saved and masked on reload\n6. Change autonomy mode - verify setting persists\n7. Edit Soul text - verify auto-saves on blur\n8. Browse Journal entries - verify entries display correctly\n9. Change retention period - verify setting persists\n10. All settings persist after app restart",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -738,7 +900,8 @@
             ],
             "details": "Create src/main/backup.ts with full backup functionality:\n\n1. Auto-backup system:\n   - Schedule daily backup using node-schedule or setInterval\n   - Copy SQLite file to backups directory: ~/Library/Application Support/[app]/backups/\n   - Filename format: backup-YYYY-MM-DD-HHmmss.db\n   - Run backup on app startup if >24 hours since last backup\n   - Keep only 30 most recent snapshots (delete oldest)\n\n2. Export with encryption:\n   - IPC handler 'backup:export' accepts { path: string, passphrase?: string }\n   - If passphrase provided, encrypt using AES-256-GCM:\n     - Derive key from passphrase using PBKDF2 (100k iterations)\n     - Generate random IV, prepend to encrypted data\n     - Add magic bytes header to identify encrypted files\n   - Use native file dialog to select export location\n   - Export as .taskdb or .taskdb.enc extension\n\n3. Import/Restore:\n   - IPC handler 'backup:import' accepts file path\n   - Detect if file is encrypted (check magic bytes)\n   - If encrypted, prompt for passphrase, decrypt with AES-256-GCM\n   - Validate SQLite file integrity before replacing\n   - Create safety backup of current DB before restore\n   - Replace current database, reload app state\n\n4. Backup history UI integration:\n   - IPC handler 'backup:list' returns available local backups\n   - Allow restore from backup history in Settings",
             "status": "pending",
-            "testStrategy": "1. App runs for first time - verify backup directory created\n2. Wait 24+ hours (or mock time) - verify auto-backup triggers\n3. Create 35 backups - verify only 30 most recent exist\n4. Click Export without passphrase - verify .taskdb file created\n5. Click Export with passphrase - verify .taskdb.enc file created\n6. Import unencrypted backup - verify data restores correctly\n7. Import encrypted backup - verify passphrase prompt appears\n8. Enter wrong passphrase - verify error message shown\n9. Enter correct passphrase - verify data restores correctly\n10. Restore from backup - verify safety backup of current DB created first\n11. Import corrupted file - verify validation catches it, shows error"
+            "testStrategy": "1. App runs for first time - verify backup directory created\n2. Wait 24+ hours (or mock time) - verify auto-backup triggers\n3. Create 35 backups - verify only 30 most recent exist\n4. Click Export without passphrase - verify .taskdb file created\n5. Click Export with passphrase - verify .taskdb.enc file created\n6. Import unencrypted backup - verify data restores correctly\n7. Import encrypted backup - verify passphrase prompt appears\n8. Enter wrong passphrase - verify error message shown\n9. Enter correct passphrase - verify data restores correctly\n10. Restore from backup - verify safety backup of current DB created first\n11. Import corrupted file - verify validation catches it, shows error",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -750,20 +913,24 @@
             ],
             "details": "Build complete settings persistence infrastructure:\n\n1. Settings IPC handlers in src/main/ipc/settings.ts:\n   - 'settings:get' - retrieve single setting by key\n   - 'settings:getAll' - retrieve all settings as object\n   - 'settings:set' - save single setting { key, value }\n   - 'settings:setMultiple' - batch update multiple settings\n   - 'settings:reset' - reset setting to default value\n\n2. Database layer:\n   - Settings table schema: { key: string (PK), value: text (JSON), updated_at }\n   - Define default values for all settings in constants file\n   - Serialize complex values (arrays, objects) as JSON strings\n   - Parse JSON on retrieval with type safety\n\n3. Type definitions:\n   - Create src/shared/types/settings.ts with full settings interface\n   - Define settings keys as enum/const for type safety\n   - Export settings defaults object\n\n4. Renderer integration:\n   - Update settingsStore to use IPC for persistence\n   - Implement optimistic updates with rollback on failure\n   - Add settings change listener for cross-window sync\n   - Preload settings on app initialization\n\n5. Specific setting handlers:\n   - Launch at login: Use electron app.setLoginItemSettings()\n   - Theme: Apply to document.documentElement className\n   - Keyboard shortcuts: Update global shortcut registrations\n   - Chat retention: Schedule cleanup job based on setting",
             "status": "pending",
-            "testStrategy": "1. Change any setting - verify IPC call to main process\n2. Restart app - verify all settings load correctly from DB\n3. Set complex value (object) - verify JSON serialization works\n4. Toggle 'Launch at login' - verify system login items updated\n5. Change theme setting - verify UI updates across all windows\n6. Update keyboard shortcut - verify new binding works immediately\n7. Set chat retention to 30 days - verify old messages cleaned up\n8. Open app in two windows - change setting in one, verify other updates\n9. Set invalid value - verify validation error returned\n10. Reset to defaults - verify all settings return to default values"
+            "testStrategy": "1. Change any setting - verify IPC call to main process\n2. Restart app - verify all settings load correctly from DB\n3. Set complex value (object) - verify JSON serialization works\n4. Toggle 'Launch at login' - verify system login items updated\n5. Change theme setting - verify UI updates across all windows\n6. Update keyboard shortcut - verify new binding works immediately\n7. Set chat retention to 30 days - verify old messages cleaned up\n8. Open app in two windows - change setting in one, verify other updates\n9. Set invalid value - verify validation error returned\n10. Reset to defaults - verify all settings return to default values",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down into: 1) Create Scratchpad component with markdown editor and slide-up animation, 2) Implement 'Send to AI' functionality that triggers parse_notes tool, 3) Build SearchModal with full-text search across tasks (SQLite FTS or LIKE queries), 4) Create Settings page structure with tabbed sections, 5) Implement backup system (daily auto-backup, export/import with optional encryption), 6) Create settings IPC handlers and state persistence. Focus on search performance with large datasets."
       },
       {
-        "id": 11,
+        "id": "11",
         "title": "Implement AI Autonomy Modes and Action Cards",
         "description": "Build the hybrid autonomy system (manual/safe/autopilot) with action cards for all AI mutations, per-action undo functionality, and confirmation dialogs for critical operations.",
         "details": "1. Create src/main/ai/autonomy.ts:\n   - Define action risk levels: low, medium, high, critical\n   - Low: create_task, non-critical update_task fields, set_today\n   - Medium: move_task, complete_task (non-financial)\n   - High: bulk changes affecting >5 tasks\n   - Critical: delete_task, invoice status change to paid/overdue, rewriting completed tasks\n\n2. Implement autonomy modes:\n   - manual: AI drafts actions, user confirms all writes\n   - safe (default): auto-executes low only; confirms medium/high/critical\n   - autopilot: auto-executes low+medium; confirms high/critical\n\n3. Hard safety override (all modes must confirm):\n   - delete_task\n   - bulk changes >5 tasks\n   - invoice status changes to paid/overdue\n   - rewriting completed tasks\n\n4. Create ActionCard UI showing action, rationale, state (pending/executed/undone), and undo.\n5. Create ConfirmationDialog for high/critical actions with explicit user confirmation.\n6. Implement undo via task_events before/after snapshots and undo_last_action tool.\n7. Maintain action queue/history for pending approvals and Cmd+Z behavior.",
         "testStrategy": "1. Set mode=manual - verify all AI writes require confirmation.\n2. Set mode=safe - verify low-risk create/update auto-executes, medium+ prompts.\n3. Set mode=autopilot - verify low+medium auto-execute, high+critical prompt.\n4. In all modes, trigger delete_task - verify confirmation is always required.\n5. Trigger invoice status change to paid/overdue - verify confirmation dialog appears.\n6. Execute action then undo - verify task restored and card state becomes 'undone'.\n7. Verify task_events logs before/after/source for every mutation.",
         "priority": "medium",
         "dependencies": [
-          7,
-          8
+          "7",
+          "8"
         ],
         "status": "pending",
         "subtasks": [
@@ -774,7 +941,8 @@
             "dependencies": [],
             "details": "Create src/main/ai/autonomy.ts with:\n\n1. Define RiskLevel enum: 'low' | 'medium' | 'high' | 'critical'.\n\n2. Implement classifyActionRisk(action):\n   - Low: create_task, update_task(title/body/priority/dueDate/today), set_today\n   - Medium: move_task, complete_task (non-financial)\n   - High: bulk operations affecting >5 tasks\n   - Critical: delete_task, invoice status changes to paid/overdue, modifying completed tasks\n\n3. Define ActionMetadata:\n   - toolName, affectedTaskIds, changeType, involvesFinancialRisk, rationale\n\n4. Implement alwaysConfirm(action): boolean for hard safety overrides:\n   - delete_task\n   - bulk changes >5 tasks\n   - invoice status to paid/overdue\n   - modifications to completed tasks\n\n5. Export getRiskRules() for settings UI and documentation.",
             "status": "pending",
-            "testStrategy": "1. create_task => low.\n2. move_task => medium.\n3. bulk update of 6 tasks => high.\n4. delete_task => critical and alwaysConfirm=true.\n5. invoice status change to paid => critical and alwaysConfirm=true.\n6. update on completed task => critical and alwaysConfirm=true."
+            "testStrategy": "1. create_task => low.\n2. move_task => medium.\n3. bulk update of 6 tasks => high.\n4. delete_task => critical and alwaysConfirm=true.\n5. invoice status change to paid => critical and alwaysConfirm=true.\n6. update on completed task => critical and alwaysConfirm=true.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -785,7 +953,8 @@
             ],
             "details": "Extend src/main/ai/autonomy.ts:\n\n1. Define AutonomyMode: 'manual' | 'safe' | 'autopilot'.\n2. Implement shouldAutoExecute(mode, riskLevel):\n   - manual: false\n   - safe: true for low only\n   - autopilot: true for low and medium\n\n3. Enforce override in execution pipeline:\n   - If alwaysConfirm(action) is true, force pending confirmation regardless of mode.\n\n4. Add ActionLifecycle states:\n   - pending, confirmed, executed, rejected, undone\n\n5. Integrate with tool execution flow:\n   - classify risk\n   - evaluate shouldAutoExecute + alwaysConfirm override\n   - queue pending action or execute and mark state\n\n6. Persist autonomy mode in settings (default 'safe').",
             "status": "pending",
-            "testStrategy": "1. mode=manual + create_task => pending confirmation.\n2. mode=safe + create_task => auto-executes.\n3. mode=autopilot + move_task => auto-executes.\n4. mode=autopilot + delete_task => still pending (override).\n5. mode=autopilot + bulk update >5 => pending (override).\n6. verify state transitions pending -> confirmed -> executed."
+            "testStrategy": "1. mode=manual + create_task => pending confirmation.\n2. mode=safe + create_task => auto-executes.\n3. mode=autopilot + move_task => auto-executes.\n4. mode=autopilot + delete_task => still pending (override).\n5. mode=autopilot + bulk update >5 => pending (override).\n6. verify state transitions pending -> confirmed -> executed.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -797,7 +966,8 @@
             ],
             "details": "Create src/renderer/components/chat/ActionCard.tsx:\n\n1. Props interface:\n   - action: { id, toolName, affectedTaskIds, rationale, riskLevel, status }\n   - onConfirm: () => void\n   - onReject: () => void  \n   - onUndo: () => void\n\n2. Visual design:\n   - Card with left border color based on risk (green=low, yellow=medium, orange=high, red=critical)\n   - Icon for action type (plus for create, pencil for update, trash for delete)\n   - Title: '{Action} {TaskTitle}' e.g., 'Create task: Review quarterly report'\n   - Subtitle: AI's rationale in muted text\n   - Status badge: Pending (yellow), Executed (green), Undone (gray), Rejected (red)\n\n3. Button states:\n   - Pending: Show Confirm (primary) and Reject (ghost) buttons\n   - Executed: Show Undo button only\n   - Undone/Rejected: No buttons, just status indicator\n\n4. Create action queue store (src/renderer/stores/actionStore.ts):\n   - pendingActions: Action[]\n   - executedActions: Action[] (for undo history)\n   - addPendingAction, confirmAction, rejectAction, undoAction methods\n\n5. Animate state transitions with Framer Motion",
             "status": "pending",
-            "testStrategy": "1. Render pending action - verify Confirm/Reject buttons visible\n2. Click Confirm - verify status changes to Executed, buttons change to Undo\n3. Click Reject - verify status changes to Rejected, no buttons shown\n4. Click Undo on executed action - verify status changes to Undone\n5. Verify risk-based border colors display correctly\n6. Test screen reader accessibility for all button states"
+            "testStrategy": "1. Render pending action - verify Confirm/Reject buttons visible\n2. Click Confirm - verify status changes to Executed, buttons change to Undo\n3. Click Reject - verify status changes to Rejected, no buttons shown\n4. Click Undo on executed action - verify status changes to Undone\n5. Verify risk-based border colors display correctly\n6. Test screen reader accessibility for all button states",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -809,7 +979,8 @@
             ],
             "details": "Create src/renderer/components/chat/ConfirmationDialog.tsx:\n\n1. Use shadcn/ui Dialog component as base\n\n2. Props interface:\n   - open: boolean\n   - action: ActionMetadata\n   - onConfirm: () => void\n   - onCancel: () => void\n\n3. Dialog content structure:\n   - Header with warning icon and risk-level-specific title:\n     - High: 'Confirm Bulk Change' or 'Confirm Financial Action'\n     - Critical: 'Critical Action Required' with red styling\n   - Body shows:\n     - What will change (list affected tasks with before/after preview)\n     - Why (AI's rationale)\n     - Risk explanation (why this is high/critical)\n   - Footer:\n     - Cancel button (secondary)\n     - Confirm button (destructive variant for critical, default for high)\n     - For critical: require typing 'CONFIRM' or checkbox 'I understand this cannot be easily undone'\n\n4. Auto-focus Cancel button for safety\n\n5. Escape key closes dialog (same as Cancel)\n\n6. Integrate with action queue: when high/critical action is pending, auto-show dialog",
             "status": "pending",
-            "testStrategy": "1. Trigger high-risk action - verify dialog appears automatically\n2. Trigger critical action - verify extra confirmation step required\n3. Press Escape - verify dialog closes and action remains pending\n4. Click Cancel - verify action is rejected\n5. Click Confirm on high action - verify action executes\n6. Verify critical action requires explicit confirmation input before button enables"
+            "testStrategy": "1. Trigger high-risk action - verify dialog appears automatically\n2. Trigger critical action - verify extra confirmation step required\n3. Press Escape - verify dialog closes and action remains pending\n4. Click Cancel - verify action is rejected\n5. Click Confirm on high action - verify action executes\n6. Verify critical action requires explicit confirmation input before button enables",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -821,21 +992,25 @@
             ],
             "details": "Extend task_events usage for undo:\n\n1. Ensure all task mutations capture snapshots:\n   - before: task state before mutation\n   - after: task state after mutation\n   - Store event row as { taskId, action, before, after, source, createdAt }\n\n2. Create src/main/ai/undoManager.ts:\n   - Track undoable action stack\n   - undo(actionId): restore before snapshot across affected tasks\n   - getLastUndoableAction()\n\n3. Implement undo_last_action AI tool:\n   - Optional actionId (defaults to latest)\n   - Calls undo manager and returns structured result\n\n4. Add Cmd+Z in chat context:\n   - Undo last executed AI action\n   - Update action card state to 'undone'\n   - Show user feedback toast\n\n5. Edge cases:\n   - Ignore already-undone actions\n   - Guard dependent-action undo chains with warning\n   - create undo => delete, delete undo => full restore",
             "status": "pending",
-            "testStrategy": "1. AI creates task - press Cmd+Z - verify task deleted and action shows 'undone'\n2. AI deletes task - press Cmd+Z - verify task restored with all original data\n3. AI updates task - press Cmd+Z - verify task reverts to previous values\n4. Try Cmd+Z on already-undone action - verify no-op with appropriate message\n5. Verify undo works across app restart (snapshots persisted)\n6. Test undo on bulk operation - verify all affected tasks restored"
+            "testStrategy": "1. AI creates task - press Cmd+Z - verify task deleted and action shows 'undone'\n2. AI deletes task - press Cmd+Z - verify task restored with all original data\n3. AI updates task - press Cmd+Z - verify task reverts to previous values\n4. Try Cmd+Z on already-undone action - verify no-op with appropriate message\n5. Verify undo works across app restart (snapshots persisted)\n6. Test undo on bulk operation - verify all affected tasks restored",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down into: 1) Define action risk classification system (low/medium/high/critical) with rules, 2) Implement autonomy mode logic (manual/safe/autopilot) that gates AI tool execution, 3) Create ActionCard component with pending/executed/undone states and confirm/reject buttons, 4) Build ConfirmationDialog for high/critical actions, 5) Implement undo system using task_events snapshots with Cmd+Z integration. Focus on state machine for action lifecycle."
       },
       {
-        "id": 12,
+        "id": "12",
         "title": "Polish UI Animations and Accessibility",
         "description": "Implement all specified animations using Framer Motion, ensure proper accessibility with keyboard navigation, screen reader support, and focus management throughout the application.",
         "details": "1. Implement Framer Motion animations:\n   - View transitions: 200ms slide (ease-out)\n   - Checkbox: smooth fill with scale on complete\n   - Task creation: fade-in from top (150ms)\n   - Hover states: background tint (100ms)\n   - Chat mode transition: task list slides up\n   - Scratchpad: slides up from bottom\n   - Action cards: fade-in with slight scale\n2. Create animation variants in src/renderer/lib/animations.ts:\n   - Consistent easing curves (no bounce/spring)\n   - Reduced motion support via prefers-reduced-motion\n3. Implement focus management:\n   - Focus trap in modals/dialogs\n   - Return focus after closing panels\n   - Visible focus rings on all interactive elements\n4. Add ARIA attributes:\n   - role=\"listbox\" for task lists\n   - aria-selected for selected task\n   - aria-expanded for collapsible sections\n   - aria-live regions for AI responses\n5. Keyboard navigation refinements:\n   - Tab order follows logical flow\n   - All actions reachable via keyboard\n   - Escape closes modals/panels consistently\n6. Test with VoiceOver:\n   - Task list announces correctly\n   - AI responses are read\n   - Form inputs have labels",
         "testStrategy": "1. Complete task - verify smooth checkbox animation\n2. Switch views - verify 200ms slide transition\n3. Enable reduced motion in macOS - verify animations respect setting\n4. Navigate entirely with keyboard - verify all features accessible\n5. Tab through app - verify logical focus order\n6. Open modal, press Escape - verify it closes and focus returns\n7. Enable VoiceOver - verify task list is announced correctly\n8. AI responds - verify aria-live region announces it\n9. Inspect DOM - verify correct ARIA attributes",
         "priority": "low",
         "dependencies": [
-          5,
-          6,
-          10
+          "5",
+          "6",
+          "10"
         ],
         "status": "pending",
         "subtasks": [
@@ -846,7 +1021,8 @@
             "dependencies": [],
             "details": "Create src/renderer/lib/animations.ts with:\n\n1. Define core animation variants:\n   - fadeInFromTop: { hidden: { opacity: 0, y: -10 }, visible: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } } with 150ms duration, ease-out\n   - slideLeft/slideRight: Direction-aware view transitions with 200ms duration\n   - slideUp: For chat mode and scratchpad panels (200ms)\n   - scaleIn: For action cards with slight scale (150ms)\n   - hoverTint: Background color change with 100ms duration\n\n2. Create useReducedMotion hook:\n   - Use window.matchMedia('(prefers-reduced-motion: reduce)')\n   - Listen for changes with addEventListener\n   - Return boolean and cleanup on unmount\n\n3. Export reducedMotionVariants:\n   - When reduced motion enabled, replace transforms with opacity-only\n   - Shorten durations to 0-50ms for essential feedback\n   - Example: slideUp becomes instant opacity transition\n\n4. Define shared easing curves:\n   - easeOut: [0, 0, 0.2, 1] (Framer Motion cubic-bezier)\n   - No bounce or spring animations per design spec\n\n5. Export animation constants:\n   - DURATION_FAST: 100 (hover states)\n   - DURATION_NORMAL: 150 (task creation, action cards)\n   - DURATION_SLOW: 200 (view transitions, panels)\n\n6. Create AnimationProvider context:\n   - Wrap app to provide reducedMotion state globally\n   - Allow components to conditionally apply variants",
             "status": "pending",
-            "testStrategy": "1. Import variants in a test component and verify Framer Motion accepts them without errors\n2. Enable 'Reduce Motion' in macOS System Preferences > Accessibility > Display\n3. Verify useReducedMotion hook returns true when setting enabled\n4. Check animations use opacity-only transitions when reduced motion active\n5. Disable reduced motion, verify full animations restore\n6. Log variant objects to confirm correct duration and easing values"
+            "testStrategy": "1. Import variants in a test component and verify Framer Motion accepts them without errors\n2. Enable 'Reduce Motion' in macOS System Preferences > Accessibility > Display\n3. Verify useReducedMotion hook returns true when setting enabled\n4. Check animations use opacity-only transitions when reduced motion active\n5. Disable reduced motion, verify full animations restore\n6. Log variant objects to confirm correct duration and easing values",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -857,7 +1033,8 @@
             ],
             "details": "Implement remaining interactive animations:\n\n1. TaskItem Checkbox Animation (src/renderer/components/tasks/TaskItem.tsx):\n   - Wrap checkbox in motion.div\n   - On completion: smooth fill with scale effect\n   - Variant: checkboxFill with { scale: [1, 1.1, 1], transition: { duration: 0.2 } }\n   - Add checkmark SVG with draw animation using motion.path\n   - strokeDasharray and strokeDashoffset for line draw effect\n   - Respect reduced motion: instant fill without scale\n\n2. Task Creation Fade-in (TaskList.tsx):\n   - Wrap new task items in motion.div with fadeInFromTop variant\n   - Use AnimatePresence with mode='popLayout' for list reordering\n   - layoutId for smooth reorder animations\n   - 150ms duration, ease-out easing\n   - Reduced motion: instant opacity change\n\n3. Scratchpad Panel Animation (src/renderer/components/scratchpad/Scratchpad.tsx):\n   - Create slide-up panel using motion.div\n   - Variant: slideUp from y: '100%' to y: 0\n   - Add AnimatePresence for enter/exit handling\n   - Include backdrop overlay with opacity fade\n   - 200ms duration for panel, 150ms for backdrop\n   - Reduced motion: instant show/hide\n\n4. Hover State Animations:\n   - Apply whileHover={{ backgroundColor: 'var(--hover)' }} to interactive elements\n   - 100ms transition duration\n   - Use Tailwind hover states as fallback for non-JS\n\n5. Action Card Animation (ActionCard.tsx):\n   - Use scaleIn variant: { hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1 } }\n   - 150ms with ease-out\n   - Stagger children if multiple cards appear",
             "status": "pending",
-            "testStrategy": "1. Complete a task - observe smooth checkbox fill with subtle scale bounce\n2. Enable reduced motion - verify checkbox fills instantly without scale\n3. Add new task via AI - observe fade-in from top animation\n4. Open scratchpad (Cmd+N) - verify slides up from bottom\n5. Close scratchpad - verify slides back down with backdrop fade\n6. Hover over task row - verify background tint appears in 100ms\n7. AI creates action - verify action card fades in with scale\n8. Test all animations with reduced motion enabled - verify instant or opacity-only"
+            "testStrategy": "1. Complete a task - observe smooth checkbox fill with subtle scale bounce\n2. Enable reduced motion - verify checkbox fills instantly without scale\n3. Add new task via AI - observe fade-in from top animation\n4. Open scratchpad (Cmd+N) - verify slides up from bottom\n5. Close scratchpad - verify slides back down with backdrop fade\n6. Hover over task row - verify background tint appears in 100ms\n7. AI creates action - verify action card fades in with scale\n8. Test all animations with reduced motion enabled - verify instant or opacity-only",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -868,7 +1045,8 @@
             ],
             "details": "Add ARIA attributes systematically:\n\n1. Task List Components (TaskList.tsx, TaskItem.tsx):\n   - Container: role='listbox', aria-label='Task list'\n   - Items: role='option', aria-selected='{isSelected}'\n   - aria-describedby for priority/client info\n   - aria-checked on checkbox (or use native input)\n   - aria-label='Complete task: {taskTitle}' on checkbox\n\n2. Project Groups (ProjectGroup.tsx):\n   - Header button: aria-expanded='{isExpanded}'\n   - aria-controls='subtasks-{projectId}'\n   - Subtask list: id='subtasks-{projectId}'\n   - aria-label='Project: {projectName}, {count} subtasks'\n\n3. Chat and AI Responses (ChatArea.tsx, ChatMessage.tsx):\n   - Chat container: aria-live='polite', aria-relevant='additions'\n   - role='log' on message container\n   - Each message: role='article' or no role (native semantics)\n   - AI typing indicator: aria-busy='true'\n   - aria-label on assistant messages: 'AI assistant says:'\n\n4. Dialogs and Modals (ConfirmationDialog.tsx, etc.):\n   - role='dialog' or role='alertdialog' for critical confirmations\n   - aria-modal='true'\n   - aria-labelledby='dialog-title-{id}'\n   - aria-describedby='dialog-description-{id}'\n   - Title: id='dialog-title-{id}'\n   - Description: id='dialog-description-{id}'\n\n5. Form Inputs (ChatInput.tsx, InlineTaskInput.tsx, SettingsMemory.tsx):\n   - Associate <label htmlFor='{inputId}'> with <input id='{inputId}'>\n   - aria-label for inputs without visible labels\n   - aria-required='true' for required fields\n   - aria-invalid='true' and aria-describedby='error-{id}' for errors\n\n6. LiveThought Component:\n   - role='status' for contextual AI insight\n   - aria-live='polite' to announce updates\n   - Dismiss button: aria-label='Dismiss insight'\n\n7. Tabs (TitleBar.tsx view tabs, SettingsMemory tabs):\n   - Container: role='tablist'\n   - Each tab: role='tab', aria-selected, aria-controls\n   - Tab panels: role='tabpanel', aria-labelledby\n\n8. Create src/renderer/lib/a11y.ts:\n   - Helper functions for generating unique IDs\n   - ARIA prop spreaders for common patterns\n   - Screen reader only text utility (.sr-only class)",
             "status": "pending",
-            "testStrategy": "1. Enable VoiceOver (Cmd+F5 on macOS)\n2. Navigate task list - verify items announce as 'option 1 of N, {title}, {selected/not selected}'\n3. Toggle checkbox - verify announces 'checked' or 'unchecked'\n4. Expand/collapse project - verify announces 'expanded' or 'collapsed'\n5. Open dialog - verify announces dialog title and description\n6. Type in chat - verify AI responses announced via aria-live\n7. Tab to all form inputs - verify labels announced correctly\n8. Use accessibility inspector in Chrome DevTools - verify no ARIA warnings\n9. Run axe-core audit - verify no critical accessibility violations"
+            "testStrategy": "1. Enable VoiceOver (Cmd+F5 on macOS)\n2. Navigate task list - verify items announce as 'option 1 of N, {title}, {selected/not selected}'\n3. Toggle checkbox - verify announces 'checked' or 'unchecked'\n4. Expand/collapse project - verify announces 'expanded' or 'collapsed'\n5. Open dialog - verify announces dialog title and description\n6. Type in chat - verify AI responses announced via aria-live\n7. Tab to all form inputs - verify labels announced correctly\n8. Use accessibility inspector in Chrome DevTools - verify no ARIA warnings\n9. Run axe-core audit - verify no critical accessibility violations",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -880,15 +1058,23 @@
             ],
             "details": "Implement complete focus management:\n\n1. Create useFocusTrap hook (src/renderer/hooks/useFocusTrap.ts):\n   - Accept ref to container element\n   - Find all focusable elements within container\n   - On Tab at last element, cycle to first\n   - On Shift+Tab at first, cycle to last\n   - Support nested focusable elements\n   - Handle dynamic content changes\n\n2. Create useFocusReturn hook (src/renderer/hooks/useFocusReturn.ts):\n   - Store triggering element ref on modal/panel open\n   - Return focus to triggering element on close\n   - Handle case where trigger no longer exists\n\n3. Apply focus traps to:\n   - ConfirmationDialog: trap focus within dialog buttons\n   - Scratchpad panel: trap focus within editor and controls\n   - Settings panel: trap focus within settings content\n   - Any modal overlays\n\n4. Implement focus behavior on view transitions:\n   - When switching views (1/2/3 keys), focus first task item\n   - Reset focus index state on view change\n   - useEffect to focus first item after transition\n\n5. Visible Focus Rings:\n   - Add Tailwind focus-visible utilities: focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500\n   - Apply to all interactive elements: buttons, inputs, checkboxes, tabs, task items\n   - Ensure ring is visible on dark background (use light ring color)\n   - Remove default browser outline: outline-none\n   - Respect focus-visible (keyboard only, not mouse click)\n\n6. Escape Key Handling:\n   - Escape closes modals/panels consistently\n   - Add global keydown listener in AppShell\n   - Check for open panels in order: dialog > scratchpad > expanded task > chat mode\n   - Call respective close handlers\n   - Return focus via useFocusReturn\n\n7. Tab Order Verification:\n   - Ensure tabIndex follows logical DOM order\n   - Interactive elements in correct sequence: title bar > view tabs > task list > chat input\n   - Remove or fix any tabIndex > 0 (should be 0 or -1 only)\n\n8. Roving Tabindex for Task List:\n   - Only focused task has tabIndex=0\n   - Other tasks have tabIndex=-1\n   - Arrow keys update focused index and tabIndex\n   - Update in useTaskListKeyboard hook\n\n9. VoiceOver Testing Checklist:\n   - Task list navigation: VO+arrows navigates items, announces state\n   - Checkbox interaction: VO+Space toggles, announces new state\n   - Chat messages: New messages announced automatically\n   - Form labels: All inputs have associated labels\n   - Dialogs: Focus moves to dialog, content announced\n   - View changes: New view content announced\n   - Document findings in ACCESSIBILITY.md",
             "status": "pending",
-            "testStrategy": "1. Open dialog - verify Tab key cycles only through dialog elements\n2. Close dialog - verify focus returns to triggering button\n3. Open scratchpad - verify Tab cycles within scratchpad only\n4. Press Escape - verify panel closes and focus returns\n5. Switch view with keyboard (1/2/3) - verify first task receives focus\n6. Tab through entire app - verify logical order: tabs > tasks > chat input\n7. Check all buttons/inputs for visible focus ring when using keyboard\n8. Click with mouse - verify no focus ring appears (focus-visible only)\n9. Run full VoiceOver test session:\n   - Turn on VoiceOver (Cmd+F5)\n   - Navigate to task list, verify items announced\n   - Complete a task, verify state change announced\n   - Send chat message, verify AI response announced\n   - Open settings, verify tabs work with VoiceOver\n10. Document any VoiceOver issues found and create follow-up tasks"
+            "testStrategy": "1. Open dialog - verify Tab key cycles only through dialog elements\n2. Close dialog - verify focus returns to triggering button\n3. Open scratchpad - verify Tab cycles within scratchpad only\n4. Press Escape - verify panel closes and focus returns\n5. Switch view with keyboard (1/2/3) - verify first task receives focus\n6. Tab through entire app - verify logical order: tabs > tasks > chat input\n7. Check all buttons/inputs for visible focus ring when using keyboard\n8. Click with mouse - verify no focus ring appears (focus-visible only)\n9. Run full VoiceOver test session:\n   - Turn on VoiceOver (Cmd+F5)\n   - Navigate to task list, verify items announced\n   - Complete a task, verify state change announced\n   - Send chat message, verify AI response announced\n   - Open settings, verify tabs work with VoiceOver\n10. Document any VoiceOver issues found and create follow-up tasks",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down into: 1) Create centralized animation variants with consistent easing and reduced-motion support, 2) Implement remaining animations (checkbox fill, task creation fade, scratchpad slide), 3) Add comprehensive ARIA attributes (roles, states, live regions) across all components, 4) Implement focus management (traps, return focus, visible rings) and VoiceOver testing. Focus on prefers-reduced-motion handling."
       }
     ],
     "metadata": {
-      "created": "2026-02-15T16:18:58.322Z",
-      "updated": "2026-02-15T16:18:58.322Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2026-02-15T17:05:57.572Z",
+      "taskCount": 13,
+      "completedCount": 0,
+      "tags": [
+        "master"
+      ]
     }
   }
 }
