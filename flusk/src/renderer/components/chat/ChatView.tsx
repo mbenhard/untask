@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
-import { Loader2, Trash2, Undo2 } from 'lucide-react';
+import { Check, Loader2, ShieldAlert, Trash2, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import type { ChatActionCard, ChatRetentionMode } from '../../../types/chat';
@@ -19,9 +19,11 @@ import { Button } from '../ui/button';
 type ActionCardProps = {
   card: ChatActionCard;
   onUndo: (taskEventId?: string) => void;
+  onApprove: (actionId: string) => void;
+  onReject: (actionId: string) => void;
 };
 
-const badgeClass = (status: ChatActionCard['status']): string => {
+const statusBadgeClass = (status: ChatActionCard['status']): string => {
   if (status === 'success') {
     return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
   }
@@ -31,6 +33,21 @@ const badgeClass = (status: ChatActionCard['status']): string => {
   }
 
   return 'border-destructive/40 bg-destructive/10 text-destructive';
+};
+
+const lifecycleBadgeClass = (lifecycle: ChatActionCard['lifecycle']): string => {
+  switch (lifecycle) {
+    case 'pending':
+      return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
+    case 'executed':
+      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+    case 'rejected':
+      return 'border-destructive/40 bg-destructive/10 text-destructive';
+    case 'undone':
+      return 'border-muted-foreground/40 bg-muted/20 text-muted-foreground';
+    default:
+      return '';
+  }
 };
 
 const formatTimestamp = (createdAt: string | null): string => {
@@ -49,37 +66,123 @@ const formatTimestamp = (createdAt: string | null): string => {
   }).format(parsed);
 };
 
-const ActionCard = ({ card, onUndo }: ActionCardProps): JSX.Element => (
-  <div className="rounded-lg border border-border/80 bg-card/70 p-3">
-    <div className="flex items-start justify-between gap-2">
-      <div>
-        <div
-          className={cn(
-            'inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]',
-            badgeClass(card.status),
-          )}
-        >
-          {card.status.replace('_', ' ')}
-        </div>
-        <p className="mt-2 text-sm font-medium text-foreground">{card.title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
-      </div>
+const ActionCard = ({ card, onUndo, onApprove, onReject }: ActionCardProps): JSX.Element => {
+  const isPending = card.lifecycle === 'pending';
+  const isExecuted = card.lifecycle === 'executed' || (!card.lifecycle && card.status === 'success');
 
-      {card.undoable && card.taskEventId ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          onClick={() => onUndo(card.taskEventId)}
-          className="shrink-0"
-        >
-          <Undo2 className="size-3" />
-          Undo
-        </Button>
-      ) : null}
+  const badgeLabel = card.lifecycle ?? card.status.replace('_', ' ');
+  const badgeStyle = card.lifecycle
+    ? lifecycleBadgeClass(card.lifecycle)
+    : statusBadgeClass(card.status);
+
+  return (
+    <div className="rounded-lg border border-border/80 bg-card/70 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                'inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]',
+                badgeStyle,
+              )}
+            >
+              {badgeLabel}
+            </div>
+            {card.riskLevel ? (
+              <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+                {card.riskLevel} risk
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-2 text-sm font-medium text-foreground">{card.title}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
+          {card.rationale && card.rationale !== card.detail ? (
+            <p className="mt-1 text-xs text-muted-foreground/70 italic">{card.rationale}</p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {isPending && card.actionId ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => { if (card.actionId) onApprove(card.actionId); }}
+              >
+                <Check className="size-3" />
+                Approve
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => { if (card.actionId) onReject(card.actionId); }}
+              >
+                <X className="size-3" />
+                Reject
+              </Button>
+            </>
+          ) : null}
+
+          {isExecuted && card.undoable && card.taskEventId ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => onUndo(card.taskEventId)}
+              className="shrink-0"
+            >
+              <Undo2 className="size-3" />
+              Undo
+            </Button>
+          ) : null}
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+type ConfirmationTarget = {
+  actionId: string;
+  rationale: string;
+  riskLevel: string;
+} | null;
+
+const ConfirmationDialog = ({
+  target,
+  onConfirm,
+  onCancel,
+}: {
+  target: ConfirmationTarget;
+  onConfirm: () => void;
+  onCancel: () => void;
+}): JSX.Element | null => {
+  if (!target) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-lg">
+        <div className="flex items-center gap-2 text-amber-300">
+          <ShieldAlert className="size-4" />
+          <h3 className="text-sm font-semibold">Confirm {target.riskLevel}-risk action</h3>
+        </div>
+        <p className="mt-3 text-sm text-muted-foreground">{target.rationale}</p>
+        <p className="mt-2 text-xs text-muted-foreground/70">
+          This action has elevated risk and requires explicit confirmation.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" variant="default" size="sm" onClick={onConfirm}>
+            Confirm &amp; Execute
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const ChatView = (): JSX.Element => {
   const messages = useChatStore(selectChatMessages);
@@ -93,6 +196,38 @@ export const ChatView = (): JSX.Element => {
   const undoAction = useChatStore((state) => state.undoAction);
   const setSelectedModel = useChatStore((state) => state.setSelectedModel);
   const setRetentionMode = useChatStore((state) => state.setRetentionMode);
+  const approvePendingAction = useChatStore((state) => state.approvePendingAction);
+  const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
+
+  const [confirmationTarget, setConfirmationTarget] = useState<ConfirmationTarget>(null);
+
+  const handleApprove = useCallback(
+    (actionId: string) => {
+      // Find the card to check risk level
+      const card = messages
+        .flatMap((m) => m.actionCards)
+        .find((c) => c.actionId === actionId);
+
+      if (card?.riskLevel === 'high' || card?.riskLevel === 'critical') {
+        setConfirmationTarget({
+          actionId,
+          rationale: card.rationale ?? card.detail,
+          riskLevel: card.riskLevel,
+        });
+        return;
+      }
+
+      void approvePendingAction(actionId);
+    },
+    [messages, approvePendingAction],
+  );
+
+  const handleConfirmApprove = useCallback(() => {
+    if (confirmationTarget) {
+      void approvePendingAction(confirmationTarget.actionId);
+      setConfirmationTarget(null);
+    }
+  }, [confirmationTarget, approvePendingAction]);
 
   const renderedMessages = useMemo(
     () =>
@@ -141,6 +276,10 @@ export const ChatView = (): JSX.Element => {
                     onUndo={(taskEventId) => {
                       void undoAction(taskEventId);
                     }}
+                    onApprove={handleApprove}
+                    onReject={(actionId) => {
+                      void rejectPendingAction(actionId);
+                    }}
                   />
                 ))}
               </div>
@@ -154,7 +293,7 @@ export const ChatView = (): JSX.Element => {
           </article>
         );
       }),
-    [messages, undoAction],
+    [messages, undoAction, handleApprove, rejectPendingAction],
   );
 
   return (
@@ -240,6 +379,12 @@ export const ChatView = (): JSX.Element => {
           </p>
         ) : null}
       </div>
+
+      <ConfirmationDialog
+        target={confirmationTarget}
+        onConfirm={handleConfirmApprove}
+        onCancel={() => setConfirmationTarget(null)}
+      />
     </div>
   );
 };

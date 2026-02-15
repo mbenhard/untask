@@ -3,11 +3,20 @@ import { randomUUID } from 'node:crypto';
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import type { ChatActionCard, ChatToolStatus } from '../../types/chat';
+import type { ChatActionCard, ChatToolStatus, ActionLifecycle } from '../../types/chat';
+import {
+  classifyRisk,
+  requiresHardConfirmation,
+  evaluateGate,
+  getAutonomyMode,
+  addPendingAction,
+  isMutationTool,
+} from './autonomy';
 import {
   completeTask,
   createTask,
   createTaskSchema,
+  deleteTask,
   getLastTaskEventForTask,
   getTaskById,
   listTasks,
@@ -121,6 +130,10 @@ const createActionCard = (
     taskId?: string;
     taskEventId?: string;
     undoable?: boolean;
+    actionId?: string;
+    riskLevel?: ChatActionCard['riskLevel'];
+    rationale?: string;
+    lifecycle?: ActionLifecycle;
   },
 ): ChatActionCard => ({
   id: randomUUID(),
@@ -132,6 +145,10 @@ const createActionCard = (
   taskEventId: options?.taskEventId,
   undoable: options?.undoable ?? false,
   createdAt: todayIso(),
+  actionId: options?.actionId,
+  riskLevel: options?.riskLevel,
+  rationale: options?.rationale,
+  lifecycle: options?.lifecycle,
 });
 
 export type ToolExecutionEnvelope = {
@@ -144,6 +161,8 @@ export type ToolExecutionEnvelope = {
 type ToolExecutionContext = {
   toolCallId?: string;
   onActionCard?: (card: ChatActionCard) => void;
+  autonomyBypass?: boolean;
+  skipInternalConfirmation?: boolean;
 };
 
 type ToolInputSchema = z.ZodTypeAny;
@@ -281,28 +300,30 @@ const updateTaskTool = {
       throw new Error(`Task not found: ${input.id}`);
     }
 
-    const isInvoiceRisk =
-      (input.invoiceStatus === 'paid' || input.invoiceStatus === 'overdue') &&
-      input.invoiceStatus !== before.invoiceStatus;
+    if (!context.skipInternalConfirmation) {
+      const isInvoiceRisk =
+        (input.invoiceStatus === 'paid' || input.invoiceStatus === 'overdue') &&
+        input.invoiceStatus !== before.invoiceStatus;
 
-    if (isInvoiceRisk) {
-      return confirmationRequired(
-        context,
-        'update_task',
-        'Confirmation required',
-        'Invoice transitions to paid/overdue require confirmation.',
-        { taskId: before.id },
-      );
-    }
+      if (isInvoiceRisk) {
+        return confirmationRequired(
+          context,
+          'update_task',
+          'Confirmation required',
+          'Invoice transitions to paid/overdue require confirmation.',
+          { taskId: before.id },
+        );
+      }
 
-    if (before.status === 'done') {
-      return confirmationRequired(
-        context,
-        'update_task',
-        'Confirmation required',
-        'Rewriting a completed task requires confirmation.',
-        { taskId: before.id },
-      );
+      if (before.status === 'done') {
+        return confirmationRequired(
+          context,
+          'update_task',
+          'Confirmation required',
+          'Rewriting a completed task requires confirmation.',
+          { taskId: before.id },
+        );
+      }
     }
 
     const updatedTask = updateTask(input, 'ai');
@@ -356,12 +377,25 @@ const deleteTaskTool = {
       throw new Error(`Task not found: ${input.id}`);
     }
 
-    return confirmationRequired(
+    if (!context.skipInternalConfirmation) {
+      return confirmationRequired(
+        context,
+        'delete_task',
+        'Confirmation required',
+        `Delete "${task.title}" only after explicit confirmation.`,
+        { taskId: task.id },
+      );
+    }
+
+    deleteTask(input.id, 'ai');
+
+    return successResult(
       context,
       'delete_task',
-      'Confirmation required',
-      `Delete "${task.title}" only after explicit confirmation.`,
+      'Task deleted',
+      `Deleted "${task.title}".`,
       { taskId: task.id },
+      { taskId: task.id, undoable: false },
     );
   },
 } satisfies ToolRegistryEntry<'delete_task', typeof deleteTaskToolInputSchema>;
@@ -487,7 +521,7 @@ const parseNotesTool = {
       };
     }
 
-    if (titles.length > 5) {
+    if (titles.length > 5 && !context.skipInternalConfirmation) {
       return confirmationRequired(
         context,
         'parse_notes',
@@ -759,6 +793,49 @@ const formatZodIssues = (error: z.ZodError): string[] =>
 
 const isToolName = (value: string): value is AiToolName => value in AI_TOOL_REGISTRY;
 
+const buildRiskHint = (
+  toolName: string,
+  input: Record<string, unknown>,
+): { toolName: string; input: Record<string, unknown> } => {
+  const hint: Record<string, unknown> = { ...input };
+
+  if (toolName === 'update_task' && typeof input.id === 'string') {
+    const before = getTaskById(input.id);
+    if (before) {
+      hint._beforeStatus = before.status;
+    }
+  }
+
+  if (toolName === 'parse_notes' && typeof input.text === 'string') {
+    hint._parsedCount = extractTaskTitlesFromNotes(input.text).length;
+  }
+
+  return { toolName, input: hint };
+};
+
+const buildPendingRationale = (toolName: string, input: Record<string, unknown>): string => {
+  switch (toolName) {
+    case 'delete_task': {
+      const task = typeof input.id === 'string' ? getTaskById(input.id) : null;
+      return task ? `Delete task "${task.title}".` : `Delete task ${String(input.id)}.`;
+    }
+    case 'update_task':
+      return `Update task ${String(input.id)}.`;
+    case 'complete_task':
+      return `Mark task ${String(input.id)} as done.`;
+    case 'move_task':
+      return `Move task ${String(input.id)}.`;
+    case 'create_task':
+      return `Create task "${String(input.title ?? '')}".`;
+    case 'set_today':
+      return `Toggle Today for task ${String(input.id)}.`;
+    case 'parse_notes':
+      return `Create tasks from notes.`;
+    default:
+      return `Execute ${toolName}.`;
+  }
+};
+
 export const executeToolCall = async (
   call: AiToolCall,
   context: ToolExecutionContext = {},
@@ -794,8 +871,57 @@ export const executeToolCall = async (
     };
   }
 
+  // ─── Autonomy gate ─────────────────────────────────────
+  if (!context.autonomyBypass && isMutationTool(rawToolName)) {
+    const hint = buildRiskHint(rawToolName, parsed.data as Record<string, unknown>);
+    const risk = classifyRisk(hint);
+    const hardOverride = requiresHardConfirmation(hint);
+    const mode = getAutonomyMode();
+    const gate = evaluateGate(mode, risk, hardOverride);
+
+    if (gate.action === 'pending') {
+      const rationale = buildPendingRationale(rawToolName, parsed.data as Record<string, unknown>);
+      const pending = addPendingAction(
+        rawToolName,
+        parsed.data,
+        risk,
+        rationale,
+        hardOverride,
+      );
+
+      const actionCard = createActionCard(
+        rawToolName,
+        'confirmation_required',
+        'Approval required',
+        gate.reason,
+        {
+          actionId: pending.actionId,
+          riskLevel: risk,
+          rationale,
+          lifecycle: 'pending',
+        },
+      );
+      emitActionCard(context, actionCard);
+
+      return {
+        ok: true,
+        toolName: rawToolName,
+        output: {
+          status: 'confirmation_required',
+          message: gate.reason,
+          actionCard,
+        },
+      };
+    }
+  }
+
+  // ─── Execute tool ──────────────────────────────────────
+  const execContext: ToolExecutionContext = context.autonomyBypass
+    ? { ...context, skipInternalConfirmation: true }
+    : context;
+
   try {
-    const output = await definition.execute(parsed.data, context);
+    const output = await definition.execute(parsed.data, execContext);
 
     return {
       ok: true,
@@ -830,11 +956,19 @@ export const createSdkTools = (context: ToolExecutionContext = {}) => {
       description: definition.description,
       inputSchema: definition.schema,
       execute: async (input: unknown, options: { toolCallId: string }) => {
-        const parsedInput = definition.schema.parse(input);
-        return definition.execute(parsedInput, {
-          ...context,
-          toolCallId: options.toolCallId,
-        });
+        const result = await executeToolCall(
+          { name: toolName, input },
+          { ...context, toolCallId: options.toolCallId },
+        );
+
+        if (result.ok) {
+          return result.output;
+        }
+
+        return {
+          status: 'error' as const,
+          message: result.error.message,
+        };
       },
     });
   });

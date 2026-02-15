@@ -14,6 +14,11 @@ import {
   type ChatSetRetentionRequest,
   type ChatUndoRequest,
   type ChatUndoResult,
+  type ChatAutonomyModeResult,
+  type ChatSetAutonomyModeRequest,
+  type ChatResolvePendingActionRequest,
+  type ChatResolvePendingActionResponse,
+  type ChatListPendingActionsResponse,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -60,6 +65,15 @@ import { getSetting, setSetting, getAllSettings } from './services/settingsServi
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 import { generateLiveThought } from './ai/liveThought';
 import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
+import {
+  getAutonomyMode,
+  setAutonomyMode,
+  loadPendingActions,
+  requeuePendingAction,
+  removePendingAction,
+  getPendingAction,
+} from './ai/autonomy';
+import { executeToolCall } from './ai/tools';
 
 type ChatSendInput = {
   content: string;
@@ -87,6 +101,11 @@ const settingsReadJournalSchema = z.object({
   limit: z.number().int().min(1).max(50).optional(),
   days_back: z.number().int().min(1).max(90).optional(),
   daysBack: z.number().int().min(1).max(90).optional(),
+});
+
+const resolvePendingActionSchema = z.object({
+  actionId: z.string().min(1),
+  decision: z.enum(['approve', 'reject']),
 });
 
 const getMemoryState = (): SettingsMemoryStatePayload => ({
@@ -343,6 +362,111 @@ export const registerIpcHandlers = (): void => {
         return generateLiveThought();
       }
       catch (e) { console.error('[ipc] CHAT_GET_LIVE_THOUGHT:', e); throw e; }
+    },
+  );
+
+  // ─── Autonomy handlers ────────────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_GET_AUTONOMY_MODE,
+    (): ChatAutonomyModeResult => {
+      try {
+        return { mode: getAutonomyMode() };
+      }
+      catch (e) { console.error('[ipc] CHAT_GET_AUTONOMY_MODE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_SET_AUTONOMY_MODE,
+    (_event, request: ChatSetAutonomyModeRequest): ChatAutonomyModeResult => {
+      try {
+        if (
+          !request ||
+          (request.mode !== 'manual' &&
+            request.mode !== 'safe' &&
+            request.mode !== 'autopilot')
+        ) {
+          throw new Error('Invalid autonomy mode payload.');
+        }
+        return { mode: setAutonomyMode(request.mode) };
+      }
+      catch (e) { console.error('[ipc] CHAT_SET_AUTONOMY_MODE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS,
+    (): ChatListPendingActionsResponse => {
+      try {
+        return { actions: loadPendingActions() };
+      }
+      catch (e) { console.error('[ipc] CHAT_LIST_PENDING_ACTIONS:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION,
+    async (_event, request: ChatResolvePendingActionRequest): Promise<ChatResolvePendingActionResponse> => {
+      try {
+        const validatedRequest = resolvePendingActionSchema.parse(request ?? {});
+
+        const pending = getPendingAction(validatedRequest.actionId);
+        if (!pending) {
+          return {
+            ok: false,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'rejected',
+            message: 'Pending action not found (may have already been resolved).',
+          };
+        }
+
+        if (validatedRequest.decision === 'reject') {
+          removePendingAction(validatedRequest.actionId);
+          return {
+            ok: true,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'rejected',
+            message: 'Action rejected. No changes were made.',
+          };
+        }
+
+        // Approve: execute the stored tool payload with autonomy bypass
+        removePendingAction(validatedRequest.actionId);
+
+        let result;
+        try {
+          result = await executeToolCall(
+            { name: pending.toolName, input: pending.input },
+            {
+              toolCallId: `autonomy-approve-${validatedRequest.actionId}`,
+              autonomyBypass: true,
+            },
+          );
+        } catch (execError) {
+          // Restore pending action on execution failure
+          requeuePendingAction(pending);
+          throw execError;
+        }
+
+        if (result.ok) {
+          return {
+            ok: true,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'executed',
+            message: result.output.message,
+            taskEventId: result.output.actionCard?.taskEventId,
+            actionCard: result.output.actionCard,
+          };
+        }
+
+        // Execution returned an error — restore pending action for retry
+        requeuePendingAction(pending);
+
+        return {
+          ok: false,
+          actionId: validatedRequest.actionId,
+          lifecycle: 'pending',
+          message: result.error.message,
+        };
+      }
+      catch (e) { console.error('[ipc] CHAT_RESOLVE_PENDING_ACTION:', e); throw e; }
     },
   );
 

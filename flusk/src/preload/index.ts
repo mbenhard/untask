@@ -15,6 +15,11 @@ import {
   type ChatStreamEventPayload,
   type ChatUndoRequest,
   type ChatUndoResult,
+  type ChatAutonomyModeResult,
+  type ChatSetAutonomyModeRequest,
+  type ChatResolvePendingActionRequest,
+  type ChatResolvePendingActionResponse,
+  type ChatListPendingActionsResponse,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -114,6 +119,18 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_SET_RETENTION_MODE, payload),
     getLiveThought: (): Promise<ChatLiveThoughtResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_LIVE_THOUGHT),
+    getAutonomyMode: (): Promise<ChatAutonomyModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_AUTONOMY_MODE),
+    setAutonomyMode: (
+      payload: ChatSetAutonomyModeRequest,
+    ): Promise<ChatAutonomyModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_SET_AUTONOMY_MODE, payload),
+    resolvePendingAction: (
+      payload: ChatResolvePendingActionRequest,
+    ): Promise<ChatResolvePendingActionResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION, payload),
+    listPendingActions: (): Promise<ChatListPendingActionsResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
   },
   scratchpad: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SCRATCHPAD_GET),

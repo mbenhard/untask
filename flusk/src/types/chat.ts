@@ -2,6 +2,12 @@ import type { ChatMessage } from './models';
 
 export type ChatToolStatus = 'success' | 'error' | 'confirmation_required';
 
+export type AutonomyMode = 'manual' | 'safe' | 'autopilot';
+
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+export type ActionLifecycle = 'pending' | 'executed' | 'rejected' | 'undone';
+
 export type ChatActionCard = {
   id: string;
   toolName: string;
@@ -12,6 +18,10 @@ export type ChatActionCard = {
   taskEventId?: string;
   undoable: boolean;
   createdAt: string;
+  actionId?: string;
+  riskLevel?: RiskLevel;
+  rationale?: string;
+  lifecycle?: ActionLifecycle;
 };
 
 export type ChatToolExecutionSummary = {
@@ -117,4 +127,45 @@ export type ChatLiveThoughtPayload = {
   actionLabel: string;
   suggestedPrompt: string;
   generatedAt: string;
+};
+
+// ─── Autonomy payloads ──────────────────────────────────────
+
+export type ChatGetAutonomyModePayload = {
+  mode: AutonomyMode;
+};
+
+export type ChatSetAutonomyModePayload = {
+  mode: AutonomyMode;
+};
+
+export type ChatPendingActionEntry = {
+  actionId: string;
+  toolName: string;
+  input: unknown;
+  riskLevel: RiskLevel;
+  rationale: string;
+  requiresHardConfirmation: boolean;
+  createdAt: string;
+  requestId?: string;
+  modeAtCreation: AutonomyMode;
+  lifecycle: 'pending';
+};
+
+export type ChatResolvePendingActionPayload = {
+  actionId: string;
+  decision: 'approve' | 'reject';
+};
+
+export type ChatResolvePendingActionResult = {
+  ok: boolean;
+  actionId: string;
+  lifecycle: ActionLifecycle;
+  message: string;
+  taskEventId?: string;
+  actionCard?: ChatActionCard;
+};
+
+export type ChatListPendingActionsResult = {
+  actions: ChatPendingActionEntry[];
 };

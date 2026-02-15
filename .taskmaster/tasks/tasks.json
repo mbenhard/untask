@@ -976,7 +976,7 @@
           "7",
           "8"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -984,9 +984,10 @@
             "description": "Create the risk classification system that categorizes all AI tool operations into low, medium, high, and critical risk levels with clear rules and boundaries.",
             "dependencies": [],
             "details": "Create src/main/ai/autonomy.ts with:\n\n1. Define RiskLevel enum: 'low' | 'medium' | 'high' | 'critical'.\n\n2. Implement classifyActionRisk(action):\n   - Low: create_task, update_task(title/body/priority/dueDate/today), set_today\n   - Medium: move_task, complete_task (non-financial)\n   - High: bulk operations affecting >5 tasks\n   - Critical: delete_task, invoice status changes to paid/overdue, modifying completed tasks\n\n3. Define ActionMetadata:\n   - toolName, affectedTaskIds, changeType, involvesFinancialRisk, rationale\n\n4. Implement alwaysConfirm(action): boolean for hard safety overrides:\n   - delete_task\n   - bulk changes >5 tasks\n   - invoice status to paid/overdue\n   - modifications to completed tasks\n\n5. Export getRiskRules() for settings UI and documentation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. create_task => low.\n2. move_task => medium.\n3. bulk update of 6 tasks => high.\n4. delete_task => critical and alwaysConfirm=true.\n5. invoice status change to paid => critical and alwaysConfirm=true.\n6. update on completed task => critical and alwaysConfirm=true.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T22:58:39.524Z"
           },
           {
             "id": 2,
@@ -996,9 +997,10 @@
               1
             ],
             "details": "Extend src/main/ai/autonomy.ts:\n\n1. Define AutonomyMode: 'manual' | 'safe' | 'autopilot'.\n2. Implement shouldAutoExecute(mode, riskLevel):\n   - manual: false\n   - safe: true for low only\n   - autopilot: true for low and medium\n\n3. Enforce override in execution pipeline:\n   - If alwaysConfirm(action) is true, force pending confirmation regardless of mode.\n\n4. Add ActionLifecycle states:\n   - pending, confirmed, executed, rejected, undone\n\n5. Integrate with tool execution flow:\n   - classify risk\n   - evaluate shouldAutoExecute + alwaysConfirm override\n   - queue pending action or execute and mark state\n\n6. Persist autonomy mode in settings (default 'safe').",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. mode=manual + create_task => pending confirmation.\n2. mode=safe + create_task => auto-executes.\n3. mode=autopilot + move_task => auto-executes.\n4. mode=autopilot + delete_task => still pending (override).\n5. mode=autopilot + bulk update >5 => pending (override).\n6. verify state transitions pending -> confirmed -> executed.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T22:58:39.532Z"
           },
           {
             "id": 3,
@@ -1009,9 +1011,10 @@
               2
             ],
             "details": "Create src/renderer/components/chat/ActionCard.tsx:\n\n1. Props interface:\n   - action: { id, toolName, affectedTaskIds, rationale, riskLevel, status }\n   - onConfirm: () => void\n   - onReject: () => void  \n   - onUndo: () => void\n\n2. Visual design:\n   - Card with left border color based on risk (green=low, yellow=medium, orange=high, red=critical)\n   - Icon for action type (plus for create, pencil for update, trash for delete)\n   - Title: '{Action} {TaskTitle}' e.g., 'Create task: Review quarterly report'\n   - Subtitle: AI's rationale in muted text\n   - Status badge: Pending (yellow), Executed (green), Undone (gray), Rejected (red)\n\n3. Button states:\n   - Pending: Show Confirm (primary) and Reject (ghost) buttons\n   - Executed: Show Undo button only\n   - Undone/Rejected: No buttons, just status indicator\n\n4. Create action queue store (src/renderer/stores/actionStore.ts):\n   - pendingActions: Action[]\n   - executedActions: Action[] (for undo history)\n   - addPendingAction, confirmAction, rejectAction, undoAction methods\n\n5. Animate state transitions with Framer Motion",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Render pending action - verify Confirm/Reject buttons visible\n2. Click Confirm - verify status changes to Executed, buttons change to Undo\n3. Click Reject - verify status changes to Rejected, no buttons shown\n4. Click Undo on executed action - verify status changes to Undone\n5. Verify risk-based border colors display correctly\n6. Test screen reader accessibility for all button states",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T22:58:39.535Z"
           },
           {
             "id": 4,
@@ -1022,9 +1025,10 @@
               3
             ],
             "details": "Create src/renderer/components/chat/ConfirmationDialog.tsx:\n\n1. Use shadcn/ui Dialog component as base\n\n2. Props interface:\n   - open: boolean\n   - action: ActionMetadata\n   - onConfirm: () => void\n   - onCancel: () => void\n\n3. Dialog content structure:\n   - Header with warning icon and risk-level-specific title:\n     - High: 'Confirm Bulk Change' or 'Confirm Financial Action'\n     - Critical: 'Critical Action Required' with red styling\n   - Body shows:\n     - What will change (list affected tasks with before/after preview)\n     - Why (AI's rationale)\n     - Risk explanation (why this is high/critical)\n   - Footer:\n     - Cancel button (secondary)\n     - Confirm button (destructive variant for critical, default for high)\n     - For critical: require typing 'CONFIRM' or checkbox 'I understand this cannot be easily undone'\n\n4. Auto-focus Cancel button for safety\n\n5. Escape key closes dialog (same as Cancel)\n\n6. Integrate with action queue: when high/critical action is pending, auto-show dialog",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Trigger high-risk action - verify dialog appears automatically\n2. Trigger critical action - verify extra confirmation step required\n3. Press Escape - verify dialog closes and action remains pending\n4. Click Cancel - verify action is rejected\n5. Click Confirm on high action - verify action executes\n6. Verify critical action requires explicit confirmation input before button enables",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T22:58:39.538Z"
           },
           {
             "id": 5,
@@ -1035,14 +1039,16 @@
               3
             ],
             "details": "Extend task_events usage for undo:\n\n1. Ensure all task mutations capture snapshots:\n   - before: task state before mutation\n   - after: task state after mutation\n   - Store event row as { taskId, action, before, after, source, createdAt }\n\n2. Create src/main/ai/undoManager.ts:\n   - Track undoable action stack\n   - undo(actionId): restore before snapshot across affected tasks\n   - getLastUndoableAction()\n\n3. Implement undo_last_action AI tool:\n   - Optional actionId (defaults to latest)\n   - Calls undo manager and returns structured result\n\n4. Add Cmd+Z in chat context:\n   - Undo last executed AI action\n   - Update action card state to 'undone'\n   - Show user feedback toast\n\n5. Edge cases:\n   - Ignore already-undone actions\n   - Guard dependent-action undo chains with warning\n   - create undo => delete, delete undo => full restore",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. AI creates task - press Cmd+Z - verify task deleted and action shows 'undone'\n2. AI deletes task - press Cmd+Z - verify task restored with all original data\n3. AI updates task - press Cmd+Z - verify task reverts to previous values\n4. Try Cmd+Z on already-undone action - verify no-op with appropriate message\n5. Verify undo works across app restart (snapshots persisted)\n6. Test undo on bulk operation - verify all affected tasks restored",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-15T22:58:39.541Z"
           }
         ],
         "complexity": 8,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Define action risk classification system (low/medium/high/critical) with rules, 2) Implement autonomy mode logic (manual/safe/autopilot) that gates AI tool execution, 3) Create ActionCard component with pending/executed/undone states and confirm/reject buttons, 4) Build ConfirmationDialog for high/critical actions, 5) Implement undo system using task_events snapshots with Cmd+Z integration. Focus on state machine for action lifecycle."
+        "expansionPrompt": "Break down into: 1) Define action risk classification system (low/medium/high/critical) with rules, 2) Implement autonomy mode logic (manual/safe/autopilot) that gates AI tool execution, 3) Create ActionCard component with pending/executed/undone states and confirm/reject buttons, 4) Build ConfirmationDialog for high/critical actions, 5) Implement undo system using task_events snapshots with Cmd+Z integration. Focus on state machine for action lifecycle.",
+        "updatedAt": "2026-02-15T22:58:39.541Z"
       },
       {
         "id": "12",
@@ -1113,9 +1119,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T22:19:19.631Z",
+      "lastModified": "2026-02-15T22:58:39.541Z",
       "taskCount": 13,
-      "completedCount": 9,
+      "completedCount": 10,
       "tags": [
         "master"
       ]

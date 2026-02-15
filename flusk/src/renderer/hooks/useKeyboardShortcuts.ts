@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
 import { useAppStore } from '../stores/appStore';
+import { useChatStore } from '../stores/chatStore';
 
 type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLInputElement | null>;
@@ -28,6 +29,7 @@ export const useKeyboardShortcuts = ({
   const setView = useAppStore((state) => state.setView);
   const isChatMode = useAppStore((state) => state.isChatMode);
   const exitChatMode = useAppStore((state) => state.exitChatMode);
+  const undoAction = useChatStore((state) => state.undoAction);
 
   const inputValueRef = useRef(inputValue);
   const isChatModeRef = useRef(isChatMode);
@@ -46,6 +48,14 @@ export const useKeyboardShortcuts = ({
         event.preventDefault();
         inputRef.current?.focus();
         return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+        if (isChatModeRef.current && !isTextInputElement(document.activeElement)) {
+          event.preventDefault();
+          void undoAction();
+          return;
+        }
       }
 
       if (event.key === 'Escape') {
@@ -92,5 +102,5 @@ export const useKeyboardShortcuts = ({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [clearInput, exitChatMode, inputRef, setView]);
+  }, [clearInput, exitChatMode, inputRef, setView, undoAction]);
 };

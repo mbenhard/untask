@@ -13,6 +13,11 @@ import type {
   ChatStreamEventPayload,
   ChatUndoRequest,
   ChatUndoResult,
+  ChatAutonomyModeResult,
+  ChatSetAutonomyModeRequest,
+  ChatResolvePendingActionRequest,
+  ChatResolvePendingActionResponse,
+  ChatListPendingActionsResponse,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   MemoryPromotionConfirmRequestPayload,
@@ -74,6 +79,10 @@ export type FluskApi = {
     getRetentionMode: () => Promise<ChatRetentionResult>;
     setRetentionMode: (payload: ChatSetRetentionRequest) => Promise<ChatRetentionResult>;
     getLiveThought: () => Promise<ChatLiveThoughtResult>;
+    getAutonomyMode: () => Promise<ChatAutonomyModeResult>;
+    setAutonomyMode: (payload: ChatSetAutonomyModeRequest) => Promise<ChatAutonomyModeResult>;
+    resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
+    listPendingActions: () => Promise<ChatListPendingActionsResponse>;
   };
   scratchpad: {
     get: () => Promise<Scratchpad>;

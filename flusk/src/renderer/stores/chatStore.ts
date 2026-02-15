@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 
 import type {
+  ActionLifecycle,
+  AutonomyMode,
   ChatActionCard,
   ChatModelCatalogEntry,
+  ChatPendingActionEntry,
   ChatRetentionMode,
   ChatStreamEvent,
   PersistedChatToolMetadata,
@@ -34,6 +37,8 @@ type ChatStore = {
   retentionMode: ChatRetentionMode;
   inFlightByRequestId: Record<string, InFlightStream>;
   unsubscribeStream?: () => void;
+  autonomyMode: AutonomyMode;
+  pendingActions: ChatPendingActionEntry[];
 
   initialize: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
@@ -43,6 +48,15 @@ type ChatStore = {
   setRetentionMode: (mode: ChatRetentionMode) => Promise<void>;
   applyStreamEvent: (event: ChatStreamEvent) => void;
   clearError: () => void;
+  setAutonomyMode: (mode: AutonomyMode) => Promise<void>;
+  approvePendingAction: (actionId: string) => Promise<void>;
+  rejectPendingAction: (actionId: string) => Promise<void>;
+  refreshPendingActions: () => Promise<void>;
+  updateCardLifecycle: (
+    actionId: string,
+    lifecycle: ActionLifecycle,
+    updates?: Partial<ChatActionCard>,
+  ) => void;
 };
 
 const flusk = () => {
@@ -119,6 +133,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   selectedModelId: null,
   retentionMode: '30d',
   inFlightByRequestId: {},
+  autonomyMode: 'safe',
+  pendingActions: [],
 
   initialize: async () => {
     if (get().isInitialized) {
@@ -126,11 +142,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
 
     try {
-      const [history, models, selectedModel, retention] = await Promise.all([
+      const [history, models, selectedModel, retention, autonomy, pending] = await Promise.all([
         flusk().chat.history(),
         flusk().chat.getModels(),
         flusk().chat.getSelectedModel(),
         flusk().chat.getRetentionMode(),
+        flusk().chat.getAutonomyMode(),
+        flusk().chat.listPendingActions(),
       ]);
 
       const unsubscribeStream = flusk().chat.onStreamEvent((event) => {
@@ -142,6 +160,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         models,
         selectedModelId: selectedModel.modelId,
         retentionMode: retention.mode,
+        autonomyMode: autonomy.mode,
+        pendingActions: pending.actions,
         unsubscribeStream,
         isInitialized: true,
         error: null,
@@ -222,6 +242,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
 
       if (result.undone) {
+        // Update matching action card lifecycle to undone
+        if (result.originalEventId) {
+          set((state) => ({
+            messages: state.messages.map((message) => ({
+              ...message,
+              actionCards: message.actionCards.map((card) =>
+                card.taskEventId === result.originalEventId
+                  ? { ...card, lifecycle: 'undone' as const }
+                  : card,
+              ),
+            })),
+          }));
+        }
         await useTaskStore.getState().fetchTasks();
       }
 
@@ -366,6 +399,95 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
+  setAutonomyMode: async (mode) => {
+    try {
+      const result = await flusk().chat.setAutonomyMode({ mode });
+      set({ autonomyMode: result.mode, error: null });
+    } catch (error) {
+      set({ error: toErrorMessage(error) });
+    }
+  },
+
+  approvePendingAction: async (actionId) => {
+    try {
+      const result = await flusk().chat.resolvePendingAction({
+        actionId,
+        decision: 'approve',
+      });
+
+      if (result.ok) {
+        const updates = result.actionCard
+          ? {
+            taskId: result.actionCard.taskId,
+            taskEventId: result.actionCard.taskEventId,
+            undoable: result.actionCard.undoable,
+            title: result.actionCard.title,
+            detail: result.actionCard.detail,
+          }
+          : undefined;
+
+        get().updateCardLifecycle(actionId, result.lifecycle, updates);
+        set((state) => ({
+          pendingActions: state.pendingActions.filter((a) => a.actionId !== actionId),
+          error: null,
+        }));
+        await useTaskStore.getState().fetchTasks();
+      } else {
+        set({ error: result.message });
+      }
+    } catch (error) {
+      set({ error: toErrorMessage(error) });
+    }
+  },
+
+  rejectPendingAction: async (actionId) => {
+    try {
+      const result = await flusk().chat.resolvePendingAction({
+        actionId,
+        decision: 'reject',
+      });
+
+      if (result.ok) {
+        get().updateCardLifecycle(actionId, result.lifecycle);
+        set((state) => ({
+          pendingActions: state.pendingActions.filter((a) => a.actionId !== actionId),
+          error: null,
+        }));
+      } else {
+        set({ error: result.message });
+      }
+    } catch (error) {
+      set({ error: toErrorMessage(error) });
+    }
+  },
+
+  refreshPendingActions: async () => {
+    try {
+      const result = await flusk().chat.listPendingActions();
+      set({ pendingActions: result.actions });
+    } catch (error) {
+      set({ error: toErrorMessage(error) });
+    }
+  },
+
+  updateCardLifecycle: (actionId, lifecycle, updates) => {
+    set((state) => ({
+      messages: state.messages.map((message) => ({
+        ...message,
+        actionCards: message.actionCards.map((card) =>
+          card.actionId === actionId
+            ? {
+              ...card,
+              ...updates,
+              lifecycle,
+              status: lifecycle === 'executed' ? 'success' as const : card.status,
+            }
+            : card,
+        ),
+      })),
+    }));
+  },
+
   clearError: () => set({ error: null }),
 }));
 
@@ -375,3 +497,5 @@ export const selectChatError = (state: ChatStore) => state.error;
 export const selectChatModels = (state: ChatStore) => state.models;
 export const selectChatSelectedModelId = (state: ChatStore) => state.selectedModelId;
 export const selectChatRetentionMode = (state: ChatStore) => state.retentionMode;
+export const selectAutonomyMode = (state: ChatStore) => state.autonomyMode;
+export const selectPendingActions = (state: ChatStore) => state.pendingActions;

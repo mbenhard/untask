@@ -23,6 +23,11 @@ import type {
   ChatLiveThoughtPayload,
   ChatUndoRequestPayload,
   ChatUndoResultPayload,
+  ChatGetAutonomyModePayload,
+  ChatSetAutonomyModePayload,
+  ChatResolvePendingActionPayload,
+  ChatResolvePendingActionResult,
+  ChatListPendingActionsResult,
 } from './chat';
 import type { AiJournal } from './models';
 
@@ -54,6 +59,10 @@ export const IPC_CHANNELS = {
   CHAT_GET_RETENTION_MODE: 'chat:get-retention-mode',
   CHAT_SET_RETENTION_MODE: 'chat:set-retention-mode',
   CHAT_GET_LIVE_THOUGHT: 'chat:get-live-thought',
+  CHAT_GET_AUTONOMY_MODE: 'chat:get-autonomy-mode',
+  CHAT_SET_AUTONOMY_MODE: 'chat:set-autonomy-mode',
+  CHAT_RESOLVE_PENDING_ACTION: 'chat:resolve-pending-action',
+  CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
   SCRATCHPAD_GET: 'scratchpad:get',
   SCRATCHPAD_SAVE: 'scratchpad:save',
   SETTINGS_GET: 'settings:get',
@@ -97,6 +106,12 @@ export type ChatUndoResult = ChatUndoResultPayload;
 export type ChatRetentionResult = ChatRetentionPayload;
 export type ChatSetRetentionRequest = ChatSetRetentionPayload;
 export type ChatLiveThoughtResult = ChatLiveThoughtPayload;
+
+export type ChatAutonomyModeResult = ChatGetAutonomyModePayload;
+export type ChatSetAutonomyModeRequest = ChatSetAutonomyModePayload;
+export type ChatResolvePendingActionRequest = ChatResolvePendingActionPayload;
+export type ChatResolvePendingActionResponse = ChatResolvePendingActionResult;
+export type ChatListPendingActionsResponse = ChatListPendingActionsResult;
 
 export type SettingsMemoryStatePayload = {
   soul: string;
