@@ -151,6 +151,7 @@
 .flusk-notes-editor .bn-block-content[data-content-type="heading"] {
   font-size: 1.3rem !important;
   font-weight: 600 !important;
+  line-height: 1.25 !important;
 }
 
 .flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
@@ -171,4 +172,73 @@
 
 .flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
   font-size: 0.9rem !important;
+}
+
+/* Keep side menu (+ / drag handle) vertically aligned with reduced heading sizes */
+.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
+  height: 42px !important;
+}
+
+.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
+  height: 36px !important;
+}
+
+.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
+  height: 32px !important;
+}
+
+/* BlockNote drag preview is rendered outside the notes container.
+   Override heading sizing there too so dragged headings match editor scale. */
+.bn-drag-preview [data-content-type="heading"] {
+  --level: 1.3rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="2"] {
+  --level: 1.15rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="3"] {
+  --level: 1.05rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="4"] {
+  --level: 1rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="5"] {
+  --level: 0.95rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="6"] {
+  --level: 0.9rem !important;
+}
+
+.bn-drag-preview [data-prev-level="1"] {
+  --prev-level: 1.3rem !important;
+}
+
+.bn-drag-preview [data-prev-level="2"] {
+  --prev-level: 1.15rem !important;
+}
+
+.bn-drag-preview [data-prev-level="3"] {
+  --prev-level: 1.05rem !important;
+}
+
+.bn-drag-preview [data-prev-level="4"] {
+  --prev-level: 1rem !important;
+}
+
+.bn-drag-preview [data-prev-level="5"] {
+  --prev-level: 0.95rem !important;
+}
+
+.bn-drag-preview [data-prev-level="6"] {
+  --prev-level: 0.9rem !important;
+}
+
+.bn-drag-preview .bn-block-outer[data-prev-type="heading"] > .bn-block > .bn-block-content {
+  font-size: var(--prev-level) !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
 }

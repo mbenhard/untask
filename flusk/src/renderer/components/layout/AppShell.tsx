@@ -22,7 +22,7 @@ import { ScratchpadView } from '../scratchpad/ScratchpadView';
 import { SearchModal } from '../search/SearchModal';
 import { SettingsMemory } from '../settings/SettingsMemory';
 import { InboxView } from '../views/InboxView';
-import { ProjectsView } from '../views/ProjectsView';
+import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
 import { TitleBar } from './TitleBar';
@@ -102,8 +102,8 @@ export const AppShell = () => {
       return <TodayView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
 
-    if (activeView === 'projects') {
-      return <ProjectsView allTasks={tasks} isLoading={isLoading} error={error} />;
+    if (activeView === 'tasks') {
+      return <TasksView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
 
     if (activeView === 'scratchpad') {

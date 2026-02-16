@@ -1,6 +1,7 @@
 import { eq, asc, desc, isNull, and, inArray, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { TASK_STATUS_VALUES, type TaskStatus } from '../../types/models';
 import { getDb } from '../db';
 import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
 
@@ -9,7 +10,7 @@ export const createTaskSchema = z.object({
   title: z.string().min(1),
   parentId: z.string().nullable().optional(),
   body: z.string().nullable().optional(),
-  status: z.enum(['inbox', 'active', 'in_progress', 'done']).optional(),
+  status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   today: z.boolean().optional(),
   client: z.string().nullable().optional(),
@@ -98,7 +99,7 @@ const assertTopLevelParentExists = (
 };
 
 export function listTasks(filter?: {
-  status?: 'inbox' | 'active' | 'in_progress' | 'done';
+  status?: TaskStatus;
   parentId?: string | null;
   today?: boolean;
   priority?: 'none' | 'low' | 'medium' | 'high';

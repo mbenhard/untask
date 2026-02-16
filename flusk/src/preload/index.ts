@@ -47,6 +47,7 @@ import {
   type SettingsReadJournalResultPayload,
   type SettingsBootstrapState,
 } from '../types/ipc';
+import type { Task } from '../types/models';
 
 const fluskApi = {
   // ─── App/window lifecycle APIs ──────────────────────────
@@ -116,7 +117,7 @@ const fluskApi = {
     ipcRenderer.invoke(IPC_CHANNELS.CHAT_ORCHESTRATE_WITH_KERNEL, request),
   // ─── Database domain APIs ─────────────────────────────────
   tasks: {
-    list: (filter?: { status?: string; parentId?: string | null; today?: boolean }) =>
+    list: (filter?: { status?: Exclude<Task['status'], null>; parentId?: string | null; today?: boolean }) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_LIST, filter),
     create: (input: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_CREATE, input),

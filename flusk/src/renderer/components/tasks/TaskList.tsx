@@ -22,6 +22,11 @@ import type { Task } from '../../../types/models';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
+import {
+  getNextPriority,
+  getNextStatusInCycle,
+  getStatusAfterToggleComplete,
+} from './taskInteraction';
 import { TaskItem } from './TaskItem';
 
 export interface TaskListProps {
@@ -67,6 +72,7 @@ export const TaskList = ({
   indentPx = 0,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
+  const updateTask = useTaskStore((state) => state.updateTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
@@ -181,12 +187,23 @@ export const TaskList = ({
 
   const handleComplete = useCallback(
     (taskId: string): void => {
-      void completeTask(taskId);
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) {
+        return;
+      }
+
+      const nextStatus = getStatusAfterToggleComplete(currentTask.status);
+      if (nextStatus === 'active') {
+        void updateTask({ id: taskId, status: 'active' });
+      } else {
+        void completeTask(taskId);
+      }
+
       if (expandedTaskId === taskId) {
         setExpandedTaskId(null);
       }
     },
-    [completeTask, expandedTaskId],
+    [completeTask, expandedTaskId, tasks, updateTask],
   );
 
   const handleToggleToday = useCallback(
@@ -194,6 +211,39 @@ export const TaskList = ({
       void toggleToday(taskId);
     },
     [toggleToday],
+  );
+
+  const handleCyclePriority = useCallback(
+    (taskId: string): void => {
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) {
+        return;
+      }
+
+      const nextPriority = getNextPriority(currentTask.priority);
+
+      void updateTask({ id: taskId, priority: nextPriority });
+    },
+    [tasks, updateTask],
+  );
+
+  const handleCycleStatus = useCallback(
+    (taskId: string): void => {
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) {
+        return;
+      }
+
+      const nextStatus = getNextStatusInCycle(currentTask.status);
+
+      if (nextStatus === 'done') {
+        void completeTask(taskId);
+        return;
+      }
+
+      void updateTask({ id: taskId, status: nextStatus });
+    },
+    [completeTask, tasks, updateTask],
   );
 
   const handleDragStart = useCallback((event: DragStartEvent): void => {
@@ -241,7 +291,10 @@ export const TaskList = ({
     onFocusedIndexChange: setFocusedIndex,
     expandedTaskId,
     onToggleExpand: handleToggleExpand,
+    onToggleComplete: handleComplete,
     onToggleToday: handleToggleToday,
+    onCyclePriority: handleCyclePriority,
+    onCycleStatus: handleCycleStatus,
     isAnyBodyEditing,
     isDragActive: activeDragId !== null,
     containerRef,
@@ -283,7 +336,8 @@ export const TaskList = ({
           >
             <p id={`${scopeId}-hint`} className="sr-only">
               Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
-              Press T to toggle today. Press E to edit title.
+              Press Space to complete or reopen. Press T to toggle today.
+              Press P to cycle priority. Press S to cycle status. Press E to edit title.
             </p>
             {tasks.map((task, index) => (
               <TaskItem

@@ -28,7 +28,6 @@ export const useKeyboardShortcuts = ({
   clearInput,
 }: UseKeyboardShortcutsOptions): void => {
   const setView = useAppStore((state) => state.setView);
-  const enterChatMode = useAppStore((state) => state.enterChatMode);
   const activeView = useAppStore((state) => state.activeView);
   const isChatMode = useAppStore((state) => state.isChatMode);
   const isMemorySettingsOpen = useAppStore((state) => state.isMemorySettingsOpen);
@@ -150,7 +149,7 @@ export const useKeyboardShortcuts = ({
 
       if (event.key === '2') {
         event.preventDefault();
-        setView('projects');
+        setView('tasks');
         return;
       }
 
@@ -160,15 +159,13 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
-      if (event.key === '4') {
-        event.preventDefault();
-        enterChatMode();
-        return;
-      }
-
       if (
         event.key.toLowerCase() === 'n' &&
-        (activeViewRef.current === 'today' || activeViewRef.current === 'inbox') &&
+        (
+          activeViewRef.current === 'today' ||
+          activeViewRef.current === 'tasks' ||
+          activeViewRef.current === 'inbox'
+        ) &&
         !isChatModeRef.current &&
         !isMemorySettingsOpenRef.current &&
         !isSearchOpenRef.current
@@ -184,7 +181,6 @@ export const useKeyboardShortcuts = ({
     clearInput,
     closeMemorySettings,
     closeSearch,
-    enterChatMode,
     exitChatMode,
     inputRef,
     openSearch,

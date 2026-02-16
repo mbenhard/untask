@@ -4,16 +4,17 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Calendar as CalendarIcon, FolderOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-import type { Task } from '../../../types/models';
-import { useAppStore } from '../../stores/appStore';
+import type { Task, TaskStatus } from '../../../types/models';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { Button, Calendar, Popover, PopoverContent, Textarea } from '../ui';
+import { InlineTaskInput } from './InlineTaskInput';
+import { TaskList } from './TaskList';
 
 // ─── Metadata Field Sub-Components ──────────────────────────
 
 type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
-const PRIORITY_OPTIONS: Array<{ value: string; label: string }> = [
+const PRIORITY_OPTIONS: Array<{ value: NonNullable<Task['priority']>; label: string }> = [
   { value: 'none', label: 'None' },
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Med' },
@@ -30,7 +31,10 @@ const TaskFieldPriority = ({
   <select
     value={task.priority ?? 'none'}
     onChange={(event) =>
-      void onUpdate({ id: task.id, priority: event.target.value })
+      void onUpdate({
+        id: task.id,
+        priority: event.target.value as NonNullable<Task['priority']>,
+      })
     }
     className="h-7 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     aria-label="Priority"
@@ -189,15 +193,15 @@ const TaskFieldClient = ({
   );
 };
 
-const EFFORT_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'unknown', label: '? Effort' },
-  { value: 'tiny', label: 'Tiny' },
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'deep', label: 'Deep' },
+const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
+  { value: 'inbox', label: 'Inbox' },
+  { value: 'active', label: 'Active' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'waiting', label: 'Waiting' },
+  { value: 'done', label: 'Done' },
 ];
 
-const TaskFieldEffort = ({
+const TaskFieldStatus = ({
   task,
   onUpdate,
 }: {
@@ -205,19 +209,43 @@ const TaskFieldEffort = ({
   onUpdate: UpdateTaskAction;
 }) => (
   <select
-    value={task.effort ?? 'unknown'}
+    value={task.status ?? 'active'}
     onChange={(event) =>
-      void onUpdate({ id: task.id, effort: event.target.value })
+      void onUpdate({
+        id: task.id,
+        status: event.target.value as TaskStatus,
+      })
     }
     className="h-7 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    aria-label="Effort"
+    aria-label="Status"
   >
-    {EFFORT_OPTIONS.map((opt) => (
+    {STATUS_OPTIONS.map((opt) => (
       <option key={opt.value} value={opt.value}>
         {opt.label}
       </option>
     ))}
   </select>
+);
+
+const TaskFieldToday = ({
+  task,
+  onUpdate,
+}: {
+  task: Task;
+  onUpdate: UpdateTaskAction;
+}) => (
+  <button
+    type="button"
+    onClick={() =>
+      void onUpdate({
+        id: task.id,
+        today: task.today !== true,
+      })
+    }
+    className="inline-flex h-7 items-center rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+  >
+    {task.today ? 'Today' : '+ Today'}
+  </button>
 );
 
 const TaskFieldProject = ({
@@ -297,10 +325,8 @@ export const TaskBody = ({
   isExpanded,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
-  const setView = useAppStore((state) => state.setView);
   const updateTask = useTaskStore((state) => state.updateTask);
   const allTasks = useTaskStore((state) => state.tasks);
-  const selectTask = useTaskStore((state) => state.selectTask);
   const prefersReducedMotion = useReducedMotion();
   const [isEditing, setIsEditingRaw] = useState(false);
   const [draftBody, setDraftBody] = useState(task.body ?? '');
@@ -355,20 +381,15 @@ export const TaskBody = ({
     () => (task.body && task.body.trim().length > 0 ? task.body : null),
     [task.body],
   );
+  const canOwnSubtasks = task.parentId === null;
   const subtasks = useMemo(
-    () => allTasks.filter((candidate) => candidate.parentId === task.id),
-    [allTasks, task.id],
-  );
-  const activeSubtasks = useMemo(
-    () => subtasks.filter((subtask) => subtask.status !== 'done'),
-    [subtasks],
+    () =>
+      canOwnSubtasks
+        ? allTasks.filter((candidate) => candidate.parentId === task.id)
+        : [],
+    [allTasks, canOwnSubtasks, task.id],
   );
   const hasChildren = subtasks.length > 0;
-
-  const handleOpenInProjects = useCallback(() => {
-    selectTask(task.id);
-    setView('projects');
-  }, [selectTask, setView, task.id]);
 
   return (
     <AnimatePresence initial={false}>
@@ -432,40 +453,26 @@ export const TaskBody = ({
             )}
           </div>
 
-          {hasChildren ? (
+          {canOwnSubtasks ? (
             <div className="border-t border-border/80 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {activeSubtasks.length} active / {subtasks.length} total subtasks
+                  Subtasks
                 </p>
-                <button
-                  type="button"
-                  onClick={handleOpenInProjects}
-                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Manage in Projects
-                </button>
+                <InlineTaskInput
+                  parentId={task.id}
+                  label="Add subtask"
+                  placeholder="Add subtask..."
+                />
               </div>
-              <ul className="mt-2 space-y-1">
-                {activeSubtasks.slice(0, 3).map((subtask) => (
-                  <li
-                    key={subtask.id}
-                    className="truncate text-xs text-muted-foreground"
-                  >
-                    {subtask.title}
-                  </li>
-                ))}
-                {activeSubtasks.length === 0 ? (
-                  <li className="truncate text-xs text-muted-foreground">
-                    All subtasks complete.
-                  </li>
-                ) : null}
-                {activeSubtasks.length > 3 ? (
-                  <li className="truncate text-xs text-muted-foreground">
-                    +{activeSubtasks.length - 3} more
-                  </li>
-                ) : null}
-              </ul>
+              <TaskList
+                tasks={subtasks}
+                allTasks={allTasks}
+                emptyMessage="No subtasks yet."
+                ariaLabel={`Subtasks for ${task.title}`}
+                scopeId={`subtasks:${task.id}`}
+                indentPx={8}
+              />
             </div>
           ) : null}
 
@@ -475,7 +482,8 @@ export const TaskBody = ({
               <TaskFieldPriority task={task} onUpdate={updateTask} />
               <TaskFieldDueDate task={task} onUpdate={updateTask} />
               <TaskFieldClient task={task} onUpdate={updateTask} />
-              <TaskFieldEffort task={task} onUpdate={updateTask} />
+              <TaskFieldStatus task={task} onUpdate={updateTask} />
+              <TaskFieldToday task={task} onUpdate={updateTask} />
               <TaskFieldProject task={task} onUpdate={updateTask} hasChildren={hasChildren} />
             </div>
           </div>

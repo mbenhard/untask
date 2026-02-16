@@ -19,6 +19,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { resolveSearchResultView } from './searchRouting';
 
 const DEBOUNCE_MS = 300;
 
@@ -120,13 +121,7 @@ export const SearchModal = () => {
       close();
       exitChatMode();
 
-      if (result.status === 'inbox') {
-        setView('inbox');
-      } else if (result.today) {
-        setView('today');
-      } else {
-        setView('projects');
-      }
+      setView(resolveSearchResultView(result));
 
       selectTask(result.id);
     },

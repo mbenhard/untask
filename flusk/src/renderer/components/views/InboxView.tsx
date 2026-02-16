@@ -25,8 +25,7 @@ export const InboxView = ({
       allTasks.filter(
         (task) =>
           task.status === 'inbox' &&
-          task.parentId === null &&
-          task.today !== true,
+          task.parentId === null,
       ),
     [allTasks],
   );
@@ -44,6 +43,14 @@ export const InboxView = ({
           </p>
         ) : null}
 
+        <InlineTaskInput
+          parentId={null}
+          defaultStatus="inbox"
+          placeholder="Type to capture..."
+          alwaysOpen={true}
+          triggerOpen={activeView === 'inbox' ? newTaskTrigger : undefined}
+        />
+
         {!isLoading ? (
           <TaskList
             tasks={inboxTasks}
@@ -53,13 +60,6 @@ export const InboxView = ({
             scopeId="inbox"
           />
         ) : null}
-
-        <InlineTaskInput
-          parentId={null}
-          defaultStatus="inbox"
-          placeholder="New inbox item..."
-          triggerOpen={activeView === 'inbox' ? newTaskTrigger : undefined}
-        />
       </div>
     </div>
   );

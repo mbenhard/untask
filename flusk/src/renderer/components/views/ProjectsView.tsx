@@ -59,7 +59,7 @@ export const ProjectsView = ({
     <div className="h-full overflow-y-auto p-3">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading projects...</p>
+          <p className="text-sm text-muted-foreground">Loading tasks...</p>
         ) : null}
 
         {error ? (
@@ -70,7 +70,7 @@ export const ProjectsView = ({
 
         {!isLoading && projectGroups.length === 0 ? (
           <div className="grid min-h-28 place-items-center">
-            <p className="text-[13px] text-muted-foreground">No project tasks yet.</p>
+            <p className="text-[13px] text-muted-foreground">No tasks yet.</p>
           </div>
         ) : null}
 

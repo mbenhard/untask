@@ -79,7 +79,7 @@ export type FluskApi = {
 
   // ─── Database domain APIs ─────────────────────────────────
   tasks: {
-    list: (filter?: { status?: string; parentId?: string | null; today?: boolean }) => Promise<Task[]>;
+    list: (filter?: { status?: Exclude<Task['status'], null>; parentId?: string | null; today?: boolean }) => Promise<Task[]>;
     create: (input: Record<string, unknown>) => Promise<Task>;
     update: (input: Record<string, unknown>) => Promise<Task>;
     delete: (id: string) => Promise<void>;

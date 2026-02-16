@@ -11,7 +11,7 @@ export const tasks = sqliteTable(
     title: text('title').notNull(),
     body: text('body'),
     status: text('status', {
-      enum: ['inbox', 'active', 'in_progress', 'done'],
+      enum: ['inbox', 'active', 'in_progress', 'waiting', 'done'],
     }).default('inbox'),
     priority: text('priority', {
       enum: ['none', 'low', 'medium', 'high'],

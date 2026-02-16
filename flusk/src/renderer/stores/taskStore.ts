@@ -11,9 +11,13 @@ export type TaskCreateInput = {
   today?: boolean;
   client?: string | null;
   dueDate?: string | null;
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   effort?: Task['effort'];
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   invoiceStatus?: Task['invoiceStatus'];
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   valueAtRisk?: number | null;
   order?: number;
 };
@@ -28,9 +32,13 @@ export type TaskUpdateInput = {
   today?: boolean;
   client?: string | null;
   dueDate?: string | null;
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   effort?: Task['effort'];
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   invoiceStatus?: Task['invoiceStatus'];
+  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   valueAtRisk?: number | null;
   order?: number;
 };

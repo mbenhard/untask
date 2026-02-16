@@ -11,6 +11,7 @@ type InlineTaskInputProps = {
   defaultToday?: boolean;
   placeholder?: string;
   label?: string;
+  alwaysOpen?: boolean;
   /** External signal to open the input (e.g. from a keyboard shortcut) */
   triggerOpen?: number;
 };
@@ -21,12 +22,13 @@ export const InlineTaskInput = ({
   defaultToday,
   placeholder,
   label = parentId ? 'Add subtask' : 'Add task',
+  alwaysOpen = false,
   triggerOpen,
 }: InlineTaskInputProps) => {
   const createTask = useTaskStore((state) => state.createTask);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSeenTriggerRef = useRef<number | undefined>(triggerOpen);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(alwaysOpen);
   const [title, setTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -71,7 +73,7 @@ export const InlineTaskInput = ({
     setTitle('');
   }, [createTask, defaultStatus, defaultToday, isCreating, parentId, title]);
 
-  if (!isOpen) {
+  if (!isOpen && !alwaysOpen) {
     return (
       <button
         type="button"
@@ -91,7 +93,7 @@ export const InlineTaskInput = ({
       value={title}
       onChange={(event) => setTitle(event.target.value)}
       onBlur={() => {
-        if (title.trim().length === 0) {
+        if (!alwaysOpen && title.trim().length === 0) {
           setIsOpen(false);
         }
       }}
@@ -105,7 +107,9 @@ export const InlineTaskInput = ({
         if (event.key === 'Escape') {
           event.preventDefault();
           setTitle('');
-          setIsOpen(false);
+          if (!alwaysOpen) {
+            setIsOpen(false);
+          }
         }
       }}
       placeholder={

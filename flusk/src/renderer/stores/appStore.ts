@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export const APP_VIEW_ORDER = ['today', 'projects', 'inbox', 'scratchpad'] as const;
+export const APP_VIEW_ORDER = ['today', 'tasks', 'inbox', 'scratchpad'] as const;
 
 export type AppView = (typeof APP_VIEW_ORDER)[number];
 

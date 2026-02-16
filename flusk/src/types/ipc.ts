@@ -29,7 +29,7 @@ import type {
   ChatResolvePendingActionResult,
   ChatListPendingActionsResult,
 } from './chat';
-import type { AiJournal } from './models';
+import type { AiJournal, Task } from './models';
 
 export const IPC_CHANNELS = {
   // ─── App/window lifecycle channels ──────────────────────
@@ -219,10 +219,10 @@ export type SearchResultItem = {
   parentId: string | null;
   title: string;
   body: string | null;
-  status: string | null;
+  status: Task['status'];
   today: boolean;
-  client: string | null;
-  priority: string | null;
+  client: Task['client'];
+  priority: Task['priority'];
   dueDate: string | null;
   snippet: string;
 };

@@ -8,7 +8,10 @@ type UseTaskListKeyboardOptions = {
   onFocusedIndexChange: (index: number) => void;
   expandedTaskId: string | null;
   onToggleExpand: (id: string) => void;
+  onToggleComplete: (id: string) => void;
   onToggleToday: (id: string) => void;
+  onCyclePriority: (id: string) => void;
+  onCycleStatus: (id: string) => void;
   onStartTitleEdit: (id: string) => void;
   isAnyBodyEditing: boolean;
   isEditingTitle: boolean;
@@ -34,7 +37,10 @@ export const useTaskListKeyboard = ({
   onFocusedIndexChange,
   expandedTaskId,
   onToggleExpand,
+  onToggleComplete,
   onToggleToday,
+  onCyclePriority,
+  onCycleStatus,
   onStartTitleEdit,
   isAnyBodyEditing,
   isEditingTitle,
@@ -88,6 +94,24 @@ export const useTaskListKeyboard = ({
         return;
       }
 
+      if (event.key === ' ') {
+        event.preventDefault();
+        onToggleComplete(focusedTask.id);
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        onCyclePriority(focusedTask.id);
+        return;
+      }
+
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        onCycleStatus(focusedTask.id);
+        return;
+      }
+
       if (event.key.toLowerCase() === 'e') {
         event.preventDefault();
         onStartTitleEdit(focusedTask.id);
@@ -112,7 +136,10 @@ export const useTaskListKeyboard = ({
       onFocusedIndexChange,
       focusedIndex,
       onToggleExpand,
+      onToggleComplete,
       onToggleToday,
+      onCyclePriority,
+      onCycleStatus,
       onStartTitleEdit,
       expandedTaskId,
       containerRef,

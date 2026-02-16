@@ -26,7 +26,7 @@ vi.mock('../services/taskService', () => {
     title: z.string().min(1),
     parentId: z.string().nullable().optional(),
     body: z.string().nullable().optional(),
-    status: z.enum(['inbox', 'active', 'in_progress', 'done']).optional(),
+    status: z.enum(['inbox', 'active', 'in_progress', 'waiting', 'done']).optional(),
     priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
     today: z.boolean().optional(),
     client: z.string().nullable().optional(),

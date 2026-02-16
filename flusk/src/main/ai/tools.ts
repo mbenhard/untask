@@ -8,6 +8,7 @@ import { extractFromHtml } from '@extractus/article-extractor';
 import { z } from 'zod';
 
 import type { ChatActionCard, ChatToolStatus, ActionLifecycle } from '../../types/chat';
+import { TASK_STATUS_VALUES } from '../../types/models';
 import {
   classifyRisk,
   requiresHardConfirmation,
@@ -248,7 +249,7 @@ const setTodayToolInputSchema = z.object({
 });
 const parseNotesToolInputSchema = z.object({
   text: z.string().trim().min(1),
-  status: z.enum(['inbox', 'active', 'in_progress']).optional(),
+  status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
 });
 const suggestDailyPlanInputSchema = z.object({
@@ -268,7 +269,7 @@ const improveTaskInputSchema = z.object({
 });
 
 const listTasksToolInputSchema = z.object({
-  status: z.enum(['inbox', 'active', 'in_progress', 'done']).optional(),
+  status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   client: z.string().optional(),
   today: z.boolean().optional(),

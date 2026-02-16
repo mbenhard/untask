@@ -1,6 +1,5 @@
 import { cn } from '../../lib/utils';
 import {
-  APP_VIEW_ORDER,
   type AppView,
   selectActiveView,
   selectIsChatMode,
@@ -10,10 +9,16 @@ import {
 
 const TAB_LABELS: Record<AppView, string> = {
   today: 'Today',
-  projects: 'Projects',
+  tasks: 'Tasks',
   inbox: 'Inbox',
   scratchpad: 'Notes',
 };
+
+const PRIMARY_TASK_VIEWS: Array<Exclude<AppView, 'scratchpad'>> = [
+  'today',
+  'tasks',
+  'inbox',
+];
 
 export const TitleBar = () => {
   const activeView = useAppStore(selectActiveView);
@@ -28,7 +33,7 @@ export const TitleBar = () => {
       <div aria-hidden className="h-full w-[64px] shrink-0" />
 
       <nav className="no-drag flex h-full items-center gap-0.5" aria-label="Primary view tabs">
-        {APP_VIEW_ORDER.map((view) => {
+        {PRIMARY_TASK_VIEWS.map((view) => {
           const isActive = activeView === view && !isChatMode;
 
           return (
@@ -65,6 +70,20 @@ export const TitleBar = () => {
       </nav>
 
       <div className="no-drag ml-auto flex h-full items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setView('scratchpad')}
+          className={cn(
+            'h-7 px-2 text-[11px] font-medium tracking-[0.01em] transition-colors',
+            activeView === 'scratchpad' && !isChatMode
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          aria-current={activeView === 'scratchpad' && !isChatMode ? 'page' : undefined}
+        >
+          {TAB_LABELS.scratchpad}
+        </button>
+
         <button
           type="button"
           onClick={toggleMemorySettings}

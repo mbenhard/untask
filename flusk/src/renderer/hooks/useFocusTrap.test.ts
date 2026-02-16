@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getFocusableElements, FOCUSABLE_SELECTOR } from './useFocusTrap';
+import { getFocusableElements } from './useFocusTrap';
 
 describe('getFocusableElements', () => {
   let container: HTMLDivElement;

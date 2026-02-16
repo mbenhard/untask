@@ -60,7 +60,10 @@ export function summonWindow(): void {
     hasEverSummoned = true;
   }
 
-  win.show();
+  if (!win.isVisible()) {
+    win.show();
+  }
+
   win.focus();
 }
 
