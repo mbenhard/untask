@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { ArrowRightLeft, Bookmark, Check, Copy, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Bookmark, Check, Copy, FolderInput, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
@@ -390,10 +390,11 @@ export const TaskItem = ({
                     <button
                       type="button"
                       onClick={() => setMenuView('projects')}
-                      className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      Move to project
-                      <span className="ml-2 text-border">&rarr;</span>
+                      <FolderInput className="size-3" />
+                      <span className="flex-1 text-left">Move to project</span>
+                      <span className="text-border">&rarr;</span>
                     </button>
                   )}
                   <button
