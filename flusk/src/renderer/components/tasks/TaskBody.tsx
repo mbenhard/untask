@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { FolderOpen } from 'lucide-react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import {
@@ -10,49 +9,151 @@ import {
 } from '@blocknote/react';
 
 import type { Task, TaskStatus } from '../../../types/models';
+import { cn } from '../../lib/utils';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
+import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 
-// ─── Metadata Field Sub-Components ──────────────────────────
+// ─── Types & Constants ──────────────────────────────────────
 
 type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
-const PRIORITY_OPTIONS: Array<{ value: NonNullable<Task['priority']>; label: string }> = [
-  { value: 'none', label: 'None' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Med' },
-  { value: 'high', label: 'High' },
+const PRIORITY_OPTIONS: Array<{
+  value: NonNullable<Task['priority']>;
+  label: string;
+  dot: string;
+}> = [
+  { value: 'none', label: 'None', dot: '' },
+  { value: 'low', label: 'Low', dot: 'bg-emerald-500' },
+  { value: 'medium', label: 'Med', dot: 'bg-amber-500' },
+  { value: 'high', label: 'High', dot: 'bg-rose-500' },
 ];
 
-const TaskFieldPriority = ({
+const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
+  { value: 'inbox', label: 'Inbox' },
+  { value: 'active', label: 'Active' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'waiting', label: 'Waiting' },
+  { value: 'done', label: 'Done' },
+];
+
+const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
+  none: '',
+  low: 'bg-emerald-500',
+  medium: 'bg-amber-500',
+  high: 'bg-rose-500',
+};
+
+const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
+  none: '',
+  low: 'Low',
+  medium: 'Med',
+  high: 'High',
+};
+
+const STATUS_LABEL: Record<TaskStatus, string> = {
+  inbox: 'Inbox',
+  active: 'Active',
+  in_progress: 'In Progress',
+  waiting: 'Waiting',
+  done: 'Done',
+};
+
+const SEGMENT =
+  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
+
+const SEGMENT_EMPTY = 'text-muted-foreground/50';
+
+const MEDIA_SLASH_ITEMS = new Set(['Image', 'Video', 'Audio', 'File']);
+
+const getTextOnlySlashMenuItems = (
+  editor: BlockNoteEditor,
+): DefaultReactSuggestionItem[] =>
+  getDefaultReactSlashMenuItems(editor).filter(
+    (item) => !MEDIA_SLASH_ITEMS.has(item.title),
+  );
+
+// ─── Dot Separator ──────────────────────────────────────────
+
+const MetaDot = () => (
+  <span aria-hidden="true" className="text-border select-none">
+    ·
+  </span>
+);
+
+// ─── Priority Segment ───────────────────────────────────────
+
+const PrioritySegment = ({
   task,
   onUpdate,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
-}) => (
-  <select
-    value={task.priority ?? 'none'}
-    onChange={(event) =>
-      void onUpdate({
-        id: task.id,
-        priority: event.target.value as NonNullable<Task['priority']>,
-      })
-    }
-    className="h-7 rounded-md border border-border bg-transparent px-2 font-mono text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    aria-label="Priority"
-  >
-    {PRIORITY_OPTIONS.map((opt) => (
-      <option key={opt.value} value={opt.value}>
-        {opt.label}
-      </option>
-    ))}
-  </select>
-);
+}) => {
+  const [open, setOpen] = useState(false);
+  const priority = task.priority ?? 'none';
+  const dot = PRIORITY_DOT[priority];
+  const label = PRIORITY_LABEL[priority];
+  const isEmpty = priority === 'none';
 
-const TaskFieldDueDate = ({
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          tabIndex={0}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
+          aria-label="Priority"
+        >
+          {!isEmpty && (
+            <span
+              className={cn('mr-1 inline-block size-1.5 rounded-full', dot)}
+            />
+          )}
+          {isEmpty ? '+ priority' : label}
+        </button>
+      </Popover.Trigger>
+      <PopoverContent
+        className="w-auto min-w-[100px] p-1"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        {PRIORITY_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => {
+              void onUpdate({ id: task.id, priority: opt.value });
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+              priority === opt.value && 'text-foreground',
+            )}
+          >
+            {opt.dot ? (
+              <span
+                className={cn('inline-block size-1.5 rounded-full', opt.dot)}
+              />
+            ) : (
+              <span className="inline-block size-1.5" />
+            )}
+            {opt.label}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover.Root>
+  );
+};
+
+// ─── Due Date Segment ───────────────────────────────────────
+
+const DueDateSegment = ({
   task,
   onUpdate,
 }: {
@@ -61,15 +162,17 @@ const TaskFieldDueDate = ({
 }) => (
   <TaskDueDatePicker
     dueDate={task.dueDate}
-    emptyLabel="+ Due date"
-    variant="meta"
+    emptyLabel="+ due date"
+    variant="segment"
     onChange={(nextDueDate) => {
       void onUpdate({ id: task.id, dueDate: nextDueDate });
     }}
   />
 );
 
-const TaskFieldClient = ({
+// ─── Client Segment ─────────────────────────────────────────
+
+const ClientSegment = ({
   task,
   onUpdate,
 }: {
@@ -83,17 +186,7 @@ const TaskFieldClient = ({
     setDraft(task.client ?? '');
   }, [task.client]);
 
-  if (!isEditing && !task.client) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        + Client
-      </button>
-    );
-  }
+  const isEmpty = !task.client;
 
   if (isEditing) {
     return (
@@ -101,15 +194,16 @@ const TaskFieldClient = ({
         autoFocus
         type="text"
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') {
+            e.preventDefault();
             void onUpdate({ id: task.id, client: draft.trim() || null });
             setIsEditing(false);
           }
-          if (event.key === 'Escape') {
-            event.preventDefault();
+          if (e.key === 'Escape') {
+            e.preventDefault();
             setDraft(task.client ?? '');
             setIsEditing(false);
           }
@@ -118,8 +212,12 @@ const TaskFieldClient = ({
           void onUpdate({ id: task.id, client: draft.trim() || null });
           setIsEditing(false);
         }}
+        onClick={(e) => e.stopPropagation()}
         placeholder="Client name"
-        className="h-7 w-28 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="min-w-[60px] max-w-[140px] bg-transparent text-[11px] font-mono text-foreground outline-none"
+        style={{
+          width: `${Math.max(60, Math.min(140, draft.length * 7 + 16))}px`,
+        }}
         aria-label="Client"
       />
     );
@@ -128,142 +226,170 @@ const TaskFieldClient = ({
   return (
     <button
       type="button"
-      onClick={() => setIsEditing(true)}
-      className="inline-flex h-7 items-center rounded-md border border-border/80 bg-muted px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      aria-label="Edit client"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      className={cn(
+        SEGMENT,
+        isEmpty && SEGMENT_EMPTY,
+        !isEmpty && 'max-w-[140px] truncate',
+      )}
+      aria-label={isEmpty ? 'Add client' : 'Edit client'}
     >
-      {task.client}
+      {isEmpty ? '+ client' : task.client}
     </button>
   );
 };
 
-const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'active', label: 'Active' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'waiting', label: 'Waiting' },
-  { value: 'done', label: 'Done' },
-];
+// ─── Status Segment ─────────────────────────────────────────
 
-const TaskFieldStatus = ({
+const StatusSegment = ({
   task,
   onUpdate,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
-}) => (
-  <select
-    value={task.status ?? 'active'}
-    onChange={(event) =>
-      void onUpdate({
-        id: task.id,
-        status: event.target.value as TaskStatus,
-      })
-    }
-    className="h-7 rounded-md border border-border bg-transparent px-2 font-mono text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    aria-label="Status"
-  >
-    {STATUS_OPTIONS.map((opt) => (
-      <option key={opt.value} value={opt.value}>
-        {opt.label}
-      </option>
-    ))}
-  </select>
-);
-
-const TaskFieldToday = ({
-  task,
-  onUpdate,
-}: {
-  task: Task;
-  onUpdate: UpdateTaskAction;
-}) => (
-  <button
-    type="button"
-    onClick={() =>
-      void onUpdate({
-        id: task.id,
-        today: task.today !== true,
-      })
-    }
-    className="inline-flex h-7 items-center rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-  >
-    {task.today ? 'Today' : '+ Today'}
-  </button>
-);
-
-const MEDIA_SLASH_ITEMS = new Set(['Image', 'Video', 'Audio', 'File']);
-
-const getTextOnlySlashMenuItems = (editor: BlockNoteEditor): DefaultReactSuggestionItem[] =>
-  getDefaultReactSlashMenuItems(editor).filter((item) => !MEDIA_SLASH_ITEMS.has(item.title));
-
-const TaskFieldProject = ({
-  task,
-  onUpdate,
-  hasChildren,
-}: {
-  task: Task;
-  onUpdate: UpdateTaskAction;
-  hasChildren: boolean;
 }) => {
-  const allTasks = useTaskStore((state) => state.tasks);
-  const projects = useMemo(
-    () =>
-      allTasks.filter(
-        (t) =>
-          t.parentId === null &&
-          t.id !== task.id &&
-          t.status !== 'done',
-      ),
-    [allTasks, task.id],
-  );
-
-  // Subtasks don't need a project dropdown
-  if (task.parentId !== null) return null;
-
-  // Parent tasks with children don't need the "Project parent" badge
-  if (hasChildren) return null;
-
-  // Standalone root tasks: show dropdown only if there are projects to move into
-  if (projects.length === 0) return null;
+  const [open, setOpen] = useState(false);
+  const status = task.status ?? 'active';
+  const label = STATUS_LABEL[status];
 
   return (
-    <div className="flex items-center gap-1">
-      <FolderOpen className="size-3 text-muted-foreground" />
-      <select
-        data-task-project-select={task.id}
-        value={task.parentId ?? ''}
-        onChange={(event) => {
-          const nextParentId = event.target.value || null;
-          const updates: TaskUpdateInput = { id: task.id, parentId: nextParentId };
-          if (nextParentId && task.status === 'inbox') updates.status = 'active';
-          void onUpdate(updates);
-        }}
-        className="h-7 max-w-[160px] truncate rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        aria-label="Project"
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          tabIndex={0}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={SEGMENT}
+          aria-label="Status"
+        >
+          {label}
+        </button>
+      </Popover.Trigger>
+      <PopoverContent
+        className="w-auto min-w-[120px] p-1"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
-        <option value="">Move to project...</option>
-        {projects.map((project) => (
-          <option key={project.id} value={project.id}>
-            {project.title}
-          </option>
+        {STATUS_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => {
+              void onUpdate({ id: task.id, status: opt.value });
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+              status === opt.value && 'text-foreground',
+            )}
+          >
+            {opt.label}
+          </button>
         ))}
-      </select>
+      </PopoverContent>
+    </Popover.Root>
+  );
+};
+
+// ─── Subtasks Segment ───────────────────────────────────────
+
+const SubtasksSegment = ({
+  count,
+  onAdd,
+}: {
+  count: number;
+  onAdd: () => void;
+}) => {
+  const label =
+    count > 0 ? `${count} subtask${count !== 1 ? 's' : ''}` : '+ subtask';
+
+  return (
+    <button
+      type="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        onAdd();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      className={cn(SEGMENT, count === 0 && SEGMENT_EMPTY)}
+      aria-label={count > 0 ? `${count} subtasks — click to add` : 'Add subtask'}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ─── Metadata Line ──────────────────────────────────────────
+
+const MetadataLine = ({
+  task,
+  onUpdate,
+  subtaskCount,
+  onRequestAddSubtask,
+}: {
+  task: Task;
+  onUpdate: UpdateTaskAction;
+  subtaskCount: number;
+  onRequestAddSubtask?: () => void;
+}) => {
+  const isCompleted = task.status === 'done';
+  const isSubtask = task.parentId !== null;
+
+  return (
+    <div
+      role="toolbar"
+      aria-label="Task metadata"
+      className={cn(
+        'flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono text-muted-foreground',
+        isCompleted && 'opacity-60',
+      )}
+    >
+      <PrioritySegment task={task} onUpdate={onUpdate} />
+      <MetaDot />
+      <DueDateSegment task={task} onUpdate={onUpdate} />
+      {!isSubtask && (
+        <>
+          <MetaDot />
+          <ClientSegment task={task} onUpdate={onUpdate} />
+          <MetaDot />
+          <StatusSegment task={task} onUpdate={onUpdate} />
+          {onRequestAddSubtask && (
+            <>
+              <MetaDot />
+              <SubtasksSegment
+                count={subtaskCount}
+                onAdd={onRequestAddSubtask}
+              />
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 };
 
+// ─── Main Component ─────────────────────────────────────────
+
 export type TaskBodyProps = {
   task: Task;
   isExpanded: boolean;
-  hasChildren: boolean;
+  subtaskCount: number;
+  onRequestAddSubtask?: () => void;
   onBodyEditModeChange?: (editing: boolean) => void;
 };
 
 export const TaskBody = ({
   task,
   isExpanded,
-  hasChildren,
+  subtaskCount,
+  onRequestAddSubtask,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -279,7 +405,9 @@ export const TaskBody = ({
     }
 
     if (pendingBodyRef.current !== null) {
-      const body = isEmptyDocument(pendingBodyRef.current) ? null : pendingBodyRef.current;
+      const body = isEmptyDocument(pendingBodyRef.current)
+        ? null
+        : pendingBodyRef.current;
       pendingBodyRef.current = null;
       void updateTask({ id: task.id, body });
     }
@@ -303,7 +431,6 @@ export const TaskBody = ({
     [task.id, updateTask],
   );
 
-  // Flush pending save on unmount or collapse
   useEffect(() => {
     if (!isExpanded) {
       flushSave();
@@ -328,38 +455,44 @@ export const TaskBody = ({
     <AnimatePresence initial={false}>
       {isExpanded ? (
         <motion.div
-          initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-          animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
-          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-          transition={{ duration: prefersReducedMotion ? 0.1 : 0.2, ease: 'easeOut' }}
+          initial={
+            prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }
+          }
+          animate={
+            prefersReducedMotion
+              ? { opacity: 1 }
+              : { opacity: 1, height: 'auto' }
+          }
+          exit={
+            prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }
+          }
+          transition={{
+            duration: prefersReducedMotion ? 0.1 : 0.2,
+            ease: 'easeOut',
+          }}
           className="overflow-hidden"
         >
-          <div className="border-t border-border/80 px-3 py-2">
+          {/* Zone 1 — Body Editor (hero) */}
+          <div className="border-t border-border/30 px-3 py-3">
             <BlockEditor
               content={task.body ?? ''}
               onChange={handleBodyChange}
               onFocus={handleFocus}
               onBlur={handleBlur}
               className="flusk-task-editor"
-              getSlashMenuItems={task.parentId !== null ? getTextOnlySlashMenuItems : undefined}
+              getSlashMenuItems={
+                task.parentId !== null ? getTextOnlySlashMenuItems : undefined
+              }
             />
           </div>
 
-          {/* Metadata fields */}
-          <div className="border-t border-dashed border-border/60 px-3 py-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <TaskFieldPriority task={task} onUpdate={updateTask} />
-              <TaskFieldDueDate task={task} onUpdate={updateTask} />
-              <TaskFieldToday task={task} onUpdate={updateTask} />
-              {task.parentId === null && (
-                <>
-                  <TaskFieldClient task={task} onUpdate={updateTask} />
-                  <TaskFieldStatus task={task} onUpdate={updateTask} />
-                  <TaskFieldProject task={task} onUpdate={updateTask} hasChildren={hasChildren} />
-                </>
-              )}
-            </div>
-          </div>
+          {/* Zone 2 — Metadata Line */}
+          <MetadataLine
+            task={task}
+            onUpdate={updateTask}
+            subtaskCount={subtaskCount}
+            onRequestAddSubtask={onRequestAddSubtask}
+          />
         </motion.div>
       ) : null}
     </AnimatePresence>

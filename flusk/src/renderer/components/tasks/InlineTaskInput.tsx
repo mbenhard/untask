@@ -118,7 +118,7 @@ export const InlineTaskInput = ({
           : (placeholder ?? 'Type and press Enter')
       }
       disabled={isCreating}
-      className="h-8 border-0 border-b border-dashed border-border/50 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
+      className="h-7 border-0 bg-transparent dark:bg-transparent px-0 text-[11px] font-mono text-muted-foreground shadow-none placeholder:text-muted-foreground/40 focus-visible:ring-0"
       aria-label={label}
     />
   );

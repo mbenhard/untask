@@ -114,6 +114,7 @@ import { windowDismissModeSchema } from './window/dismissMode';
 type ChatSendInput = {
   content: string;
   modelId?: string | null;
+  images?: string[];
 };
 
 const settingsMemoryUpdateSchema = z
@@ -435,13 +436,14 @@ export const registerIpcHandlers = (): void => {
         throw new Error('Chat content cannot be empty.');
       }
 
-      const payload: ChatSendRequest = {
-        content,
-        modelId: message.modelId,
-      };
+      const images = Array.isArray(message.images) ? message.images.filter(
+        (img): img is string => typeof img === 'string' && img.length > 0,
+      ) : undefined;
 
       return startChatTurn({
-        ...payload,
+        content,
+        modelId: message.modelId,
+        images: images?.length ? images : undefined,
         emit: (streamEvent): void => {
           if (event.sender.isDestroyed()) {
             return;

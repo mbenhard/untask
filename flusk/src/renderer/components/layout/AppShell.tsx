@@ -96,6 +96,13 @@ export const AppShell = () => {
     setChatInputValue('');
   }, []);
 
+  const handleSuggestionClick = useCallback((prefill: string) => {
+    setChatInputValue(prefill);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, []);
+
   useKeyboardShortcuts({
     inputRef,
     inputValue: chatInputValue,
@@ -293,7 +300,7 @@ export const AppShell = () => {
                   </header>
 
                   <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
-                    <ChatView />
+                    <ChatView onSuggestionClick={handleSuggestionClick} />
                   </div>
                   <div className="border-t border-dashed border-border/50">
                     <ChatInput

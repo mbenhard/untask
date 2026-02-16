@@ -18,6 +18,7 @@ export type ModelCatalogEntry = {
   defaultSelected: boolean;
   supportsReasoning: boolean;
   supportsWebSearch: boolean;
+  supportsVision: boolean;
   webSearchMethod?: 'kimi_builtin' | 'claude_native';
 };
 
@@ -33,6 +34,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     defaultSelected: false,
     supportsReasoning: true,
     supportsWebSearch: false,
+    supportsVision: false,
   },
   {
     id: 'moonshotai/kimi-k2.5',
@@ -42,6 +44,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     defaultSelected: true,
     supportsReasoning: true,
     supportsWebSearch: true,
+    supportsVision: false,
     webSearchMethod: 'kimi_builtin',
   },
   {
@@ -52,6 +55,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     defaultSelected: false,
     supportsReasoning: false,
     supportsWebSearch: false,
+    supportsVision: false,
   },
   {
     id: 'anthropic/claude-haiku-4.5',
@@ -61,6 +65,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     defaultSelected: false,
     supportsReasoning: false,
     supportsWebSearch: true,
+    supportsVision: true,
     webSearchMethod: 'claude_native',
   },
   {
@@ -71,6 +76,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     defaultSelected: false,
     supportsReasoning: true,
     supportsWebSearch: false,
+    supportsVision: true,
   },
 ] as const;
 
@@ -94,6 +100,9 @@ export const getModels = (): ModelCatalogEntry[] => [...MODEL_CATALOG];
 
 export const modelSupportsReasoning = (modelId: ChatModelId): boolean =>
   MODEL_CATALOG.find((entry) => entry.id === modelId)?.supportsReasoning ?? false;
+
+export const modelSupportsVision = (modelId: ChatModelId): boolean =>
+  MODEL_CATALOG.find((entry) => entry.id === modelId)?.supportsVision ?? false;
 
 export const getModelWebSearchConfig = (modelId: ChatModelId): {
   supportsWebSearch: boolean;

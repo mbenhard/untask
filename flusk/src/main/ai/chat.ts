@@ -21,7 +21,7 @@ import { getSetting, setSetting } from '../services/settingsService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { createOpenRouterProviderFromEnv } from './openrouter';
 import type { ChatModelId } from './models';
-import { getSelectedModelId, getModelWebSearchConfig, resolveModelId } from './models';
+import { getSelectedModelId, getModelWebSearchConfig, modelSupportsVision, resolveModelId } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall } from './tools';
@@ -512,6 +512,7 @@ const maybeWriteMeaningfulInteractionJournal = (input: {
 export type StartChatTurnInput = {
   content: string;
   modelId?: string | null;
+  images?: string[];
   tokenBudget?: number;
   requestId?: string;
   emit: (event: ChatStreamEvent) => void;
@@ -522,6 +523,7 @@ const runAssistantStream = async (
     requestId: string;
     userMessage: string;
     modelId: ChatModelId;
+    images?: string[];
     tokenBudget?: number;
     emit: (event: ChatStreamEvent) => void;
   },
@@ -586,10 +588,36 @@ const runAssistantStream = async (
           allowWebSearchToolChoice: false,
         });
 
+        // Build final messages, converting last user message to multimodal if images present
+        const hasImages = input.images && input.images.length > 0;
+        const visionCapable = modelSupportsVision(input.modelId);
+
+        const sdkMessages = conversationMessages.map((msg, idx) => {
+          const isLastUserMessage = idx === conversationMessages.length - 1 && msg.role === 'user';
+
+          if (isLastUserMessage && hasImages) {
+            if (visionCapable) {
+              // Build multimodal content with images + text
+              const parts: Array<{ type: 'image'; image: string } | { type: 'text'; text: string }> = [];
+              for (const dataUrl of input.images!) {
+                parts.push({ type: 'image', image: dataUrl });
+              }
+              parts.push({ type: 'text', text: msg.content });
+              return { role: msg.role, content: parts };
+            }
+
+            // Non-vision model: strip images, prepend note
+            const note = `[User attached ${input.images!.length} image(s), but the current model doesn't support vision.]\n\n`;
+            return { role: msg.role, content: note + msg.content };
+          }
+
+          return msg;
+        });
+
         const result = streamText({
           model,
           system: builtPrompt.modelInputPrompt,
-          messages: conversationMessages,
+          messages: sdkMessages,
           toolChoice: requireToolChoice ? 'required' : 'auto',
           stopWhen: stepCountIs(STREAM_TOOL_LOOP_MAX_STEPS),
           prepareStep: async ({ steps }) => {
@@ -981,20 +1009,28 @@ export const startChatTurn = async (
   activeChatRequestIds.add(requestId);
   canceledChatRequestIds.delete(requestId);
 
+  const images = input.images?.length ? input.images : undefined;
+
   try {
+    const userMessageMeta: Record<string, unknown> = {
+      requestId,
+      modelId,
+    };
+    if (images) {
+      userMessageMeta.imageCount = images.length;
+    }
+
     const userMessage = saveChatMessage({
       role: 'user',
       content,
-      toolCalls: JSON.stringify({
-        requestId,
-        modelId,
-      }),
+      toolCalls: JSON.stringify(userMessageMeta),
     });
 
     void runAssistantStream({
       requestId,
       userMessage: content,
       modelId,
+      images,
       tokenBudget: input.tokenBudget,
       emit: input.emit,
     });

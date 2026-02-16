@@ -27,7 +27,6 @@ import {
   getNextStatusInCycle,
   getStatusAfterToggleComplete,
 } from './taskInteraction';
-import { InlineTaskInput } from './InlineTaskInput';
 import { reconcileScopedReorder } from './statusLaneDrag';
 import { TaskBody } from './TaskBody';
 import { TaskItem } from './TaskItem';
@@ -56,6 +55,7 @@ export const TaskList = ({
   sharedActiveDragId = null,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
+  const createTask = useTaskStore((state) => state.createTask);
   const updateTask = useTaskStore((state) => state.updateTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
@@ -68,6 +68,8 @@ export const TaskList = ({
   const [isAnyBodyEditing, setIsAnyBodyEditing] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
+  const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const effectiveActiveDragId = dndMode === 'shared' ? sharedActiveDragId : activeDragId;
@@ -332,6 +334,7 @@ export const TaskList = ({
               isExpanded={isExpanded}
               isFocused={focusedIndex === index}
               isEditingTitle={editingTitleTaskId === task.id}
+              hasChildren={subtasks.length > 0}
               onStartTitleEdit={setEditingTitleTaskId}
               onEndTitleEdit={() => setEditingTitleTaskId(null)}
               onToggleExpand={handleToggleExpand}
@@ -342,30 +345,69 @@ export const TaskList = ({
               <TaskBody
                 task={task}
                 isExpanded={isExpanded}
-                hasChildren={subtasks.length > 0}
+                subtaskCount={subtasks.length}
+                onRequestAddSubtask={
+                  canOwnSubtasks
+                    ? () => setAddingSubtaskForId(task.id)
+                    : undefined
+                }
                 onBodyEditModeChange={setIsAnyBodyEditing}
               />
 
-              {isExpanded && canOwnSubtasks ? (
-                <div className="border-t border-border/80 px-3 py-2">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">Subtasks</p>
-                    <InlineTaskInput
-                      parentId={task.id}
-                      label="Add subtask"
-                      placeholder="Add subtask..."
-                    />
+              {isExpanded &&
+                canOwnSubtasks &&
+                (subtasks.length > 0 || addingSubtaskForId === task.id) && (
+                  <div className="px-3 pb-1">
+                    {subtasks.length > 0 && (
+                      <TaskList
+                        tasks={subtasks}
+                        allTasks={allTasks}
+                        emptyMessage=""
+                        ariaLabel={`Subtasks for ${task.title}`}
+                        scopeId={`subtasks:${task.id}`}
+                        indentPx={8}
+                      />
+                    )}
+                    {addingSubtaskForId === task.id && (
+                      <div className="flex min-h-8 items-center gap-2 pl-1.5">
+                        <span className="inline-flex size-6 items-center justify-center">
+                          <span className="inline-flex size-3.5 rounded-full border border-border" />
+                        </span>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={newSubtaskTitle}
+                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter' && newSubtaskTitle.trim()) {
+                              e.preventDefault();
+                              void createTask({
+                                title: newSubtaskTitle.trim(),
+                                parentId: task.id,
+                                status: 'active',
+                                priority: 'none',
+                              });
+                              setNewSubtaskTitle('');
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setAddingSubtaskForId(null);
+                              setNewSubtaskTitle('');
+                            }
+                          }}
+                          onBlur={() => {
+                            setAddingSubtaskForId(null);
+                            setNewSubtaskTitle('');
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="New subtask..."
+                          className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40"
+                        />
+                      </div>
+                    )}
                   </div>
-                  <TaskList
-                    tasks={subtasks}
-                    allTasks={allTasks}
-                    emptyMessage="No subtasks yet."
-                    ariaLabel={`Subtasks for ${task.title}`}
-                    scopeId={`subtasks:${task.id}`}
-                    indentPx={8}
-                  />
-                </div>
-              ) : null}
+                )}
             </TaskItem>
           );
         })}

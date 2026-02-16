@@ -98,6 +98,13 @@ export const buildSystemPrompt = async (
     '- If a tool call returns an error, do NOT retry it. Inform the user what went wrong.',
     '- Never create a resource and then immediately delete or modify it in the same turn.',
     '- After executing a tool, summarize the result concisely and wait for user input.',
+    '',
+    '### Memory Behavior',
+    '- When the user shares stable facts, preferences, or patterns, save them using the appropriate tool (update_user_profile, update_patterns).',
+    '- Announce what you\'re saving: "I\'ll remember that [X]. [Saving to profile/patterns]"',
+    '- For inferred patterns (not explicitly stated), ask before saving.',
+    '- Don\'t save ephemeral context, things already captured as tasks, or low-confidence inferences.',
+    '- Chat messages may be cleared at any time. If something matters long-term, save it to memory — don\'t rely on chat history.',
     ...webSearchGuidance,
   ].join('\n');
 

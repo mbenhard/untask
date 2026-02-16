@@ -26,6 +26,7 @@ type ChatUiMessage = {
   isStreaming?: boolean;
   actionCards: ChatActionCard[];
   steps: TurnStep[];
+  imageCount?: number;
 };
 
 type InFlightStream = {
@@ -66,6 +67,7 @@ type ChatStore = {
   unsubscribeStream?: () => void;
   autonomyMode: AutonomyMode;
   pendingActions: ChatPendingActionEntry[];
+  pendingImages: string[];
 
   initialize: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
@@ -86,6 +88,9 @@ type ChatStore = {
     lifecycle: ActionLifecycle,
     updates?: Partial<ChatActionCard>,
   ) => void;
+  addPendingImage: (dataUrl: string) => void;
+  removePendingImage: (index: number) => void;
+  clearPendingImages: () => void;
 };
 
 const toErrorMessage = (error: unknown): string =>
@@ -132,6 +137,7 @@ const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata | null
       ...(parsed.telemetry ? { telemetry: parsed.telemetry } : {}),
       ...(typeof parsed.reasoningText === 'string' ? { reasoningText: parsed.reasoningText } : {}),
       ...(Array.isArray(parsed.stepDescriptions) ? { stepDescriptions: parsed.stepDescriptions } : {}),
+      ...(typeof parsed.imageCount === 'number' ? { imageCount: parsed.imageCount } : {}),
     };
   } catch {
     return null;
@@ -179,8 +185,21 @@ const reconstructStepsFromMetadata = (
   return steps;
 };
 
+const parseImageCount = (raw: string | null): number | undefined => {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return typeof parsed?.imageCount === 'number' && parsed.imageCount > 0
+      ? parsed.imageCount
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
   const metadata = parseToolMetadata(message.toolCalls);
+  const imageCount = metadata?.imageCount ?? parseImageCount(message.toolCalls);
 
   return {
     id: message.id,
@@ -191,6 +210,7 @@ const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
     steps: message.role === 'assistant'
       ? reconstructStepsFromMetadata(metadata, message.content)
       : [],
+    ...(imageCount ? { imageCount } : {}),
   };
 };
 
@@ -221,6 +241,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
   const sendPreparedMessage = async (
     content: string,
     modelId: string | null,
+    images?: string[],
   ): Promise<void> => {
     const trimmed = content.trim();
     if (trimmed.length === 0) {
@@ -233,6 +254,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const response = await getFlusk().chat.send({
         content: trimmed,
         modelId,
+        images: images?.length ? images : undefined,
       });
 
       const userMessage = mapMessageToUi(response.userMessage);
@@ -302,6 +324,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     lastStreamError: null,
     autonomyMode: 'safe',
     pendingActions: [],
+    pendingImages: [],
 
     initialize: async () => {
       if (get().isInitialized) {
@@ -361,7 +384,9 @@ export const useChatStore = create<ChatStore>((set, get) => {
       if (selected?.modelId) {
         set({ selectedModelId: selected.modelId });
       }
-      await sendPreparedMessage(content, selected?.modelId ?? null);
+      const images = get().pendingImages;
+      set({ pendingImages: [] });
+      await sendPreparedMessage(content, selected?.modelId ?? null, images);
     },
 
     cancelStream: async () => {
@@ -870,6 +895,20 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }));
     },
 
+    addPendingImage: (dataUrl) => {
+      const current = get().pendingImages;
+      if (current.length >= 4) return;
+      set({ pendingImages: [...current, dataUrl] });
+    },
+
+    removePendingImage: (index) => {
+      set((state) => ({
+        pendingImages: state.pendingImages.filter((_, i) => i !== index),
+      }));
+    },
+
+    clearPendingImages: () => set({ pendingImages: [] }),
+
     clearError: () => set({ error: null }),
   };
 });
@@ -883,3 +922,4 @@ export const selectChatSelectedModelId = (state: ChatStore) => state.selectedMod
 export const selectChatRetentionMode = (state: ChatStore) => state.retentionMode;
 export const selectAutonomyMode = (state: ChatStore) => state.autonomyMode;
 export const selectPendingActions = (state: ChatStore) => state.pendingActions;
+export const selectPendingImages = (state: ChatStore) => state.pendingImages;

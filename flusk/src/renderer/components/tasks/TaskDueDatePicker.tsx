@@ -10,13 +10,15 @@ export interface TaskDueDatePickerProps {
   dueDate: string | null;
   onChange: (next: string | null) => void | Promise<void>;
   emptyLabel: string;
-  variant: 'row' | 'meta';
+  variant: 'row' | 'meta' | 'segment';
 }
 
 const ROW_TRIGGER_BASE =
   'inline-flex h-6 items-center rounded border px-1.5 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring';
 const META_TRIGGER_BASE =
   'inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring';
+const SEGMENT_TRIGGER_BASE =
+  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
 
 export const TaskDueDatePicker = ({
   dueDate,
@@ -29,10 +31,16 @@ export const TaskDueDatePicker = ({
   const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
 
   const triggerClassName = cn(
-    variant === 'row' ? ROW_TRIGGER_BASE : META_TRIGGER_BASE,
-    dueDate
-      ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
-      : 'border-dashed border-border text-muted-foreground hover:text-foreground',
+    variant === 'row'
+      ? ROW_TRIGGER_BASE
+      : variant === 'meta'
+        ? META_TRIGGER_BASE
+        : SEGMENT_TRIGGER_BASE,
+    variant !== 'segment' &&
+      (dueDate
+        ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
+        : 'border-dashed border-border text-muted-foreground hover:text-foreground'),
+    variant === 'segment' && !dueDate && 'text-muted-foreground/50',
     variant === 'meta' && dueDate && 'bg-transparent',
   );
 

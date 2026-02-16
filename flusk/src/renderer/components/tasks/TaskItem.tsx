@@ -3,11 +3,12 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { Bookmark, Check, GripVertical, Pencil } from 'lucide-react';
+import { Bookmark, Check, GripVertical, MoreHorizontal, Pencil } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
-import { useTaskStore } from '../../stores/taskStore';
+import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
+import { Popover, PopoverContent } from '../ui';
 import { formatDueDateDisplay } from './dueDate';
 import { getNextPriority } from './taskInteraction';
 
@@ -16,6 +17,7 @@ export interface TaskItemProps {
   isExpanded: boolean;
   isFocused: boolean;
   isEditingTitle: boolean;
+  hasChildren: boolean;
   onStartTitleEdit: (id: string) => void;
   onEndTitleEdit: () => void;
   onToggleExpand: (id: string) => void;
@@ -25,11 +27,11 @@ export interface TaskItemProps {
   children?: ReactNode;
 }
 
-const PRIORITY_CLASSNAME: Record<NonNullable<Task['priority']>, string> = {
-  none: 'border-border bg-transparent',
-  low: 'border-emerald-500/60 bg-emerald-500/20',
-  medium: 'border-amber-500/70 bg-amber-500/30',
-  high: 'border-rose-500/80 bg-rose-500/40',
+const PRIORITY_RING: Record<NonNullable<Task['priority']>, string> = {
+  none: 'border-border/60',
+  low: 'border-emerald-500/50',
+  medium: 'border-amber-500/60',
+  high: 'border-rose-500/70',
 };
 
 const SORTABLE_TRANSITION = {
@@ -42,6 +44,7 @@ export const TaskItem = ({
   isExpanded,
   isFocused,
   isEditingTitle,
+  hasChildren,
   onStartTitleEdit,
   onEndTitleEdit,
   onToggleExpand,
@@ -51,7 +54,10 @@ export const TaskItem = ({
   children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
+  const allTasks = useTaskStore((state) => state.tasks);
   const [titleDraft, setTitleDraft] = useState(task.title);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuView, setMenuView] = useState<'main' | 'projects'>('main');
 
   useEffect(() => {
     setTitleDraft(task.title);
@@ -118,6 +124,22 @@ export const TaskItem = ({
     onEndTitleEdit();
   };
 
+  const canMoveToProject =
+    task.parentId === null && !hasChildren;
+
+  const projects = useMemo(
+    () =>
+      canMoveToProject
+        ? allTasks.filter(
+            (t) =>
+              t.parentId === null && t.id !== task.id && t.status !== 'done',
+          )
+        : [],
+    [allTasks, canMoveToProject, task.id],
+  );
+
+  const showOverflowMenu = canMoveToProject && projects.length > 0;
+
   return (
     <div
       ref={setNodeRef}
@@ -140,48 +162,54 @@ export const TaskItem = ({
             event.stopPropagation();
             onComplete(task.id);
           }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const nextPriority = getNextPriority(task.priority);
+            void updateTask({ id: task.id, priority: nextPriority });
+          }}
           aria-label={
             isCompleted
               ? `Reopen "${task.title}"`
               : `Mark "${task.title}" complete`
           }
-          className="inline-flex size-5 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <motion.span
-            initial={false}
-            animate={{
-              scale: isCompleted ? 1 : 0.96,
-              backgroundColor: isCompleted ? 'var(--foreground)' : 'transparent',
-              borderColor: isCompleted ? 'var(--foreground)' : 'var(--border)',
-            }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="inline-flex size-4 items-center justify-center rounded-full border"
-          >
-            <Check
-              className={cn(
-                'size-2.5 transition-opacity duration-300',
-                isCompleted ? 'opacity-100 text-background' : 'opacity-0',
-              )}
-            />
-          </motion.span>
-        </button>
-
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            const nextPriority = getNextPriority(task.priority);
-            void updateTask({ id: task.id, priority: nextPriority });
-          }}
-          aria-label={`Cycle priority for "${task.title}"`}
-          className="inline-flex size-4 items-center justify-center outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          title={
+            priority === 'none'
+              ? 'Right-click to set priority'
+              : `Priority: ${priority} · Right-click to change`
+          }
+          className="inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
         >
           <span
             className={cn(
-              'inline-flex size-2.5 rounded-full border',
-              PRIORITY_CLASSNAME[priority],
+              'inline-flex items-center justify-center rounded-full border-[1.5px] p-[2px] transition-colors duration-200',
+              PRIORITY_RING[priority],
             )}
-          />
+          >
+            <motion.span
+              initial={false}
+              animate={{
+                scale: isCompleted ? 1 : 0.96,
+                backgroundColor: isCompleted
+                  ? 'var(--foreground)'
+                  : 'transparent',
+                borderColor: isCompleted
+                  ? 'var(--foreground)'
+                  : 'var(--foreground-muted, rgba(255,255,255,0.35))',
+              }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="inline-flex size-3.5 items-center justify-center rounded-full border"
+            >
+              <Check
+                className={cn(
+                  'size-2 transition-opacity duration-300',
+                  isCompleted
+                    ? 'opacity-100 text-background'
+                    : 'opacity-0',
+                )}
+              />
+            </motion.span>
+          </span>
         </button>
 
         <div className="min-w-0 flex-1">
@@ -269,6 +297,74 @@ export const TaskItem = ({
           >
             <Bookmark className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
           </button>
+
+          {showOverflowMenu && (
+            <Popover.Root
+              open={menuOpen}
+              onOpenChange={(open) => {
+                setMenuOpen(open);
+                if (!open) setMenuView('main');
+              }}
+            >
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  onClick={(event) => event.stopPropagation()}
+                  aria-label={`More actions for "${task.title}"`}
+                  className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <MoreHorizontal className="size-3.5" />
+                </button>
+              </Popover.Trigger>
+              <PopoverContent
+                className="w-auto min-w-[160px] p-1"
+                align="end"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {menuView === 'main' ? (
+                  <button
+                    type="button"
+                    onClick={() => setMenuView('projects')}
+                    className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    Move to project
+                    <span className="ml-2 text-border">&rarr;</span>
+                  </button>
+                ) : (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setMenuView('main')}
+                      className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <span>&larr;</span> Back
+                    </button>
+                    {projects.map((project) => (
+                      <button
+                        key={project.id}
+                        type="button"
+                        onClick={() => {
+                          const updates: TaskUpdateInput = {
+                            id: task.id,
+                            parentId: project.id,
+                          };
+                          if (task.status === 'inbox')
+                            updates.status = 'active';
+                          void updateTask(updates);
+                          setMenuOpen(false);
+                          setMenuView('main');
+                        }}
+                        className="flex w-full items-center truncate rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        {project.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover.Root>
+          )}
 
           <button
             type="button"

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Image as ImageIcon, Loader2, Undo2, X, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 
@@ -185,7 +185,46 @@ const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) =
   </div>
 );
 
-export const ChatView = () => {
+const SUGGESTIONS = [
+  { label: 'Create a task', prefill: 'Create a task: ' },
+  { label: "What's due today?", prefill: "What's due today?" },
+  { label: 'Summarize my week', prefill: 'Summarize my week' },
+] as const;
+
+type EmptyStateProps = {
+  onSuggestionClick: (prefill: string) => void;
+};
+
+const EmptyState = ({ onSuggestionClick }: EmptyStateProps) => (
+  <div className="flex h-full flex-col items-center justify-center gap-4 px-4">
+    <span className="font-mono text-sm font-medium tracking-[0.08em] text-muted-foreground/60">
+      flusk
+    </span>
+    <p className="max-w-[260px] text-center text-xs leading-relaxed text-muted-foreground/50">
+      Your personal assistant. Asks before acting,
+      double-checks risky changes, and remembers
+      what matters — even after chats are cleared.
+    </p>
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {SUGGESTIONS.map((suggestion) => (
+        <button
+          key={suggestion.label}
+          type="button"
+          onClick={() => onSuggestionClick(suggestion.prefill)}
+          className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+        >
+          {suggestion.label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+type ChatViewProps = {
+  onSuggestionClick?: (prefill: string) => void;
+};
+
+export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const messages = useChatStore(selectChatMessages);
   const isSending = useChatStore(selectChatIsSending);
   const error = useChatStore(selectChatError);
@@ -268,7 +307,7 @@ export const ChatView = () => {
     () => {
       const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
 
-      return messages.map((message) => {
+      return messages.map((message, messageIndex) => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
         const hasSteps = isAssistant && message.steps.length > 0;
@@ -284,6 +323,12 @@ export const ChatView = () => {
         if (shouldAnimate) {
           lastAnimatedIdRef.current = message.id;
         }
+
+        // Tool-call indicator: check if next message is assistant with tool steps
+        const nextMessage = messages[messageIndex + 1];
+        const triggeredTools = !isAssistant
+          && nextMessage?.role === 'assistant'
+          && nextMessage.steps.some((s) => s.kind === 'tool');
 
         return (
           <motion.article
@@ -361,14 +406,21 @@ export const ChatView = () => {
                 )}
               </div>
             ) : (
-              <div
-                className={cn(
-                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm',
-                  'border-border/70 bg-secondary text-secondary-foreground',
-                )}
-              >
+              <div className="relative max-w-[88%] rounded-xl border border-border/70 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
                 <p className="whitespace-pre-wrap">{message.content}</p>
+
+                {triggeredTools && (
+                  <Zap className="absolute bottom-1.5 right-2 size-3 text-muted-foreground/40" />
+                )}
               </div>
+            )}
+
+            {/* Image attachment indicator for history messages */}
+            {!isAssistant && message.imageCount && message.imageCount > 0 && (
+              <span className="flex items-center gap-1 px-1 text-[10px] text-muted-foreground/60">
+                <ImageIcon className="size-2.5" />
+                {message.imageCount} image{message.imageCount > 1 ? 's' : ''} attached
+              </span>
             )}
 
             {timestamp ? (
@@ -415,9 +467,9 @@ export const ChatView = () => {
         {renderedMessages.length > 0 ? (
           renderedMessages
         ) : (
-          <div className="rounded-xl border border-dashed border-border/80 bg-card/20 p-4 text-sm text-muted-foreground">
-            Start a conversation here. Ask Flusk to plan, edit tasks, or work with your notes.
-          </div>
+          <EmptyState
+            onSuggestionClick={onSuggestionClick ?? (() => {})}
+          />
         )}
 
       </div>

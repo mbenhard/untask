@@ -55,6 +55,7 @@ export type PersistedChatToolMetadata = {
   telemetry?: ChatTurnTelemetry;
   reasoningText?: string;
   stepDescriptions?: string[];
+  imageCount?: number;
 };
 
 export type TurnStep =
@@ -115,6 +116,7 @@ export type ChatStreamEvent =
 export type ChatSendRequestPayload = {
   content: string;
   modelId?: string | null;
+  images?: string[];
 };
 
 export type ChatSendResultPayload = {

@@ -19,6 +19,18 @@ import type {
 } from '../../../types/ipc';
 import { cn } from '../../lib/utils';
 import { getFlusk } from '../../lib/flusk';
+import {
+  MONO_FONT_OPTIONS,
+  SANS_FONT_OPTIONS,
+  TYPOGRAPHY_PRESET_OPTIONS,
+  getMonoFontLabel,
+  getSansFontLabel,
+  getTypographySelectionFromPreset,
+  parseMonoFontId,
+  parseSansFontId,
+  type TypographyPresetId,
+} from '../../lib/typography';
+import { useTypography } from '../providers/TypographyProvider';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -167,6 +179,7 @@ type MemorySubTab = 'soul' | 'profile' | 'patterns';
 
 export const SettingsMemory = () => {
   const prefersReducedMotion = useReducedMotion();
+  const typography = useTypography();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('soul');
@@ -195,6 +208,7 @@ export const SettingsMemory = () => {
   const [windowDismissMode, setWindowDismissModeState] = useState<WindowDismissMode>('persistent');
   const [isLoadingWindowDismissMode, setIsLoadingWindowDismissMode] = useState(false);
   const [isSavingWindowDismissMode, setIsSavingWindowDismissMode] = useState(false);
+  const [isSavingTypography, setIsSavingTypography] = useState(false);
 
   // AI tab state
   const [openRouterApiKeyInput, setOpenRouterApiKeyInput] = useState('');
@@ -665,6 +679,72 @@ export const SettingsMemory = () => {
     [windowDismissMode],
   );
 
+  const handleSansFontChange = useCallback(
+    async (value: string) => {
+      const nextSansId = parseSansFontId(value);
+      if (!nextSansId) {
+        setError('Invalid body font selection.');
+        return;
+      }
+
+      try {
+        setIsSavingTypography(true);
+        setNotice(null);
+        setError(null);
+        await typography.setSans(nextSansId);
+        setNotice(`Body font set to ${getSansFontLabel(nextSansId)}.`);
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to update body font.');
+      } finally {
+        setIsSavingTypography(false);
+      }
+    },
+    [typography],
+  );
+
+  const handleMonoFontChange = useCallback(
+    async (value: string) => {
+      const nextMonoId = parseMonoFontId(value);
+      if (!nextMonoId) {
+        setError('Invalid mono font selection.');
+        return;
+      }
+
+      try {
+        setIsSavingTypography(true);
+        setNotice(null);
+        setError(null);
+        await typography.setMono(nextMonoId);
+        setNotice(`Mono font set to ${getMonoFontLabel(nextMonoId)}.`);
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to update mono font.');
+      } finally {
+        setIsSavingTypography(false);
+      }
+    },
+    [typography],
+  );
+
+  const handleTypographyPresetChange = useCallback(
+    async (presetId: TypographyPresetId) => {
+      const presetLabel =
+        TYPOGRAPHY_PRESET_OPTIONS.find((option) => option.id === presetId)?.label ?? presetId;
+
+      try {
+        setIsSavingTypography(true);
+        setNotice(null);
+        setError(null);
+        await typography.applyPreset(presetId);
+        setNotice(`Typography preset set to ${presetLabel}.`);
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to update typography preset.');
+      } finally {
+        setIsSavingTypography(false);
+      }
+    },
+    [typography],
+  );
+
   const saveOpenRouterApiKey = useCallback(async () => {
     const normalized = openRouterApiKeyInput.trim();
     if (normalized.length === 0) {
@@ -812,7 +892,7 @@ export const SettingsMemory = () => {
             {activeTab === 'general' ? (
               <div role="tabpanel" id="settings-panel-general" className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Configure desktop startup and window behavior.
+                  Configure desktop startup, typography, and window behavior.
                 </p>
                 <div className="rounded-md border border-border/60 px-3 py-3">
                   <label className="flex items-center justify-between gap-3 text-sm text-foreground">
@@ -873,6 +953,90 @@ export const SettingsMemory = () => {
                       ? 'Persistent: Stay visible when focus changes.'
                       : 'Quick-hide: Hide when window loses focus.'}
                   </p>
+                </div>
+
+                <div className="rounded-md border border-border/60 px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">Typography</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose app-wide body and monospace fonts.
+                  </p>
+
+                  {!typography.isReady ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Loading typography settings...</p>
+                  ) : (
+                    <>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1">
+                          <span className="text-xs text-muted-foreground">Body font</span>
+                          <select
+                            value={typography.sansId}
+                            onChange={(event) => void handleSansFontChange(event.target.value)}
+                            disabled={isSavingTypography}
+                            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                            aria-label="Body font"
+                          >
+                            {SANS_FONT_OPTIONS.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="space-y-1">
+                          <span className="text-xs text-muted-foreground">Mono font</span>
+                          <select
+                            value={typography.monoId}
+                            onChange={(event) => void handleMonoFontChange(event.target.value)}
+                            disabled={isSavingTypography}
+                            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                            aria-label="Mono font"
+                          >
+                            {MONO_FONT_OPTIONS.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {TYPOGRAPHY_PRESET_OPTIONS.map((preset) => {
+                          const selection = getTypographySelectionFromPreset(preset.id);
+                          const isActivePreset =
+                            selection.sansId === typography.sansId &&
+                            selection.monoId === typography.monoId;
+
+                          return (
+                            <Button
+                              key={preset.id}
+                              type="button"
+                              size="sm"
+                              variant={isActivePreset ? 'default' : 'outline'}
+                              onClick={() => void handleTypographyPresetChange(preset.id)}
+                              disabled={isSavingTypography}
+                            >
+                              {preset.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-3 rounded-md border border-border/50 bg-muted/20 px-3 py-3">
+                        <p className="text-sm text-foreground">
+                          The quick brown fox jumps over 13 invoices due this week.
+                        </p>
+                        <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                          quick.add --client="Northwind" --due=tomorrow --priority=high
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {typography.error ? (
+                    <p className="mt-2 text-xs text-destructive">{typography.error}</p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
