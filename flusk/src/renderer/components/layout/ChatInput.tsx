@@ -9,10 +9,10 @@ import {
   useState,
 } from 'react';
 
-import { ArrowUp, Paperclip, Square, X } from 'lucide-react';
+import { ArrowUp, Loader2, Paperclip, Square } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
-import { useChatStore, selectPendingImages } from '../../stores/chatStore';
+import { useChatStore, selectPendingImages, selectProcessingImageCount } from '../../stores/chatStore';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 
@@ -81,8 +81,11 @@ export const ChatInput = ({
   const isSending = useChatStore((state) => state.isSending);
   const cancelStream = useChatStore((state) => state.cancelStream);
   const pendingImages = useChatStore(selectPendingImages);
+  const processingImageCount = useChatStore(selectProcessingImageCount);
   const addPendingImage = useChatStore((state) => state.addPendingImage);
-  const removePendingImage = useChatStore((state) => state.removePendingImage);
+  const clearPendingImages = useChatStore((state) => state.clearPendingImages);
+  const incrementProcessing = useChatStore((state) => state.incrementProcessingImages);
+  const decrementProcessing = useChatStore((state) => state.decrementProcessingImages);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -115,16 +118,19 @@ export const ChatInput = ({
           continue;
         }
 
+        incrementProcessing();
         try {
           const dataUrl = await readFileAsDataUrl(file);
           const resized = await resizeImageIfNeeded(dataUrl);
           addPendingImage(resized);
         } catch {
           showError('Failed to process image');
+        } finally {
+          decrementProcessing();
         }
       }
     },
-    [addPendingImage, showError],
+    [addPendingImage, showError, incrementProcessing, decrementProcessing],
   );
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
@@ -206,6 +212,8 @@ export const ChatInput = ({
   );
 
   const hasContent = value.trim().length > 0;
+  const isProcessingImages = processingImageCount > 0;
+  const totalImageCount = pendingImages.length + processingImageCount;
   const atImageLimit = pendingImages.length >= MAX_IMAGES;
 
   return (
@@ -219,25 +227,30 @@ export const ChatInput = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {pendingImages.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto px-3 pt-1.5 pb-0">
-          {pendingImages.map((dataUrl, index) => (
-            <div key={index} className="relative shrink-0">
-              <img
-                src={dataUrl}
-                alt={`Attachment ${index + 1}`}
-                className="h-8 rounded-md object-cover"
-              />
-              <button
-                type="button"
-                onClick={() => removePendingImage(index)}
-                className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                aria-label={`Remove image ${index + 1}`}
-              >
-                <X className="size-2" />
-              </button>
-            </div>
-          ))}
+      {(totalImageCount > 0 || isProcessingImages) && (
+        <div className="flex items-center px-3 pt-1.5 pb-0">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground">
+            {isProcessingImages ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Paperclip className="size-3" />
+            )}
+            <span>
+              {isProcessingImages && pendingImages.length === 0
+                ? `Processing ${processingImageCount} image${processingImageCount > 1 ? 's' : ''}…`
+                : `${totalImageCount} image${totalImageCount > 1 ? 's' : ''}`}
+            </span>
+            <button
+              type="button"
+              onClick={clearPendingImages}
+              className="-mr-0.5 ml-0.5 rounded-full p-0.5 transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Remove all images"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" />
+              </svg>
+            </button>
+          </span>
         </div>
       )}
 
@@ -285,7 +298,7 @@ export const ChatInput = ({
           variant="ghost"
           size="icon-xs"
           className="mb-0.5 text-muted-foreground hover:text-foreground"
-          disabled={!isSending && !hasContent}
+          disabled={!isSending && (!hasContent || isProcessingImages)}
           aria-label={isSending ? 'Stop response' : 'Send message'}
           onClick={() => {
             if (isSending) {

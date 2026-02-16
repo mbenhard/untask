@@ -68,6 +68,7 @@ type ChatStore = {
   autonomyMode: AutonomyMode;
   pendingActions: ChatPendingActionEntry[];
   pendingImages: string[];
+  processingImageCount: number;
 
   initialize: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
@@ -91,6 +92,8 @@ type ChatStore = {
   addPendingImage: (dataUrl: string) => void;
   removePendingImage: (index: number) => void;
   clearPendingImages: () => void;
+  incrementProcessingImages: () => void;
+  decrementProcessingImages: () => void;
 };
 
 const toErrorMessage = (error: unknown): string =>
@@ -325,6 +328,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     autonomyMode: 'safe',
     pendingActions: [],
     pendingImages: [],
+    processingImageCount: 0,
 
     initialize: async () => {
       if (get().isInitialized) {
@@ -380,6 +384,16 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     sendMessage: async (content) => {
+      // Wait for any in-flight image processing to complete
+      const waitForProcessing = async () => {
+        let checks = 0;
+        while (get().processingImageCount > 0 && checks < 50) {
+          await new Promise((r) => { setTimeout(r, 100); });
+          checks += 1;
+        }
+      };
+      await waitForProcessing();
+
       const selected = await getFlusk().chat.getSelectedModel().catch(() => null);
       if (selected?.modelId) {
         set({ selectedModelId: selected.modelId });
@@ -909,6 +923,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     clearPendingImages: () => set({ pendingImages: [] }),
 
+    incrementProcessingImages: () =>
+      set((state) => ({ processingImageCount: state.processingImageCount + 1 })),
+
+    decrementProcessingImages: () =>
+      set((state) => ({ processingImageCount: Math.max(0, state.processingImageCount - 1) })),
+
     clearError: () => set({ error: null }),
   };
 });
@@ -923,3 +943,4 @@ export const selectChatRetentionMode = (state: ChatStore) => state.retentionMode
 export const selectAutonomyMode = (state: ChatStore) => state.autonomyMode;
 export const selectPendingActions = (state: ChatStore) => state.pendingActions;
 export const selectPendingImages = (state: ChatStore) => state.pendingImages;
+export const selectProcessingImageCount = (state: ChatStore) => state.processingImageCount;
