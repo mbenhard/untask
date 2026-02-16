@@ -80,9 +80,9 @@ When the user is done capturing, they hit a "Process" button (or `/process` slas
 
 ### After Processing
 
-- Note auto-archives when user is satisfied
-- Triggered by explicit action or closing chat after processing
-- Note keeps a small "processed" badge
+- User explicitly archives via an "Archive" button on the note (in editor header or list item action)
+- No auto-archive on chat close - too easy to accidentally archive a half-processed note
+- Archived notes keep a "processed" badge
 
 ## What We're NOT Building
 
@@ -114,7 +114,13 @@ createdAt TEXT
 updatedAt TEXT
 ```
 
-Migration moves existing scratchpad content into first note.
+**Migration plan:**
+- Create new `notes` table (SQLite doesn't support column renames well)
+- If existing scratchpad has non-empty content, insert it as a note with title "Migrated notes" and status "active"
+- If scratchpad is empty, skip - don't create a ghost note
+- Drop old `scratchpad` table
+- Migration file: `0004_notes_migration.sql` (or next available number)
+- The renderer auto-save (2s debounce) means dirty content could exist during upgrade. The store should flush any dirty content before the app restarts for migration.
 
 ### Store
 
@@ -125,6 +131,10 @@ Migration moves existing scratchpad content into first note.
 - `archiveNote(id)` - set status to archived
 - `listNotes()` - return all notes grouped by status
 - `deleteNote(id)` - permanent delete
+
+**State shape:** The store tracks `activeNoteId` and separates list state from editor state. Switching notes triggers an immediate flush of any dirty content (bypasses the 2s debounce) before loading the new note.
+
+**Empty note cleanup:** Notes that are never written to (empty content, older than 1 minute) are auto-deleted on next `listNotes()` call. This prevents ghost notes from `Cmd+Shift+N` followed by navigation away.
 
 ### UI Components
 
@@ -145,12 +155,26 @@ Replace `scratchpad:get` / `scratchpad:save` with:
 
 ### Chat Integration
 
-- `sendToAI()` sends note content as context without a fixed prompt
-- User directs the conversation naturally
-- AI task tools (create, update, assign) available during processing
+**`/process` flow (replaces `/send`):**
+1. Serialize current note to markdown
+2. Inject the markdown as a context attachment on the chat session (not as a user message)
+3. Open the chat overlay with the input field focused
+4. User types their first instruction ("extract tasks", "clean this up", etc.)
+5. The old hardcoded prompt (`"Parse the following notes and extract any tasks..."`) is removed
+
+The note content is context, not a message. The AI sees it and can reference it, but the user drives the conversation.
+
+**AI task tools** (create, update, assign) remain available during processing.
+
+### AI Tool Changes
+
+- `read_scratchpad` → rename to `read_note(noteId)` - reads a specific note by ID
+- `edit_scratchpad` → rename to `edit_note(noteId)` - edits a specific note by ID
+- `parse_notes` → unchanged, still operates on arbitrary text input
+- When processing a note via `/process`, the chat session knows which note is active, so the AI can reference it without the user specifying an ID
 
 ### Navigation
 
 - `Cmd+N` opens Notes list
 - `Cmd+Shift+N` creates a new note and opens editor
-- Internal view state: `'scratchpad'` renamed to `'notes'`
+- Internal view state: `'scratchpad'` renamed to `'notes'` (requires updating all references in `appStore`, `TitleBar`, `AppShell`, `useKeyboardShortcuts`, and any Escape layer logic)
