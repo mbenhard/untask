@@ -78,6 +78,10 @@ export function listTasks(filter?: {
   status?: 'inbox' | 'active' | 'in_progress' | 'done';
   parentId?: string | null;
   today?: boolean;
+  priority?: 'none' | 'low' | 'medium' | 'high';
+  client?: string;
+  search?: string;
+  limit?: number;
 }): Task[] {
   const db = getDb();
   const conditions: SQL[] = [];
@@ -95,13 +99,36 @@ export function listTasks(filter?: {
         : eq(tasks.parentId, filter.parentId),
     );
   }
+  if (filter?.priority) {
+    conditions.push(eq(tasks.priority, filter.priority));
+  }
 
-  return db
+  let results = db
     .select()
     .from(tasks)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(tasks.order))
     .all();
+
+  if (filter?.client) {
+    const clientLower = filter.client.toLowerCase();
+    results = results.filter(
+      (task) => task.client && task.client.toLowerCase().includes(clientLower),
+    );
+  }
+
+  if (filter?.search) {
+    const searchLower = filter.search.toLowerCase();
+    results = results.filter(
+      (task) => task.title.toLowerCase().includes(searchLower),
+    );
+  }
+
+  if (filter?.limit && filter.limit > 0) {
+    results = results.slice(0, filter.limit);
+  }
+
+  return results;
 }
 
 export function getTaskById(id: string): Task | null {

@@ -28,7 +28,11 @@ import type {
   ProactiveTriggerEvaluationRequestPayload,
   ProactiveTriggerEvaluationResultPayload,
   BackupExportRequest,
+  BackupExportDialogRequest,
+  BackupExportDialogResponse,
   BackupImportRequest,
+  BackupImportDialogRequest,
+  BackupImportDialogResponse,
   BackupListResponse,
   BackupMetadataPayload,
   QuickAddPayload,
@@ -49,6 +53,7 @@ export type FluskApi = {
     requestHide: () => Promise<void>;
     escapeLayerExit: () => Promise<void>;
     onQuickAddPayload: (listener: (payload: QuickAddPayload) => void) => () => void;
+    onBackupRestored: (listener: () => void) => () => void;
     getLaunchAtLogin: () => Promise<LaunchAtLoginResult>;
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
   };
@@ -106,7 +111,9 @@ export type FluskApi = {
     list: () => Promise<BackupListResponse>;
     create: () => Promise<BackupMetadataPayload>;
     export: (request: BackupExportRequest) => Promise<void>;
+    exportWithDialog: (request?: BackupExportDialogRequest) => Promise<BackupExportDialogResponse>;
     import: (request: BackupImportRequest) => Promise<void>;
+    importWithDialog: (request?: BackupImportDialogRequest) => Promise<BackupImportDialogResponse>;
   };
   search: {
     query: (request: SearchQueryRequest) => Promise<SearchQueryResponse>;

@@ -31,7 +31,11 @@ import {
   type ProactiveTriggerEvaluationRequestPayload,
   type ProactiveTriggerEvaluationResultPayload,
   type BackupExportRequest,
+  type BackupExportDialogRequest,
+  type BackupExportDialogResponse,
   type BackupImportRequest,
+  type BackupImportDialogRequest,
+  type BackupImportDialogResponse,
   type BackupListResponse,
   type BackupMetadataPayload,
   type QuickAddPayload,
@@ -63,6 +67,15 @@ const fluskApi = {
 
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
+      };
+    },
+    onBackupRestored: (listener: () => void): (() => void) => {
+      const wrapped = (): void => listener();
+
+      ipcRenderer.on(IPC_CHANNELS.APP_BACKUP_RESTORED, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_BACKUP_RESTORED, wrapped);
       };
     },
     getLaunchAtLogin: (): Promise<LaunchAtLoginResult> =>
@@ -174,8 +187,16 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_CREATE),
     export: (request: BackupExportRequest): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_EXPORT, request),
+    exportWithDialog: (
+      request?: BackupExportDialogRequest,
+    ): Promise<BackupExportDialogResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_EXPORT_DIALOG, request),
     import: (request: BackupImportRequest): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_IMPORT, request),
+    importWithDialog: (
+      request?: BackupImportDialogRequest,
+    ): Promise<BackupImportDialogResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_IMPORT_DIALOG, request),
   },
   search: {
     query: (request: SearchQueryRequest): Promise<SearchQueryResponse> =>

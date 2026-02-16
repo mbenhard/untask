@@ -12,7 +12,7 @@ import {
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-import { getDbPath } from '../db';
+import { getDbPath, getRawDb } from '../db';
 
 const BACKUP_DIR_NAME = 'backups';
 const MAX_BACKUPS = 30;
@@ -21,6 +21,7 @@ const PBKDF2_ITERATIONS = 100_000;
 const KEY_LENGTH = 32; // AES-256
 const IV_LENGTH = 12; // GCM recommended
 const SALT_LENGTH = 16;
+const SQLITE_MAGIC = Buffer.from('SQLite format 3\0');
 
 export type BackupMetadata = {
   filename: string;
@@ -41,11 +42,31 @@ function formatTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
+function checkpointDatabaseWal(): void {
+  try {
+    getRawDb().pragma('wal_checkpoint(TRUNCATE)');
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[backup] failed to checkpoint WAL before snapshot', error);
+  }
+}
+
+function assertValidSqliteDatabase(data: Buffer): void {
+  if (
+    data.length < SQLITE_MAGIC.length ||
+    !data.subarray(0, SQLITE_MAGIC.length).equals(SQLITE_MAGIC)
+  ) {
+    throw new Error('Invalid backup file: not a valid SQLite database.');
+  }
+}
+
 export function createBackup(): BackupMetadata {
   const dbPath = getDbPath();
   if (!existsSync(dbPath)) {
     throw new Error('Database file not found.');
   }
+
+  checkpointDatabaseWal();
 
   const backupDir = getBackupDir();
   const filename = `flusk-backup-${formatTimestamp()}.db`;
@@ -54,6 +75,7 @@ export function createBackup(): BackupMetadata {
   copyFileSync(dbPath, backupPath);
 
   const stat = statSync(backupPath);
+  pruneOldBackups(MAX_BACKUPS);
 
   return {
     filename,
@@ -117,6 +139,8 @@ export function exportBackup(
   if (!existsSync(dbPath)) {
     throw new Error('Database file not found.');
   }
+
+  checkpointDatabaseWal();
 
   if (!passphrase || passphrase.length === 0) {
     copyFileSync(dbPath, destination);
@@ -183,17 +207,13 @@ export function importBackup(
       const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
       decipher.setAuthTag(authTag);
       const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      assertValidSqliteDatabase(decrypted);
       writeFileSync(dbPath, decrypted);
     } catch {
       throw new Error('Decryption failed. Wrong passphrase or corrupted file.');
     }
   } else {
-    // Validate it's a valid SQLite file (magic bytes)
-    const SQLITE_MAGIC = Buffer.from('SQLite format 3\0');
-    if (data.length >= 16 && !data.subarray(0, 16).equals(SQLITE_MAGIC)) {
-      throw new Error('Invalid backup file: not a valid SQLite database.');
-    }
-
+    assertValidSqliteDatabase(data);
     writeFileSync(dbPath, data);
   }
 }

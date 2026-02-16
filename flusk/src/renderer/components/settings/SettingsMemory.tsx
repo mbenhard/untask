@@ -117,6 +117,11 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
   const [backups, setBackups] = useState<BackupMetadataPayload[]>([]);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
+  const [restoringBackupFilename, setRestoringBackupFilename] = useState<string | null>(null);
+  const [exportPassphrase, setExportPassphrase] = useState('');
+  const [importPassphrase, setImportPassphrase] = useState('');
 
   // Shortcuts tab state
   const [shortcutDrafts, setShortcutDrafts] = useState<Record<string, string>>({});
@@ -301,6 +306,79 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
       setIsCreatingBackup(false);
     }
   }, [loadBackups]);
+
+  const handleExportBackup = useCallback(async () => {
+    try {
+      setIsExportingBackup(true);
+      setError(null);
+      setNotice(null);
+
+      const response = await flusk().backup.exportWithDialog({
+        passphrase: exportPassphrase.trim() || undefined,
+      });
+
+      if (response.canceled) {
+        setNotice('Backup export canceled.');
+        return;
+      }
+
+      setNotice(`Backup exported to ${response.destination ?? 'selected path'}.`);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : 'Failed to export backup.');
+    } finally {
+      setIsExportingBackup(false);
+    }
+  }, [exportPassphrase]);
+
+  const handleImportBackupFromFile = useCallback(async () => {
+    try {
+      setIsImportingBackup(true);
+      setError(null);
+      setNotice(null);
+
+      const response = await flusk().backup.importWithDialog({
+        passphrase: importPassphrase.trim() || undefined,
+      });
+
+      if (response.canceled) {
+        setNotice('Backup import canceled.');
+        return;
+      }
+
+      setNotice('Backup restored. Reloading app state...');
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : 'Failed to import backup.');
+    } finally {
+      setIsImportingBackup(false);
+    }
+  }, [importPassphrase]);
+
+  const handleRestoreBackup = useCallback(async (backup: BackupMetadataPayload) => {
+    const confirmed = window.confirm(
+      `Restore backup "${backup.filename}"? Current data will be replaced after a safety snapshot is created.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setRestoringBackupFilename(backup.filename);
+      setError(null);
+      setNotice(null);
+
+      await flusk().backup.import({
+        source: backup.path,
+        passphrase: importPassphrase.trim() || undefined,
+      });
+
+      setNotice(`Backup ${backup.filename} restored. Reloading app state...`);
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : 'Failed to restore backup.');
+    } finally {
+      setRestoringBackupFilename(null);
+    }
+  }, [importPassphrase]);
 
   // ─── Lifecycle effects ───────────────────────────────────
 
@@ -966,11 +1044,60 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                 type="button"
                 size="sm"
                 variant="outline"
+                onClick={() => void handleExportBackup()}
+                disabled={isExportingBackup}
+              >
+                {isExportingBackup ? 'Exporting...' : 'Export backup'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void handleImportBackupFromFile()}
+                disabled={isImportingBackup || restoringBackupFilename !== null}
+              >
+                {isImportingBackup ? 'Importing...' : 'Import backup'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => void loadBackups()}
                 disabled={isLoadingBackups}
               >
                 Refresh
               </Button>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-md border border-border bg-card px-3 py-3">
+                <p className="text-sm font-medium text-foreground">Export encryption</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Optional passphrase used for encrypted export files.
+                </p>
+                <Input
+                  type="password"
+                  value={exportPassphrase}
+                  onChange={(event) => setExportPassphrase(event.target.value)}
+                  placeholder="Optional passphrase"
+                  className="mt-2"
+                  aria-label="Backup export passphrase"
+                />
+              </div>
+              <div className="rounded-md border border-border bg-card px-3 py-3">
+                <p className="text-sm font-medium text-foreground">Import passphrase</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Required only when importing encrypted backups.
+                </p>
+                <Input
+                  type="password"
+                  value={importPassphrase}
+                  onChange={(event) => setImportPassphrase(event.target.value)}
+                  placeholder="Passphrase for encrypted backup"
+                  className="mt-2"
+                  aria-label="Backup import passphrase"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -992,6 +1119,15 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                       {(backup.sizeBytes / 1024).toFixed(1)} KB
                     </p>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleRestoreBackup(backup)}
+                    disabled={restoringBackupFilename !== null}
+                  >
+                    {restoringBackupFilename === backup.filename ? 'Restoring...' : 'Restore'}
+                  </Button>
                 </div>
               ))}
             </div>

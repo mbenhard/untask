@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
+import { URL } from 'node:url';
 
 import { tool } from 'ai';
+import { extractFromHtml } from '@extractus/article-extractor';
 import { z } from 'zod';
 
 import type { ChatActionCard, ChatToolStatus, ActionLifecycle } from '../../types/chat';
@@ -261,6 +265,24 @@ const updatePatternsInputSchema = z.object({
 });
 const improveTaskInputSchema = z.object({
   id: z.string().min(1),
+});
+
+const listTasksToolInputSchema = z.object({
+  status: z.enum(['inbox', 'active', 'in_progress', 'done']).optional(),
+  priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
+  client: z.string().optional(),
+  today: z.boolean().optional(),
+  search: z.string().optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+const getTaskToolInputSchema = z.object({
+  id: z.string().min(1),
+});
+
+const fetchUrlToolInputSchema = z.object({
+  url: z.string().url(),
+  maxLength: z.number().int().min(100).max(10000).default(3000),
 });
 const generateLiveThoughtInputSchema = z.object({
   focus: z.string().trim().optional(),
@@ -737,6 +759,301 @@ const improveTaskTool = {
   },
 } satisfies ToolRegistryEntry<'improve_task', typeof improveTaskInputSchema>;
 
+const listTasksTool = {
+  name: 'list_tasks',
+  description: 'Search and filter the full task list. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Accepts optional filters: status, priority, client (case-insensitive partial match), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
+  schema: listTasksToolInputSchema,
+  execute: async (input) => {
+    const results = listTasks({
+      status: input.status,
+      priority: input.priority,
+      client: input.client,
+      today: input.today,
+      search: input.search,
+      limit: input.limit,
+    });
+
+    const taskSummaries = results.map((task) => ({
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      client: task.client,
+      dueDate: task.dueDate,
+      today: task.today,
+      parentId: task.parentId,
+    }));
+
+    return {
+      status: 'success',
+      message: `Found ${taskSummaries.length} task${taskSummaries.length === 1 ? '' : 's'}.`,
+      data: { tasks: taskSummaries },
+    };
+  },
+} satisfies ToolRegistryEntry<'list_tasks', typeof listTasksToolInputSchema>;
+
+const getTaskTool = {
+  name: 'get_task',
+  description: 'Fetch full details of a single task by ID. Returns all task fields (body, notes, invoice fields, timestamps) plus child subtasks. Use when you need complete context before acting on a task.',
+  schema: getTaskToolInputSchema,
+  execute: async (input) => {
+    const task = getTaskById(input.id);
+    if (!task) {
+      throw new Error(`Task not found: ${input.id}`);
+    }
+
+    const subtasks = listTasks({ parentId: input.id }).map((child) => ({
+      id: child.id,
+      title: child.title,
+      status: child.status,
+      priority: child.priority,
+      today: child.today,
+    }));
+
+    return {
+      status: 'success',
+      message: `Loaded task "${task.title}"${subtasks.length > 0 ? ` with ${subtasks.length} subtask${subtasks.length === 1 ? '' : 's'}` : ''}.`,
+      data: { task, subtasks },
+    };
+  },
+} satisfies ToolRegistryEntry<'get_task', typeof getTaskToolInputSchema>;
+
+const PRIVATE_IP_PATTERNS = [
+  /^10\./,
+  /^127\./,
+];
+
+const isPrivateIpAddress = (address: string): boolean => {
+  const normalized = address.toLowerCase();
+
+  if (normalized === '::1') {
+    return true;
+  }
+
+  if (normalized.startsWith('::ffff:')) {
+    const mapped = normalized.replace('::ffff:', '');
+    return isPrivateIpAddress(mapped);
+  }
+
+  if (normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80')) {
+    return true;
+  }
+
+  if (isIP(address) !== 4) {
+    return false;
+  }
+
+  const octets = address.split('.').map((part) => Number.parseInt(part, 10));
+  if (octets.length !== 4 || octets.some((value) => Number.isNaN(value))) {
+    return true;
+  }
+
+  const [a, b] = octets;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+};
+
+const resolveHostAddresses = async (hostname: string): Promise<string[]> => {
+  try {
+    const records = await lookup(hostname, { all: true, verbatim: true });
+    return records.map((record) => record.address);
+  } catch {
+    return [];
+  }
+};
+
+const isPrivateUrl = async (urlString: string): Promise<boolean> => {
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return true;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === '[::1]' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal')
+    ) {
+      return true;
+    }
+
+    if (PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname))) {
+      return true;
+    }
+
+    if (isIP(hostname) > 0) {
+      return isPrivateIpAddress(hostname);
+    }
+
+    const addresses = await resolveHostAddresses(hostname);
+    if (addresses.length === 0) {
+      return true;
+    }
+
+    return addresses.some((address) => isPrivateIpAddress(address));
+  } catch {
+    return true;
+  }
+};
+
+const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_MAX_BODY_BYTES = 500_000;
+const FETCH_MAX_REDIRECTS = 5;
+
+const isRedirectStatus = (status: number): boolean =>
+  status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+
+const readResponseBodyWithLimit = async (
+  response: Response,
+  maxBytes: number,
+): Promise<string> => {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    const declaredBytes = Number.parseInt(contentLength, 10);
+    if (!Number.isNaN(declaredBytes) && declaredBytes > maxBytes) {
+      throw new Error(`Response body exceeds ${maxBytes} byte limit.`);
+    }
+  }
+
+  if (!response.body) {
+    const fallback = await response.arrayBuffer();
+    if (fallback.byteLength > maxBytes) {
+      throw new Error(`Response body exceeds ${maxBytes} byte limit.`);
+    }
+    return new TextDecoder().decode(fallback);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  let streamDone = false;
+  while (!streamDone) {
+    const { done, value } = await reader.read();
+    if (done) {
+      streamDone = true;
+      continue;
+    }
+    if (!value) {
+      continue;
+    }
+
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Response body exceeds ${maxBytes} byte limit.`);
+    }
+    chunks.push(value);
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  });
+
+  return new TextDecoder().decode(merged);
+};
+
+const fetchReadableHtml = async (
+  inputUrl: string,
+  signal: AbortSignal,
+): Promise<{ html: string; finalUrl: string }> => {
+  let currentUrl = inputUrl;
+
+  for (let redirectCount = 0; redirectCount <= FETCH_MAX_REDIRECTS; redirectCount += 1) {
+    if (await isPrivateUrl(currentUrl)) {
+      throw new Error('Cannot fetch private or internal URLs.');
+    }
+
+    const response = await fetch(currentUrl, {
+      signal,
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'Flusk/1.0 (Article Extractor)',
+        Accept: 'text/html, application/xhtml+xml, text/plain',
+      },
+    });
+
+    if (isRedirectStatus(response.status)) {
+      if (redirectCount === FETCH_MAX_REDIRECTS) {
+        throw new Error('Too many redirects while fetching URL.');
+      }
+
+      const location = response.headers.get('location');
+      if (!location) {
+        throw new Error('Redirect response missing Location header.');
+      }
+
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    if (
+      !contentType.includes('text/') &&
+      !contentType.includes('html') &&
+      !contentType.includes('application/xhtml')
+    ) {
+      throw new Error(`Unsupported content type: ${contentType}. Only text/HTML is supported.`);
+    }
+
+    const html = await readResponseBodyWithLimit(response, FETCH_MAX_BODY_BYTES);
+    return { html, finalUrl: currentUrl };
+  }
+
+  throw new Error('Too many redirects while fetching URL.');
+};
+
+const fetchUrlTool = {
+  name: 'fetch_url',
+  description: 'Fetch a URL and return its readable content. Use when the user pastes a link and asks you to summarize or read it. Only processes text/HTML content. Returns extracted article title and content, truncated to maxLength.',
+  schema: fetchUrlToolInputSchema,
+  execute: async (input) => {
+    if (await isPrivateUrl(input.url)) {
+      throw new Error('Cannot fetch private or internal URLs.');
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+      const { html, finalUrl } = await fetchReadableHtml(input.url, controller.signal);
+      const article = await extractFromHtml(html, finalUrl);
+      const title = article?.title ?? 'Untitled';
+      let content = article?.content ?? html;
+
+      // Strip HTML tags for plain text output
+      content = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+      if (content.length > input.maxLength) {
+        content = content.slice(0, input.maxLength).trimEnd() + '...';
+      }
+
+      return {
+        status: 'success',
+        message: `Fetched "${title}" (${content.length} chars).`,
+        data: { title, content, url: finalUrl },
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+} satisfies ToolRegistryEntry<'fetch_url', typeof fetchUrlToolInputSchema>;
+
 export const AI_TOOL_REGISTRY = {
   create_task: createTaskTool,
   update_task: updateTaskTool,
@@ -753,6 +1070,9 @@ export const AI_TOOL_REGISTRY = {
   update_user_profile: updateUserProfileTool,
   update_patterns: updatePatternsTool,
   improve_task: improveTaskTool,
+  list_tasks: listTasksTool,
+  get_task: getTaskTool,
+  fetch_url: fetchUrlTool,
 } as const;
 
 export type AiToolName = keyof typeof AI_TOOL_REGISTRY;

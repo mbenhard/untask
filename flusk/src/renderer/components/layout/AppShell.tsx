@@ -67,6 +67,16 @@ export const AppShell = () => {
     void initializeChat();
   }, [initializeChat]);
 
+  useEffect(() => {
+    const unsubscribe = window.flusk?.app.onBackupRestored(() => {
+      window.location.reload();
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
   const clearInput = useCallback(() => {
     setChatInputValue('');
   }, []);

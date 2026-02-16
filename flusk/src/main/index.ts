@@ -156,7 +156,7 @@ app.whenReady().then(() => {
   startDailyBackupScheduler();
   runWeeklyDigestStartupCheck();
 
-  app.on('activate', () => {
+  const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow();
       initSummonController(mainWindow);
@@ -164,7 +164,12 @@ app.whenReady().then(() => {
     } else {
       summonWindow();
     }
-  });
+  };
+
+  app.on('activate', handleAppActivation);
+  if (process.platform === 'darwin') {
+    app.on('did-become-active', handleAppActivation);
+  }
 });
 
 app.on('will-quit', () => {

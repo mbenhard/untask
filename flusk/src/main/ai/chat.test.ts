@@ -129,6 +129,25 @@ describe('shouldRequireToolChoice', () => {
       }),
     ).toBe(false);
   });
+
+  it('does not require tool choice for generic factual questions by default', () => {
+    expect(
+      shouldRequireToolChoice({
+        userMessage: 'what is the weather in berlin today',
+        history: [],
+      }),
+    ).toBe(false);
+  });
+
+  it('can require tool choice for explicit web-search phrasing when enabled', () => {
+    expect(
+      shouldRequireToolChoice({
+        userMessage: 'look up latest news about openrouter',
+        history: [],
+        allowWebSearchToolChoice: true,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('generateToolCallDescription', () => {

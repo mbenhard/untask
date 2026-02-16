@@ -17,6 +17,8 @@ export type ModelCatalogEntry = {
   outputCostPerMillion: number | null;
   defaultSelected: boolean;
   supportsReasoning: boolean;
+  supportsWebSearch: boolean;
+  webSearchMethod?: 'kimi_builtin' | 'claude_native';
 };
 
 const DEFAULT_MODEL_ID: ChatModelId = 'moonshotai/kimi-k2.5';
@@ -30,6 +32,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     outputCostPerMillion: 1.2,
     defaultSelected: false,
     supportsReasoning: true,
+    supportsWebSearch: false,
   },
   {
     id: 'moonshotai/kimi-k2.5',
@@ -38,6 +41,8 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     outputCostPerMillion: 2.8,
     defaultSelected: true,
     supportsReasoning: true,
+    supportsWebSearch: true,
+    webSearchMethod: 'kimi_builtin',
   },
   {
     id: 'z-ai/glm-5',
@@ -46,6 +51,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     outputCostPerMillion: null,
     defaultSelected: false,
     supportsReasoning: false,
+    supportsWebSearch: false,
   },
   {
     id: 'anthropic/claude-haiku-4.5',
@@ -54,6 +60,8 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     outputCostPerMillion: 4.0,
     defaultSelected: false,
     supportsReasoning: false,
+    supportsWebSearch: true,
+    webSearchMethod: 'claude_native',
   },
   {
     id: 'google/gemini-3-flash-preview',
@@ -62,6 +70,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     outputCostPerMillion: null,
     defaultSelected: false,
     supportsReasoning: true,
+    supportsWebSearch: false,
   },
 ] as const;
 
@@ -85,6 +94,17 @@ export const getModels = (): ModelCatalogEntry[] => [...MODEL_CATALOG];
 
 export const modelSupportsReasoning = (modelId: ChatModelId): boolean =>
   MODEL_CATALOG.find((entry) => entry.id === modelId)?.supportsReasoning ?? false;
+
+export const getModelWebSearchConfig = (modelId: ChatModelId): {
+  supportsWebSearch: boolean;
+  webSearchMethod?: 'kimi_builtin' | 'claude_native';
+} => {
+  const entry = MODEL_CATALOG.find((e) => e.id === modelId);
+  return {
+    supportsWebSearch: entry?.supportsWebSearch ?? false,
+    webSearchMethod: entry?.webSearchMethod,
+  };
+};
 
 export const isSupportedModelId = (value: string): value is ChatModelId =>
   SUPPORTED_MODEL_IDS.includes(value as ChatModelId);

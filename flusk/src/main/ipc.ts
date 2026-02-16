@@ -1,4 +1,5 @@
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import path from 'node:path';
 import { z } from 'zod';
 import {
   type ChatModelCatalogResult,
@@ -38,9 +39,15 @@ import {
   type BackupListResponse,
   type BackupMetadataPayload,
   type BackupExportRequest,
+  type BackupExportDialogRequest,
+  type BackupExportDialogResponse,
   type BackupImportRequest,
+  type BackupImportDialogRequest,
+  type BackupImportDialogResponse,
 } from '../types/ipc';
 import { buildIdentityContext } from './ai/contextBuilder';
+import { closeDatabase, initDatabase } from './db';
+import { runMigrations } from './db/migrate';
 import { getPatterns, getProfile, getSoul, resetSoul, setPatterns, setProfile, setSoul } from './ai/memory';
 import {
   evaluateMemoryPromotion,
@@ -73,7 +80,7 @@ import {
   importBackup,
   listBackups,
 } from './services/backupService';
-import { searchTasks } from './services/searchService';
+import { initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 import { generateLiveThought } from './ai/liveThought';
@@ -127,12 +134,57 @@ const resolvePendingActionSchema = z.object({
 });
 
 const launchAtLoginSchema = z.boolean();
+const backupExportRequestSchema = z.object({
+  destination: z.string().min(1),
+  passphrase: z.string().optional(),
+});
+const backupImportRequestSchema = z.object({
+  source: z.string().min(1),
+  passphrase: z.string().optional(),
+});
+const backupDialogRequestSchema = z.object({
+  passphrase: z.string().optional(),
+});
 
 const getMemoryState = (): SettingsMemoryStatePayload => ({
   soul: getSoul(),
   profile: getProfile(),
   patterns: getPatterns(),
 });
+
+const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
+
+const notifyBackupRestored = (): void => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) {
+      continue;
+    }
+
+    window.webContents.send(IPC_CHANNELS.APP_BACKUP_RESTORED);
+  }
+};
+
+const reinitializeDatabase = (): void => {
+  initDatabase();
+  runMigrations();
+  initSearchFts();
+  refreshTodayBadge();
+};
+
+const restoreBackupAndReloadRuntime = (request: BackupImportRequest): void => {
+  closeDatabase();
+
+  try {
+    importBackup(request.source, request.passphrase);
+  } catch (error) {
+    // Keep runtime usable if restore attempt fails.
+    reinitializeDatabase();
+    throw error;
+  }
+
+  reinitializeDatabase();
+  notifyBackupRestored();
+};
 
 export const registerIpcHandlers = (): void => {
   if (ipcMain.listenerCount(IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_STATE) > 0) {
@@ -571,7 +623,8 @@ export const registerIpcHandlers = (): void => {
     IPC_CHANNELS.BACKUP_EXPORT,
     (_event, request: BackupExportRequest): void => {
       try {
-        exportBackup(request.destination, request.passphrase);
+        const validated = backupExportRequestSchema.parse(request ?? {});
+        exportBackup(validated.destination, validated.passphrase);
       }
       catch (e) { console.error('[ipc] BACKUP_EXPORT:', e); throw e; }
     },
@@ -580,9 +633,81 @@ export const registerIpcHandlers = (): void => {
     IPC_CHANNELS.BACKUP_IMPORT,
     (_event, request: BackupImportRequest): void => {
       try {
-        importBackup(request.source, request.passphrase);
+        const validated = backupImportRequestSchema.parse(request ?? {});
+        restoreBackupAndReloadRuntime(validated);
       }
       catch (e) { console.error('[ipc] BACKUP_IMPORT:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_EXPORT_DIALOG,
+    async (
+      event,
+      request?: BackupExportDialogRequest,
+    ): Promise<BackupExportDialogResponse> => {
+      try {
+        const validated = backupDialogRequestSchema.parse(request ?? {});
+        const extension = validated.passphrase?.trim() ? 'taskdb.enc' : 'taskdb';
+        const defaultPath = path.join(
+          app.getPath('documents'),
+          `flusk-backup-${backupTimestamp()}.${extension}`,
+        );
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Export Flusk backup',
+          defaultPath,
+          filters: [
+            { name: 'Flusk Backup', extensions: ['taskdb', 'enc', 'db'] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+        };
+        const result = owner
+          ? await dialog.showSaveDialog(owner, dialogOptions)
+          : await dialog.showSaveDialog(dialogOptions);
+
+        if (result.canceled || !result.filePath) {
+          return { canceled: true };
+        }
+
+        exportBackup(result.filePath, validated.passphrase?.trim() || undefined);
+        return { canceled: false, destination: result.filePath };
+      }
+      catch (e) { console.error('[ipc] BACKUP_EXPORT_DIALOG:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_IMPORT_DIALOG,
+    async (
+      event,
+      request?: BackupImportDialogRequest,
+    ): Promise<BackupImportDialogResponse> => {
+      try {
+        const validated = backupDialogRequestSchema.parse(request ?? {});
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Import Flusk backup',
+          properties: ['openFile' as const],
+          filters: [
+            { name: 'Flusk Backup', extensions: ['taskdb', 'enc', 'db'] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+        };
+        const result = owner
+          ? await dialog.showOpenDialog(owner, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
+
+        const source = result.filePaths[0];
+        if (result.canceled || !source) {
+          return { canceled: true, restored: false };
+        }
+
+        restoreBackupAndReloadRuntime({
+          source,
+          passphrase: validated.passphrase?.trim() || undefined,
+        });
+        return { canceled: false, source, restored: true };
+      }
+      catch (e) { console.error('[ipc] BACKUP_IMPORT_DIALOG:', e); throw e; }
     },
   );
 

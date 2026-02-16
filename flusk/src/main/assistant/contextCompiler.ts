@@ -411,7 +411,7 @@ const buildLiveContextSection = (
     riskLevel = 'medium';
   }
 
-  const taskLines = activeTasks.slice(0, 8).map((task) => {
+  const taskLines = activeTasks.slice(0, 15).map((task) => {
     const tags = [
       task.today ? 'today' : null,
       task.priority ? `priority:${task.priority}` : null,
@@ -421,7 +421,7 @@ const buildLiveContextSection = (
       .filter(Boolean)
       .join(', ');
 
-    return `- ${task.title}${tags.length > 0 ? ` (${tags})` : ''}`;
+    return `- [${task.id}] ${task.title}${tags.length > 0 ? ` (${tags})` : ''}`;
   });
 
   const overdueLines = overdueTasks.slice(0, 5).map((task) => {
@@ -430,7 +430,7 @@ const buildLiveContextSection = (
         ? `, value-at-risk:$${task.valueAtRisk}`
         : '';
 
-    return `- ${task.title} (due:${task.dueDate ?? 'unknown'}${valueAtRisk})`;
+    return `- [${task.id}] ${task.title} (due:${task.dueDate ?? 'unknown'}${valueAtRisk})`;
   });
 
   const lines = [
@@ -639,7 +639,7 @@ export const compileIdentityContext = (
       id: 'live-context',
       title: 'Live Context',
       content: liveContextSection,
-      maxTokens: 420,
+      maxTokens: 620,
       required: true,
     },
   );

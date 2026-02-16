@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { Fragment, useCallback, useEffect, useRef } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Search, X } from 'lucide-react';
@@ -19,6 +19,33 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 const DEBOUNCE_MS = 300;
+
+const renderSafeSnippet = (snippet: string) => {
+  const parts = snippet.split(/(<mark>|<\/mark>)/g);
+  let isHighlighted = false;
+
+  return parts.map((part, index) => {
+    if (part === '<mark>') {
+      isHighlighted = true;
+      return null;
+    }
+
+    if (part === '</mark>') {
+      isHighlighted = false;
+      return null;
+    }
+
+    if (part.length === 0) {
+      return null;
+    }
+
+    return isHighlighted ? (
+      <mark key={`search-snippet-mark-${index}`}>{part}</mark>
+    ) : (
+      <Fragment key={`search-snippet-text-${index}`}>{part}</Fragment>
+    );
+  });
+};
 
 export const SearchModal = () => {
   const isOpen = useSearchStore(selectSearchIsOpen);
@@ -88,10 +115,12 @@ export const SearchModal = () => {
       close();
       exitChatMode();
 
-      if (result.status === 'done') {
-        setView('projects');
-      } else {
+      if (result.status === 'inbox') {
+        setView('inbox');
+      } else if (result.today) {
         setView('today');
+      } else {
+        setView('projects');
       }
 
       selectTask(result.id);
@@ -160,10 +189,9 @@ export const SearchModal = () => {
           </p>
         ) : null}
         {result.snippet ? (
-          <p
-            className="mt-0.5 truncate text-xs text-muted-foreground"
-            dangerouslySetInnerHTML={{ __html: result.snippet }}
-          />
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {renderSafeSnippet(result.snippet)}
+          </p>
         ) : null}
       </button>
     );

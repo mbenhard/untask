@@ -1,49 +1,55 @@
 # Implementation Review
 
 ## Plan Path
-- `docs/plans/2026-02-16-scratchpad-search-settings-execution-plan.md`
-- Scoped checkpoint input: `docs/plans/2026-02-16-scratchpad-search-settings-execution-checkpoints.md` (`10.1` scratchpad batch)
+- `docs/plans/2026-02-16-scratchpad-search-settings-execution-checkpoints.md`
+- `.taskmaster/tasks/tasks.json` (Task `10`)
 
 ## Traceability Summary
-| Checkpoint task | Code evidence | Status | Notes |
+| Taskmaster subtask | Code evidence | Status | Notes |
 | --- | --- | --- | --- |
-| Scratchpad store with `isOpen`, `content`, `isDirty`, persisted load/save actions | `flusk/src/renderer/stores/scratchpadStore.ts`, `flusk/src/main/services/scratchpadService.ts`, `flusk/src/main/ipc.ts`, `flusk/src/preload/index.ts` | implemented | Store + typed IPC bridge + DB-backed service are wired end-to-end. |
-| Animated scratchpad panel with backdrop close, autosave on blur/close, markdown editor | `flusk/src/renderer/components/scratchpad/Scratchpad.tsx` | implemented | `AnimatePresence` + motion panel + markdown editor + blur/close save path confirmed. |
-| Scratchpad toggle in title bar and `Cmd+N`/`Escape` keyboard handling | `flusk/src/renderer/components/layout/TitleBar.tsx`, `flusk/src/renderer/hooks/useKeyboardShortcuts.ts`, `flusk/src/renderer/components/layout/AppShell.tsx` | implemented | Toggle button and layered escape handling are present and connected. |
-| Scratchpad persistence schema/migration surface | `flusk/src/main/db/schema.ts`, `flusk/drizzle/0000_parched_otto_octavius.sql` | implemented | `scratchpad` table exists in schema and migration SQL. |
+| `10.1` Scratchpad panel + autosave | `flusk/src/renderer/components/scratchpad/Scratchpad.tsx`, `flusk/src/renderer/stores/scratchpadStore.ts`, `flusk/src/main/services/scratchpadService.ts`, `flusk/src/main/ipc.ts` | implemented | Slide-up panel, markdown editor, blur/close autosave, typed IPC persistence. |
+| `10.2` Send to AI / parse notes path | `flusk/src/renderer/stores/scratchpadStore.ts`, `flusk/src/renderer/components/scratchpad/Scratchpad.tsx`, `flusk/src/main/ai/tools.ts` | implemented | `Send to AI` pushes parse prompt through chat and tool orchestration. |
+| `10.3` Search modal + FTS5 + grouped results | `flusk/src/main/services/searchService.ts`, `flusk/src/renderer/stores/searchStore.ts`, `flusk/src/renderer/components/search/SearchModal.tsx`, `flusk/src/main/ipc.ts` | implemented | FTS5 setup/sync, grouped results, safe snippet rendering, keyboard navigation. |
+| `10.4` Unified settings shell | `flusk/src/renderer/components/settings/SettingsMemory.tsx`, `flusk/src/main/services/settingsService.ts`, `flusk/src/main/ipc.ts` | implemented | General/AI/Memory/Journal/Chat/Shortcuts/Backup tabs and persistence hooks are wired. |
+| `10.5` Backup system (daily + retention + export/import) | `flusk/src/main/services/backupService.ts`, `flusk/src/main/ipc.ts`, `flusk/src/preload/index.ts`, `flusk/src/renderer/components/settings/SettingsMemory.tsx`, `flusk/src/renderer/components/layout/AppShell.tsx` | implemented | Daily auto-backup + keep-30, encrypted export/import, dialog-based file selection, restore from history, runtime reload broadcast. |
+| `10.6` Settings IPC + shortcut persistence path | `flusk/src/main/ipc.ts`, `flusk/src/main/services/settingsService.ts`, `flusk/src/main/shortcuts.ts`, `flusk/src/renderer/components/settings/SettingsMemory.tsx` | implemented | Settings get/set/getAll handlers and settings-backed shortcut resolution are present. |
 
 ## Findings (by severity)
-- `P1` Fixed: async save completion could overwrite newer user edits in the scratchpad store when content changed while save was in-flight (`flusk/src/renderer/stores/scratchpadStore.ts`).
+- None.
 
 ## Improvements Applied
-- Updated scratchpad save flow to:
-  - prevent overlapping saves (`isSaving` guard),
-  - avoid stale content overwrite if content changed during save completion.
-- Added regression coverage:
-  - `flusk/src/renderer/stores/scratchpadStore.test.ts` verifies dirty-clear path and late-save overwrite protection.
+- Backup integrity hardening:
+  - WAL checkpoint before snapshot/export.
+  - strict SQLite magic validation for plaintext and decrypted imports.
+  - keep-30 retention enforcement on manual backup creation.
+- Backup UX completion:
+  - export/import dialog IPC channels.
+  - backup tab now supports export, import, and per-backup restore actions.
+  - app reload broadcast after successful restore to avoid stale runtime state.
+- Search safety/navigation hardening:
+  - removed raw HTML sink for snippets.
+  - search payload includes `parentId`/`today` for better destination view routing.
+  - task list now focuses/expands selected task on search navigation.
 
 ## Test Delta
 - Before:
   - `npm run lint` (pass)
   - `npm run typecheck` (pass)
-  - `npm run test -- --run` (pass, 9 files / 36 tests)
+  - `npm run test -- --run` (pass, 12 files / 74 tests)
 - After:
   - `npm run lint` (pass)
   - `npm run typecheck` (pass)
-  - `npm run test -- --run` (pass, 11 files / 42 tests)
+  - `npm run test -- --run` (pass, 12 files / 74 tests)
 - Gaps:
-  - Manual interactive UX checks from checkpoint remain pending (panel animation feel, keyboard flow across real window focus states).
-  - No renderer integration test currently asserts `Cmd+N` + layered `Escape` behavior against mounted UI.
+  - Manual QA still recommended for native dialog and restore UX flow in packaged app.
 
 ## Verification Run
-- Verified typed IPC contract continuity for `scratchpad:get` and `scratchpad:save`.
-- Verified no regressions in existing test suite after store change.
-- Verified new scratchpad store regression tests are passing.
+- Full regression commands succeeded after final implementation updates.
 
 ## Verdict
 PASS_WITH_CHANGES
 
 ## LESSONS_LEARNED
-1. Async autosave flows must defend against stale-write races to prevent silent note loss.
-2. Store-level regression tests are low-cost and catch user-impacting edge cases early.
-3. Checkpoint audits are stronger when scoped evidence and baseline/after deltas are both recorded.
+1. WAL-mode SQLite backups need explicit checkpointing before file-level export/copy.
+2. Renderer snippet highlighting should avoid raw HTML sinks.
+3. Task completion checks must validate both backend capability and user-reachable settings flows.

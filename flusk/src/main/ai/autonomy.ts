@@ -256,6 +256,9 @@ const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'generate_live_thought',
   'improve_task',
   'undo_last_action',
+  'list_tasks',
+  'get_task',
+  'fetch_url',
 ]);
 
 export const isMutationTool = (toolName: string): boolean =>

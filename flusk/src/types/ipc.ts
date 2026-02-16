@@ -36,6 +36,7 @@ export const IPC_CHANNELS = {
   APP_REQUEST_HIDE: 'app:request-hide',
   APP_ESCAPE_LAYER_EXIT: 'app:escape-layer-exit',
   APP_QUICK_ADD_PAYLOAD: 'app:quick-add-payload',
+  APP_BACKUP_RESTORED: 'app:backup-restored',
   APP_GET_LAUNCH_AT_LOGIN: 'app:get-launch-at-login',
   APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
 
@@ -75,6 +76,8 @@ export const IPC_CHANNELS = {
   BACKUP_CREATE: 'backup:create',
   BACKUP_EXPORT: 'backup:export',
   BACKUP_IMPORT: 'backup:import',
+  BACKUP_EXPORT_DIALOG: 'backup:export-dialog',
+  BACKUP_IMPORT_DIALOG: 'backup:import-dialog',
   SEARCH_QUERY: 'search:query',
   SCRATCHPAD_GET: 'scratchpad:get',
   SCRATCHPAD_SAVE: 'scratchpad:save',
@@ -185,6 +188,25 @@ export type BackupImportRequest = {
   passphrase?: string;
 };
 
+export type BackupExportDialogRequest = {
+  passphrase?: string;
+};
+
+export type BackupExportDialogResponse = {
+  canceled: boolean;
+  destination?: string;
+};
+
+export type BackupImportDialogRequest = {
+  passphrase?: string;
+};
+
+export type BackupImportDialogResponse = {
+  canceled: boolean;
+  source?: string;
+  restored: boolean;
+};
+
 // ─── Search payloads ──────────────────────────────────────
 
 export type SearchQueryRequest = {
@@ -194,9 +216,11 @@ export type SearchQueryRequest = {
 
 export type SearchResultItem = {
   id: string;
+  parentId: string | null;
   title: string;
   body: string | null;
   status: string | null;
+  today: boolean;
   client: string | null;
   priority: string | null;
   dueDate: string | null;

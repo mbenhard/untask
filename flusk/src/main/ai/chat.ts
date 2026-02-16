@@ -22,10 +22,11 @@ import { getSetting, setSetting } from '../services/settingsService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { createOpenRouterProviderFromEnv } from './openrouter';
 import type { ChatModelId } from './models';
-import { getSelectedModelId, resolveModelId } from './models';
+import { getSelectedModelId, getModelWebSearchConfig, resolveModelId } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolExecutionResult, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall } from './tools';
+import { loadPendingActions } from './autonomy';
 
 const activeChatRequestIds = new Set<string>();
 const canceledChatRequestIds = new Set<string>();
@@ -243,14 +244,21 @@ const looksLikeQuestion = (message: string): boolean =>
   message.includes('?') || /^(can|could|would|will|should|please)\b/i.test(message);
 
 const TASK_MUTATION_VERB_PATTERN =
-  /\b(create|add|update|edit|complete|finish|move|schedule|plan|undo)\b/i;
+  /\b(create|add|update|edit|complete|finish|move|schedule|plan|undo|mark|done|remove|delete|set|change|rename|prioritize|defer|remember|save|note|log)\b/i;
 const TASK_ENTITY_PATTERN = /\b(task|todo|to-do|today|inbox)\b/i;
 const TASK_CLARIFICATION_PATTERN =
   /\b(what(?:'| i)s the task|give me a title|title and any details|which task|clarify)\b/i;
+const PRONOUN_WITH_VERB_PATTERN =
+  /\b(mark|complete|finish|delete|remove|update|set|change|move|done)\b.*\b(it|that|this|them)\b|\b(it|that|this|them)\b.*\b(mark|complete|finish|delete|remove|update|set|change|move|done|as done|as complete)\b/i;
+const CONFIRMATION_PATTERN =
+  /^(yes|yeah|yep|do it|go ahead|sure|ok|okay|confirmed|approve|please|absolutely|definitely)\s*[.!]?\s*$/i;
+const WEB_SEARCH_INTENT_PATTERN =
+  /\b(search for|look up|find out|latest news|current price|stock price|price of)\b/i;
 
 export const shouldRequireToolChoice = (input: {
   userMessage: string;
   history: ConversationMessage[];
+  allowWebSearchToolChoice?: boolean;
 }): boolean => {
   const normalizedMessage = input.userMessage.trim();
   if (normalizedMessage.length === 0) {
@@ -267,6 +275,27 @@ export const shouldRequireToolChoice = (input: {
     TASK_ENTITY_PATTERN.test(normalizedMessage);
   if (mutationIntent && !looksLikeQuestion(normalizedMessage)) {
     return true;
+  }
+
+  // Pronoun + strong verb pattern (e.g., "complete it", "mark that as done")
+  if (PRONOUN_WITH_VERB_PATTERN.test(normalizedMessage)) {
+    return true;
+  }
+
+  // Web search intent detection
+  if (
+    input.allowWebSearchToolChoice === true &&
+    WEB_SEARCH_INTENT_PATTERN.test(normalizedMessage)
+  ) {
+    return true;
+  }
+
+  // Follow-up confirmation when there are pending actions
+  if (CONFIRMATION_PATTERN.test(normalizedMessage)) {
+    const pending = loadPendingActions();
+    if (pending.length > 0) {
+      return true;
+    }
   }
 
   const lastAssistantMessage = [...input.history]
@@ -373,6 +402,12 @@ export const generateToolCallDescription = (
       return 'Saving workflow pattern';
     case 'improve_task':
       return input.id ? `Analyzing task ${String(input.id)}` : 'Analyzing task';
+    case 'list_tasks':
+      return input.search ? `Searching tasks for "${truncate(String(input.search), 40)}"` : 'Listing tasks';
+    case 'get_task':
+      return input.id ? `Loading task ${String(input.id)}` : 'Loading task';
+    case 'fetch_url':
+      return input.url ? `Fetching ${truncate(String(input.url), 60)}` : 'Fetching URL';
     default:
       return `Running ${toolName}`;
   }
@@ -509,6 +544,7 @@ export const prepareChatTurn = async (
     tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
     memory,
     liveContext,
+    modelId,
   });
 
   return {
@@ -556,10 +592,12 @@ const runAssistantStream = async (
           tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
           memory,
           liveContext,
+          modelId: input.modelId,
         });
 
         const provider = createOpenRouterProviderFromEnv();
         const model = provider.chat(input.modelId);
+        const webSearchConfig = getModelWebSearchConfig(input.modelId);
         const recentHistory = getRecentChatMessages(HISTORY_WINDOW_LIMIT).filter(
           (message) => message.role === 'user' || message.role === 'assistant',
         );
@@ -573,6 +611,7 @@ const runAssistantStream = async (
         const requireToolChoice = shouldRequireToolChoice({
           userMessage: input.userMessage,
           history: conversationMessages,
+          allowWebSearchToolChoice: false,
         });
 
         const result = streamText({
@@ -622,11 +661,22 @@ const runAssistantStream = async (
 
             return {};
           },
-          tools: createSdkTools({
-            onActionCard: (card) => {
-              actionCards.push(card);
-            },
-          }) as Parameters<typeof streamText>[0]['tools'],
+          tools: (() => {
+            const sdkTools = createSdkTools({
+              onActionCard: (card) => {
+                actionCards.push(card);
+              },
+            });
+
+            // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
+            if (webSearchConfig.supportsWebSearch && webSearchConfig.webSearchMethod) {
+              (sdkTools as Record<string, unknown>).web_search = provider.tools.webSearch({
+                searchContextSize: 'medium',
+              });
+            }
+
+            return sdkTools;
+          })() as Parameters<typeof streamText>[0]['tools'],
         });
 
         for await (const part of result.fullStream) {

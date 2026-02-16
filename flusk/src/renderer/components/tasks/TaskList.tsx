@@ -69,6 +69,7 @@ export const TaskList = ({
   const completeTask = useTaskStore((state) => state.completeTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
+  const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -117,6 +118,39 @@ export const TaskList = ({
       nextFocused.focus();
     }
   }, [focusedIndex, tasks]);
+
+  useEffect(() => {
+    if (!selectedTaskId) {
+      return;
+    }
+
+    const selectedIndex = tasks.findIndex((task) => task.id === selectedTaskId);
+    if (selectedIndex < 0) {
+      return;
+    }
+
+    setFocusedIndex(selectedIndex);
+    setExpandedTaskId(selectedTaskId);
+    setIsAnyBodyEditing(false);
+
+    requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      const target = container.querySelector<HTMLElement>(
+        `[data-task-id="${selectedTaskId}"]`,
+      );
+
+      if (!target) {
+        return;
+      }
+
+      target.scrollIntoView({ block: 'nearest' });
+      target.focus();
+    });
+  }, [selectedTaskId, tasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

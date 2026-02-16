@@ -10,10 +10,16 @@ export const searchQuerySchema = z.object({
 
 export type SearchQueryInput = z.input<typeof searchQuerySchema>;
 
-export type SearchResultItem = Pick<
-  Task,
-  'id' | 'title' | 'body' | 'status' | 'client' | 'priority' | 'dueDate'
-> & {
+export type SearchResultItem = {
+  id: Task['id'];
+  parentId: Task['parentId'];
+  title: Task['title'];
+  body: Task['body'];
+  status: Task['status'];
+  today: boolean;
+  client: Task['client'];
+  priority: Task['priority'];
+  dueDate: Task['dueDate'];
   snippet: string;
 };
 
@@ -101,7 +107,7 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
     .prepare(
       `
       SELECT
-        t.id, t.title, t.body, t.status, t.client, t.priority, t.due_date,
+        t.id, t.parent_id, t.title, t.body, t.status, t.today, t.client, t.priority, t.due_date,
         snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32) AS snippet
       FROM tasks_fts
       JOIN tasks t ON t.rowid = tasks_fts.rowid
@@ -112,9 +118,11 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
     )
     .all(sanitized, validated.limit) as Array<{
     id: string;
+    parent_id: string | null;
     title: string;
     body: string | null;
     status: string | null;
+    today: number | null;
     client: string | null;
     priority: string | null;
     due_date: string | null;
@@ -127,9 +135,11 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
   for (const row of rows) {
     const item: SearchResultItem = {
       id: row.id,
+      parentId: row.parent_id,
       title: row.title,
       body: row.body,
       status: row.status as Task['status'],
+      today: Boolean(row.today),
       client: row.client,
       priority: row.priority as Task['priority'],
       dueDate: row.due_date,

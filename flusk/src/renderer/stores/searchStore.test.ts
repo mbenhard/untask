@@ -7,9 +7,11 @@ const createMockSearchApi = () => ({
     active: [
       {
         id: '1',
+        parentId: null,
         title: 'Active task',
         body: 'some body',
         status: 'active',
+        today: false,
         client: 'Acme',
         priority: 'high',
         dueDate: null,
@@ -19,9 +21,11 @@ const createMockSearchApi = () => ({
     done: [
       {
         id: '2',
+        parentId: 'p1',
         title: 'Done task',
         body: null,
         status: 'done',
+        today: false,
         client: null,
         priority: 'none',
         dueDate: null,
@@ -92,10 +96,10 @@ describe('searchStore', () => {
       isOpen: true,
       query: 'task',
       activeResults: [
-        { id: '1', title: 'A', body: null, status: 'active', client: null, priority: 'none', dueDate: null, snippet: '' },
+        { id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
       doneResults: [
-        { id: '2', title: 'B', body: null, status: 'done', client: null, priority: 'none', dueDate: null, snippet: '' },
+        { id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
       total: 2,
       selectedIndex: 0,
@@ -117,10 +121,10 @@ describe('searchStore', () => {
   it('getSelectedResult returns correct item across groups', () => {
     useSearchStore.setState({
       activeResults: [
-        { id: '1', title: 'A', body: null, status: 'active', client: null, priority: 'none', dueDate: null, snippet: '' },
+        { id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
       doneResults: [
-        { id: '2', title: 'B', body: null, status: 'done', client: null, priority: 'none', dueDate: null, snippet: '' },
+        { id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
       total: 2,
       selectedIndex: 0,
