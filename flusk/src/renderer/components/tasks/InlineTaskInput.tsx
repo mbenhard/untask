@@ -6,10 +6,23 @@ import { useTaskStore } from '../../stores/taskStore';
 import { Input } from '../ui';
 
 type InlineTaskInputProps = {
-  parentId: string;
+  parentId?: string | null;
+  defaultStatus?: 'inbox' | 'active';
+  defaultToday?: boolean;
+  placeholder?: string;
+  label?: string;
+  /** External signal to open the input (e.g. from a keyboard shortcut) */
+  triggerOpen?: number;
 };
 
-export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
+export const InlineTaskInput = ({
+  parentId = null,
+  defaultStatus = 'active',
+  defaultToday,
+  placeholder,
+  label = parentId ? 'Add subtask' : 'Add task',
+  triggerOpen,
+}: InlineTaskInputProps) => {
   const createTask = useTaskStore((state) => state.createTask);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -22,6 +35,12 @@ export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (triggerOpen && triggerOpen > 0) {
+      setIsOpen(true);
+    }
+  }, [triggerOpen]);
+
   const handleSubmit = useCallback(async (): Promise<void> => {
     const normalizedTitle = title.trim();
     if (normalizedTitle.length === 0 || isCreating) {
@@ -31,9 +50,10 @@ export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
     setIsCreating(true);
     const created = await createTask({
       title: normalizedTitle,
-      parentId,
-      status: 'active',
+      parentId: parentId ?? undefined,
+      status: defaultStatus,
       priority: 'none',
+      today: defaultToday,
     });
     setIsCreating(false);
 
@@ -42,8 +62,7 @@ export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
     }
 
     setTitle('');
-    setIsOpen(false);
-  }, [createTask, isCreating, parentId, title]);
+  }, [createTask, defaultStatus, defaultToday, isCreating, parentId, title]);
 
   if (!isOpen) {
     return (
@@ -53,7 +72,7 @@ export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
         className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <Plus className="size-3.5" />
-        Add subtask
+        {label}
       </button>
     );
   }
@@ -81,10 +100,14 @@ export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
           setIsOpen(false);
         }
       }}
-      placeholder={isCreating ? 'Creating...' : 'Write a subtask and press Enter'}
+      placeholder={
+        isCreating
+          ? 'Creating...'
+          : (placeholder ?? `Write a ${label.toLowerCase()} and press Enter`)
+      }
       disabled={isCreating}
       className="h-8 text-xs"
-      aria-label="Add subtask"
+      aria-label={label}
     />
   );
 };
