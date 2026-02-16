@@ -9,7 +9,9 @@ type UseTaskListKeyboardOptions = {
   expandedTaskId: string | null;
   onToggleExpand: (id: string) => void;
   onToggleToday: (id: string) => void;
+  onStartTitleEdit: (id: string) => void;
   isAnyBodyEditing: boolean;
+  isEditingTitle: boolean;
   isDragActive: boolean;
   containerRef: RefObject<HTMLDivElement | null>;
 };
@@ -33,7 +35,9 @@ export const useTaskListKeyboard = ({
   expandedTaskId,
   onToggleExpand,
   onToggleToday,
+  onStartTitleEdit,
   isAnyBodyEditing,
+  isEditingTitle,
   isDragActive,
   containerRef,
 }: UseTaskListKeyboardOptions) =>
@@ -43,7 +47,7 @@ export const useTaskListKeyboard = ({
         return;
       }
 
-      if (isDragActive || isAnyBodyEditing) {
+      if (isDragActive || isAnyBodyEditing || isEditingTitle) {
         return;
       }
 
@@ -84,6 +88,12 @@ export const useTaskListKeyboard = ({
         return;
       }
 
+      if (event.key.toLowerCase() === 'e') {
+        event.preventDefault();
+        onStartTitleEdit(focusedTask.id);
+        return;
+      }
+
       if (event.key === 'Escape') {
         event.preventDefault();
         if (expandedTaskId) {
@@ -98,10 +108,12 @@ export const useTaskListKeyboard = ({
       tasks,
       isDragActive,
       isAnyBodyEditing,
+      isEditingTitle,
       onFocusedIndexChange,
       focusedIndex,
       onToggleExpand,
       onToggleToday,
+      onStartTitleEdit,
       expandedTaskId,
       containerRef,
     ],

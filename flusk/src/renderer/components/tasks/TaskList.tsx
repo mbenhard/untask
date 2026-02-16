@@ -76,6 +76,7 @@ export const TaskList = ({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [isAnyBodyEditing, setIsAnyBodyEditing] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
 
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const activeDragTask = useMemo(
@@ -232,6 +233,8 @@ export const TaskList = ({
     isAnyBodyEditing,
     isDragActive: activeDragId !== null,
     containerRef,
+    onStartTitleEdit: setEditingTitleTaskId,
+    isEditingTitle: editingTitleTaskId !== null,
   });
 
   if (tasks.length === 0) {
@@ -268,7 +271,7 @@ export const TaskList = ({
           >
             <p id={`${scopeId}-hint`} className="sr-only">
               Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
-              Press T to toggle today.
+              Press T to toggle today. Press E to edit title.
             </p>
             {tasks.map((task, index) => (
               <TaskItem
@@ -276,6 +279,9 @@ export const TaskList = ({
                 task={task}
                 isExpanded={expandedTaskId === task.id}
                 isFocused={focusedIndex === index}
+                isEditingTitle={editingTitleTaskId === task.id}
+                onStartTitleEdit={setEditingTitleTaskId}
+                onEndTitleEdit={() => setEditingTitleTaskId(null)}
                 onToggleExpand={handleToggleExpand}
                 onComplete={handleComplete}
                 onToggleToday={handleToggleToday}

@@ -1,12 +1,13 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { Check, GripVertical, Sun } from 'lucide-react';
+import { Check, GripVertical, Pencil, Sun } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { useTaskStore } from '../../stores/taskStore';
 import { TaskBody } from './TaskBody';
 
 const PRIORITY_INDICATOR_CLASS: Record<'none' | 'low' | 'medium' | 'high', string> = {
@@ -20,6 +21,9 @@ export interface TaskItemProps {
   task: Task;
   isExpanded: boolean;
   isFocused: boolean;
+  isEditingTitle: boolean;
+  onStartTitleEdit: (id: string) => void;
+  onEndTitleEdit: () => void;
   onToggleExpand: (id: string) => void;
   onComplete: (id: string) => void;
   onToggleToday: (id: string) => void;
@@ -31,12 +35,22 @@ export const TaskItem = ({
   task,
   isExpanded,
   isFocused,
+  isEditingTitle,
+  onStartTitleEdit,
+  onEndTitleEdit,
   onToggleExpand,
   onComplete,
   onToggleToday,
   onBodyEditModeChange,
   onFocus,
 }: TaskItemProps) => {
+  const updateTask = useTaskStore((state) => state.updateTask);
+  const [titleDraft, setTitleDraft] = useState(task.title);
+
+  useEffect(() => {
+    setTitleDraft(task.title);
+  }, [task.title]);
+
   const {
     attributes,
     listeners,
@@ -57,6 +71,21 @@ export const TaskItem = ({
   const isCompleted = task.status === 'done';
   const isToday = task.today === true;
 
+  const saveTitleDraft = () => {
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== task.title) {
+      void updateTask({ id: task.id, title: trimmed });
+    } else {
+      setTitleDraft(task.title);
+    }
+    onEndTitleEdit();
+  };
+
+  const cancelTitleEdit = () => {
+    setTitleDraft(task.title);
+    onEndTitleEdit();
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -74,7 +103,7 @@ export const TaskItem = ({
     >
       <div
         onClick={() => onToggleExpand(task.id)}
-        className="flex min-h-11 items-center gap-2 px-2"
+        className="group flex min-h-11 items-center gap-2 px-2"
       >
         <span
           aria-hidden="true"
@@ -114,19 +143,55 @@ export const TaskItem = ({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p
-              className={cn(
-                'truncate text-sm text-foreground',
-                isCompleted && 'text-muted-foreground line-through',
-              )}
-            >
-              {task.title}
-            </p>
-            {task.client ? (
-              <span className="rounded-sm border border-border/80 bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {task.client}
-              </span>
-            ) : null}
+            {isEditingTitle ? (
+              <input
+                autoFocus
+                type="text"
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    saveTitleDraft();
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancelTitleEdit();
+                  }
+                  event.stopPropagation();
+                }}
+                onBlur={saveTitleDraft}
+                onClick={(event) => event.stopPropagation()}
+                className="min-w-0 flex-1 truncate rounded-sm bg-transparent text-sm text-foreground outline-none ring-1 ring-ring px-1"
+              />
+            ) : (
+              <>
+                <p
+                  className={cn(
+                    'truncate text-sm text-foreground',
+                    isCompleted && 'text-muted-foreground line-through',
+                  )}
+                >
+                  {task.title}
+                </p>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStartTitleEdit(task.id);
+                  }}
+                  className="hidden size-5 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover:flex group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:flex focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+                  aria-label={`Edit title for "${task.title}"`}
+                >
+                  <Pencil className="size-3" />
+                </button>
+                {task.client ? (
+                  <span className="rounded-sm border border-border/80 bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {task.client}
+                  </span>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 
