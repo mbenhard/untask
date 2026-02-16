@@ -7,7 +7,6 @@ import type { Task } from '../../../types/models';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { cn } from '../../lib/utils';
-import { LiveThought } from '../layout/LiveThought';
 import { InlineTaskInput } from '../tasks/InlineTaskInput';
 import { TaskList } from '../tasks/TaskList';
 
@@ -35,14 +34,6 @@ export const TodayView = ({
     () => allTasks.filter((task) => task.today === true && task.status === 'done'),
     [allTasks],
   );
-  const liveThoughtRefreshKey = useMemo(
-    () =>
-      allTasks
-        .map((task) => `${task.id}:${task.status}:${task.today ? '1' : '0'}:${task.completedAt ?? ''}`)
-        .join('|'),
-    [allTasks],
-  );
-
   useEffect(() => {
     if (!selectedTaskId) {
       return;
@@ -61,8 +52,6 @@ export const TodayView = ({
   return (
     <div className="h-full overflow-y-auto p-3">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        <LiveThought refreshKey={liveThoughtRefreshKey} />
-
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading today list...</p>
         ) : null}

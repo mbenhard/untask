@@ -185,7 +185,7 @@ const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) =
   </div>
 );
 
-const SUGGESTIONS = [
+export const SUGGESTIONS = [
   { label: 'Create a task', prefill: 'Create a task: ' },
   { label: "What's due today?", prefill: "What's due today?" },
   { label: 'Summarize my week', prefill: 'Summarize my week' },

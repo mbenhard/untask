@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import {
@@ -351,15 +350,15 @@ const MetadataLine = ({
         isCompleted && 'opacity-60',
       )}
     >
-      <PrioritySegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
       <DueDateSegment task={task} onUpdate={onUpdate} />
+      <MetaDot />
+      <PrioritySegment task={task} onUpdate={onUpdate} />
       {!isSubtask && (
         <>
           <MetaDot />
-          <ClientSegment task={task} onUpdate={onUpdate} />
-          <MetaDot />
           <StatusSegment task={task} onUpdate={onUpdate} />
+          <MetaDot />
+          <ClientSegment task={task} onUpdate={onUpdate} />
           {onRequestAddSubtask && (
             <>
               <MetaDot />
@@ -393,8 +392,6 @@ export const TaskBody = ({
   onBodyEditModeChange,
 }: TaskBodyProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
-  const prefersReducedMotion = useReducedMotion();
-
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBodyRef = useRef<string | null>(null);
 
@@ -451,50 +448,31 @@ export const TaskBody = ({
     onBodyEditModeChange?.(false);
   }, [onBodyEditModeChange]);
 
-  return (
-    <AnimatePresence initial={false}>
-      {isExpanded ? (
-        <motion.div
-          initial={
-            prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }
-          }
-          animate={
-            prefersReducedMotion
-              ? { opacity: 1 }
-              : { opacity: 1, height: 'auto' }
-          }
-          exit={
-            prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }
-          }
-          transition={{
-            duration: prefersReducedMotion ? 0.1 : 0.2,
-            ease: 'easeOut',
-          }}
-          className="overflow-hidden"
-        >
-          {/* Zone 1 — Body Editor (hero) */}
-          <div className="border-t border-border/30 px-3 py-3">
-            <BlockEditor
-              content={task.body ?? ''}
-              onChange={handleBodyChange}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              className="flusk-task-editor"
-              getSlashMenuItems={
-                task.parentId !== null ? getTextOnlySlashMenuItems : undefined
-              }
-            />
-          </div>
+  if (!isExpanded) return null;
 
-          {/* Zone 2 — Metadata Line */}
-          <MetadataLine
-            task={task}
-            onUpdate={updateTask}
-            subtaskCount={subtaskCount}
-            onRequestAddSubtask={onRequestAddSubtask}
-          />
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+  return (
+    <div className="overflow-hidden">
+      {/* Zone 1 — Body Editor (hero) */}
+      <div className="border-t border-border/30 px-3 py-3">
+        <BlockEditor
+          content={task.body ?? ''}
+          onChange={handleBodyChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className="flusk-task-editor"
+          getSlashMenuItems={
+            task.parentId !== null ? getTextOnlySlashMenuItems : undefined
+          }
+        />
+      </div>
+
+      {/* Zone 2 — Metadata Line */}
+      <MetadataLine
+        task={task}
+        onUpdate={updateTask}
+        subtaskCount={subtaskCount}
+        onRequestAddSubtask={onRequestAddSubtask}
+      />
+    </div>
   );
 };

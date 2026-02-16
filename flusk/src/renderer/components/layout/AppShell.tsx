@@ -29,6 +29,7 @@ import { InboxView } from '../views/InboxView';
 import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
+import { LiveThought } from './LiveThought';
 import { TitleBar } from './TitleBar';
 
 export const AppShell = () => {
@@ -218,6 +219,14 @@ export const AppShell = () => {
 
   const isSettingsActive = activeView === 'settings';
 
+  const liveThoughtRefreshKey = useMemo(
+    () =>
+      tasks
+        .map((task) => `${task.id}:${task.status}:${task.today ? '1' : '0'}:${task.completedAt ?? ''}`)
+        .join('|'),
+    [tasks],
+  );
+
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <TitleBar />
@@ -316,34 +325,40 @@ export const AppShell = () => {
           </div>
         </div>
 
-        <div className="no-drag absolute bottom-3 left-3 z-10 flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setView(isSettingsActive ? 'today' : 'settings')}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-              isSettingsActive
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-            )}
-            aria-label="Settings"
-          >
-            <Settings className="size-[15px]" />
-          </button>
+        <div className="no-drag absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setView(isSettingsActive ? 'today' : 'settings')}
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                isSettingsActive
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+              )}
+              aria-label="Settings"
+            >
+              <Settings className="size-[15px]" />
+            </button>
 
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-              resolvedTheme === 'light'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-            )}
-            aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            <LampDesk className="size-[15px]" />
-          </button>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                resolvedTheme === 'light'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+              )}
+              aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              <LampDesk className="size-[15px]" />
+            </button>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <LiveThought refreshKey={liveThoughtRefreshKey} />
+          </div>
         </div>
       </div>
 

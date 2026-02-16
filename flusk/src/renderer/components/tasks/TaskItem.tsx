@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { Bookmark, Check, GripVertical, MoreHorizontal, Pencil } from 'lucide-react';
+import { Bookmark, Check, Copy, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
@@ -27,11 +27,11 @@ export interface TaskItemProps {
   children?: ReactNode;
 }
 
-const PRIORITY_RING: Record<NonNullable<Task['priority']>, string> = {
-  none: 'border-border/60',
-  low: 'border-emerald-500/50',
-  medium: 'border-amber-500/60',
-  high: 'border-rose-500/70',
+const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
+  none: 'bg-foreground/15',
+  low: 'bg-emerald-500',
+  medium: 'bg-amber-500',
+  high: 'bg-rose-500',
 };
 
 const SORTABLE_TRANSITION = {
@@ -54,10 +54,12 @@ export const TaskItem = ({
   children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
+  const createTask = useTaskStore((state) => state.createTask);
+  const deleteTask = useTaskStore((state) => state.deleteTask);
   const allTasks = useTaskStore((state) => state.tasks);
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuView, setMenuView] = useState<'main' | 'projects'>('main');
+  const [menuView, setMenuView] = useState<'main' | 'projects' | 'delete-confirm'>('main');
 
   useEffect(() => {
     setTitleDraft(task.title);
@@ -138,7 +140,27 @@ export const TaskItem = ({
     [allTasks, canMoveToProject, task.id],
   );
 
-  const showOverflowMenu = canMoveToProject && projects.length > 0;
+  const showMoveToProject = canMoveToProject && projects.length > 0;
+
+  const handleDuplicate = () => {
+    void createTask({
+      title: task.title,
+      parentId: task.parentId,
+      body: task.body,
+      status: task.status === 'done' ? 'active' : task.status,
+      priority: task.priority,
+      today: task.today,
+      client: task.client,
+      dueDate: task.dueDate,
+    });
+    setMenuOpen(false);
+  };
+
+  const handleDelete = () => {
+    void deleteTask(task.id);
+    setMenuOpen(false);
+    setMenuView('main');
+  };
 
   return (
     <div
@@ -156,35 +178,30 @@ export const TaskItem = ({
       )}
     >
       <div onClick={() => onToggleExpand(task.id)} className="flex min-h-10 items-center gap-2 px-1.5">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onComplete(task.id);
-          }}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const nextPriority = getNextPriority(task.priority);
-            void updateTask({ id: task.id, priority: nextPriority });
-          }}
-          aria-label={
-            isCompleted
-              ? `Reopen "${task.title}"`
-              : `Mark "${task.title}" complete`
-          }
-          title={
-            priority === 'none'
-              ? 'Right-click to set priority'
-              : `Priority: ${priority} · Right-click to change`
-          }
-          className="inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <span
-            className={cn(
-              'inline-flex items-center justify-center rounded-full border-[1.5px] p-[2px] transition-colors duration-200',
-              PRIORITY_RING[priority],
-            )}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onComplete(task.id);
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const nextPriority = getNextPriority(task.priority);
+              void updateTask({ id: task.id, priority: nextPriority });
+            }}
+            aria-label={
+              isCompleted
+                ? `Reopen "${task.title}"`
+                : `Mark "${task.title}" complete`
+            }
+            title={
+              priority === 'none'
+                ? 'Right-click to set priority'
+                : `Priority: ${priority} · Right-click to change`
+            }
+            className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
           >
             <motion.span
               initial={false}
@@ -198,19 +215,28 @@ export const TaskItem = ({
                   : 'var(--foreground-muted, rgba(255,255,255,0.35))',
               }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="inline-flex size-3.5 items-center justify-center rounded-full border"
+              className={cn(
+                'inline-flex size-4 items-center justify-center rounded-full border transition-[border-style] duration-200',
+                isCompleted ? 'border-solid' : 'border-dashed group-hover:border-solid',
+              )}
             >
               <Check
                 className={cn(
-                  'size-2 transition-opacity duration-300',
+                  'size-2.5 transition-opacity duration-200',
                   isCompleted
                     ? 'opacity-100 text-background'
-                    : 'opacity-0',
+                    : 'opacity-0 group-hover:opacity-25',
                 )}
               />
             </motion.span>
-          </span>
-        </button>
+          </button>
+          <span
+            className={cn(
+              'size-[5px] rounded-full transition-colors duration-200',
+              PRIORITY_DOT[priority],
+            )}
+          />
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -233,7 +259,7 @@ export const TaskItem = ({
                 }}
                 onBlur={saveTitleDraft}
                 onClick={(event) => event.stopPropagation()}
-                className="min-w-0 flex-1 truncate bg-transparent text-[13px] text-foreground outline-none ring-1 ring-ring px-1"
+                className="min-w-0 flex-1 truncate bg-transparent text-[13px] text-foreground outline-none"
               />
             ) : (
               <>
@@ -298,73 +324,111 @@ export const TaskItem = ({
             <Bookmark className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
           </button>
 
-          {showOverflowMenu && (
-            <Popover.Root
-              open={menuOpen}
-              onOpenChange={(open) => {
-                setMenuOpen(open);
-                if (!open) setMenuView('main');
-              }}
-            >
-              <Popover.Trigger asChild>
-                <button
-                  type="button"
-                  onClick={(event) => event.stopPropagation()}
-                  aria-label={`More actions for "${task.title}"`}
-                  className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <MoreHorizontal className="size-3.5" />
-                </button>
-              </Popover.Trigger>
-              <PopoverContent
-                className="w-auto min-w-[160px] p-1"
-                align="end"
+          <Popover.Root
+            open={menuOpen}
+            onOpenChange={(open) => {
+              setMenuOpen(open);
+              if (!open) setMenuView('main');
+            }}
+          >
+            <Popover.Trigger asChild>
+              <button
+                type="button"
                 onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
+                aria-label={`More actions for "${task.title}"`}
+                className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
               >
-                {menuView === 'main' ? (
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            </Popover.Trigger>
+            <PopoverContent
+              className="w-auto min-w-[160px] p-1"
+              align="end"
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              {menuView === 'main' ? (
+                <div>
+                  {showMoveToProject && (
+                    <button
+                      type="button"
+                      onClick={() => setMenuView('projects')}
+                      className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      Move to project
+                      <span className="ml-2 text-border">&rarr;</span>
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setMenuView('projects')}
-                    className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    onClick={handleDuplicate}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
-                    Move to project
-                    <span className="ml-2 text-border">&rarr;</span>
+                    <Copy className="size-3" />
+                    Duplicate
                   </button>
-                ) : (
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => setMenuView('delete-confirm')}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="size-3" />
+                    Delete
+                  </button>
+                </div>
+              ) : menuView === 'projects' ? (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setMenuView('main')}
+                    className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <span>&larr;</span> Back
+                  </button>
+                  {projects.map((project) => (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => {
+                        const updates: TaskUpdateInput = {
+                          id: task.id,
+                          parentId: project.id,
+                        };
+                        if (task.status === 'inbox')
+                          updates.status = 'active';
+                        void updateTask(updates);
+                        setMenuOpen(false);
+                        setMenuView('main');
+                      }}
+                      className="flex w-full items-center truncate rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      {project.title}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5 px-1 py-1.5">
+                  <p className="text-xs text-muted-foreground">Delete this task?</p>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setMenuView('main')}
-                      className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                      className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <span>&larr;</span> Back
+                      Cancel
                     </button>
-                    {projects.map((project) => (
-                      <button
-                        key={project.id}
-                        type="button"
-                        onClick={() => {
-                          const updates: TaskUpdateInput = {
-                            id: task.id,
-                            parentId: project.id,
-                          };
-                          if (task.status === 'inbox')
-                            updates.status = 'active';
-                          void updateTask(updates);
-                          setMenuOpen(false);
-                          setMenuView('main');
-                        }}
-                        className="flex w-full items-center truncate rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        {project.title}
-                      </button>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
+                    >
+                      Delete
+                    </button>
                   </div>
-                )}
-              </PopoverContent>
-            </Popover.Root>
-          )}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover.Root>
 
           <button
             type="button"
