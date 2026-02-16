@@ -41,7 +41,7 @@ const TaskFieldPriority = ({
         priority: event.target.value as NonNullable<Task['priority']>,
       })
     }
-    className="h-7 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    className="h-7 rounded-md border border-border bg-transparent px-2 font-mono text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     aria-label="Priority"
   >
     {PRIORITY_OPTIONS.map((opt) => (
@@ -160,7 +160,7 @@ const TaskFieldStatus = ({
         status: event.target.value as TaskStatus,
       })
     }
-    className="h-7 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    className="h-7 rounded-md border border-border bg-transparent px-2 font-mono text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     aria-label="Status"
   >
     {STATUS_OPTIONS.map((opt) => (
@@ -346,7 +346,7 @@ export const TaskBody = ({
           </div>
 
           {/* Metadata fields */}
-          <div className="border-t border-border/80 px-3 py-2">
+          <div className="border-t border-dashed border-border/60 px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
               <TaskFieldPriority task={task} onUpdate={updateTask} />
               <TaskFieldDueDate task={task} onUpdate={updateTask} />

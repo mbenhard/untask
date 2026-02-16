@@ -28,7 +28,7 @@ const resetStores = (): void => {
   useAppStore.setState({
     activeView: 'today',
     manualNavigationVersion: 0,
-    chatOverlayState: 'hidden',
+    chatOverlayState: 'peek',
 
     newTaskTrigger: 0,
   });
@@ -78,7 +78,7 @@ describe('useKeyboardShortcuts', () => {
     vi.restoreAllMocks();
   });
 
-  it('maps key 4 to hidden|peek -> open and open -> hidden', () => {
+  it('maps key 4 to peek -> open and open -> peek', () => {
     const inputRef = {
       current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
     };
@@ -98,19 +98,13 @@ describe('useKeyboardShortcuts', () => {
     });
     expect(useAppStore.getState().chatOverlayState).toBe('open');
 
-    useAppStore.setState({ chatOverlayState: 'peek' });
     flushSync(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
     });
-    expect(useAppStore.getState().chatOverlayState).toBe('open');
-
-    flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
-    });
-    expect(useAppStore.getState().chatOverlayState).toBe('hidden');
+    expect(useAppStore.getState().chatOverlayState).toBe('peek');
   });
 
-  it('maps Cmd/Ctrl+K to hidden|peek -> open and open -> hidden with focus changes', () => {
+  it('maps Cmd/Ctrl+K to peek -> open and open -> peek with focus changes', () => {
     const focus = vi.fn();
     const blur = vi.fn();
     const inputRef = {
@@ -133,21 +127,14 @@ describe('useKeyboardShortcuts', () => {
     expect(useAppStore.getState().chatOverlayState).toBe('open');
     expect(focus).toHaveBeenCalledTimes(1);
 
-    useAppStore.setState({ chatOverlayState: 'peek' });
     flushSync(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
     });
-    expect(useAppStore.getState().chatOverlayState).toBe('open');
-    expect(focus).toHaveBeenCalledTimes(2);
-
-    flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
-    });
-    expect(useAppStore.getState().chatOverlayState).toBe('hidden');
+    expect(useAppStore.getState().chatOverlayState).toBe('peek');
     expect(blur).toHaveBeenCalledTimes(1);
   });
 
-  it('closes overlay layers before requesting window hide on Escape', () => {
+  it('collapses open overlay on Escape and stops at peek', () => {
     useAppStore.setState({ chatOverlayState: 'open' });
 
     const inputRef = {
@@ -170,15 +157,10 @@ describe('useKeyboardShortcuts', () => {
     expect(useAppStore.getState().chatOverlayState).toBe('peek');
     expect(requestHide).not.toHaveBeenCalled();
 
+    // Peek is the minimum state — further Escape does nothing
     flushSync(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     });
-    expect(useAppStore.getState().chatOverlayState).toBe('hidden');
     expect(requestHide).not.toHaveBeenCalled();
-
-    flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    });
-    expect(requestHide).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 
 import type { ChatLiveThoughtResult } from '../../../types/ipc';
+import { useAppStore } from '../../stores/appStore';
 import { useChatStore } from '../../stores/chatStore';
 import { Button } from '../ui/button';
 
@@ -17,6 +18,7 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
   const [thought, setThought] = useState<ChatLiveThoughtResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sendMessage = useChatStore((state) => state.sendMessage);
+  const openChatOverlay = useAppStore((state) => state.openChatOverlay);
   const prefersReducedMotion = useReducedMotion();
 
   const loadLiveThought = useCallback(async () => {
@@ -51,7 +53,7 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
           animate={{ opacity: 1, y: 0 }}
           exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
           transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
-          className="flex items-center gap-2 px-1 py-1"
+          className="flex items-center gap-2 rounded-lg border border-dashed border-border/40 px-2 py-1.5"
           aria-live="polite"
         >
           <Sparkles className="size-4 text-muted-foreground" />
@@ -75,6 +77,7 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
                 return;
               }
 
+              openChatOverlay();
               void sendMessage(thought.suggestedPrompt);
             }}
           >

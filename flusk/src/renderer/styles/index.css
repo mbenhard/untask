@@ -84,6 +84,7 @@
   --radius-window: 0px;
   --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ──────────────────────────────────────────────
@@ -115,6 +116,35 @@
   #root {
     border-radius: 0;
     background: transparent;
+  }
+}
+
+/* Chat input placeholder in Geist Mono for terminal-prompt feel */
+[aria-label="Chat input"]::placeholder {
+  font-family: var(--font-mono);
+}
+
+/* ──────────────────────────────────────────────
+   Theme toggle: radial circle-reveal via View Transitions API.
+   The old snapshot stays put while the new theme expands
+   as a circle from the lamp icon (bottom-left).
+   ────────────────────────────────────────────── */
+::view-transition-old(root) {
+  animation: none;
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  animation: theme-circle-reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 9999;
+}
+
+@keyframes theme-circle-reveal {
+  from {
+    clip-path: circle(0% at 5% 95%);
+  }
+  to {
+    clip-path: circle(150% at 5% 95%);
   }
 }
 

@@ -1,5 +1,4 @@
 import { listTasks } from '../services/taskService';
-import { getPatterns } from './memory';
 
 type DayWindow = 'morning' | 'afternoon' | 'evening';
 
@@ -33,14 +32,6 @@ const dayWindow = (date: Date): DayWindow => {
   return 'evening';
 };
 
-const readPatternHint = (): string | null => {
-  const lines = getPatterns()
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^\s*-\s*/, '').trim())
-    .filter((line) => line.length > 0);
-
-  return lines[0] ?? null;
-};
 
 const completedTodayCount = (
   tasks: ReturnType<typeof listTasks>,
@@ -81,7 +72,6 @@ export const generateLiveThought = (
   });
   const completedToday = completedTodayCount(tasks, now);
   const focus = input?.focus?.trim();
-  const patternHint = readPatternHint();
   const nowWindow = dayWindow(now);
 
   if (overdue.length > 0) {
@@ -134,9 +124,8 @@ export const generateLiveThought = (
     };
   }
 
-  const patternClause = patternHint ? ` Pattern reminder: ${patternHint}.` : '';
   return {
-    thought: `You have ${today.length} tasks on Today and ${active.length} active overall.${patternClause}`,
+    thought: `You have ${today.length} tasks on Today and ${active.length} active overall.`,
     actionLabel: 'Refocus',
     suggestedPrompt: 'Help me refocus this afternoon and pick the next concrete step.',
     generatedAt: now.toISOString(),

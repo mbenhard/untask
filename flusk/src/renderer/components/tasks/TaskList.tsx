@@ -289,7 +289,7 @@ export const TaskList = ({
 
   if (tasks.length === 0) {
     return (
-      <div className="grid min-h-28 place-items-center px-1 text-center">
+      <div className="grid min-h-28 place-items-center rounded-lg border border-dashed border-border/40 px-1 text-center">
         <div className="space-y-1">
           <p className="text-[13px] text-muted-foreground">{emptyMessage}</p>
           {emptyAction ? (

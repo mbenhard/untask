@@ -98,7 +98,7 @@ export const TodayView = ({
                   )}
                 />
                 <span className="text-[12px] font-medium text-foreground">Done today</span>
-                <span className="ml-auto text-[11px] text-muted-foreground">
+                <span className="ml-auto font-mono text-[11px] text-muted-foreground">
                   {doneTodayTasks.length}
                 </span>
               </button>

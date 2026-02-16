@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Square, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 
@@ -99,12 +99,12 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
         {toolStatusIcon(isUndone ? 'success' : step.status)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-foreground/90">{step.description}</p>
+        <p className="font-mono font-medium text-foreground/90">{step.description}</p>
         {step.summary && step.status !== 'running' ? (
           <p className="mt-0.5 text-muted-foreground">{step.summary}</p>
         ) : null}
         {card?.riskLevel && (card.riskLevel === 'high' || card.riskLevel === 'critical') ? (
-          <p className="mt-0.5 text-amber-400/80 text-[10px] uppercase tracking-wide">
+          <p className="mt-0.5 font-mono text-amber-400/80 text-[10px] uppercase tracking-wide">
             {card.riskLevel} risk{card.rationale ? ` — ${card.rationale}` : ''}
           </p>
         ) : null}
@@ -153,6 +153,38 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
   );
 };
 
+type StreamingIndicatorProps = {
+  prefersReducedMotion: boolean;
+};
+
+const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) => (
+  <div className="flex items-center gap-1.5 py-0.5" role="status" aria-label="Flusk is thinking">
+    {[0, 1, 2].map((dotIndex) => (
+      prefersReducedMotion ? (
+        <span
+          key={dotIndex}
+          className="size-1.5 rounded-full bg-muted-foreground/60"
+          style={{ opacity: 0.45 + dotIndex * 0.15 }}
+        />
+      ) : (
+        <motion.span
+          key={dotIndex}
+          className="size-1.5 rounded-full bg-muted-foreground/70"
+          initial={false}
+          animate={{ y: [0, -2, 0], opacity: [0.35, 0.9, 0.35] }}
+          transition={{
+            duration: 0.9,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: dotIndex * 0.12,
+          }}
+        />
+      )
+    ))}
+    <span className="sr-only">Flusk is thinking</span>
+  </div>
+);
+
 export const ChatView = () => {
   const messages = useChatStore(selectChatMessages);
   const isSending = useChatStore(selectChatIsSending);
@@ -162,7 +194,6 @@ export const ChatView = () => {
   const undoAction = useChatStore((state) => state.undoAction);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
-  const cancelStream = useChatStore((state) => state.cancelStream);
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
 
   const prefersReducedMotion = useReducedMotion();
@@ -241,6 +272,11 @@ export const ChatView = () => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
         const hasSteps = isAssistant && message.steps.length > 0;
+        const isPendingAssistantPlaceholder =
+          isAssistant &&
+          Boolean(message.isStreaming) &&
+          !hasSteps &&
+          message.content.trim().length === 0;
 
         const isLatest = message.id === lastMessageId;
         const shouldAnimate = isLatest && message.id !== lastAnimatedIdRef.current;
@@ -280,7 +316,7 @@ export const ChatView = () => {
                     return (
                       <div
                         key={`text-${index}`}
-                        className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm shadow-sm"
+                        className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm"
                       >
                         <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
                           <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
@@ -312,18 +348,22 @@ export const ChatView = () => {
             ) : isAssistant ? (
               <div
                 className={cn(
-                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm shadow-sm',
+                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm',
                   'border-border bg-card/80 text-foreground',
                 )}
               >
-                <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                  <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
-                </div>
+                {isPendingAssistantPlaceholder ? (
+                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+                ) : (
+                  <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                    <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
+                  </div>
+                )}
               </div>
             ) : (
               <div
                 className={cn(
-                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm shadow-sm',
+                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm',
                   'border-border/70 bg-secondary text-secondary-foreground',
                 )}
               >
@@ -332,7 +372,7 @@ export const ChatView = () => {
             )}
 
             {timestamp ? (
-              <time className="px-1 text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80">
+              <time className="px-1 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80">
                 {timestamp}
               </time>
             ) : null}
@@ -350,7 +390,7 @@ export const ChatView = () => {
           <div className="min-w-0">
             <p className="truncate">{error}</p>
             {lastStreamError ? (
-              <p className="mt-1 text-[10px] uppercase tracking-[0.06em] text-destructive/80">
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-destructive/80">
                 {lastStreamError.code.replaceAll('_', ' ')}
               </p>
             ) : null}
@@ -371,7 +411,7 @@ export const ChatView = () => {
         </div>
       ) : null}
 
-      <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 pb-16">
+      <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 pb-0">
         {renderedMessages.length > 0 ? (
           renderedMessages
         ) : (
@@ -380,16 +420,6 @@ export const ChatView = () => {
           </div>
         )}
 
-        {isSending ? (
-          <button
-            type="button"
-            onClick={() => { void cancelStream(); }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-          >
-            <Square className="size-3 fill-current" />
-            Stop
-          </button>
-        ) : null}
       </div>
 
       <AnimatePresence>

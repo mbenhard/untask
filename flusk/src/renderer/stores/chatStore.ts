@@ -207,10 +207,10 @@ const upsertMessage = (messages: ChatUiMessage[], message: ChatUiMessage): ChatU
 const shouldRefreshTasks = (actionCards: ChatActionCard[]): boolean =>
   actionCards.some((card) => card.status === 'success');
 
-const revealPeekIfChatOverlayHidden = (): void => {
+const revealPeekIfChatNotOpen = (): void => {
   const appStore = useAppStore.getState();
 
-  if (appStore.chatOverlayState === 'hidden') {
+  if (appStore.chatOverlayState !== 'open') {
     appStore.peekChatOverlay();
   }
 };
@@ -499,7 +499,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         event.type === 'tool_call_completed' ||
         event.type === 'assistant_done'
       ) {
-        revealPeekIfChatOverlayHidden();
+        revealPeekIfChatNotOpen();
       }
 
       if (event.type === 'reasoning') {

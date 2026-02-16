@@ -37,16 +37,112 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   backup: 'Backup',
 };
 
-type ShortcutEntry = {
+type GlobalShortcutSetting = {
   key: string;
   label: string;
   defaultAccelerator: string;
+  action: string;
 };
 
-const SHORTCUT_ENTRIES: ShortcutEntry[] = [
-  { key: 'shortcut.toggleWindow', label: 'Toggle window', defaultAccelerator: 'CommandOrControl+Shift+Space' },
-  { key: 'shortcut.quickAdd', label: 'Quick add', defaultAccelerator: 'CommandOrControl+Shift+A' },
+type ShortcutHintEntry = {
+  keys: string;
+  action: string;
+  context?: string;
+};
+
+type ShortcutHintSection = {
+  title: string;
+  description: string;
+  entries: ShortcutHintEntry[];
+};
+
+const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
+  {
+    key: 'shortcut.toggleWindow',
+    label: 'Toggle window',
+    defaultAccelerator: 'CommandOrControl+Shift+Space',
+    action: 'Show or hide the Flusk window from anywhere in the OS.',
+  },
+  {
+    key: 'shortcut.quickAdd',
+    label: 'Quick add',
+    defaultAccelerator: 'CommandOrControl+Shift+A',
+    action: 'Open quick add and prefill from clipboard when available.',
+  },
 ];
+
+const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
+  {
+    title: 'App-wide',
+    description: 'These work while the Flusk window is focused.',
+    entries: [
+      { keys: 'Cmd/Ctrl + K', action: 'Toggle chat overlay and focus chat input.' },
+      { keys: 'Cmd/Ctrl + F', action: 'Open or close Search.' },
+      { keys: 'Cmd/Ctrl + N', action: 'Jump to Scratchpad view.' },
+      {
+        keys: 'Cmd/Ctrl + Z',
+        action: 'Undo the last assistant action.',
+        context: 'Only when chat overlay is open and you are not typing in an input.',
+      },
+      {
+        keys: 'Escape',
+        action: 'Layered dismiss: search -> clear chat input -> leave settings -> close chat overlay -> hide window.',
+      },
+      { keys: '1', action: 'Go to Today view.' },
+      { keys: '2', action: 'Go to Tasks view.' },
+      { keys: '3', action: 'Go to Inbox view.' },
+      { keys: '4', action: 'Toggle chat overlay (peek/open).' },
+      { keys: ',', action: 'Open Settings view.' },
+      {
+        keys: 'N',
+        action: 'Open new-task input.',
+        context: 'Only in Today, Tasks, or Inbox while chat is in peek mode and Search is closed.',
+      },
+    ],
+  },
+  {
+    title: 'Task list (focused list)',
+    description: 'These work when a task list has keyboard focus.',
+    entries: [
+      { keys: 'Arrow Up / Arrow Down', action: 'Move focus between tasks.' },
+      { keys: 'Enter', action: 'Expand or collapse focused task.' },
+      { keys: 'Space', action: 'Toggle complete or reopen focused task.' },
+      { keys: 'T', action: 'Toggle Today flag on focused task.' },
+      { keys: 'P', action: 'Cycle focused task priority.' },
+      { keys: 'S', action: 'Cycle focused task status.' },
+      { keys: 'E', action: 'Edit focused task title.' },
+      { keys: 'Escape', action: 'Collapse expanded task, then blur list focus.' },
+    ],
+  },
+  {
+    title: 'Search modal',
+    description: 'These work while Search is open.',
+    entries: [
+      { keys: 'Arrow Up / Arrow Down', action: 'Move selected result.' },
+      { keys: 'Enter', action: 'Open the selected result.' },
+      { keys: 'Escape', action: 'Close Search.' },
+    ],
+  },
+  {
+    title: 'Input actions',
+    description: 'Contextual input shortcuts.',
+    entries: [
+      { keys: 'Enter', action: 'Send chat message from chat input.' },
+      { keys: 'Shift + Enter', action: 'Insert newline in chat input.' },
+      { keys: 'Enter', action: 'Submit inline task input.' },
+      { keys: 'Escape', action: 'Cancel inline task input.' },
+      { keys: 'Enter', action: 'Save task title/client inline edits.' },
+      { keys: 'Escape', action: 'Cancel task title/client inline edits.' },
+    ],
+  },
+];
+
+const formatAccelerator = (value: string): string =>
+  value
+    .replace(/CommandOrControl/g, 'Cmd/Ctrl')
+    .replace(/Command/g, 'Cmd')
+    .replace(/Control/g, 'Ctrl')
+    .replace(/\+/g, ' + ');
 
 const MEMORY_FIELD_LABELS: Record<'soul' | 'profile' | 'patterns', string> = {
   soul: 'Soul',
@@ -126,9 +222,8 @@ export const SettingsMemory = () => {
   const [importPassphrase, setImportPassphrase] = useState('');
 
   // Shortcuts tab state
-  const [shortcutDrafts, setShortcutDrafts] = useState<Record<string, string>>({});
+  const [resolvedShortcuts, setResolvedShortcuts] = useState<Record<string, string>>({});
   const [isLoadingShortcuts, setIsLoadingShortcuts] = useState(false);
-  const [isSavingShortcut, setIsSavingShortcut] = useState(false);
 
   // ─── Load actions ────────────────────────────────────────
 
@@ -274,47 +369,18 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingShortcuts(true);
       setError(null);
-      const drafts: Record<string, string> = {};
-      for (const entry of SHORTCUT_ENTRIES) {
+      const resolved: Record<string, string> = {};
+      for (const entry of GLOBAL_SHORTCUT_SETTINGS) {
         const stored = await getFlusk().settings.get(entry.key);
-        drafts[entry.key] = stored && stored.trim().length > 0
+        resolved[entry.key] = stored && stored.trim().length > 0
           ? stored
           : entry.defaultAccelerator;
       }
-      setShortcutDrafts(drafts);
+      setResolvedShortcuts(resolved);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load shortcuts.');
     } finally {
       setIsLoadingShortcuts(false);
-    }
-  }, []);
-
-  const saveShortcut = useCallback(async (key: string, value: string) => {
-    try {
-      setIsSavingShortcut(true);
-      setError(null);
-      setNotice(null);
-      await getFlusk().settings.set(key, value);
-      setNotice('Shortcut saved. Restart app to apply.');
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save shortcut.');
-    } finally {
-      setIsSavingShortcut(false);
-    }
-  }, []);
-
-  const resetShortcut = useCallback(async (key: string, defaultValue: string) => {
-    setShortcutDrafts((current) => ({ ...current, [key]: defaultValue }));
-    try {
-      setIsSavingShortcut(true);
-      setError(null);
-      setNotice(null);
-      await getFlusk().settings.set(key, defaultValue);
-      setNotice('Shortcut reset to default. Restart app to apply.');
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to reset shortcut.');
-    } finally {
-      setIsSavingShortcut(false);
     }
   }, []);
 
@@ -1173,54 +1239,73 @@ export const SettingsMemory = () => {
             {activeTab === 'shortcuts' ? (
               <div role="tabpanel" id="settings-panel-shortcuts" className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Configure global keyboard shortcuts. Changes take effect after restart.
+                  Read-only shortcut reference for all currently supported keyboard controls.
                 </p>
+
                 {isLoadingShortcuts ? (
-                  <p className="text-sm text-muted-foreground">Loading shortcuts...</p>
-                ) : (
-                  SHORTCUT_ENTRIES.map((entry) => (
-                    <div
-                      key={entry.key}
+                  <p className="text-sm text-muted-foreground">Loading global shortcut values...</p>
+                ) : null}
+
+                <div className="space-y-3">
+                  <section className="rounded-md border border-border/60 px-3 py-3">
+                    <p className="text-sm font-medium text-foreground">Global (system)</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Works when Flusk is hidden or unfocused.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {GLOBAL_SHORTCUT_SETTINGS.map((entry) => {
+                        const activeValue = resolvedShortcuts[entry.key] ?? entry.defaultAccelerator;
+                        return (
+                          <div
+                            key={entry.key}
+                            className="flex items-start justify-between gap-3 rounded-md border border-border/40 px-2 py-2"
+                          >
+                            <div className="space-y-1">
+                              <p className="text-sm text-foreground">{entry.label}</p>
+                              <p className="text-xs text-muted-foreground">{entry.action}</p>
+                              {activeValue !== entry.defaultAccelerator ? (
+                                <p className="text-[11px] text-muted-foreground">
+                                  Default: {formatAccelerator(entry.defaultAccelerator)}
+                                </p>
+                              ) : null}
+                            </div>
+                            <code className="rounded bg-muted px-2 py-1 text-[11px] text-foreground">
+                              {formatAccelerator(activeValue)}
+                            </code>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  {SHORTCUT_HINT_SECTIONS.map((section) => (
+                    <section
+                      key={section.title}
                       className="rounded-md border border-border/60 px-3 py-3"
                     >
-                      <p className="text-sm font-medium text-foreground">{entry.label}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Default: {entry.defaultAccelerator}
-                      </p>
-                      <Input
-                        type="text"
-                        value={shortcutDrafts[entry.key] ?? entry.defaultAccelerator}
-                        onChange={(event) =>
-                          setShortcutDrafts((current) => ({
-                            ...current,
-                            [entry.key]: event.target.value,
-                          }))
-                        }
-                        className="mt-2"
-                        aria-label={`${entry.label} shortcut`}
-                      />
-                      <div className="mt-2 flex items-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => void saveShortcut(entry.key, shortcutDrafts[entry.key] ?? entry.defaultAccelerator)}
-                          disabled={isSavingShortcut}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void resetShortcut(entry.key, entry.defaultAccelerator)}
-                          disabled={isSavingShortcut}
-                        >
-                          Reset
-                        </Button>
+                      <p className="text-sm font-medium text-foreground">{section.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{section.description}</p>
+                      <div className="mt-3 space-y-2">
+                        {section.entries.map((entry) => (
+                          <div
+                            key={`${section.title}-${entry.keys}-${entry.action}`}
+                            className="flex items-start justify-between gap-3 rounded-md border border-border/40 px-2 py-2"
+                          >
+                            <div className="space-y-1">
+                              <p className="text-xs text-foreground">{entry.action}</p>
+                              {entry.context ? (
+                                <p className="text-[11px] text-muted-foreground">{entry.context}</p>
+                              ) : null}
+                            </div>
+                            <code className="rounded bg-muted px-2 py-1 text-[11px] text-foreground">
+                              {entry.keys}
+                            </code>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))
-                )}
+                    </section>
+                  ))}
+                </div>
               </div>
             ) : null}
 

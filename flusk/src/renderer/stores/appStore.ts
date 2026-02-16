@@ -3,7 +3,7 @@ import { create } from 'zustand';
 export const APP_VIEW_ORDER = ['today', 'tasks', 'inbox', 'scratchpad'] as const;
 
 export type AppView = (typeof APP_VIEW_ORDER)[number] | 'settings';
-export type ChatOverlayState = 'hidden' | 'peek' | 'open';
+export type ChatOverlayState = 'peek' | 'open';
 
 type AppStore = {
   activeView: AppView;
@@ -14,7 +14,6 @@ type AppStore = {
   setViewFromAssistant: (view: AppView) => void;
   openChatOverlay: () => void;
   peekChatOverlay: () => void;
-  hideChatOverlay: () => void;
   toggleChatOverlay: () => void;
   closeChatOverlayLayer: () => void;
   triggerNewTask: () => void;
@@ -23,7 +22,7 @@ type AppStore = {
 export const useAppStore = create<AppStore>((set) => ({
   activeView: 'today',
   manualNavigationVersion: 0,
-  chatOverlayState: 'hidden',
+  chatOverlayState: 'peek',
   newTaskTrigger: 0,
   setView: (view) =>
     set((state) => {
@@ -48,19 +47,14 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
   openChatOverlay: () => set({ chatOverlayState: 'open' }),
   peekChatOverlay: () => set({ chatOverlayState: 'peek' }),
-  hideChatOverlay: () => set({ chatOverlayState: 'hidden' }),
   toggleChatOverlay: () =>
     set((state) => ({
-      chatOverlayState: state.chatOverlayState === 'open' ? 'hidden' : 'open',
+      chatOverlayState: state.chatOverlayState === 'open' ? 'peek' : 'open',
     })),
   closeChatOverlayLayer: () =>
     set((state) => {
       if (state.chatOverlayState === 'open') {
         return { chatOverlayState: 'peek' as const };
-      }
-
-      if (state.chatOverlayState === 'peek') {
-        return { chatOverlayState: 'hidden' as const };
       }
 
       return state;
@@ -75,7 +69,5 @@ export const selectManualNavigationVersion = (state: AppStore) =>
 export const selectChatOverlayState = (state: AppStore) => state.chatOverlayState;
 export const selectIsChatOverlayOpen = (state: AppStore) =>
   state.chatOverlayState === 'open';
-export const selectIsChatOverlayVisible = (state: AppStore) =>
-  state.chatOverlayState !== 'hidden';
 export const selectNewTaskTrigger = (state: AppStore) =>
   state.newTaskTrigger;

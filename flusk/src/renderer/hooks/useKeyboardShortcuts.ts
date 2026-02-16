@@ -8,6 +8,7 @@ type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLTextAreaElement | null>;
   inputValue: string;
   clearInput: () => void;
+  onToggleTheme?: () => void;
 };
 
 const isTextInputElement = (element: Element | null): boolean => {
@@ -26,6 +27,7 @@ export const useKeyboardShortcuts = ({
   inputRef,
   inputValue,
   clearInput,
+  onToggleTheme,
 }: UseKeyboardShortcutsOptions): void => {
   const setView = useAppStore((state) => state.setView);
   const activeView = useAppStore((state) => state.activeView);
@@ -93,6 +95,12 @@ export const useKeyboardShortcuts = ({
         }
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        onToggleTheme?.();
+        return;
+      }
+
       if (event.key === 'Escape') {
         // Layer 0: close search overlay (highest z-index)
         if (isSearchOpenRef.current) {
@@ -115,18 +123,13 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        // Layer 3: close chat overlay step (open -> peek -> hidden)
-        if (chatOverlayState !== 'hidden') {
+        // Layer 3: collapse chat overlay (open -> peek)
+        if (chatOverlayState === 'open') {
           event.preventDefault();
           closeChatOverlayLayer();
           inputRef.current?.blur();
           return;
         }
-
-        // Layer 4: request window hide from main process
-        event.preventDefault();
-        void window.flusk?.app.requestHide();
-        return;
       }
 
       if (event.metaKey || event.ctrlKey || event.altKey) {
@@ -181,7 +184,7 @@ export const useKeyboardShortcuts = ({
           activeViewRef.current === 'tasks' ||
           activeViewRef.current === 'inbox'
         ) &&
-        chatOverlayState === 'hidden' &&
+        chatOverlayState === 'peek' &&
         !isSearchOpenRef.current
       ) {
         event.preventDefault();
@@ -196,6 +199,7 @@ export const useKeyboardShortcuts = ({
     closeSearch,
     closeChatOverlayLayer,
     inputRef,
+    onToggleTheme,
     openSearch,
     setView,
     toggleChatOverlay,

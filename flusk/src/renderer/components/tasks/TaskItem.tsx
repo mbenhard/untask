@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { Check, Crosshair, GripVertical, Pencil } from 'lucide-react';
+import { Bookmark, Check, GripVertical, Pencil } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
@@ -224,19 +224,19 @@ export const TaskItem = ({
 
         <div className="ml-auto flex items-center gap-1">
           {task.client ? (
-            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
               {task.client}
             </span>
           ) : null}
 
           {dueDateLabel ? (
-            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
               {dueDateLabel}
             </span>
           ) : null}
 
           {isCompleted && completedAtLabel ? (
-            <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">
               {completedAtLabel}
             </span>
           ) : null}
@@ -267,7 +267,7 @@ export const TaskItem = ({
                 : 'hover:text-foreground',
             )}
           >
-            <Crosshair className="size-3.5" />
+            <Bookmark className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
           </button>
 
           <button

@@ -65,7 +65,7 @@ describe('chatStore stream reliability', () => {
     useAppStore.setState({
       activeView: 'today',
       manualNavigationVersion: 0,
-      chatOverlayState: 'hidden',
+      chatOverlayState: 'peek',
 
       newTaskTrigger: 0,
     });
@@ -143,8 +143,8 @@ describe('chatStore stream reliability', () => {
     ).toHaveLength(1);
   });
 
-  it('reveals peek rail on assistant activity while overlay is hidden', () => {
-    useAppStore.setState({ chatOverlayState: 'hidden' });
+  it('keeps peek state on assistant activity while overlay is peeked', () => {
+    useAppStore.setState({ chatOverlayState: 'peek' });
 
     useChatStore.setState({
       messages: [
@@ -222,7 +222,7 @@ describe('chatStore stream reliability', () => {
     useAppStore.setState({
       activeView: 'tasks',
       manualNavigationVersion: 0,
-      chatOverlayState: 'hidden',
+      chatOverlayState: 'peek',
 
       newTaskTrigger: 0,
     });

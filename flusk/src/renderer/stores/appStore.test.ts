@@ -7,12 +7,12 @@ describe('appStore navigation', () => {
     expect(APP_VIEW_ORDER.slice(0, 3)).toEqual(['today', 'tasks', 'inbox']);
   });
 
-  it('routes to tasks view without forcing the chat overlay hidden', () => {
+  it('routes to tasks view without forcing the chat overlay to peek', () => {
     useAppStore.setState({
       activeView: 'today',
       manualNavigationVersion: 0,
       chatOverlayState: 'open',
-            newTaskTrigger: 0,
+      newTaskTrigger: 0,
     });
 
     useAppStore.getState().setView('tasks');
@@ -28,7 +28,7 @@ describe('appStore navigation', () => {
       activeView: 'today',
       manualNavigationVersion: 3,
       chatOverlayState: 'open',
-            newTaskTrigger: 0,
+      newTaskTrigger: 0,
     });
 
     useAppStore.getState().setViewFromAssistant('inbox');
@@ -38,14 +38,7 @@ describe('appStore navigation', () => {
     expect(state.manualNavigationVersion).toBe(3);
   });
 
-  it('toggleChatOverlay opens from hidden/peek and hides from open', () => {
-    useAppStore.setState({
-      chatOverlayState: 'hidden',
-    });
-
-    useAppStore.getState().toggleChatOverlay();
-    expect(useAppStore.getState().chatOverlayState).toBe('open');
-
+  it('toggleChatOverlay toggles between peek and open', () => {
     useAppStore.setState({
       chatOverlayState: 'peek',
     });
@@ -54,10 +47,10 @@ describe('appStore navigation', () => {
     expect(useAppStore.getState().chatOverlayState).toBe('open');
 
     useAppStore.getState().toggleChatOverlay();
-    expect(useAppStore.getState().chatOverlayState).toBe('hidden');
+    expect(useAppStore.getState().chatOverlayState).toBe('peek');
   });
 
-  it('closeChatOverlayLayer steps open -> peek -> hidden', () => {
+  it('closeChatOverlayLayer steps open -> peek and stays at peek', () => {
     useAppStore.setState({
       chatOverlayState: 'open',
     });
@@ -66,6 +59,6 @@ describe('appStore navigation', () => {
     expect(useAppStore.getState().chatOverlayState).toBe('peek');
 
     useAppStore.getState().closeChatOverlayLayer();
-    expect(useAppStore.getState().chatOverlayState).toBe('hidden');
+    expect(useAppStore.getState().chatOverlayState).toBe('peek');
   });
 });

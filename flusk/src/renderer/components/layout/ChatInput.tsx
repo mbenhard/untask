@@ -4,6 +4,8 @@ import {
   type RefObject,
 } from 'react';
 
+import { ArrowUp, Square } from 'lucide-react';
+
 import { cn } from '../../lib/utils';
 import { useChatStore } from '../../stores/chatStore';
 import { Button } from '../ui/button';
@@ -24,8 +26,8 @@ export const ChatInput = ({
   onChange,
   onSubmit,
 }: ChatInputProps) => {
-  const messageCount = useChatStore((state) => state.messages.length);
-  const clearHistory = useChatStore((state) => state.clearHistory);
+  const isSending = useChatStore((state) => state.isSending);
+  const cancelStream = useChatStore((state) => state.cancelStream);
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
     onChange(event.target.value);
@@ -41,6 +43,8 @@ export const ChatInput = ({
       onSubmit();
     }
   };
+
+  const hasContent = value.trim().length > 0;
 
   return (
     <footer
@@ -61,19 +65,28 @@ export const ChatInput = ({
           className="h-7 max-h-32 !min-h-0 resize-none overflow-y-auto !border-0 !bg-transparent !px-0 py-1 text-[13px] leading-5 !shadow-none focus-visible:!border-0 focus-visible:!ring-0"
         />
       </div>
-      {messageCount > 0 ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            void clearHistory();
-          }}
-        >
-          Clear
-        </Button>
-      ) : null}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="mb-0.5 text-muted-foreground hover:text-foreground"
+        disabled={!isSending && !hasContent}
+        aria-label={isSending ? 'Stop response' : 'Send message'}
+        onClick={() => {
+          if (isSending) {
+            void cancelStream();
+            return;
+          }
+
+          onSubmit();
+        }}
+      >
+        {isSending ? (
+          <Square className="size-3 fill-current" />
+        ) : (
+          <ArrowUp className="size-3.5" />
+        )}
+      </Button>
     </footer>
   );
 };
