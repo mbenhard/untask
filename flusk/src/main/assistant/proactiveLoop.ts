@@ -14,6 +14,7 @@ import { evaluateProactiveTriggers } from './proactiveTriggers';
 
 const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const LAST_MORNING_BRIEFING_KEY = 'proactive_last_morning_briefing';
+const MAX_SETTIMEOUT_MS = 2_147_483_647; // 2^31 - 1 (~24.8 days)
 
 // ─── Cooldown system ────────────────────────────────────────
 
@@ -76,19 +77,17 @@ const TRIGGER_TEMPLATES: Record<ProactiveTriggerType, string> = {
 
   time_reminder:
     '[PROACTIVE TRIGGER: time_reminder]\n' +
-    'A task with a time-based reminder is due now. Remind Marcus briefly ' +
+    'The following task is due now. Remind Marcus briefly ' +
     'and suggest immediate action. Include chips.',
 };
 
-// ─── Working hours check ────────────────────────────────────
-
-const isWorkingHours = (now: Date, timezone: string): boolean => {
-  const local = new Date(
-    now.toLocaleString('en-US', { timeZone: timezone }),
-  );
-  const day = local.getDay();
-  const hour = local.getHours();
-  return day >= 1 && day <= 5 && hour >= 8 && hour <= 18;
+const buildTriggerMessage = (
+  trigger: ProactiveTriggerType,
+  taskContext?: { id: string; title: string },
+): string => {
+  const template = TRIGGER_TEMPLATES[trigger];
+  if (!taskContext) return template;
+  return `${template}\nTask: "${taskContext.title}" (ID: ${taskContext.id})`;
 };
 
 const toLocalDateKey = (now: Date, timezone: string): string => {
@@ -151,6 +150,7 @@ export class ProactiveLoop {
   private deps: ProactiveLoopDeps;
   private running = false;
   private reminderTimers = new Map<string, NodeJS.Timeout>();
+  private rescheduleTimer: NodeJS.Timeout | null = null;
   private unsubscribeTaskChange: (() => void) | null = null;
 
   constructor(deps: ProactiveLoopDeps) {
@@ -184,6 +184,11 @@ export class ProactiveLoop {
     }
     this.reminderTimers.clear();
 
+    if (this.rescheduleTimer) {
+      clearTimeout(this.rescheduleTimer);
+      this.rescheduleTimer = null;
+    }
+
     if (this.unsubscribeTaskChange) {
       this.unsubscribeTaskChange();
       this.unsubscribeTaskChange = null;
@@ -200,8 +205,6 @@ export class ProactiveLoop {
     const lastBriefing = getSetting(LAST_MORNING_BRIEFING_KEY);
     if (lastBriefing === today) return;
 
-    if (!isWorkingHours(now, timezone)) return;
-
     setSetting(LAST_MORNING_BRIEFING_KEY, today);
     recordCooldown('morning_briefing', now.getTime());
 
@@ -214,13 +217,18 @@ export class ProactiveLoop {
       void this.evaluate();
     }, 2000);
 
-    // Reschedule reminders when tasks change (new due dates, completions, etc.)
-    this.scheduleUpcomingReminders();
+    // Debounce reminder reschedule (2s, latest wins)
+    if (this.rescheduleTimer) clearTimeout(this.rescheduleTimer);
+    this.rescheduleTimer = setTimeout(() => {
+      this.rescheduleTimer = null;
+      this.scheduleUpcomingReminders();
+    }, 2000);
   }
 
   /**
-   * Scan active tasks for time-component dueDates (e.g., "2026-02-17T14:30")
-   * and schedule setTimeout-based reminders for tasks due within the next interval.
+   * Scan all active tasks with dueDates and schedule a setTimeout for each
+   * future deadline. Date-only deadlines fire at 9 AM local time.
+   * Deadlines beyond ~24.8 days are skipped (setTimeout overflow guard).
    */
   private scheduleUpcomingReminders(): void {
     // Clear existing reminder timers
@@ -231,26 +239,34 @@ export class ProactiveLoop {
 
     const tasks = listTasks();
     const nowMs = Date.now();
-    const horizon = nowMs + INTERVAL_MS + 5 * 60 * 1000; // next interval + 5min buffer
 
     for (const task of tasks) {
       if (task.status === 'done') continue;
 
       const parsed = parseDueDate(task.dueDate);
-      if (!parsed || !parsed.hasTime) continue;
+      if (!parsed) continue;
 
-      // Only schedule if due in the future and within the scheduling horizon
-      if (parsed.ms <= nowMs || parsed.ms > horizon) continue;
+      // Resolve target time: exact time for date+time, 9 AM for date-only
+      const targetMs = parsed.hasTime
+        ? parsed.ms
+        : new Date(parsed.dateStr + 'T09:00').getTime();
+
+      // Skip past deadlines
+      if (targetMs <= nowMs) continue;
+
+      // Skip if beyond setTimeout max (~24.8 days)
+      const delay = targetMs - nowMs;
+      if (delay > MAX_SETTIMEOUT_MS) continue;
 
       // Skip if already reminded for this task
       const cooldownKey = `time_reminder:${task.id}`;
       if (isCooldownActive(cooldownKey, Infinity, nowMs)) continue;
 
-      const delay = parsed.ms - nowMs;
+      const taskContext = { id: task.id, title: task.title };
       const timer = setTimeout(() => {
         this.reminderTimers.delete(task.id);
         recordCooldown(cooldownKey, Date.now());
-        void this.fireProactiveMessage('time_reminder');
+        void this.fireProactiveMessage('time_reminder', taskContext);
       }, delay);
 
       this.reminderTimers.set(task.id, timer);
@@ -269,8 +285,6 @@ export class ProactiveLoop {
     try {
       const now = new Date();
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      if (!isWorkingHours(now, timezone)) return;
 
       const { liveContext } = buildCanonicalRuntimeContext();
       const triggers = evaluateProactiveTriggers({
@@ -303,9 +317,12 @@ export class ProactiveLoop {
     }
   }
 
-  private async fireProactiveMessage(trigger: ProactiveTriggerType): Promise<void> {
-    const template = TRIGGER_TEMPLATES[trigger];
-    if (!template) return;
+  private async fireProactiveMessage(
+    trigger: ProactiveTriggerType,
+    taskContext?: { id: string; title: string },
+  ): Promise<void> {
+    const message = buildTriggerMessage(trigger, taskContext);
+    if (!message) return;
 
     const isWindowFocused = BrowserWindow.getAllWindows().some(
       (w) => !w.isDestroyed() && w.isFocused(),
@@ -313,7 +330,7 @@ export class ProactiveLoop {
 
     try {
       await this.deps.startProactiveTurn({
-        triggerMessage: template,
+        triggerMessage: message,
         triggerType: trigger,
         emit: (event) => {
           emitToAllWindows(event);

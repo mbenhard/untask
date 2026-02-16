@@ -25,12 +25,15 @@ describe('dueDateParser', () => {
     expect(parsed?.timeStr).toBe('14:30');
   });
 
-  it('treats date-only as overdue after end of day', () => {
-    const noonUtc = Date.parse('2026-02-17T12:00:00.000Z');
-    const nextDayUtc = Date.parse('2026-02-18T00:00:00.000Z');
+  it('treats date-only as overdue after 9 AM on the due date', () => {
+    // 9 AM local on 2026-02-17
+    const nineAm = new Date('2026-02-17T09:00').getTime();
+    const beforeNineAm = nineAm - 1;
+    const afterNineAm = nineAm + 1;
 
-    expect(isDueDateOverdue('2026-02-17', noonUtc)).toBe(false);
-    expect(isDueDateOverdue('2026-02-17', nextDayUtc)).toBe(true);
+    expect(isDueDateOverdue('2026-02-17', beforeNineAm)).toBe(false);
+    expect(isDueDateOverdue('2026-02-17', nineAm)).toBe(true);
+    expect(isDueDateOverdue('2026-02-17', afterNineAm)).toBe(true);
   });
 
   it('detects due dates within a window', () => {

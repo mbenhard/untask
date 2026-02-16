@@ -102,10 +102,9 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
         {toolStatusIcon(isUndone ? 'success' : step.status)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-mono font-medium text-foreground/90">{step.description}</p>
-        {step.summary && step.status !== 'running' ? (
-          <p className="mt-0.5 text-muted-foreground">{step.summary}</p>
-        ) : null}
+        <p className="font-mono font-medium text-foreground/90">
+          {step.summary && step.status !== 'running' ? step.summary : step.description}
+        </p>
         {card?.riskLevel && (card.riskLevel === 'high' || card.riskLevel === 'critical') ? (
           <p className="mt-0.5 font-mono text-amber-400/80 text-[10px] uppercase tracking-wide">
             {card.riskLevel} risk{card.rationale ? ` — ${card.rationale}` : ''}

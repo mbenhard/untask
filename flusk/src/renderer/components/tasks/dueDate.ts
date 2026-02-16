@@ -98,6 +98,39 @@ export const formatDueDateDisplay = (iso: string): string => {
   return time ? `${dateStr} ${time}` : dateStr;
 };
 
+/**
+ * Check if a dueDate is overdue relative to the given timestamp.
+ * Date-only: overdue after 9 AM on the due date.
+ * Date+time: overdue after the exact time.
+ *
+ * NOTE: This logic is duplicated in main/services/dueDateParser.ts
+ * due to Electron process boundary. Keep both in sync.
+ */
+export const isDueDateOverdue = (iso: string | null | undefined, nowMs: number): boolean => {
+  if (!iso) return false;
+
+  const parts = parseDateParts(iso);
+  if (!parts) return false;
+
+  const hasTime = ISO_TIME_PATTERN.test(iso);
+
+  if (hasTime) {
+    const date = toLocalDate(parts);
+    if (!isSameDate(date, parts)) return false;
+    const time = parseDueTime(iso);
+    if (!time) return false;
+    const [hours, minutes] = time.split(':').map(Number);
+    date.setHours(hours, minutes, 0, 0);
+    return date.getTime() < nowMs;
+  }
+
+  // Date-only: overdue after 9 AM on the due date
+  const date = toLocalDate(parts);
+  if (!isSameDate(date, parts)) return false;
+  date.setHours(9, 0, 0, 0);
+  return date.getTime() <= nowMs;
+};
+
 export const toISODate = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

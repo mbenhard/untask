@@ -331,6 +331,7 @@ const revealPeekIfChatNotOpen = (): void => {
 
   if (appStore.chatOverlayState !== 'open') {
     appStore.peekChatOverlay();
+    appStore.setUnreadProactive(true);
   }
 };
 

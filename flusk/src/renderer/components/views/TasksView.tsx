@@ -15,13 +15,10 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ChevronRight } from 'lucide-react';
-
 import type { Task } from '../../../types/models';
-import { cn } from '../../lib/utils';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { InlineTaskInput } from '../tasks/InlineTaskInput';
+import { type AddTaskConfig, SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 import {
   flattenStatusLaneTaskIds,
@@ -91,6 +88,8 @@ type StatusGroupSectionProps = {
   onToggle: () => void;
   allTasks: Task[];
   activeDragId: string | null;
+  addTaskConfig?: AddTaskConfig;
+  triggerAdd?: number;
 };
 
 const StatusGroupSection = ({
@@ -100,54 +99,35 @@ const StatusGroupSection = ({
   onToggle,
   allTasks,
   activeDragId,
+  addTaskConfig,
+  triggerAdd,
 }: StatusGroupSectionProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: getStatusLaneId(group.key),
   });
 
   return (
-    <section
-      ref={setNodeRef}
-      className={cn(
-        'rounded-md border border-border/60 transition-colors',
-        isOver && activeDragId ? 'border-ring/70 bg-accent/20' : null,
-      )}
+    <SectionGroup
+      sectionId={`tasks-${group.key}`}
+      label={group.label}
+      count={tasks.length}
+      isCollapsed={isCollapsed}
+      onToggle={onToggle}
+      isDropTarget={isOver && activeDragId !== null}
+      dropRef={setNodeRef}
+      addTaskConfig={addTaskConfig}
+      triggerAdd={triggerAdd}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-2 px-2 py-2 text-left"
-        aria-expanded={!isCollapsed}
-        aria-controls={`tasks-group-${group.key}`}
-      >
-        <ChevronRight
-          className={cn(
-            'size-3.5 text-muted-foreground transition-transform',
-            !isCollapsed && 'rotate-90',
-          )}
-        />
-        <span className="text-[12px] font-medium text-foreground">
-          {group.label}
-        </span>
-        <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-          {tasks.length}
-        </span>
-      </button>
-
-      {!isCollapsed ? (
-        <div id={`tasks-group-${group.key}`} className="border-t border-border/60 px-1 py-1">
-          <TaskList
-            tasks={tasks}
-            allTasks={allTasks}
-            emptyMessage={group.emptyMessage}
-            ariaLabel={`${group.label} tasks`}
-            scopeId={`tasks-${group.key}`}
-            dndMode="shared"
-            sharedActiveDragId={activeDragId}
-          />
-        </div>
-      ) : null}
-    </section>
+      <TaskList
+        tasks={tasks}
+        allTasks={allTasks}
+        emptyMessage={group.emptyMessage}
+        ariaLabel={`${group.label} tasks`}
+        scopeId={`tasks-${group.key}`}
+        dndMode="shared"
+        sharedActiveDragId={activeDragId}
+      />
+    </SectionGroup>
   );
 };
 
@@ -322,6 +302,7 @@ export const TasksView = ({
               {GROUP_CONFIG.map((group) => {
                 const tasks = groupedTasks[group.key];
                 const isCollapsed = collapsedGroups[group.key];
+                const isBacklog = group.key === 'active';
 
                 return (
                   <StatusGroupSection
@@ -331,6 +312,14 @@ export const TasksView = ({
                     isCollapsed={isCollapsed}
                     allTasks={allTasks}
                     activeDragId={activeDragId}
+                    addTaskConfig={
+                      isBacklog
+                        ? { defaultStatus: 'active', showMetadata: true, placeholder: 'Add task...' }
+                        : undefined
+                    }
+                    triggerAdd={
+                      isBacklog && activeView === 'tasks' ? newTaskTrigger : undefined
+                    }
                     onToggle={() => {
                       setCollapsedGroups((current) => ({
                         ...current,
@@ -351,13 +340,6 @@ export const TasksView = ({
             </DragOverlay>
           </DndContext>
         ) : null}
-
-        <InlineTaskInput
-          parentId={null}
-          defaultStatus="active"
-          placeholder="Add task..."
-          triggerOpen={activeView === 'tasks' ? newTaskTrigger : undefined}
-        />
       </div>
     </div>
   );

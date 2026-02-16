@@ -12,6 +12,7 @@ import { cn } from '../../lib/utils';
 import {
   selectActiveView,
   selectChatOverlayState,
+  selectUnreadProactive,
   useAppStore,
 } from '../../stores/appStore';
 import {
@@ -62,6 +63,7 @@ export const AppShell = () => {
 
   const activeView = useAppStore(selectActiveView);
   const chatOverlayState = useAppStore(selectChatOverlayState);
+  const unreadProactive = useAppStore(selectUnreadProactive);
   const setView = useAppStore((state) => state.setView);
   const openChatOverlay = useAppStore((state) => state.openChatOverlay);
   const peekChatOverlay = useAppStore((state) => state.peekChatOverlay);
@@ -259,6 +261,9 @@ export const AppShell = () => {
                   onClick={openChatFromOverlay}
                 >
                   Chat
+                  {unreadProactive ? (
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive" />
+                  ) : null}
                 </motion.button>
               ) : null}
 

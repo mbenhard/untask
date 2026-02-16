@@ -376,15 +376,15 @@ export const generateToolCallDescription = (
     case 'create_task':
       return input.title ? `Creating task "${truncate(String(input.title), 60)}"` : 'Creating task';
     case 'update_task':
-      return input.id ? `Updating task ${String(input.id)}` : 'Updating task';
+      return 'Updating task…';
     case 'complete_task':
-      return input.id ? `Completing task ${String(input.id)}` : 'Completing task';
+      return 'Completing task…';
     case 'delete_task':
-      return input.id ? `Deleting task ${String(input.id)}` : 'Deleting task';
+      return 'Deleting task…';
     case 'move_task':
-      return input.id ? `Moving task ${String(input.id)}` : 'Moving task';
+      return 'Moving task…';
     case 'set_today':
-      return input.id ? `Updating Today list for task ${String(input.id)}` : 'Updating Today list';
+      return 'Updating Today list…';
     case 'suggest_daily_plan':
       return 'Generating daily plan';
     case 'parse_notes':
@@ -398,7 +398,7 @@ export const generateToolCallDescription = (
           ? 'Replacing scratchpad section'
           : 'Appending to scratchpad';
     case 'undo_last_action':
-      return input.taskEventId ? `Undoing event ${String(input.taskEventId)}` : 'Undoing last action';
+      return 'Undoing last action…';
     case 'write_journal':
       return 'Writing journal entry';
     case 'read_journal':
@@ -416,11 +416,11 @@ export const generateToolCallDescription = (
     case 'emit_chips':
       return 'Attaching chips';
     case 'improve_task':
-      return input.id ? `Analyzing task ${String(input.id)}` : 'Analyzing task';
+      return 'Analyzing task…';
     case 'list_tasks':
       return input.search ? `Searching tasks for "${truncate(String(input.search), 40)}"` : 'Listing tasks';
     case 'get_task':
-      return input.id ? `Loading task ${String(input.id)}` : 'Loading task';
+      return 'Loading task…';
     case 'fetch_url':
       return input.url ? `Fetching ${truncate(String(input.url), 60)}` : 'Fetching URL';
     default:

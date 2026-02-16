@@ -63,17 +63,6 @@ const normalizeLiveContext = (
   timezone: timezone ?? value.timezone,
 });
 
-const isWorkingHours = (now: Date, timezone: string): boolean => {
-  const local = new Date(
-    now.toLocaleString('en-US', {
-      timeZone: timezone,
-    }),
-  );
-  const day = local.getDay();
-  const hour = local.getHours();
-  return day >= 1 && day <= 5 && hour >= 8 && hour <= 18;
-};
-
 const getCooldownMinutes = (trigger: ProactiveTriggerType): number =>
   TRIGGER_COOLDOWNS.find((entry) => entry.trigger === trigger)?.cooldownMinutes ??
   120;
@@ -257,42 +246,6 @@ export const evaluateProactiveTriggerPolicy = (
   const shouldRecord = request.recordSelection ?? true;
   const candidateMap = new Map<ProactiveTriggerType, TriggerCandidate>();
   const evaluations: ProactiveTriggerEvaluation[] = [];
-
-  if (!isWorkingHours(now, timezone)) {
-    return {
-      recommendation: undefined,
-      evaluations: [
-        {
-          trigger: 'empty_today_list',
-          eligible: false,
-          suppressedByCooldown: false,
-          reason: 'outside configured working hours',
-          score: 0,
-        },
-        {
-          trigger: 'overdue_accumulation',
-          eligible: false,
-          suppressedByCooldown: false,
-          reason: 'outside configured working hours',
-          score: 0,
-        },
-        {
-          trigger: 'stale_client_touchpoint',
-          eligible: false,
-          suppressedByCooldown: false,
-          reason: 'outside configured working hours',
-          score: 0,
-        },
-        {
-          trigger: 'value_at_risk_idle',
-          eligible: false,
-          suppressedByCooldown: false,
-          reason: 'outside configured working hours',
-          score: 0,
-        },
-      ],
-    };
-  }
 
   const candidates = buildCandidates(liveContext, now);
 

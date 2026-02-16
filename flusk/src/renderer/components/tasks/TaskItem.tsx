@@ -9,7 +9,7 @@ import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { Popover, PopoverContent } from '../ui';
-import { formatDueDateDisplay } from './dueDate';
+import { formatDueDateDisplay, isDueDateOverdue } from './dueDate';
 import { getNextPriority } from './taskInteraction';
 
 export interface TaskItemProps {
@@ -98,6 +98,7 @@ export const TaskItem = ({
     () => (task.dueDate ? formatDueDateDisplay(task.dueDate) : null),
     [task.dueDate],
   );
+  const isOverdue = !isCompleted && isDueDateOverdue(task.dueDate, Date.now());
 
   const completedAtLabel = useMemo(() => {
     if (!task.completedAt) {
@@ -289,7 +290,10 @@ export const TaskItem = ({
           ) : null}
 
           {dueDateLabel ? (
-            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
+            <span className={cn(
+              'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
+              isOverdue && 'text-destructive',
+            )}>
               {dueDateLabel}
             </span>
           ) : null}

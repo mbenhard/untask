@@ -9,6 +9,7 @@ type AppStore = {
   activeView: AppView;
   manualNavigationVersion: number;
   chatOverlayState: ChatOverlayState;
+  unreadProactive: boolean;
   newTaskTrigger: number;
   setView: (view: AppView) => void;
   setViewFromAssistant: (view: AppView) => void;
@@ -16,6 +17,7 @@ type AppStore = {
   peekChatOverlay: () => void;
   toggleChatOverlay: () => void;
   closeChatOverlayLayer: () => void;
+  setUnreadProactive: (value: boolean) => void;
   triggerNewTask: () => void;
 };
 
@@ -23,6 +25,7 @@ export const useAppStore = create<AppStore>((set) => ({
   activeView: 'today',
   manualNavigationVersion: 0,
   chatOverlayState: 'peek',
+  unreadProactive: false,
   newTaskTrigger: 0,
   setView: (view) =>
     set((state) => {
@@ -45,11 +48,12 @@ export const useAppStore = create<AppStore>((set) => ({
         activeView: view,
       };
     }),
-  openChatOverlay: () => set({ chatOverlayState: 'open' }),
+  openChatOverlay: () => set({ chatOverlayState: 'open', unreadProactive: false }),
   peekChatOverlay: () => set({ chatOverlayState: 'peek' }),
   toggleChatOverlay: () =>
     set((state) => ({
       chatOverlayState: state.chatOverlayState === 'open' ? 'peek' : 'open',
+      unreadProactive: state.chatOverlayState === 'open' ? state.unreadProactive : false,
     })),
   closeChatOverlayLayer: () =>
     set((state) => {
@@ -59,6 +63,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
       return state;
     }),
+  setUnreadProactive: (value) => set({ unreadProactive: value }),
   triggerNewTask: () =>
     set((state) => ({ newTaskTrigger: state.newTaskTrigger + 1 })),
 }));
@@ -69,5 +74,7 @@ export const selectManualNavigationVersion = (state: AppStore) =>
 export const selectChatOverlayState = (state: AppStore) => state.chatOverlayState;
 export const selectIsChatOverlayOpen = (state: AppStore) =>
   state.chatOverlayState === 'open';
+export const selectUnreadProactive = (state: AppStore) =>
+  state.unreadProactive;
 export const selectNewTaskTrigger = (state: AppStore) =>
   state.newTaskTrigger;

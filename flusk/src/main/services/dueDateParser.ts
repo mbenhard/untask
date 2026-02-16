@@ -38,9 +38,12 @@ export const parseDueDate = (value: string | null | undefined): ParsedDueDate | 
 
 /**
  * Check if a dueDate is overdue relative to the given timestamp.
- * For date-only dueDates, the entire day is considered the deadline
- * (overdue after midnight of the next day).
+ * For date-only dueDates, overdue after 9 AM on the due date
+ * (matching the notification trigger time).
  * For date+time dueDates, overdue after the exact time.
+ *
+ * NOTE: This logic is duplicated in renderer/components/tasks/dueDate.ts
+ * due to Electron process boundary. Keep both in sync.
  */
 export const isDueDateOverdue = (
   value: string | null | undefined,
@@ -53,10 +56,9 @@ export const isDueDateOverdue = (
     return parsed.ms < nowMs;
   }
 
-  // Date-only: overdue after the end of that day (midnight next day)
-  const endOfDay = new Date(parsed.dateStr);
-  endOfDay.setDate(endOfDay.getDate() + 1);
-  return endOfDay.getTime() <= nowMs;
+  // Date-only: overdue after 9 AM on the due date
+  const nineAm = new Date(parsed.dateStr + 'T09:00');
+  return nineAm.getTime() <= nowMs;
 };
 
 /**

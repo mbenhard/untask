@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { ChevronRight } from 'lucide-react';
-
 import type { Task } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { cn } from '../../lib/utils';
-import { InlineTaskInput } from '../tasks/InlineTaskInput';
+import { SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 
 type TodayViewProps = {
@@ -24,6 +21,7 @@ export const TodayView = ({
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
   const activeView = useAppStore((state) => state.activeView);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
+  const [isTodayCollapsed, setIsTodayCollapsed] = useState(false);
   const [isDoneCollapsed, setIsDoneCollapsed] = useState(true);
 
   const activeTodayTasks = useMemo(
@@ -46,6 +44,8 @@ export const TodayView = ({
 
     if (selectedTask.today === true && selectedTask.status === 'done') {
       setIsDoneCollapsed(false);
+    } else if (selectedTask.today === true && selectedTask.status !== 'done') {
+      setIsTodayCollapsed(false);
     }
   }, [allTasks, selectedTaskId]);
 
@@ -64,56 +64,46 @@ export const TodayView = ({
 
         {!isLoading ? (
           <>
-            <TaskList
-              tasks={activeTodayTasks}
-              allTasks={allTasks}
-              emptyMessage="Nothing planned for today."
-              ariaLabel="Today tasks"
-              scopeId="today"
-            />
+            <SectionGroup
+              sectionId="today-active"
+              label="Today"
+              count={activeTodayTasks.length}
+              isCollapsed={isTodayCollapsed}
+              onToggle={() => setIsTodayCollapsed((c) => !c)}
+              addTaskConfig={{
+                defaultStatus: 'active',
+                defaultToday: true,
+                showMetadata: true,
+                placeholder: 'Add to today...',
+              }}
+              triggerAdd={activeView === 'today' ? newTaskTrigger : undefined}
+            >
+              <TaskList
+                tasks={activeTodayTasks}
+                allTasks={allTasks}
+                emptyMessage="Nothing planned for today."
+                ariaLabel="Today tasks"
+                scopeId="today"
+              />
+            </SectionGroup>
 
-            <section className="rounded-md border border-border/60">
-              <button
-                type="button"
-                onClick={() => setIsDoneCollapsed((current) => !current)}
-                className="flex w-full items-center gap-2 px-2 py-2 text-left"
-                aria-expanded={!isDoneCollapsed}
-                aria-controls="today-done-group"
-              >
-                <ChevronRight
-                  className={cn(
-                    'size-3.5 text-muted-foreground transition-transform',
-                    !isDoneCollapsed && 'rotate-90',
-                  )}
-                />
-                <span className="text-[12px] font-medium text-foreground">Done today</span>
-                <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-                  {doneTodayTasks.length}
-                </span>
-              </button>
-
-              {!isDoneCollapsed ? (
-                <div id="today-done-group" className="border-t border-border/60 px-1 py-1">
-                  <TaskList
-                    tasks={doneTodayTasks}
-                    allTasks={allTasks}
-                    emptyMessage="No done tasks today."
-                    ariaLabel="Done today tasks"
-                    scopeId="today-done"
-                  />
-                </div>
-              ) : null}
-            </section>
+            <SectionGroup
+              sectionId="today-done"
+              label="Done today"
+              count={doneTodayTasks.length}
+              isCollapsed={isDoneCollapsed}
+              onToggle={() => setIsDoneCollapsed((c) => !c)}
+            >
+              <TaskList
+                tasks={doneTodayTasks}
+                allTasks={allTasks}
+                emptyMessage="No done tasks today."
+                ariaLabel="Done today tasks"
+                scopeId="today-done"
+              />
+            </SectionGroup>
           </>
         ) : null}
-
-        <InlineTaskInput
-          parentId={null}
-          defaultStatus="active"
-          defaultToday={true}
-          placeholder="Add to today..."
-          triggerOpen={activeView === 'today' ? newTaskTrigger : undefined}
-        />
       </div>
     </div>
   );

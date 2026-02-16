@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { Task } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
-import { InlineTaskInput } from '../tasks/InlineTaskInput';
+import { SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 
 type InboxViewProps = {
@@ -19,6 +19,8 @@ export const InboxView = ({
 }: InboxViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
   const activeView = useAppStore((state) => state.activeView);
+
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const inboxTasks = useMemo(
     () =>
@@ -43,22 +45,28 @@ export const InboxView = ({
           </p>
         ) : null}
 
-        <InlineTaskInput
-          parentId={null}
-          defaultStatus="inbox"
-          placeholder="Type to capture..."
-          alwaysOpen={true}
-          triggerOpen={activeView === 'inbox' ? newTaskTrigger : undefined}
-        />
-
         {!isLoading ? (
-          <TaskList
-            tasks={inboxTasks}
-            allTasks={allTasks}
-            emptyMessage="Inbox is empty."
-            ariaLabel="Inbox tasks"
-            scopeId="inbox"
-          />
+          <SectionGroup
+            sectionId="inbox"
+            label="Inbox"
+            count={inboxTasks.length}
+            isCollapsed={isCollapsed}
+            onToggle={() => setIsCollapsed((c) => !c)}
+            addTaskConfig={{
+              defaultStatus: 'inbox',
+              showMetadata: true,
+              placeholder: 'Type to capture...',
+            }}
+            triggerAdd={activeView === 'inbox' ? newTaskTrigger : undefined}
+          >
+            <TaskList
+              tasks={inboxTasks}
+              allTasks={allTasks}
+              emptyMessage="Inbox is empty."
+              ariaLabel="Inbox tasks"
+              scopeId="inbox"
+            />
+          </SectionGroup>
         ) : null}
       </div>
     </div>
