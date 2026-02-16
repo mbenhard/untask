@@ -107,8 +107,8 @@ export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   switch (hint.toolName) {
     case 'create_task':
     case 'set_today':
-    case 'update_user_profile':
-    case 'update_patterns':
+    case 'update_identity':
+    case 'update_memory':
     case 'write_journal':
       return 'low';
 
@@ -146,8 +146,11 @@ export const evaluateGate = (
   risk: RiskLevel,
   hardOverride: boolean,
 ): GateDecision => {
-  if (hardOverride && mode !== 'autopilot') {
-    return { action: 'pending', reason: 'Hard safety override requires confirmation.' };
+  if (hardOverride) {
+    return {
+      action: 'pending',
+      reason: 'Hard safety override requires confirmation regardless of autonomy mode.',
+    };
   }
 
   switch (mode) {
@@ -266,7 +269,10 @@ const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'suggest_daily_plan',
   'read_journal',
   'read_scratchpad',
-  'generate_live_thought',
+  'read_memory',
+  'search_memory',
+  'search_journal',
+  'emit_chips',
   'improve_task',
   'undo_last_action',
   'list_tasks',

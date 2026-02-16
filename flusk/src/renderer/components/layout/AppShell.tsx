@@ -29,7 +29,7 @@ import { InboxView } from '../views/InboxView';
 import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
-import { LiveThought } from './LiveThought';
+
 import { TitleBar } from './TitleBar';
 
 export const AppShell = () => {
@@ -127,11 +127,8 @@ export const AppShell = () => {
     void sendMessage(content);
   }, [chatInputValue, sendMessage]);
 
-  const transition = { duration: prefersReducedMotion ? 0.1 : 0.2, ease: 'easeOut' as const };
-  const overlayTransition = {
-    duration: prefersReducedMotion ? 0.1 : 0.2,
-    ease: 'easeOut' as const,
-  };
+  const transition = { duration: 0, ease: 'easeOut' as const };
+  const overlayTransition = { duration: 0, ease: 'easeOut' as const };
 
   const viewVariants = {
     enter: { opacity: 0 },
@@ -219,13 +216,6 @@ export const AppShell = () => {
 
   const isSettingsActive = activeView === 'settings';
 
-  const liveThoughtRefreshKey = useMemo(
-    () =>
-      tasks
-        .map((task) => `${task.id}:${task.status}:${task.today ? '1' : '0'}:${task.completedAt ?? ''}`)
-        .join('|'),
-    [tasks],
-  );
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
@@ -356,9 +346,6 @@ export const AppShell = () => {
             </button>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <LiveThought refreshKey={liveThoughtRefreshKey} />
-          </div>
         </div>
       </div>
 

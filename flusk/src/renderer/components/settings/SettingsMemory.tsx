@@ -156,16 +156,25 @@ const formatAccelerator = (value: string): string =>
     .replace(/Control/g, 'Ctrl')
     .replace(/\+/g, ' + ');
 
-const MEMORY_FIELD_LABELS: Record<'soul' | 'profile' | 'patterns', string> = {
+const MEMORY_FIELD_LABELS: Record<
+  'identity' | 'memory' | 'soul' | 'profile' | 'patterns',
+  string
+> = {
+  identity: 'Identity',
+  memory: 'Memory',
   soul: 'Soul',
   profile: 'Profile',
   patterns: 'Patterns',
 };
 
+const MEMORY_SUB_TABS = ['identity', 'memory', 'soul', 'profile', 'patterns'] as const;
+
 const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
   soul: '',
   profile: '',
   patterns: '',
+  identity: '',
+  memory: '',
 };
 
 const DEFAULT_JOURNAL_FILTERS: SettingsReadJournalRequestPayload = {
@@ -175,14 +184,14 @@ const DEFAULT_JOURNAL_FILTERS: SettingsReadJournalRequestPayload = {
 
 const OPENROUTER_API_KEY_SETTING_KEY = 'ai_openrouter_key';
 
-type MemorySubTab = 'soul' | 'profile' | 'patterns';
+type MemorySubTab = (typeof MEMORY_SUB_TABS)[number];
 
 export const SettingsMemory = () => {
   const prefersReducedMotion = useReducedMotion();
   const typography = useTypography();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('soul');
+  const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('identity');
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
   const [memoryHistory, setMemoryHistory] = useState<SettingsMemoryEventPayload[]>([]);
   const [journalEntries, setJournalEntries] = useState<AiJournal[]>([]);
@@ -553,7 +562,7 @@ export const SettingsMemory = () => {
   // ─── Save actions ────────────────────────────────────────
 
   const saveField = useCallback(
-    async (field: 'soul' | 'profile' | 'patterns') => {
+    async (field: MemorySubTab) => {
       try {
         setIsSaving(true);
         setNotice(null);
@@ -1150,7 +1159,7 @@ export const SettingsMemory = () => {
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      {(['soul', 'profile', 'patterns'] as const).map((sub) => (
+                      {MEMORY_SUB_TABS.map((sub) => (
                         <Button
                           key={sub}
                           type="button"
@@ -1162,6 +1171,42 @@ export const SettingsMemory = () => {
                         </Button>
                       ))}
                     </div>
+
+                    {memorySubTab === 'identity' ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Identity is always injected in the assistant prompt. Keep it concise and outcome-driven.
+                        </p>
+                        <Textarea
+                          value={draft.identity}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, identity: event.target.value }))
+                          }
+                          className="min-h-64"
+                        />
+                        <Button type="button" size="sm" onClick={() => void saveField('identity')} disabled={isSaving}>
+                          Save Identity
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    {memorySubTab === 'memory' ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Memory is loaded on-demand for client context, preferences, and workflows.
+                        </p>
+                        <Textarea
+                          value={draft.memory}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, memory: event.target.value }))
+                          }
+                          className="min-h-64"
+                        />
+                        <Button type="button" size="sm" onClick={() => void saveField('memory')} disabled={isSaving}>
+                          Save Memory
+                        </Button>
+                      </div>
+                    ) : null}
 
                     {memorySubTab === 'soul' ? (
                       <div className="space-y-3">

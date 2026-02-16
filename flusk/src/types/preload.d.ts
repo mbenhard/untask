@@ -3,7 +3,7 @@ import type {
   ChatKernelOrchestrationRequestPayload,
   ChatKernelOrchestrationResultPayload,
   ChatKernelStatusResultPayload,
-  ChatLiveThoughtResult,
+
   ChatRetentionResult,
   ChatSelectedModelResult,
   ChatSendRequest,
@@ -18,6 +18,9 @@ import type {
   ChatResolvePendingActionRequest,
   ChatResolvePendingActionResponse,
   ChatListPendingActionsResponse,
+  ChatExecuteChipActionRequest,
+  ChatExecuteChipActionResponse,
+  ChatFocusMessagePayload,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   LaunchAtLoginResult,
@@ -111,6 +114,9 @@ export type FluskApi = {
     onStreamEvent: (
       listener: (event: ChatStreamEventPayload) => void,
     ) => () => void;
+    onFocusMessage: (
+      listener: (payload: ChatFocusMessagePayload) => void,
+    ) => () => void;
     history: () => Promise<ChatMessage[]>;
     clear: () => Promise<void>;
     getModels: () => Promise<ChatModelCatalogResult>;
@@ -119,11 +125,12 @@ export type FluskApi = {
     undoLastAction: (payload?: ChatUndoRequest) => Promise<ChatUndoResult>;
     getRetentionMode: () => Promise<ChatRetentionResult>;
     setRetentionMode: (payload: ChatSetRetentionRequest) => Promise<ChatRetentionResult>;
-    getLiveThought: () => Promise<ChatLiveThoughtResult>;
+
     getAutonomyMode: () => Promise<ChatAutonomyModeResult>;
     setAutonomyMode: (payload: ChatSetAutonomyModeRequest) => Promise<ChatAutonomyModeResult>;
     resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
     listPendingActions: () => Promise<ChatListPendingActionsResponse>;
+    executeChipAction: (payload: ChatExecuteChipActionRequest) => Promise<ChatExecuteChipActionResponse>;
   };
   backup: {
     list: () => Promise<BackupListResponse>;

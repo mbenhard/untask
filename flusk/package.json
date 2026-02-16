@@ -1,6 +1,6 @@
 {
   "name": "flusk",
-  "productName": "flusk",
+  "productName": "Flusk",
   "version": "1.0.0",
   "description": "AI-powered task management assistant for solo freelancers",
   "main": ".vite/build/index.js",

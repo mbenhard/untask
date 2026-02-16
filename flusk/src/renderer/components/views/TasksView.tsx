@@ -47,8 +47,8 @@ const GROUP_CONFIG: Array<{
   emptyMessage: string;
 }> = [
   { key: 'in_progress', label: 'In Progress', emptyMessage: 'No tasks in progress.' },
-  { key: 'active', label: 'Active', emptyMessage: 'No active tasks.' },
-  { key: 'waiting', label: 'Waiting', emptyMessage: 'No waiting tasks.' },
+  { key: 'active', label: 'Backlog', emptyMessage: 'No tasks in backlog.' },
+  { key: 'waiting', label: 'On Hold', emptyMessage: 'No tasks on hold.' },
   { key: 'done', label: 'Done', emptyMessage: 'No completed tasks.' },
 ];
 

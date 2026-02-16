@@ -33,6 +33,8 @@ export type Task = {
   valueAtRisk: number | null;
   // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
   lastClientTouchAt: string | null;
+  recurrence: string | null;
+  recurrenceSourceId: string | null;
   order: number | null;
   createdAt: string | null;
   completedAt: string | null;
@@ -43,6 +45,7 @@ export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   toolCalls: string | null;
+  chips: string | null;
   createdAt: string | null;
 };
 

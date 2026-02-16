@@ -83,18 +83,15 @@ vi.mock('../services/scratchpadService', () => ({
   })),
 }));
 
-vi.mock('./liveThought', () => ({
-  generateLiveThought: vi.fn(() => ({
-    thought: 'Focus on one high-impact task.',
-    actionLabel: 'Start now',
-    suggestedPrompt: 'What is the most important task?',
-    generatedAt: new Date().toISOString(),
-  })),
-}));
-
 vi.mock('./memory', () => ({
-  appendPatternEntry: vi.fn((entry: string) => entry),
-  appendProfileEntry: vi.fn((entry: string) => entry),
+  estimateTokens: vi.fn((text: string) => Math.ceil(text.length / 4)),
+  getIdentity: vi.fn(() => '# Identity'),
+  setIdentity: vi.fn(),
+  IDENTITY_TOKEN_HARD_LIMIT: 3000,
+  getMemory: vi.fn(() => ''),
+  readMemorySection: vi.fn(() => ''),
+  updateMemorySection: vi.fn(() => ({})),
+  searchMemory: vi.fn(() => []),
 }));
 
 import * as taskService from '../services/taskService';
@@ -191,6 +188,43 @@ describe('create_task tool', () => {
   });
 });
 
+describe('emit_chips tool', () => {
+  it('defaults responseText to the chip label for response chips', async () => {
+    const result = await executeToolCall({
+      name: 'emit_chips',
+      input: {
+        chips: [
+          { label: 'Review Inbox now', type: 'response' },
+          {
+            label: 'Suggest daily plan',
+            type: 'action',
+            toolCall: { name: 'suggest_daily_plan', args: { maxTasks: 5 } },
+          },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+      expect(result.output.data).toEqual({
+        chips: [
+          {
+            label: 'Review Inbox now',
+            type: 'response',
+            responseText: 'Review Inbox now',
+          },
+          {
+            label: 'Suggest daily plan',
+            type: 'action',
+            toolCall: { name: 'suggest_daily_plan', args: { maxTasks: 5 } },
+          },
+        ],
+      });
+    }
+  });
+});
+
 describe('view intent mapping', () => {
   it('maps update_task to inbox view when resulting task is in inbox', async () => {
     getTaskByIdMock.mockReturnValue({
@@ -239,13 +273,16 @@ describe('view intent mapping', () => {
     } as never);
     listTasksMock.mockReturnValue([] as never);
     completeTaskMock.mockReturnValue({
-      id: 'task-done-1',
-      title: 'Write summary',
-      status: 'done',
-      today: false,
-      priority: 'none',
-      dueDate: null,
-      client: null,
+      completed: {
+        id: 'task-done-1',
+        title: 'Write summary',
+        status: 'done',
+        today: false,
+        priority: 'none',
+        dueDate: null,
+        client: null,
+      },
+      recurredTask: null,
     } as never);
     getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-done-1' } as never);
 

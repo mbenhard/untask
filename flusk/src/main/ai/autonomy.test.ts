@@ -48,8 +48,8 @@ describe('evaluateGate autopilot full trust', () => {
     expect(evaluateGate('autopilot', 'high', false).action).toBe('execute');
   });
 
-  it('auto-executes with hard override in autopilot', () => {
-    expect(evaluateGate('autopilot', 'critical', true).action).toBe('execute');
+  it('still blocks hard override in autopilot', () => {
+    expect(evaluateGate('autopilot', 'critical', true).action).toBe('pending');
   });
 
   it('still blocks hard override in safe mode', () => {

@@ -1,18 +1,18 @@
+import type { Task } from '../db/schema';
 import type {
   AssistantLiveContext,
-  AssistantMemorySnapshot,
   IdentityContextDebugSnapshot,
 } from '../../types/assistant';
-import { orchestrateChatWithIdentityKernel } from '../assistant/identityKernel';
+import { getIdentity, estimateTokens } from './memory';
 import { getToolDefinitions } from './tools';
 import type { ChatModelId } from './models';
 import { getModelWebSearchConfig } from './models';
 
+// ─── Types ──────────────────────────────────────────────────
+
 export type BuildSystemPromptInput = {
   userMessage: string;
-  tokenBudget?: number;
-  memory?: Partial<AssistantMemorySnapshot>;
-  liveContext?: Partial<AssistantLiveContext>;
+  liveContext: AssistantLiveContext;
   modelId?: ChatModelId;
 };
 
@@ -21,95 +21,381 @@ export type BuiltSystemPrompt = {
   contextSnapshot: IdentityContextDebugSnapshot;
 };
 
-export const buildSystemPrompt = async (
-  input: BuildSystemPromptInput,
-): Promise<BuiltSystemPrompt> => {
-  const kernelResult = await orchestrateChatWithIdentityKernel({
-    userMessage: input.userMessage,
-    tokenBudget: input.tokenBudget,
-    memory: input.memory,
-    liveContext: input.liveContext,
+// ─── Task helpers ───────────────────────────────────────────
+
+const PRIORITY_RANK: Record<NonNullable<Task['priority']>, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+  none: 3,
+};
+
+const toIsoDate = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const taskSortKey = (task: Task): [number, number, number, string] => {
+  const dueAt = toIsoDate(task.dueDate) ?? Number.POSITIVE_INFINITY;
+  const priority = task.priority ?? 'none';
+  return [
+    task.today ? 0 : 1,
+    dueAt,
+    PRIORITY_RANK[priority],
+    task.title.toLowerCase(),
+  ];
+};
+
+const sortTasks = (tasks: Task[]): Task[] =>
+  [...tasks].sort((left, right) => {
+    const a = taskSortKey(left);
+    const b = taskSortKey(right);
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] < b[i]) return -1;
+      if (a[i] > b[i]) return 1;
+    }
+    return left.id.localeCompare(right.id);
   });
 
-  if (!kernelResult.ok) {
-    throw new Error(
-      `Identity kernel unavailable for system prompt assembly: ${kernelResult.diagnostics.join(
-        '; ',
-      )}`,
-    );
+// ─── Time helpers ───────────────────────────────────────────
+
+const inferDaySegment = (now: Date): 'morning' | 'afternoon' | 'evening' => {
+  const hour = now.getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 18) return 'afternoon';
+  return 'evening';
+};
+
+const formatLocalTimestamp = (now: Date, timezone: string): string => {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+      timeZone: timezone,
+    }).format(now);
+  } catch {
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+    }).format(now);
+  }
+};
+
+// ─── Section builders ───────────────────────────────────────
+
+const buildMetaSection = (now: Date, timezone: string): string => {
+  const lines = [
+    '## Now',
+    `- ${formatLocalTimestamp(now, timezone)} (${timezone})`,
+    `- Day segment: ${inferDaySegment(now)}`,
+  ];
+  return lines.join('\n');
+};
+
+const buildLiveStateSection = (
+  liveContext: AssistantLiveContext,
+  now: Date,
+): string => {
+  const activeTasks = sortTasks(
+    liveContext.tasks.filter((task) => task.status !== 'done'),
+  );
+  const todayTasks = activeTasks.filter((task) => task.today);
+  const overdueTasks = activeTasks.filter((task) => {
+    const dueAt = toIsoDate(task.dueDate);
+    return dueAt !== null && dueAt < now.getTime();
+  });
+  const dueSoonTasks = activeTasks.filter((task) => {
+    const dueAt = toIsoDate(task.dueDate);
+    if (dueAt === null) return false;
+    const hoursUntilDue = (dueAt - now.getTime()) / (1000 * 60 * 60);
+    return hoursUntilDue > 0 && hoursUntilDue <= 24;
+  });
+  const staleClientTasks = activeTasks.filter((task) => {
+    const touchedAt = toIsoDate(task.lastClientTouchAt);
+    if (touchedAt === null) return false;
+    return (now.getTime() - touchedAt) / (1000 * 60 * 60 * 24) >= 7;
+  });
+  const completedToday = liveContext.tasks.filter((task) => {
+    if (task.status !== 'done' || !task.completedAt) return false;
+    const completedDate = new Date(task.completedAt).toISOString().slice(0, 10);
+    const todayDate = now.toISOString().slice(0, 10);
+    return completedDate === todayDate;
+  });
+
+  const overdueValueAtRisk = overdueTasks.reduce(
+    (sum, task) => sum + (task.valueAtRisk ?? 0),
+    0,
+  );
+
+  let riskLevel = 'low';
+  if (overdueTasks.length >= 3 || staleClientTasks.length >= 2 || overdueValueAtRisk >= 2000) {
+    riskLevel = 'high';
+  } else if (overdueTasks.length > 0 || staleClientTasks.length > 0 || overdueValueAtRisk > 0) {
+    riskLevel = 'medium';
   }
 
-  const toolNames = getToolDefinitions()
-    .map((toolDefinition) => toolDefinition.name)
-    .join(', ');
+  // Today tasks with detail
+  const todayLines = todayTasks.slice(0, 10).map((task) => {
+    const tags = [
+      task.priority && task.priority !== 'none' ? task.priority : null,
+      task.dueDate ? `due:${task.dueDate}` : null,
+      overdueTasks.some((o) => o.id === task.id) ? 'OVERDUE' : null,
+      typeof task.valueAtRisk === 'number' && task.valueAtRisk > 0
+        ? `$${task.valueAtRisk} at risk`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
 
-  const webSearchConfig = input.modelId
-    ? getModelWebSearchConfig(input.modelId)
-    : { supportsWebSearch: false };
+    return `- [${task.id}] ${task.title}${tags ? ` (${tags})` : ''}`;
+  });
 
-  const webSearchGuidance = webSearchConfig.supportsWebSearch
+  const lines = [
+    '## Your Current State',
+    '',
+    `### Today (${todayTasks.length} tasks)`,
+    ...(todayLines.length > 0 ? todayLines : ['- (empty — you should propose a plan)']),
+    '',
+    '### Situation',
+    `- Active: ${activeTasks.length} tasks | Inbox: ${liveContext.inboxCount} unprocessed`,
+    `- Overdue: ${overdueTasks.length} tasks${overdueValueAtRisk > 0 ? ` ($${overdueValueAtRisk} at risk)` : ''}`,
+    `- Due within 24h: ${dueSoonTasks.length}`,
+  ];
+
+  if (staleClientTasks.length > 0) {
+    lines.push(`- Stale client touchpoints: ${staleClientTasks.length} (>7 days)`);
+  }
+
+  lines.push(`- Risk level: ${riskLevel}`);
+
+  if (completedToday.length > 0) {
+    lines.push('', '### Momentum', `- Completed today: ${completedToday.length}`);
+  }
+
+  return lines.join('\n');
+};
+
+const buildProtocolSection = (
+  toolNames: string,
+  supportsWebSearch: boolean,
+): string => {
+  const webSearchGuidance = supportsWebSearch
     ? [
         '',
-        '### Web Search',
-        '- You have access to web search. Use it when the user asks about current events, facts you\'re unsure about, prices, weather, or anything outside your training data.',
+        '### 9. Web Search',
+        "- You have access to web search. Use it for current events, facts outside your training data, prices, or anything time-sensitive.",
         '- Cite sources when presenting search results.',
       ]
     : [
         '',
-        '### Web Search',
-        '- This model does not support web search. If the user asks for current information, suggest switching to Kimi K2.5 or Claude Haiku 4.5 which support web search.',
+        '### 9. Web Search',
+        '- This model does not support web search. If Marcus asks for current information, suggest switching to a model that supports it.',
       ];
 
-  const policySection = [
-    '## Runtime Tool Policy',
+  return [
+    '## Operating Protocol',
     '',
-    '### Action Bias',
-    '- When the user asks you to DO something (create, update, complete, delete, move, plan, remember), you MUST call the appropriate tool. Never describe what you would do — just do it.',
-    '- If you lack required information (like a task ID), call list_tasks to find it first, then call the mutation tool.',
-    '- Only respond with text (no tool call) when the user is asking a question, making conversation, or the request is genuinely ambiguous.',
-    '- NEVER say "I\'ll do that" or "Let me do that" without immediately calling a tool. Words without action is a failure mode.',
+    '### 1. Action Bias',
+    'When Marcus asks you to DO something — create, update, complete, delete, move, plan, schedule, remember — call the tool immediately. Never describe what you would do. Just do it.',
     '',
-    '### Response Style',
-    '- Default to concise, direct, accountability-oriented responses.',
-    '- Proactively suggest next actions when drift, risk, or ambiguity appears.',
-    '- After tool execution, summarize what you did and propose the next step.',
+    'If you need a task ID, call list_tasks to find it first, then call the mutation.',
     '',
-    '### Thinking Before Acting',
-    '- Assess what the user needs before calling tools. Think about which tools are needed and in what order.',
-    '- Chain multiple tool calls when the task requires several steps (e.g., "plan my day" may need suggest_daily_plan then multiple set_today calls).',
-    '- If a request is vague or missing required inputs, ask for clarification instead of guessing.',
-    '- Use conversation history for context continuity — refer to recent messages before asking questions the user already answered.',
+    'The only time you respond with text alone (no tool call) is when Marcus is asking a question, making conversation, or the request is genuinely ambiguous.',
     '',
-    '### Task Resolution',
-    '- When the user refers to a task by name, description, or partial match, use list_tasks with a search query to find the matching task ID before calling mutation tools.',
-    '- If multiple tasks match, present the options and ask which one.',
-    '- If no tasks match, tell the user and ask for clarification.',
+    "Failure mode to avoid: \"I'll do that for you\" followed by no tool call. Words without action is never acceptable.",
     '',
-    '### Safety and Confirmation',
-    '- Never perform destructive or high-financial actions without confirmation.',
-    '- If a requested mutation is blocked by policy, explain what confirmation is required.',
+    '### 2. Response Shape',
+    '- Lead with what you did or what matters most.',
+    '- Follow with the next recommended action.',
+    '- End with chips when applicable.',
+    '- Maximum 3-4 sentences for routine operations. Longer only for planning or analysis.',
+    '',
+    "GOOD: \"Moved Autogeber Invoice to Monday. That frees today for the Lorinčík handoff — want me to add it to Today?\"",
+    "BAD: \"Sure! I'd be happy to help you move that task. Let me go ahead and reschedule the Autogeber Invoice to next Monday for you. Is there anything else you'd like me to do?\"",
+    '',
+    '### 3. Interactive Chips',
+    'You can attach chips to your messages for quick interactions. Use the emit_chips tool to attach them.',
+    '',
+    '**When to use chips:**',
+    '- ALWAYS when you need clarification and there\'s a finite set of options',
+    '- ALWAYS after completing an action (offer logical next steps)',
+    '- ALWAYS when presenting choices or alternatives',
+    '- When suggesting a plan (offer accept/modify/reject)',
+    '',
+    '**When NOT to use chips:**',
+    '- Open-ended questions with no finite answer set',
+    '- Simple confirmations where yes/no is enough (just ask)',
+    '- When the user is in the middle of explaining something',
+    '',
+    '**Chip rules:**',
+    '- 2-4 chips per message. Never more than 4.',
+    '- Labels: 2-5 words maximum. Action-oriented.',
+    '- Response chips for disambiguation: use the exact text Marcus would type.',
+    '- Action chips for next steps: each maps to one tool call.',
+    '',
+    '### 4. Memory & Self-Management',
+    '',
+    '**Reading Memory:**',
+    '- Call read_memory when a client, project, or preference is relevant to the current request',
+    '- Call read_memory during planning or scheduling to check for known workflows',
+    "- Don't read Memory on every message — only when the context demands it",
+    '',
+    '**Writing Memory:**',
+    '- Save when Marcus explicitly states a preference ("I always...", "My client...", "I prefer...")',
+    '- Save when you observe a pattern repeated across 2+ interactions',
+    '- Save self-corrections to prevent repeating mistakes',
+    '- Announce what you\'re saving: "Noted — saving to Memory: [fact]"',
+    '- Keep entries atomic. One fact per line. Organized by section heading.',
+    '',
+    '**Writing Journal:**',
+    '- After meaningful interactions where you learned something',
+    '- After every Identity or Memory update (mandatory — log the diff and reason)',
+    '- After proactive interventions (did the nudge help?)',
+    '- When you make a mistake (self-correction: what went wrong, what to do differently)',
+    '',
+    '**Updating Identity:**',
+    "- Almost never. Only when you've confirmed a behavioral shift across multiple sessions.",
+    '- Before updating, read your Journal to verify the pattern is real, not a one-off.',
+    '- Log every Identity change to Journal with a before/after diff and reasoning.',
+    "- Keep Identity under 3000 tokens. If it's growing, compress — don't truncate meaning.",
+    '',
+    '### 5. Thinking Before Acting',
+    '- Assess what Marcus needs before reaching for tools.',
+    '- Chain multiple tool calls when a task needs several steps. ("Plan my day" might need list_tasks → suggest_daily_plan → set_today × 3.)',
+    "- Use conversation history for context continuity. Don't re-ask things Marcus already answered.",
+    '- If a request is genuinely vague and you can\'t resolve it with chips, ask one clear question.',
+    '',
+    '### 6. Task Resolution',
+    'When Marcus refers to a task by name or partial description:',
+    '1. Call list_tasks with a search query to find matches.',
+    '2. If exactly one match: proceed immediately.',
+    '3. If multiple matches: present them as response chips, not a numbered list.',
+    '4. If no matches: tell Marcus and ask for clarification.',
+    '',
+    '### 7. Proactive Behavior',
+    'You are not a passive tool. You monitor the situation and speak first when:',
+    '- The Today list is empty during working hours → propose a plan',
+    '- Tasks are overdue and accumulating → surface the top blocker',
+    '- A client touchpoint has gone stale (>7 days) → suggest a brief update',
+    '- High-value work is idle → nudge toward the revenue-critical task',
+    '- A deadline is approaching (within 48h) and priority is low → escalate and explain why',
+    '',
+    'When speaking proactively:',
+    '- Be brief. One observation, one recommendation, chips for action.',
+    "- Don't nag. If Marcus dismisses a nudge, respect it. Wait at least 2 hours before nudging the same topic.",
+    '- Always include an [Undo] chip when you autonomously changed something.',
+    '',
+    '### 8. Safety & Confirmation',
+    '- Never perform destructive actions without confirmation, regardless of autonomy mode.',
+    '- When a mutation is blocked by policy, explain clearly what confirmation is needed.',
+    '- If a tool call fails, tell Marcus what happened. Never retry silently.',
+    '- Never create something and immediately delete/modify it in the same turn.',
     '',
     '### Tool Selection',
-    '- For user requests to create/update/complete/move/today/plan/parse/undo, call matching tools only when required inputs are explicit and sufficient.',
-    '- If required mutation inputs are missing or ambiguous, ask a concise clarification question before any write action.',
     `- Available tools: ${toolNames}.`,
-    '',
-    '### Tool Error Policy',
-    '- If a tool call returns an error, do NOT retry it. Inform the user what went wrong.',
-    '- Never create a resource and then immediately delete or modify it in the same turn.',
-    '- After executing a tool, summarize the result concisely and wait for user input.',
-    '',
-    '### Memory Behavior',
-    '- When the user shares stable facts, preferences, or patterns, save them using the appropriate tool (update_user_profile, update_patterns).',
-    '- Announce what you\'re saving: "I\'ll remember that [X]. [Saving to profile/patterns]"',
-    '- For inferred patterns (not explicitly stated), ask before saving.',
-    '- Don\'t save ephemeral context, things already captured as tasks, or low-confidence inferences.',
-    '- Chat messages may be cleared at any time. If something matters long-term, save it to memory — don\'t rely on chat history.',
     ...webSearchGuidance,
   ].join('\n');
+};
+
+// ─── Main builder ───────────────────────────────────────────
+
+export const buildSystemPrompt = (
+  input: BuildSystemPromptInput,
+): BuiltSystemPrompt => {
+  const now = input.liveContext.now
+    ? new Date(input.liveContext.now)
+    : new Date();
+  const timezone =
+    input.liveContext.timezone ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // 1. Meta
+  const metaSection = buildMetaSection(now, timezone);
+
+  // 2. Identity (full, untruncated from DB)
+  const identity = getIdentity();
+
+  // 3. Live State
+  const liveStateSection = buildLiveStateSection(input.liveContext, now);
+
+  // 4. Operating Protocol
+  const toolNames = getToolDefinitions()
+    .map((t) => t.name)
+    .join(', ');
+  const webSearchConfig = input.modelId
+    ? getModelWebSearchConfig(input.modelId)
+    : { supportsWebSearch: false };
+  const protocolSection = buildProtocolSection(
+    toolNames,
+    webSearchConfig.supportsWebSearch,
+  );
+
+  // Assemble
+  const compiledPrompt = [
+    metaSection,
+    '',
+    '---',
+    '',
+    identity,
+    '',
+    '---',
+    '',
+    liveStateSection,
+    '',
+    '---',
+    '',
+    protocolSection,
+  ].join('\n');
+
+  const estimatedTotalTokens = estimateTokens(compiledPrompt);
+
+  // Build debug snapshot (simplified — no more section scoring)
+  const contextSnapshot: IdentityContextDebugSnapshot = {
+    generatedAt: now.toISOString(),
+    timezone,
+    tokenBudget: estimatedTotalTokens, // No budget system — report actual size
+    estimatedTotalTokens,
+    sectionOrder: ['meta', 'identity', 'live-state', 'protocol'],
+    sections: [
+      {
+        id: 'meta',
+        title: 'Now',
+        estimatedTokens: estimateTokens(metaSection),
+        included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+      {
+        id: 'identity',
+        title: 'Identity',
+        estimatedTokens: estimateTokens(identity),
+        included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+      {
+        id: 'live-state',
+        title: 'Your Current State',
+        estimatedTokens: estimateTokens(liveStateSection),
+        included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+      {
+        id: 'protocol',
+        title: 'Operating Protocol',
+        estimatedTokens: estimateTokens(protocolSection),
+        included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+    ],
+    compiledPrompt,
+  };
 
   return {
-    modelInputPrompt: `${kernelResult.context.compiledPrompt}\n\n${policySection}`,
-    contextSnapshot: kernelResult.context,
+    modelInputPrompt: compiledPrompt,
+    contextSnapshot,
   };
 };

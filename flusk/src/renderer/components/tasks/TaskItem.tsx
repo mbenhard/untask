@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { Bookmark, Check, Copy, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Bookmark, Check, Copy, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
@@ -18,6 +18,8 @@ export interface TaskItemProps {
   isFocused: boolean;
   isEditingTitle: boolean;
   hasChildren: boolean;
+  childrenCount: number;
+  childrenDoneCount: number;
   onStartTitleEdit: (id: string) => void;
   onEndTitleEdit: () => void;
   onToggleExpand: (id: string) => void;
@@ -45,6 +47,8 @@ export const TaskItem = ({
   isFocused,
   isEditingTitle,
   hasChildren,
+  childrenCount,
+  childrenDoneCount,
   onStartTitleEdit,
   onEndTitleEdit,
   onToggleExpand,
@@ -149,9 +153,10 @@ export const TaskItem = ({
       body: task.body,
       status: task.status === 'done' ? 'active' : task.status,
       priority: task.priority,
-      today: task.today,
+      today: task.today ?? undefined,
       client: task.client,
       dueDate: task.dueDate,
+      recurrence: task.recurrence,
     });
     setMenuOpen(false);
   };
@@ -277,9 +282,9 @@ export const TaskItem = ({
         </div>
 
         <div className="ml-auto flex items-center gap-1">
-          {task.client ? (
+          {task.recurrence ? (
             <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
-              {task.client}
+              {task.recurrence}
             </span>
           ) : null}
 
@@ -288,6 +293,12 @@ export const TaskItem = ({
               {dueDateLabel}
             </span>
           ) : null}
+
+          {childrenCount > 0 && (
+            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
+              {childrenDoneCount}/{childrenCount}
+            </span>
+          )}
 
           {isCompleted && completedAtLabel ? (
             <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">
@@ -349,6 +360,32 @@ export const TaskItem = ({
             >
               {menuView === 'main' ? (
                 <div>
+                  {task.status === 'inbox' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void updateTask({ id: task.id, status: 'active' });
+                        setMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <ArrowRightLeft className="size-3" />
+                      Move to Tasks
+                    </button>
+                  )}
+                  {task.status !== 'inbox' && task.status !== 'done' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void updateTask({ id: task.id, status: 'inbox' });
+                        setMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <ArrowRightLeft className="size-3" />
+                      Move to Inbox
+                    </button>
+                  )}
                   {showMoveToProject && (
                     <button
                       type="button"

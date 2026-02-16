@@ -98,7 +98,10 @@ export type ProactiveTriggerType =
   | 'empty_today_list'
   | 'overdue_accumulation'
   | 'stale_client_touchpoint'
-  | 'value_at_risk_idle';
+  | 'value_at_risk_idle'
+  | 'morning_briefing'
+  | 'deadline_approaching'
+  | 'time_reminder';
 
 export type ProactiveTriggerAction = {
   label: string;

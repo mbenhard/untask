@@ -4,7 +4,7 @@ import { useSearchStore } from './searchStore';
 
 const createMockSearchApi = () => ({
   query: vi.fn(async () => ({
-    active: [
+    results: [
       {
         id: '1',
         parentId: null,
@@ -17,8 +17,6 @@ const createMockSearchApi = () => ({
         dueDate: null,
         snippet: '<mark>Active</mark> task',
       },
-    ],
-    done: [
       {
         id: '2',
         parentId: 'p1',
@@ -44,8 +42,7 @@ describe('searchStore', () => {
     useSearchStore.setState({
       isOpen: false,
       query: '',
-      activeResults: [],
-      doneResults: [],
+      results: [],
       total: 0,
       isSearching: false,
       selectedIndex: 0,
@@ -58,8 +55,7 @@ describe('searchStore', () => {
     const state = useSearchStore.getState();
     expect(state.isOpen).toBe(true);
     expect(state.query).toBe('');
-    expect(state.activeResults).toEqual([]);
-    expect(state.doneResults).toEqual([]);
+    expect(state.results).toEqual([]);
     expect(state.selectedIndex).toBe(0);
   });
 
@@ -69,13 +65,12 @@ describe('searchStore', () => {
     expect(useSearchStore.getState().isOpen).toBe(false);
   });
 
-  it('searches and populates grouped results', async () => {
+  it('searches and populates results', async () => {
     useSearchStore.setState({ isOpen: true, query: 'task' });
     await useSearchStore.getState().search();
 
     const state = useSearchStore.getState();
-    expect(state.activeResults).toHaveLength(1);
-    expect(state.doneResults).toHaveLength(1);
+    expect(state.results).toHaveLength(2);
     expect(state.total).toBe(2);
     expect(state.isSearching).toBe(false);
     expect(state.selectedIndex).toBe(0);
@@ -86,8 +81,7 @@ describe('searchStore', () => {
     await useSearchStore.getState().search();
 
     const state = useSearchStore.getState();
-    expect(state.activeResults).toEqual([]);
-    expect(state.doneResults).toEqual([]);
+    expect(state.results).toEqual([]);
     expect(state.total).toBe(0);
   });
 
@@ -95,10 +89,8 @@ describe('searchStore', () => {
     useSearchStore.setState({
       isOpen: true,
       query: 'task',
-      activeResults: [
+      results: [
         { id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
-      ],
-      doneResults: [
         { id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
       total: 2,
@@ -118,12 +110,10 @@ describe('searchStore', () => {
     expect(useSearchStore.getState().selectedIndex).toBe(0); // clamped at 0
   });
 
-  it('getSelectedResult returns correct item across groups', () => {
+  it('getSelectedResult returns correct item', () => {
     useSearchStore.setState({
-      activeResults: [
+      results: [
         { id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
-      ],
-      doneResults: [
         { id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
       total: 2,

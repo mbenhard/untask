@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { stepCountIs, streamText } from 'ai';
+import { stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
+  ChipAction,
   ChatStreamErrorCode,
   ChatSendResultPayload,
   ChatStreamEvent,
@@ -10,6 +11,7 @@ import type {
   ChatToolExecutionSummary,
   PersistedChatToolMetadata,
 } from '../../types/chat';
+import type { ProactiveTriggerType } from '../../types/assistant';
 import {
   getRecentChatMessages,
   saveChatMessage,
@@ -33,7 +35,6 @@ const AUTO_JOURNAL_LAST_WRITE_AT_KEY = 'ai_journal_last_auto_write_at';
 const AUTO_JOURNAL_COOLDOWN_MS = 20 * 60 * 1000;
 const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
-const DEFAULT_TOKEN_BUDGET = 12_000;
 const HISTORY_WINDOW_LIMIT = 60;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
 const TOOL_MUTATION_NAMES = new Set([
@@ -45,8 +46,8 @@ const TOOL_MUTATION_NAMES = new Set([
   'parse_notes',
   'edit_scratchpad',
   'undo_last_action',
-  'update_user_profile',
-  'update_patterns',
+  'update_identity',
+  'update_memory',
 ]);
 
 type ClassifiedChatError = {
@@ -402,12 +403,18 @@ export const generateToolCallDescription = (
       return 'Writing journal entry';
     case 'read_journal':
       return 'Reading journal entries';
-    case 'generate_live_thought':
-      return 'Generating live thought';
-    case 'update_user_profile':
-      return 'Saving profile memory';
-    case 'update_patterns':
-      return 'Saving workflow pattern';
+    case 'update_identity':
+      return 'Updating identity document';
+    case 'read_memory':
+      return 'Reading memory';
+    case 'update_memory':
+      return input.section ? `Updating memory section "${truncate(String(input.section), 30)}"` : 'Updating memory';
+    case 'search_memory':
+      return input.query ? `Searching memory for "${truncate(String(input.query), 30)}"` : 'Searching memory';
+    case 'search_journal':
+      return input.query ? `Searching journal for "${truncate(String(input.query), 30)}"` : 'Searching journal';
+    case 'emit_chips':
+      return 'Attaching chips';
     case 'improve_task':
       return input.id ? `Analyzing task ${String(input.id)}` : 'Analyzing task';
     case 'list_tasks':
@@ -540,7 +547,8 @@ const runAssistantStream = async (
   let reasoningText = '';
   const stepDescriptions: string[] = [];
   let finalizedTextFromModel = '';
-  let cachedPrompt: Awaited<ReturnType<typeof buildSystemPrompt>> | null = null;
+  let emittedChips: ChipAction[] | undefined;
+  let cachedPrompt: ReturnType<typeof buildSystemPrompt> | null = null;
 
   try {
     let streamCompleted = false;
@@ -550,15 +558,11 @@ const runAssistantStream = async (
       let attemptHadToolExecution = false;
 
       try {
-        let builtPrompt: Awaited<ReturnType<typeof buildSystemPrompt>> | null = cachedPrompt;
+        let builtPrompt: ReturnType<typeof buildSystemPrompt> | null = cachedPrompt;
         if (!builtPrompt) {
-          const { memory, liveContext } = buildCanonicalRuntimeContext({
-            journalLimit: 24,
-          });
-          builtPrompt = await buildSystemPrompt({
+          const { liveContext } = buildCanonicalRuntimeContext();
+          builtPrompt = buildSystemPrompt({
             userMessage: input.userMessage,
-            tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
-            memory,
             liveContext,
             modelId: input.modelId,
           });
@@ -589,29 +593,34 @@ const runAssistantStream = async (
         });
 
         // Build final messages, converting last user message to multimodal if images present
-        const hasImages = input.images && input.images.length > 0;
+        const images = input.images ?? [];
+        const hasImages = images.length > 0;
         const visionCapable = modelSupportsVision(input.modelId);
 
-        const sdkMessages = conversationMessages.map((msg, idx) => {
+        const sdkMessages: ModelMessage[] = conversationMessages.map((msg, idx) => {
           const isLastUserMessage = idx === conversationMessages.length - 1 && msg.role === 'user';
 
           if (isLastUserMessage && hasImages) {
             if (visionCapable) {
               // Build multimodal content with images + text
               const parts: Array<{ type: 'image'; image: string } | { type: 'text'; text: string }> = [];
-              for (const dataUrl of input.images!) {
+              for (const dataUrl of images) {
                 parts.push({ type: 'image', image: dataUrl });
               }
               parts.push({ type: 'text', text: msg.content });
-              return { role: msg.role, content: parts };
+              return { role: 'user', content: parts };
             }
 
             // Non-vision model: strip images, prepend note
-            const note = `[User attached ${input.images!.length} image(s), but the current model doesn't support vision.]\n\n`;
-            return { role: msg.role, content: note + msg.content };
+            const note = `[User attached ${images.length} image(s), but the current model doesn't support vision.]\n\n`;
+            return { role: 'user', content: note + msg.content };
           }
 
-          return msg;
+          if (msg.role === 'assistant') {
+            return { role: 'assistant', content: msg.content };
+          }
+
+          return { role: 'user', content: msg.content };
         });
 
         const result = streamText({
@@ -747,6 +756,20 @@ const runAssistantStream = async (
               };
               toolExecutions.push(execution);
 
+              // Capture chips from emit_chips tool results
+              let toolChips: ChipAction[] | undefined;
+              if (
+                part.toolName === 'emit_chips' &&
+                status === 'success' &&
+                envelope?.data &&
+                typeof envelope.data === 'object' &&
+                'chips' in envelope.data &&
+                Array.isArray((envelope.data as Record<string, unknown>).chips)
+              ) {
+                toolChips = (envelope.data as Record<string, unknown>).chips as ChipAction[];
+                emittedChips = toolChips;
+              }
+
               emit({
                 type: 'tool_call_completed',
                 requestId: input.requestId,
@@ -756,6 +779,7 @@ const runAssistantStream = async (
                 message,
                 summary,
                 actionCard,
+                ...(toolChips ? { chips: toolChips } : {}),
               });
               break;
             }
@@ -944,6 +968,7 @@ const runAssistantStream = async (
       },
       ...(reasoningText.length > 0 ? { reasoningText } : {}),
       ...(stepDescriptions.length > 0 ? { stepDescriptions } : {}),
+      ...(emittedChips ? { chips: emittedChips } : {}),
     };
 
     if (isChatRequestCanceled(input.requestId)) {
@@ -957,6 +982,7 @@ const runAssistantStream = async (
           ? finalizedText
           : 'No assistant text was generated for this turn.',
       toolCalls: JSON.stringify(metadata),
+      chips: emittedChips ? JSON.stringify(emittedChips) : null,
     });
 
     maybeWriteMeaningfulInteractionJournal({
@@ -974,6 +1000,7 @@ const runAssistantStream = async (
       requestId: input.requestId,
       assistantMessage,
       actionCards,
+      ...(emittedChips ? { chips: emittedChips } : {}),
     });
   } catch (error) {
     if (isChatRequestCanceled(input.requestId)) {
@@ -1024,6 +1051,7 @@ export const startChatTurn = async (
       role: 'user',
       content,
       toolCalls: JSON.stringify(userMessageMeta),
+      chips: null,
     });
 
     void runAssistantStream({
@@ -1049,5 +1077,31 @@ export const startChatTurn = async (
 export const cancelActiveChatTurns = (): void => {
   activeChatRequestIds.forEach((requestId) => {
     canceledChatRequestIds.add(requestId);
+  });
+};
+
+// ─── Proactive turn (no user message saved) ─────────────────
+
+export type StartProactiveTurnInput = {
+  triggerMessage: string;
+  triggerType: ProactiveTriggerType;
+  emit: (event: ChatStreamEvent) => void;
+};
+
+export const startProactiveTurn = async (
+  input: StartProactiveTurnInput,
+): Promise<void> => {
+  const requestId = `proactive-${randomUUID()}`;
+  const modelId = getSelectedModelId();
+  activeChatRequestIds.add(requestId);
+  canceledChatRequestIds.delete(requestId);
+
+  // No user message saved to DB — synthetic trigger is invisible to chat history.
+  // The assistant response will be saved by runAssistantStream as normal.
+  await runAssistantStream({
+    requestId,
+    userMessage: input.triggerMessage,
+    modelId,
+    emit: input.emit,
   });
 };

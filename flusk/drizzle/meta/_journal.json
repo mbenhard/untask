@@ -15,6 +15,20 @@
       "when": 1771253614923,
       "tag": "0001_task_integrity_memory_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771275413667,
+      "tag": "0002_fancy_true_believers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771276800000,
+      "tag": "0003_journal_archive_chips",
+      "breakpoints": true
     }
   ]
 }

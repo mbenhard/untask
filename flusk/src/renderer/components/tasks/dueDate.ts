@@ -1,4 +1,5 @@
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/;
+const ISO_TIME_PATTERN = /T(\d{2}):(\d{2})(?:$|[:.Z+-])/;
 
 type DateParts = {
   year: number;
@@ -61,6 +62,26 @@ export const parseDueDate = (iso?: string | null): Date | undefined => {
   return date;
 };
 
+export const parseDueTime = (iso?: string | null): string | null => {
+  if (!iso) {
+    return null;
+  }
+
+  const match = ISO_TIME_PATTERN.exec(iso);
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 export const formatDueDateDisplay = (iso: string): string => {
   const parts = parseDateParts(iso);
   if (!parts) {
@@ -72,7 +93,9 @@ export const formatDueDateDisplay = (iso: string): string => {
     return iso;
   }
 
-  return `${String(parts.day).padStart(2, '0')}.${String(parts.month).padStart(2, '0')}.${String(parts.year % 100).padStart(2, '0')}`;
+  const dateStr = `${String(parts.day).padStart(2, '0')}.${String(parts.month).padStart(2, '0')}.${String(parts.year % 100).padStart(2, '0')}`;
+  const time = parseDueTime(iso);
+  return time ? `${dateStr} ${time}` : dateStr;
 };
 
 export const toISODate = (date: Date): string => {
@@ -80,4 +103,12 @@ export const toISODate = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+export const toISODateTime = (date: Date, time?: string | null): string => {
+  const dateStr = toISODate(date);
+  if (!time) {
+    return dateStr;
+  }
+  return `${dateStr}T${time}`;
 };

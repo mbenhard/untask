@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type {
   ActionLifecycle,
   ChatActionCard,
+  ChipAction,
   ChatToolStatus,
   ChatViewIntent,
 } from '../../types/chat';
@@ -39,12 +40,22 @@ import {
 import {
   readJournalEntries,
   readJournalEntriesSchema,
+  searchJournalEntries,
   writeJournalEntry,
   writeJournalEntrySchema,
 } from '../services/journalService';
 import { getScratchpad, saveScratchpad } from '../services/scratchpadService';
-import { generateLiveThought } from './liveThought';
-import { appendPatternEntry, appendProfileEntry } from './memory';
+import {
+  estimateTokens,
+  getIdentity,
+  setIdentity,
+  IDENTITY_TOKEN_HARD_LIMIT,
+  getMemory,
+  setMemory,
+  readMemorySection,
+  updateMemorySection,
+  searchMemory,
+} from './memory';
 
 const priorityScore: Record<'none' | 'low' | 'medium' | 'high', number> = {
   high: 0,
@@ -122,11 +133,13 @@ const summarizeTask = (task: {
   priority: string | null;
   dueDate: string | null;
   client: string | null;
+  recurrence?: string | null;
 }): string => {
   const tags = [
     task.priority ? `priority:${task.priority}` : null,
     task.client ? `client:${task.client}` : null,
     task.dueDate ? `due:${task.dueDate}` : null,
+    task.recurrence ? `repeats:${task.recurrence}` : null,
   ].filter(Boolean);
 
   return `${task.title}${tags.length > 0 ? ` (${tags.join(', ')})` : ''}`;
@@ -142,6 +155,35 @@ const normalizeForSummary = (value: string, maxLength: number): string => {
     ? normalized
     : `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 };
+
+const normalizeDiffLines = (value: string): string[] =>
+  value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+const summarizeLineDiff = (
+  before: string,
+  after: string,
+): { added: string[]; removed: string[] } => {
+  const beforeLines = normalizeDiffLines(before);
+  const afterLines = normalizeDiffLines(after);
+  const beforeSet = new Set(beforeLines);
+  const afterSet = new Set(afterLines);
+
+  const added = afterLines.filter((line) => !beforeSet.has(line));
+  const removed = beforeLines.filter((line) => !afterSet.has(line));
+
+  return {
+    added: added.slice(0, 3),
+    removed: removed.slice(0, 3),
+  };
+};
+
+const formatDiffItems = (items: string[]): string =>
+  items.length > 0
+    ? items.map((item) => `- ${normalizeForSummary(item, 160)}`).join('\n')
+    : '- (none)';
 
 const resolveTaskLensViewIntent = (task: {
   today?: boolean | null;
@@ -299,12 +341,53 @@ const suggestDailyPlanInputSchema = z.object({
 const undoLastActionInputSchema = z.object({
   taskEventId: z.string().min(1).optional(),
 });
-const updateUserProfileInputSchema = z.object({
-  entry: z.string().trim().min(1),
+const updateIdentityInputSchema = z.object({
+  content: z.string().min(100).max(12000),
 });
-const updatePatternsInputSchema = z.object({
-  entry: z.string().trim().min(1),
+const readMemoryInputSchema = z.object({
+  section: z.string().optional(),
 });
+const updateMemoryInputSchema = z.object({
+  section: z.string().min(1),
+  content: z.string().min(1),
+  mode: z.enum(['merge', 'replace']).default('merge'),
+});
+const searchMemoryInputSchema = z.object({
+  query: z.string().min(1),
+});
+const searchJournalInputSchema = z.object({
+  query: z.string().min(1),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+const emitChipsInputSchema = z.object({
+  chips: z.array(z.object({
+    label: z.string().min(1).max(40),
+    type: z.enum(['action', 'response']),
+    toolCall: z.object({
+      name: z.string(),
+      args: z.record(z.string(), z.unknown()),
+    }).optional(),
+    responseText: z.string().optional(),
+  })).min(1).max(4),
+});
+
+const normalizeChipActions = (chips: ChipAction[]): ChipAction[] =>
+  chips.map((chip) => {
+    if (chip.type !== 'response') {
+      return chip;
+    }
+
+    const responseText = chip.responseText?.trim().length
+      ? chip.responseText.trim()
+      : chip.label.trim();
+
+    return {
+      ...chip,
+      responseText: responseText.length > 0 ? responseText : chip.label,
+    };
+  });
 const improveTaskInputSchema = z.object({
   id: z.string().min(1),
 });
@@ -326,9 +409,6 @@ const fetchUrlToolInputSchema = z.object({
   url: z.string().url(),
   maxLength: z.number().int().min(100).max(10000).default(3000),
 });
-const generateLiveThoughtInputSchema = z.object({
-  focus: z.string().trim().optional(),
-});
 const readScratchpadToolInputSchema = z.object({});
 const editScratchpadToolInputSchema = z.discriminatedUnion('action', [
   z.object({
@@ -348,7 +428,7 @@ const editScratchpadToolInputSchema = z.discriminatedUnion('action', [
 
 const createTaskTool = {
   name: 'create_task',
-  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Optional: priority, dueDate, client, parentId, status.',
+  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Optional: priority, dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), client, parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks").',
   schema: createTaskToolInputSchema,
   execute: async (input, context) => {
     const createdTask = createTask(input, 'ai');
@@ -372,7 +452,7 @@ const createTaskTool = {
 
 const updateTaskTool = {
   name: 'update_task',
-  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, client, notes, or invoice fields. Requires the task id. High-risk changes (invoice transitions, rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
+  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, client, notes, invoice fields, or recurrence. Requires the task id. dueDate supports date "2026-02-17" or date+time "2026-02-17T14:30". recurrence accepts rules like "daily", "weekly", "monthly", "every monday", "every 2 weeks". Set recurrence to null to remove. High-risk changes (invoice transitions, rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
   schema: updateTaskSchema.strict(),
   execute: async (input, context) => {
     const before = getTaskById(input.id);
@@ -463,17 +543,21 @@ const completeTaskTool = {
       );
     }
 
-    const completed = completeTask(input.id, 'ai', {
+    const { completed, recurredTask } = completeTask(input.id, 'ai', {
       completeChildren: input.completeChildren === true,
     });
     const event = getLastTaskEventForTask(completed.id);
 
+    const summary = recurredTask
+      ? `${summarizeTask(completed)}\nRecurring task regenerated: "${recurredTask.title}" — due ${recurredTask.dueDate ?? 'unset'}`
+      : summarizeTask(completed);
+
     return successResult(
       context,
       'complete_task',
-      'Task completed',
-      summarizeTask(completed),
-      { task: completed },
+      recurredTask ? 'Task completed (recurring — next instance created)' : 'Task completed',
+      summary,
+      { task: completed, recurredTask },
       {
         taskId: completed.id,
         taskEventId: event?.id,
@@ -885,59 +969,199 @@ const readJournalTool = {
   },
 } satisfies ToolRegistryEntry<'read_journal', typeof readJournalEntriesSchema>;
 
-const generateLiveThoughtTool = {
-  name: 'generate_live_thought',
-  description: 'Generate a live thought — a short, outcome-focused insight shown in the UI sidebar. Use proactively when you notice something worth surfacing: a deadline approaching, a pattern in the user workflow, or a suggestion that does not warrant a full message. Optional focus parameter narrows the thought topic.',
-  schema: generateLiveThoughtInputSchema,
+// ─── New Proactive Assistant OS tools ──────────────────────
+
+const updateIdentityTool = {
+  name: 'update_identity',
+  description: 'Rewrite your Identity document — your personality, voice, decision rules, and operating principles. This is who you are. Only update when a behavioral shift is confirmed across multiple interactions. You must write_journal with the diff and reasoning BEFORE calling this tool. Content must be under 3000 tokens. Submit the full document, not a patch.',
+  schema: updateIdentityInputSchema,
   execute: async (input) => {
-    const liveThought = generateLiveThought({
-      focus: input.focus ?? null,
+    const tokens = estimateTokens(input.content);
+    if (tokens > IDENTITY_TOKEN_HARD_LIMIT) {
+      return {
+        status: 'error' as const,
+        message: `Identity document is ~${tokens} tokens (limit: ${IDENTITY_TOKEN_HARD_LIMIT}). Compress it — remove redundancy, tighten language, keep the meaning. Don't truncate.`,
+      };
+    }
+
+    const previousIdentity = getIdentity();
+    const diff = summarizeLineDiff(previousIdentity, input.content);
+
+    try {
+      writeJournalEntry({
+        category: 'summary',
+        content: [
+          'Identity update applied.',
+          'Reason: autonomous refinement based on observed behavior effectiveness.',
+          `Estimated tokens: ${tokens}.`,
+          'Added lines:',
+          formatDiffItems(diff.added),
+          'Removed lines:',
+          formatDiffItems(diff.removed),
+        ].join('\n'),
+      });
+    } catch (error) {
+      return {
+        status: 'error' as const,
+        message: error instanceof Error
+          ? `Identity update aborted: journal logging failed (${error.message}).`
+          : 'Identity update aborted: journal logging failed.',
+      };
+    }
+
+    setIdentity(input.content, 'ai');
+
+    return {
+      status: 'success',
+      message: `Identity updated (~${tokens} tokens). Change logged to Journal and memory events.`,
+      data: { estimatedTokens: tokens, journalLogged: true },
+    };
+  },
+} satisfies ToolRegistryEntry<'update_identity', typeof updateIdentityInputSchema>;
+
+const readMemoryTool = {
+  name: 'read_memory',
+  description: "Read your Memory — everything you know about Marcus: clients, preferences, workflows, project context. Returns the full document or a specific section. Call this when a client is mentioned, when planning, or when you need to recall a preference. Don't call on every message — only when context demands it.",
+  schema: readMemoryInputSchema,
+  execute: async (input) => {
+    const content = input.section
+      ? readMemorySection(input.section)
+      : getMemory();
+
+    if (!content.trim()) {
+      return {
+        status: 'success',
+        message: input.section
+          ? `No Memory section found for "${input.section}".`
+          : 'Memory is empty.',
+        data: { content: '' },
+      };
+    }
+
+    return {
+      status: 'success',
+      message: input.section
+        ? `Loaded Memory section "${input.section}".`
+        : `Loaded full Memory (~${estimateTokens(content)} tokens).`,
+      data: { content },
+    };
+  },
+} satisfies ToolRegistryEntry<'read_memory', typeof readMemoryInputSchema>;
+
+const updateMemoryTool = {
+  name: 'update_memory',
+  description: "Update a section of your Memory. Adds new knowledge or replaces existing entries in the specified section. Keep entries atomic (one fact per line). If the section doesn't exist, it's created. Announce what you're saving to Marcus. If Memory exceeds 8000 tokens, you'll get a warning to consolidate.",
+  schema: updateMemoryInputSchema,
+  execute: async (input) => {
+    try {
+      const beforeMemory = getMemory();
+      const beforeSection = readMemorySection(input.section);
+      const result = updateMemorySection(input.section, input.content, input.mode, 'ai');
+      const afterSection = readMemorySection(input.section);
+      const diff = summarizeLineDiff(beforeSection, afterSection);
+      let journalLogged = false;
+
+      try {
+        writeJournalEntry({
+          category: 'summary',
+          content: [
+            `Memory update applied.`,
+            `Section: ${input.section}. Mode: ${input.mode}.`,
+            'Reason: persistent preference/fact/workflow update.',
+            'Added lines:',
+            formatDiffItems(diff.added),
+            'Removed lines:',
+            formatDiffItems(diff.removed),
+          ].join('\n'),
+        });
+        journalLogged = true;
+      } catch {
+        setMemory(beforeMemory, 'system');
+        return {
+          status: 'error' as const,
+          message: `Memory update for section "${input.section}" was rolled back because journal logging failed.`,
+        };
+      }
+
+      const response: { status: 'success'; message: string; data: Record<string, unknown> } = {
+        status: 'success',
+        message: `Memory section "${input.section}" updated (mode: ${input.mode}).`,
+        data: { section: input.section, mode: input.mode, journalLogged },
+      };
+
+      if (result.tokenWarning) {
+        response.message += ` Warning: ${result.tokenWarning}`;
+        response.data.tokenWarning = result.tokenWarning;
+      }
+
+      return response;
+    } catch (error) {
+      return {
+        status: 'error' as const,
+        message: error instanceof Error ? error.message : 'Failed to update Memory.',
+      };
+    }
+  },
+} satisfies ToolRegistryEntry<'update_memory', typeof updateMemoryInputSchema>;
+
+const searchMemoryTool = {
+  name: 'search_memory',
+  description: "Search your Memory for keywords. Returns matching lines with their section headings. Use for quick lookups when you don't need the full document.",
+  schema: searchMemoryInputSchema,
+  execute: async (input) => {
+    const results = searchMemory(input.query);
+
+    if (results.length === 0) {
+      return {
+        status: 'success',
+        message: `No Memory matches for "${input.query}".`,
+        data: { results: [] },
+      };
+    }
+
+    return {
+      status: 'success',
+      message: `Found ${results.length} matching lines in Memory.`,
+      data: { results },
+    };
+  },
+} satisfies ToolRegistryEntry<'search_memory', typeof searchMemoryInputSchema>;
+
+const searchJournalTool = {
+  name: 'search_journal',
+  description: 'Search your Journal by keyword with optional date range. Use to recall past reasoning, find self-corrections, or verify patterns before updating Identity.',
+  schema: searchJournalInputSchema,
+  execute: async (input) => {
+    const entries = searchJournalEntries({
+      query: input.query,
+      fromDate: input.fromDate,
+      toDate: input.toDate,
+      limit: input.limit,
     });
 
     return {
       status: 'success',
-      message: 'Generated live thought.',
-      data: {
-        focus: input.focus ?? null,
-        ...liveThought,
-      },
+      message: `Found ${entries.length} journal entries matching "${input.query}".`,
+      data: { entries },
     };
   },
-} satisfies ToolRegistryEntry<'generate_live_thought', typeof generateLiveThoughtInputSchema>;
+} satisfies ToolRegistryEntry<'search_journal', typeof searchJournalInputSchema>;
 
-const updateUserProfileTool = {
-  name: 'update_user_profile',
-  description: 'Save a fact about the user to their profile. Use when the user shares a stable personal detail (name, role, timezone, communication preference) or explicitly asks you to remember something. Only save high-confidence facts. Entry should be a concise, atomic statement.',
-  schema: updateUserProfileInputSchema,
+const emitChipsTool = {
+  name: 'emit_chips',
+  description: 'Attach interactive chips to your current message. Response chips let Marcus answer with a tap instead of typing. Action chips execute a tool call on tap. Call AFTER writing your text, not instead of it. Always 2-4 chips.',
+  schema: emitChipsInputSchema,
   execute: async (input) => {
-    const content = appendProfileEntry(input.entry, 'ai');
+    const normalizedChips = normalizeChipActions(input.chips as ChipAction[]);
 
+    // No-op execution. The renderer reads the tool call args directly.
     return {
       status: 'success',
-      message: 'Profile memory updated.',
-      data: {
-        profile: content,
-      },
+      message: `${normalizedChips.length} chips attached.`,
+      data: { chips: normalizedChips },
     };
   },
-} satisfies ToolRegistryEntry<'update_user_profile', typeof updateUserProfileInputSchema>;
-
-const updatePatternsTool = {
-  name: 'update_patterns',
-  description: 'Save a recurring workflow pattern the user follows. Use when you observe a repeated behavior across multiple interactions (e.g., "Reviews invoices every Monday", "Prefers tasks broken into subtasks"). Only save after confirming the pattern is stable, not a one-off.',
-  schema: updatePatternsInputSchema,
-  execute: async (input) => {
-    const content = appendPatternEntry(input.entry, 'ai');
-
-    return {
-      status: 'success',
-      message: 'Pattern memory updated.',
-      data: {
-        patterns: content,
-      },
-    };
-  },
-} satisfies ToolRegistryEntry<'update_patterns', typeof updatePatternsInputSchema>;
+} satisfies ToolRegistryEntry<'emit_chips', typeof emitChipsInputSchema>;
 
 const improveTaskTool = {
   name: 'improve_task',
@@ -1291,9 +1515,12 @@ export const AI_TOOL_REGISTRY = {
   undo_last_action: undoLastActionTool,
   write_journal: writeJournalTool,
   read_journal: readJournalTool,
-  generate_live_thought: generateLiveThoughtTool,
-  update_user_profile: updateUserProfileTool,
-  update_patterns: updatePatternsTool,
+  update_identity: updateIdentityTool,
+  read_memory: readMemoryTool,
+  update_memory: updateMemoryTool,
+  search_memory: searchMemoryTool,
+  search_journal: searchJournalTool,
+  emit_chips: emitChipsTool,
   improve_task: improveTaskTool,
   list_tasks: listTasksTool,
   get_task: getTaskTool,

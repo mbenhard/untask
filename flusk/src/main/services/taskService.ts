@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { TASK_STATUS_VALUES, type TaskStatus } from '../../types/models';
 import { getDb } from '../db';
 import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
+import { calculateNextOccurrence } from './recurrenceEngine';
 
 // ─── Validation schemas ─────────────────────────────────────
 export const createTaskSchema = z.object({
@@ -20,6 +21,8 @@ export const createTaskSchema = z.object({
   invoiceStatus: z.enum(['none', 'draft', 'sent', 'paid', 'overdue']).nullable().optional(),
   valueAtRisk: z.number().nullable().optional(),
   lastClientTouchAt: z.string().nullable().optional(),
+  recurrence: z.string().nullable().optional(),
+  recurrenceSourceId: z.string().nullable().optional(),
   order: z.number().optional(),
 });
 
@@ -34,6 +37,29 @@ export type DeleteTaskOptions = {
 
 export type CompleteTaskOptions = {
   completeChildren?: boolean;
+};
+
+export type TaskChangeListener = () => void;
+
+const taskChangeListeners = new Set<TaskChangeListener>();
+
+const emitTaskChange = (): void => {
+  for (const listener of [...taskChangeListeners]) {
+    try {
+      listener();
+    } catch {
+      // Ignore listener failures so task mutations always complete.
+    }
+  }
+};
+
+export const subscribeTaskChanges = (
+  listener: TaskChangeListener,
+): (() => void) => {
+  taskChangeListeners.add(listener);
+  return () => {
+    taskChangeListeners.delete(listener);
+  };
 };
 
 // ─── Service functions ──────────────────────────────────────
@@ -249,6 +275,7 @@ export function undoTaskEvent(
       null,
     );
 
+    emitTaskChange();
     return {
       undone: true,
       targetTaskId: targetEvent.taskId,
@@ -280,6 +307,7 @@ export function undoTaskEvent(
       restored,
     );
 
+    emitTaskChange();
     return {
       undone: true,
       targetTaskId: targetEvent.taskId,
@@ -310,6 +338,7 @@ export function undoTaskEvent(
     restored,
   );
 
+  emitTaskChange();
   return {
     undone: true,
     targetTaskId: targetEvent.taskId,
@@ -361,6 +390,7 @@ export function createTask(
     logTaskEvent(parentTask.id, 'update', source, parentTask, promotedParent);
   }
 
+  emitTaskChange();
   return created;
 }
 
@@ -411,6 +441,7 @@ export function updateTask(
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
+  emitTaskChange();
   return updated;
 }
 
@@ -471,6 +502,7 @@ export function deleteTask(
   options?: DeleteTaskOptions,
 ): void {
   deleteTaskRecursive(id, source, options?.cascade === true, new Set<string>());
+  emitTaskChange();
 }
 
 const completeTaskRecursive = (
@@ -518,16 +550,55 @@ const completeTaskRecursive = (
   return updated;
 }
 
+export type CompleteTaskResult = {
+  completed: Task;
+  recurredTask: Task | null;
+};
+
 export function completeTask(
   id: string,
   source: 'user' | 'ai' = 'user',
   options?: CompleteTaskOptions,
-): Task {
-  return completeTaskRecursive(
+): CompleteTaskResult {
+  const completed = completeTaskRecursive(
     id,
     source,
     options?.completeChildren === true,
     new Set<string>(),
+  );
+
+  // Spawn next recurring instance if applicable
+  const recurredTask = spawnRecurringInstance(completed, source);
+
+  emitTaskChange();
+  return { completed, recurredTask };
+}
+
+function spawnRecurringInstance(
+  completedTask: Task,
+  source: 'user' | 'ai',
+): Task | null {
+  if (!completedTask.recurrence) return null;
+
+  const fromDate = completedTask.dueDate ?? new Date().toISOString().slice(0, 10);
+  const next = calculateNextOccurrence(completedTask.recurrence, fromDate);
+  if (!next) return null;
+
+  const sourceId = completedTask.recurrenceSourceId ?? completedTask.id;
+
+  return createTask(
+    {
+      title: completedTask.title,
+      body: completedTask.body,
+      status: 'inbox',
+      priority: completedTask.priority ?? undefined,
+      client: completedTask.client,
+      effort: completedTask.effort ?? undefined,
+      dueDate: next.nextDate,
+      recurrence: completedTask.recurrence,
+      recurrenceSourceId: sourceId,
+    },
+    source,
   );
 }
 
@@ -545,6 +616,7 @@ export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
+  emitTaskChange();
   return updated;
 }
 
@@ -608,4 +680,5 @@ export function reorderTasks(
         .run();
     }
   });
+  emitTaskChange();
 }

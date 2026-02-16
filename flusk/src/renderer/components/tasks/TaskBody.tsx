@@ -14,27 +14,17 @@ import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
+import { getNextPriority } from './taskInteraction';
 
 // ─── Types & Constants ──────────────────────────────────────
 
 type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
-const PRIORITY_OPTIONS: Array<{
-  value: NonNullable<Task['priority']>;
-  label: string;
-  dot: string;
-}> = [
-  { value: 'none', label: 'None', dot: '' },
-  { value: 'low', label: 'Low', dot: 'bg-emerald-500' },
-  { value: 'medium', label: 'Med', dot: 'bg-amber-500' },
-  { value: 'high', label: 'High', dot: 'bg-rose-500' },
-];
-
 const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
   { value: 'inbox', label: 'Inbox' },
-  { value: 'active', label: 'Active' },
+  { value: 'active', label: 'Backlog' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'waiting', label: 'Waiting' },
+  { value: 'waiting', label: 'On Hold' },
   { value: 'done', label: 'Done' },
 ];
 
@@ -54,9 +44,9 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   inbox: 'Inbox',
-  active: 'Active',
+  active: 'Backlog',
   in_progress: 'In Progress',
-  waiting: 'Waiting',
+  waiting: 'On Hold',
   done: 'Done',
 };
 
@@ -91,62 +81,30 @@ const PrioritySegment = ({
   task: Task;
   onUpdate: UpdateTaskAction;
 }) => {
-  const [open, setOpen] = useState(false);
   const priority = task.priority ?? 'none';
   const dot = PRIORITY_DOT[priority];
   const label = PRIORITY_LABEL[priority];
   const isEmpty = priority === 'none';
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          tabIndex={0}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
-          aria-label="Priority"
-        >
-          {!isEmpty && (
-            <span
-              className={cn('mr-1 inline-block size-1.5 rounded-full', dot)}
-            />
-          )}
-          {isEmpty ? '+ priority' : label}
-        </button>
-      </Popover.Trigger>
-      <PopoverContent
-        className="w-auto min-w-[100px] p-1"
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {PRIORITY_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => {
-              void onUpdate({ id: task.id, priority: opt.value });
-              setOpen(false);
-            }}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-              priority === opt.value && 'text-foreground',
-            )}
-          >
-            {opt.dot ? (
-              <span
-                className={cn('inline-block size-1.5 rounded-full', opt.dot)}
-              />
-            ) : (
-              <span className="inline-block size-1.5" />
-            )}
-            {opt.label}
-          </button>
-        ))}
-      </PopoverContent>
-    </Popover.Root>
+    <button
+      type="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        void onUpdate({ id: task.id, priority: getNextPriority(priority) });
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
+      aria-label={`Priority: ${priority} — click to cycle`}
+    >
+      {!isEmpty && (
+        <span
+          className={cn('mr-1 inline-block size-1.5 rounded-full', dot)}
+        />
+      )}
+      {isEmpty ? '+ priority' : label}
+    </button>
   );
 };
 
@@ -296,6 +254,98 @@ const StatusSegment = ({
   );
 };
 
+// ─── Recurrence Segment ────────────────────────────────────
+
+const RECURRENCE_PRESETS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'every 2 weeks', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' },
+];
+
+const RecurrenceSegment = ({
+  task,
+  onUpdate,
+}: {
+  task: Task;
+  onUpdate: UpdateTaskAction;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [customDraft, setCustomDraft] = useState('');
+  const isEmpty = !task.recurrence;
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          tabIndex={0}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
+          aria-label="Recurrence"
+        >
+          {isEmpty ? '+ repeat' : task.recurrence}
+        </button>
+      </Popover.Trigger>
+      <PopoverContent
+        className="w-auto min-w-[140px] p-1"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        {RECURRENCE_PRESETS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => {
+              void onUpdate({ id: task.id, recurrence: opt.value });
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+              task.recurrence === opt.value && 'text-foreground',
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+        <div className="border-t border-border/40 px-2 py-1.5">
+          <input
+            type="text"
+            value={customDraft}
+            onChange={(e) => setCustomDraft(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter' && customDraft.trim()) {
+                void onUpdate({ id: task.id, recurrence: customDraft.trim() });
+                setCustomDraft('');
+                setOpen(false);
+              }
+            }}
+            placeholder="Custom (e.g. every 3 days)"
+            className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50"
+          />
+        </div>
+        {!isEmpty && (
+          <button
+            type="button"
+            onClick={() => {
+              void onUpdate({ id: task.id, recurrence: null });
+              setOpen(false);
+            }}
+            className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            Remove
+          </button>
+        )}
+      </PopoverContent>
+    </Popover.Root>
+  );
+};
+
 // ─── Subtasks Segment ───────────────────────────────────────
 
 const SubtasksSegment = ({
@@ -353,6 +403,8 @@ const MetadataLine = ({
       <DueDateSegment task={task} onUpdate={onUpdate} />
       <MetaDot />
       <PrioritySegment task={task} onUpdate={onUpdate} />
+      <MetaDot />
+      <RecurrenceSegment task={task} onUpdate={onUpdate} />
       {!isSubtask && (
         <>
           <MetaDot />

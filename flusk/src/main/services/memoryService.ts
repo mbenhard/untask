@@ -7,13 +7,15 @@ import {
 } from '../db/schema';
 import { getSetting, setSetting } from './settingsService';
 
-export type MemoryLayer = 'soul' | 'profile' | 'patterns';
+export type MemoryLayer = 'soul' | 'profile' | 'patterns' | 'identity' | 'memory';
 export type MemoryEventSource = 'user' | 'ai' | 'system';
 
 export const MEMORY_LAYER_SETTINGS_KEYS: Record<MemoryLayer, string> = {
   soul: 'ai_soul',
   profile: 'ai_user_profile',
   patterns: 'ai_patterns',
+  identity: 'ai_identity',
+  memory: 'ai_memory',
 };
 
 export type MemoryState = Record<MemoryLayer, string>;
@@ -22,6 +24,8 @@ export const getMemoryState = (): MemoryState => ({
   soul: getSetting(MEMORY_LAYER_SETTINGS_KEYS.soul) ?? '',
   profile: getSetting(MEMORY_LAYER_SETTINGS_KEYS.profile) ?? '',
   patterns: getSetting(MEMORY_LAYER_SETTINGS_KEYS.patterns) ?? '',
+  identity: getSetting(MEMORY_LAYER_SETTINGS_KEYS.identity) ?? '',
+  memory: getSetting(MEMORY_LAYER_SETTINGS_KEYS.memory) ?? '',
 });
 
 const createMemoryEvent = (

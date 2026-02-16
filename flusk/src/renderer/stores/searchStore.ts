@@ -6,8 +6,7 @@ import { getFlusk } from '../lib/flusk';
 type SearchStore = {
   isOpen: boolean;
   query: string;
-  activeResults: SearchResultItem[];
-  doneResults: SearchResultItem[];
+  results: SearchResultItem[];
   total: number;
   isSearching: boolean;
   selectedIndex: number;
@@ -24,8 +23,7 @@ type SearchStore = {
 export const useSearchStore = create<SearchStore>((set, get) => ({
   isOpen: false,
   query: '',
-  activeResults: [],
-  doneResults: [],
+  results: [],
   total: 0,
   isSearching: false,
   selectedIndex: 0,
@@ -35,8 +33,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     set({
       isOpen: true,
       query: '',
-      activeResults: [],
-      doneResults: [],
+      results: [],
       total: 0,
       selectedIndex: 0,
       error: null,
@@ -52,8 +49,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
 
     if (trimmed.length === 0) {
       set({
-        activeResults: [],
-        doneResults: [],
+        results: [],
         total: 0,
         selectedIndex: 0,
         error: null,
@@ -70,8 +66,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       });
 
       set({
-        activeResults: result.active,
-        doneResults: result.done,
+        results: result.results,
         total: result.total,
         isSearching: false,
         selectedIndex: 0,
@@ -97,19 +92,8 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     })),
 
   getSelectedResult: () => {
-    const { activeResults, doneResults, selectedIndex } = get();
-
-    if (selectedIndex < activeResults.length) {
-      return activeResults[selectedIndex];
-    }
-
-    const doneIndex = selectedIndex - activeResults.length;
-
-    if (doneIndex < doneResults.length) {
-      return doneResults[doneIndex];
-    }
-
-    return null;
+    const { results, selectedIndex } = get();
+    return results[selectedIndex] ?? null;
   },
 }));
 

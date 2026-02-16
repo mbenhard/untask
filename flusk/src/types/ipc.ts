@@ -20,7 +20,7 @@ import type {
   ChatSetModelPayload,
   ChatSetRetentionPayload,
   ChatStreamEvent,
-  ChatLiveThoughtPayload,
+
   ChatUndoRequestPayload,
   ChatUndoResultPayload,
   ChatGetAutonomyModePayload,
@@ -28,6 +28,8 @@ import type {
   ChatResolvePendingActionPayload,
   ChatResolvePendingActionResult,
   ChatListPendingActionsResult,
+  ChatExecuteChipActionPayload,
+  ChatExecuteChipActionResult,
 } from './chat';
 import type { AiJournal, Task } from './models';
 
@@ -68,12 +70,14 @@ export const IPC_CHANNELS = {
   CHAT_UNDO_LAST_ACTION: 'chat:undo-last-action',
   CHAT_GET_RETENTION_MODE: 'chat:get-retention-mode',
   CHAT_SET_RETENTION_MODE: 'chat:set-retention-mode',
-  CHAT_GET_LIVE_THOUGHT: 'chat:get-live-thought',
+
   CHAT_GET_AUTONOMY_MODE: 'chat:get-autonomy-mode',
   CHAT_SET_AUTONOMY_MODE: 'chat:set-autonomy-mode',
   CHAT_RESOLVE_PENDING_ACTION: 'chat:resolve-pending-action',
   CHAT_CANCEL: 'chat:cancel',
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
+  CHAT_EXECUTE_CHIP_ACTION: 'chat:execute-chip-action',
+  CHAT_FOCUS_MESSAGE: 'chat:focus-message',
   BACKUP_LIST: 'backup:list',
   BACKUP_CREATE: 'backup:create',
   BACKUP_EXPORT: 'backup:export',
@@ -125,18 +129,23 @@ export type ChatUndoRequest = ChatUndoRequestPayload;
 export type ChatUndoResult = ChatUndoResultPayload;
 export type ChatRetentionResult = ChatRetentionPayload;
 export type ChatSetRetentionRequest = ChatSetRetentionPayload;
-export type ChatLiveThoughtResult = ChatLiveThoughtPayload;
-
 export type ChatAutonomyModeResult = ChatGetAutonomyModePayload;
 export type ChatSetAutonomyModeRequest = ChatSetAutonomyModePayload;
 export type ChatResolvePendingActionRequest = ChatResolvePendingActionPayload;
 export type ChatResolvePendingActionResponse = ChatResolvePendingActionResult;
 export type ChatListPendingActionsResponse = ChatListPendingActionsResult;
+export type ChatExecuteChipActionRequest = ChatExecuteChipActionPayload;
+export type ChatExecuteChipActionResponse = ChatExecuteChipActionResult;
+export type ChatFocusMessagePayload = {
+  messageId: string;
+};
 
 export type SettingsMemoryStatePayload = {
   soul: string;
   profile: string;
   patterns: string;
+  identity: string;
+  memory: string;
 };
 
 export type SettingsMemoryUpdateRequestPayload = Partial<SettingsMemoryStatePayload>;
@@ -154,7 +163,7 @@ export type SettingsReadJournalResultPayload = {
 
 export type SettingsMemoryEventPayload = {
   id: string;
-  layer: 'soul' | 'profile' | 'patterns';
+  layer: 'soul' | 'profile' | 'patterns' | 'identity' | 'memory';
   before: string;
   after: string;
   source: 'user' | 'ai' | 'system';
@@ -162,7 +171,7 @@ export type SettingsMemoryEventPayload = {
 };
 
 export type SettingsMemoryHistoryRequestPayload = {
-  layer?: 'soul' | 'profile' | 'patterns';
+  layer?: 'soul' | 'profile' | 'patterns' | 'identity' | 'memory';
   limit?: number;
 };
 
@@ -276,7 +285,6 @@ export type SearchResultItem = {
 };
 
 export type SearchQueryResponse = {
-  active: SearchResultItem[];
-  done: SearchResultItem[];
+  results: SearchResultItem[];
   total: number;
 };

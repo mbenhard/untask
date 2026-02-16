@@ -12,6 +12,7 @@ const createMockChatApi = () => {
     send: vi.fn(),
     cancel: vi.fn(async () => undefined),
     onStreamEvent: vi.fn(() => unsubscribe),
+    onFocusMessage: vi.fn(() => unsubscribe),
     history: vi.fn(async (): Promise<ChatMessage[]> => []),
     clear: vi.fn(async () => undefined),
     getModels: vi.fn(async () => []),
@@ -26,7 +27,7 @@ const createMockChatApi = () => {
     setRetentionMode: vi.fn(async ({ mode }: { mode: 'session' | '30d' | 'forever' }) => ({
       mode,
     })),
-    getLiveThought: vi.fn(),
+
     getAutonomyMode: vi.fn(async () => ({ mode: 'safe' as const })),
     setAutonomyMode: vi.fn(async ({ mode }: { mode: 'manual' | 'safe' | 'autopilot' }) => ({
       mode,
@@ -58,8 +59,12 @@ describe('chatStore stream reliability', () => {
       requestPayloadByRequestId: {},
       lastStreamError: null,
       unsubscribeStream: undefined,
+      unsubscribeFocusMessage: undefined,
       autonomyMode: 'safe',
       pendingActions: [],
+      pendingImages: [],
+      processingImageCount: 0,
+      focusMessageId: null,
     });
 
     useAppStore.setState({
@@ -89,6 +94,25 @@ describe('chatStore stream reliability', () => {
     ]);
 
     expect(mockChatApi.onStreamEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens chat overlay and stores focus target on focus-message event', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    await useChatStore.getState().initialize();
+
+    const focusCalls = mockChatApi.onFocusMessage.mock.calls as unknown[][];
+    const listener = focusCalls[0]?.[0] as
+      | ((payload: { messageId: string }) => void)
+      | undefined;
+
+    expect(listener).toBeDefined();
+    listener?.({ messageId: 'assistant-msg-1' });
+
+    expect(useAppStore.getState().chatOverlayState).toBe('open');
+    expect(useChatStore.getState().focusMessageId).toBe('assistant-msg-1');
   });
 
   it('dedupes repeated tool_call_completed cards by card id', () => {
@@ -216,6 +240,7 @@ describe('chatStore stream reliability', () => {
       role: 'assistant',
       content: 'Done.',
       toolCalls: null,
+      chips: null,
       createdAt: now,
     };
 
@@ -314,6 +339,7 @@ describe('chatStore stream reliability', () => {
       role: 'assistant',
       content: 'Done.',
       toolCalls: null,
+      chips: null,
       createdAt: now,
     };
 
@@ -381,6 +407,7 @@ describe('chatStore stream reliability', () => {
       role: 'assistant',
       content: 'Done.',
       toolCalls: null,
+      chips: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -627,6 +654,7 @@ describe('chatStore stream reliability', () => {
       role: 'assistant',
       content: 'Done. Task created.',
       toolCalls: JSON.stringify(metadata),
+      chips: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -659,6 +687,70 @@ describe('chatStore stream reliability', () => {
     });
   });
 
+  it('hydrates chips from the dedicated chat column', async () => {
+    const historicalMessage: ChatMessage = {
+      id: 'msg-chip-hist',
+      role: 'assistant',
+      content: 'Choose one.',
+      toolCalls: JSON.stringify({
+        requestId: 'req-chip-hist',
+        modelId: 'minimax/minimax-m2.5',
+        actionCards: [],
+        toolExecutions: [],
+      }),
+      chips: JSON.stringify([
+        { label: 'Do it', type: 'response', responseText: 'Do it' },
+      ]),
+      createdAt: new Date().toISOString(),
+    };
+
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    mockChatApi.history.mockResolvedValue([historicalMessage]);
+
+    await useChatStore.getState().initialize();
+
+    const message = useChatStore.getState().messages.find((m) => m.id === 'msg-chip-hist');
+    expect(message?.chips).toHaveLength(1);
+    expect(message?.chips?.[0]?.label).toBe('Do it');
+  });
+
+  it('hydrates legacy response chips by defaulting responseText to label', async () => {
+    const historicalMessage: ChatMessage = {
+      id: 'msg-chip-legacy',
+      role: 'assistant',
+      content: 'Choose one.',
+      toolCalls: JSON.stringify({
+        requestId: 'req-chip-legacy',
+        modelId: 'minimax/minimax-m2.5',
+        actionCards: [],
+        toolExecutions: [],
+      }),
+      chips: JSON.stringify([
+        { label: 'Review Inbox now', type: 'response' },
+      ]),
+      createdAt: new Date().toISOString(),
+    };
+
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    mockChatApi.history.mockResolvedValue([historicalMessage]);
+
+    await useChatStore.getState().initialize();
+
+    const message = useChatStore.getState().messages.find((m) => m.id === 'msg-chip-legacy');
+    expect(message?.chips).toHaveLength(1);
+    expect(message?.chips?.[0]).toEqual({
+      label: 'Review Inbox now',
+      type: 'response',
+      responseText: 'Review Inbox now',
+    });
+  });
+
   it('uses the main-selected model at send time instead of stale store state', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
       flusk: { chat: ReturnType<typeof createMockChatApi> };
@@ -672,6 +764,7 @@ describe('chatStore stream reliability', () => {
         role: 'user',
         content: 'hello',
         toolCalls: null,
+        chips: null,
         createdAt: new Date().toISOString(),
       },
     });
@@ -701,6 +794,7 @@ describe('chatStore stream reliability', () => {
         role: 'user',
         content: 'fallback',
         toolCalls: null,
+        chips: null,
         createdAt: new Date().toISOString(),
       },
     });

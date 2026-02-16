@@ -15,6 +15,16 @@ export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type ActionLifecycle = 'pending' | 'executed' | 'rejected' | 'undone';
 export type ChatViewIntent = 'today' | 'tasks' | 'inbox' | 'scratchpad';
 
+export type ChipAction = {
+  label: string;
+  type: 'action' | 'response';
+  toolCall?: {
+    name: string;
+    args: Record<string, unknown>;
+  };
+  responseText?: string;
+};
+
 export type ChatActionCard = {
   id: string;
   toolName: string;
@@ -56,6 +66,7 @@ export type PersistedChatToolMetadata = {
   reasoningText?: string;
   stepDescriptions?: string[];
   imageCount?: number;
+  chips?: ChipAction[];
 };
 
 export type TurnStep =
@@ -98,12 +109,14 @@ export type ChatStreamEvent =
       message: string;
       summary?: string;
       actionCard?: ChatActionCard;
+      chips?: ChipAction[];
     }
   | {
       type: 'assistant_done';
       requestId: string;
       assistantMessage: ChatMessage;
       actionCards: ChatActionCard[];
+      chips?: ChipAction[];
     }
   | {
       type: 'error';
@@ -164,13 +177,6 @@ export type ChatRetentionPayload = {
   mode: ChatRetentionMode;
 };
 
-export type ChatLiveThoughtPayload = {
-  thought: string;
-  actionLabel: string;
-  suggestedPrompt: string;
-  generatedAt: string;
-};
-
 // ─── Autonomy payloads ──────────────────────────────────────
 
 export type ChatGetAutonomyModePayload = {
@@ -210,4 +216,16 @@ export type ChatResolvePendingActionResult = {
 
 export type ChatListPendingActionsResult = {
   actions: ChatPendingActionEntry[];
+};
+
+export type ChatExecuteChipActionPayload = {
+  toolName: string;
+  args: Record<string, unknown>;
+};
+
+export type ChatExecuteChipActionResult = {
+  ok: boolean;
+  status: ChatToolStatus;
+  message: string;
+  actionCard?: ChatActionCard;
 };

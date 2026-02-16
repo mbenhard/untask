@@ -5,7 +5,7 @@ import {
   type ChatKernelOrchestrationRequestPayload,
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
-  type ChatLiveThoughtResult,
+
   type ChatRetentionResult,
   type ChatSelectedModelResult,
   type ChatSendRequest,
@@ -20,6 +20,9 @@ import {
   type ChatResolvePendingActionRequest,
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
+  type ChatExecuteChipActionRequest,
+  type ChatExecuteChipActionResponse,
+  type ChatFocusMessagePayload,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -169,6 +172,18 @@ const fluskApi: FluskApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.CHAT_STREAM_EVENT, wrapped);
       };
     },
+    onFocusMessage: (
+      listener: (payload: ChatFocusMessagePayload) => void,
+    ): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, payload: ChatFocusMessagePayload) =>
+        listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.CHAT_FOCUS_MESSAGE, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.CHAT_FOCUS_MESSAGE, wrapped);
+      };
+    },
     history: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_HISTORY),
     clear: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CLEAR),
     getModels: (): Promise<ChatModelCatalogResult> =>
@@ -187,8 +202,6 @@ const fluskApi: FluskApi = {
       payload: ChatSetRetentionRequest,
     ): Promise<ChatRetentionResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_SET_RETENTION_MODE, payload),
-    getLiveThought: (): Promise<ChatLiveThoughtResult> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_LIVE_THOUGHT),
     getAutonomyMode: (): Promise<ChatAutonomyModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_AUTONOMY_MODE),
     setAutonomyMode: (
@@ -201,6 +214,10 @@ const fluskApi: FluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION, payload),
     listPendingActions: (): Promise<ChatListPendingActionsResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
+    executeChipAction: (
+      payload: ChatExecuteChipActionRequest,
+    ): Promise<ChatExecuteChipActionResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_EXECUTE_CHIP_ACTION, payload),
   },
   backup: {
     list: (): Promise<BackupListResponse> =>

@@ -30,7 +30,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "p-3 [--cell-size:2rem] [--cell-radius:calc(var(--cell-size)/2)]",
+        "p-2 [--cell-size:1.75rem]",
         className
       )}
       captionLayout={captionLayout}
@@ -43,43 +43,40 @@ function Calendar({
       }}
       classNames={{
         ...defaultClassNames,
-        months: "flex flex-col gap-4 sm:flex-row sm:gap-2",
-        month: "grid grid-cols-[auto_1fr_auto] items-center gap-y-4",
+        months: "flex flex-col gap-2 sm:flex-row sm:gap-2",
+        month: "grid grid-cols-[auto_1fr_auto] items-center gap-y-1.5",
         month_caption:
-          "col-start-2 flex w-full items-center justify-center pt-1",
-        caption_label: "text-sm font-medium",
-        nav: "flex items-center gap-1",
+          "col-start-2 flex w-full items-center justify-center",
+        caption_label: "font-mono text-[11px] font-medium text-muted-foreground",
+        nav: "flex items-center gap-0.5",
         button_previous: cn(
-          buttonVariants({ variant: "outline" }),
-          "col-start-1 justify-self-start size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
+          buttonVariants({ variant: "ghost" }),
+          "col-start-1 justify-self-start size-6 p-0 text-muted-foreground opacity-70 hover:opacity-100 hover:bg-accent/50"
         ),
         button_next: cn(
-          buttonVariants({ variant: "outline" }),
-          "col-start-3 justify-self-end size-7 bg-transparent p-0 opacity-60 hover:opacity-100"
+          buttonVariants({ variant: "ghost" }),
+          "col-start-3 justify-self-end size-6 p-0 text-muted-foreground opacity-70 hover:opacity-100 hover:bg-accent/50"
         ),
         month_grid: "col-span-3 w-full border-collapse",
         weekdays: "flex",
-        weekday: "text-muted-foreground w-[var(--cell-size)] rounded-md text-center text-[0.8rem] font-normal",
-        week: "mt-1 flex w-full",
+        weekday: "text-muted-foreground/60 w-[var(--cell-size)] text-center font-mono text-[9px] font-medium uppercase",
+        week: "mt-px flex w-full",
         day: cn(
-          "relative h-[var(--cell-size)] w-[var(--cell-size)] p-0 text-center text-sm focus-within:relative focus-within:z-20",
-          "[&:first-child[data-selected=true]_button]:rounded-s-[var(--cell-radius)]",
-          "[&:last-child[data-selected=true]_button]:rounded-e-[var(--cell-radius)]",
-          "[&:nth-child(2)[data-selected=true]_button]:rounded-s-[var(--cell-radius)]",
-          "[&:has([aria-selected])]:bg-accent",
-          "[&:has([aria-selected].day-outside)]:bg-accent/50",
-          "[&:has([aria-selected])]:rounded-[var(--cell-radius)]"
+          "relative h-[var(--cell-size)] w-[var(--cell-size)] p-0 text-center focus-within:relative focus-within:z-20",
+          "[&:has([aria-selected])]:bg-accent/60",
+          "[&:has([aria-selected].day-outside)]:bg-accent/30",
+          "[&:has([aria-selected])]:rounded-sm"
         ),
         range_start:
-          "day-range-start rounded-s-[var(--cell-radius)] [&:has(>.day-outside)]:bg-accent/50",
+          "day-range-start rounded-s-sm [&:has(>.day-outside)]:bg-accent/30",
         range_end:
-          "day-range-end rounded-e-[var(--cell-radius)] [&:has(>.day-outside)]:bg-accent/50",
+          "day-range-end rounded-e-sm [&:has(>.day-outside)]:bg-accent/30",
         selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        today: "bg-accent text-accent-foreground",
+          "bg-foreground text-background hover:bg-foreground hover:text-background focus:bg-foreground focus:text-background",
+        today: "bg-accent/80 text-accent-foreground",
         outside:
-          "day-outside text-muted-foreground aria-selected:text-muted-foreground",
-        disabled: "text-muted-foreground opacity-50",
+          "day-outside text-muted-foreground/30 aria-selected:text-muted-foreground/50",
+        disabled: "text-muted-foreground/30",
         range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         hidden: "invisible",
@@ -88,7 +85,7 @@ function Calendar({
       components={{
         Chevron: ({ orientation, ...chevronProps }) => {
           const Icon = orientation === "left" ? ChevronLeft : ChevronRight
-          return <Icon className="size-4" {...chevronProps} />
+          return <Icon className="size-3.5" {...chevronProps} />
         },
         DayButton: ({ ...dayButtonProps }) => (
           <CalendarDayButton
@@ -132,10 +129,11 @@ function CalendarDayButton({
       data-range-start={modifiers.range_start ? true : undefined}
       data-range-end={modifiers.range_end ? true : undefined}
       className={cn(
-        "h-[var(--cell-size)] w-[var(--cell-size)] p-0 font-normal aria-selected:opacity-100",
-        "data-[selected-single=true]:rounded-[var(--cell-radius)]",
-        "data-[range-start=true]:rounded-s-[var(--cell-radius)]",
-        "data-[range-end=true]:rounded-e-[var(--cell-radius)]",
+        "h-[var(--cell-size)] w-[var(--cell-size)] rounded-[3px] p-0 font-mono text-[11px] font-normal aria-selected:opacity-100",
+        "hover:bg-accent/50",
+        "data-[selected-single=true]:rounded-[3px]",
+        "data-[range-start=true]:rounded-s-[3px]",
+        "data-[range-end=true]:rounded-e-[3px]",
         className
       )}
       {...props}

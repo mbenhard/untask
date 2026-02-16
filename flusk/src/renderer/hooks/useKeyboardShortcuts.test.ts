@@ -36,8 +36,7 @@ const resetStores = (): void => {
   useSearchStore.setState({
     isOpen: false,
     query: '',
-    activeResults: [],
-    doneResults: [],
+    results: [],
     total: 0,
     isSearching: false,
     selectedIndex: 0,

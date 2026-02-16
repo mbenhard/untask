@@ -1,12 +1,12 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
-import {
-  compileIdentityContext,
-  loadIdentityContracts,
-} from './assistant/contextCompiler';
+import { buildSystemPrompt } from './ai/systemPrompt';
+import { startProactiveTurn } from './ai/chat';
 import { checkAndGenerateWeeklyDigest } from './ai/weeklyDigest';
+import { initProactiveLoop, stopProactiveLoop, getProactiveLoop } from './assistant/proactiveLoop';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
@@ -88,30 +88,19 @@ const bootstrap = (): void => {
   registerGlobalShortcuts(mainWindow);
 };
 
-const emitIdentityContextDebugSnapshot = async (): Promise<void> => {
+const emitIdentityContextDebugSnapshot = (): void => {
   if (process.env.FLUSK_DEBUG_IDENTITY_CONTEXT !== '1') {
     return;
   }
 
-  const contracts = await loadIdentityContracts(process.cwd());
-  const snapshot = compileIdentityContext({
-    contracts,
-    memory: {
-      soul: '',
-      profile: '',
-      patterns: '',
-      journalEntries: [],
-    },
-    liveContext: {
-      tasks: [],
-      inboxCount: 0,
-    },
-    request: 'debug identity context snapshot',
+  const result = buildSystemPrompt({
+    userMessage: 'debug identity context snapshot',
+    liveContext: { tasks: [], inboxCount: 0 },
   });
 
   // eslint-disable-next-line no-console
   console.info(
-    `[identity-context] section order: ${snapshot.sectionOrder.join(' -> ')}`,
+    `[identity-context] section order: ${result.contextSnapshot.sectionOrder.join(' -> ')}`,
   );
 };
 
@@ -149,12 +138,57 @@ const applyLaunchAtLogin = (): void => {
   }
 };
 
+const applyDevDockIcon = (): void => {
+  if (process.platform !== 'darwin' || app.isPackaged) {
+    return;
+  }
+
+  const iconCandidates = [
+    path.join(app.getAppPath(), 'assets/icons/icon.icns'),
+    path.join(process.cwd(), 'assets/icons/icon.icns'),
+    path.resolve(__dirname, '../../assets/icons/icon.icns'),
+  ];
+
+  for (const iconPath of iconCandidates) {
+    if (!existsSync(iconPath)) {
+      continue;
+    }
+
+    try {
+      const icon = nativeImage.createFromPath(iconPath);
+      if (icon.isEmpty()) {
+        continue;
+      }
+      app.dock?.setIcon(icon);
+      return;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[app] failed to set dev dock icon', iconPath, error);
+    }
+  }
+};
+
 app.whenReady().then(() => {
+  applyDevDockIcon();
   void emitIdentityContextDebugSnapshot();
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
   runWeeklyDigestStartupCheck();
+
+  // Initialize the proactive loop with chat pipeline dependency
+  const proactiveLoop = initProactiveLoop({
+    startProactiveTurn: async (input) => {
+      await startProactiveTurn({
+        triggerMessage: input.triggerMessage,
+        triggerType: input.triggerType,
+        emit: input.emit,
+      });
+    },
+  });
+
+  // Fire morning briefing check on first ready
+  void proactiveLoop.onAppOpen();
 
   const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -163,6 +197,12 @@ app.whenReady().then(() => {
       summonWindow();
     } else {
       summonWindow();
+    }
+
+    // Check for morning briefing on each activation
+    const loop = getProactiveLoop();
+    if (loop) {
+      void loop.onAppOpen();
     }
   };
 
@@ -173,6 +213,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  stopProactiveLoop();
   stopDailyBackupScheduler();
   unregisterGlobalShortcuts();
   destroyTray();

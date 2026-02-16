@@ -128,35 +128,39 @@ export const TaskList = ({
     }
 
     const selectedIndex = tasks.findIndex((task) => task.id === selectedTaskId);
-    if (selectedIndex < 0) {
+
+    if (selectedIndex >= 0) {
+      // Direct task in this list — expand + focus it.
+      selectTask(null);
+      setFocusedIndex(selectedIndex);
+      setExpandedTaskId(selectedTaskId);
+      setIsAnyBodyEditing(false);
+
+      requestAnimationFrame(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const target = container.querySelector<HTMLElement>(
+          `[data-task-id="${selectedTaskId}"]`,
+        );
+        if (!target) return;
+        target.scrollIntoView({ block: 'nearest' });
+        target.focus();
+      });
       return;
     }
 
-    // Consume the selection so this effect doesn't re-fire on every tasks change.
-    selectTask(null);
+    // Not a direct task — check if it's a subtask whose parent is in this list.
+    const subtask = allTasks.find((t) => t.id === selectedTaskId);
+    if (!subtask?.parentId) return;
 
-    setFocusedIndex(selectedIndex);
-    setExpandedTaskId(selectedTaskId);
+    const parentIndex = tasks.findIndex((t) => t.id === subtask.parentId);
+    if (parentIndex < 0) return;
+
+    // Expand parent so the nested TaskList renders and picks up selectedTaskId.
+    setFocusedIndex(parentIndex);
+    setExpandedTaskId(subtask.parentId);
     setIsAnyBodyEditing(false);
-
-    requestAnimationFrame(() => {
-      const container = containerRef.current;
-      if (!container) {
-        return;
-      }
-
-      const target = container.querySelector<HTMLElement>(
-        `[data-task-id="${selectedTaskId}"]`,
-      );
-
-      if (!target) {
-        return;
-      }
-
-      target.scrollIntoView({ block: 'nearest' });
-      target.focus();
-    });
-  }, [selectTask, selectedTaskId, tasks]);
+  }, [allTasks, selectTask, selectedTaskId, tasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -335,6 +339,8 @@ export const TaskList = ({
               isFocused={focusedIndex === index}
               isEditingTitle={editingTitleTaskId === task.id}
               hasChildren={subtasks.length > 0}
+              childrenCount={subtasks.length}
+              childrenDoneCount={subtasks.filter((s) => s.status === 'done').length}
               onStartTitleEdit={setEditingTitleTaskId}
               onEndTitleEdit={() => setEditingTitleTaskId(null)}
               onToggleExpand={handleToggleExpand}

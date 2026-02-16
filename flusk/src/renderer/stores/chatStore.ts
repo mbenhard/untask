@@ -4,6 +4,7 @@ import type {
   ActionLifecycle,
   AutonomyMode,
   ChatActionCard,
+  ChipAction,
   ChatModelCatalogEntry,
   ChatPendingActionEntry,
   ChatRetentionMode,
@@ -27,12 +28,15 @@ type ChatUiMessage = {
   actionCards: ChatActionCard[];
   steps: TurnStep[];
   imageCount?: number;
+  chips?: ChipAction[];
+  chipsUsed?: boolean;
 };
 
 type InFlightStream = {
   placeholderId: string;
   actionCards: ChatActionCard[];
   steps: TurnStep[];
+  chips?: ChipAction[];
 };
 
 type PendingViewSwitch = {
@@ -65,10 +69,12 @@ type ChatStore = {
   requestPayloadByRequestId: Record<string, ChatRequestPayload>;
   lastStreamError: ChatLastStreamError | null;
   unsubscribeStream?: () => void;
+  unsubscribeFocusMessage?: () => void;
   autonomyMode: AutonomyMode;
   pendingActions: ChatPendingActionEntry[];
   pendingImages: string[];
   processingImageCount: number;
+  focusMessageId: string | null;
 
   initialize: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
@@ -94,6 +100,7 @@ type ChatStore = {
   clearPendingImages: () => void;
   incrementProcessingImages: () => void;
   decrementProcessingImages: () => void;
+  clearFocusMessageId: () => void;
 };
 
 const toErrorMessage = (error: unknown): string =>
@@ -114,6 +121,79 @@ const dedupeActionCards = (cards: ChatActionCard[]): ChatActionCard[] => {
   return deduped;
 };
 
+const normalizeChip = (raw: unknown): ChipAction | null => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const chip = raw as Record<string, unknown>;
+  const label = typeof chip.label === 'string' ? chip.label.trim() : '';
+
+  if (label.length === 0) {
+    return null;
+  }
+
+  if (chip.type === 'response') {
+    const responseText = typeof chip.responseText === 'string'
+      ? chip.responseText.trim()
+      : typeof chip.response === 'string'
+        ? chip.response.trim()
+        : '';
+
+    return {
+      label,
+      type: 'response',
+      responseText: responseText.length > 0 ? responseText : label,
+    };
+  }
+
+  if (chip.type === 'action') {
+    if (!chip.toolCall || typeof chip.toolCall !== 'object') {
+      return {
+        label,
+        type: 'action',
+      };
+    }
+
+    const toolCall = chip.toolCall as Record<string, unknown>;
+    const name = typeof toolCall.name === 'string' ? toolCall.name : '';
+    const args = toolCall.args;
+
+    if (name.length === 0) {
+      return {
+        label,
+        type: 'action',
+      };
+    }
+
+    return {
+      label,
+      type: 'action',
+      toolCall: {
+        name,
+        args:
+          args && typeof args === 'object' && !Array.isArray(args)
+            ? (args as Record<string, unknown>)
+            : {},
+      },
+    };
+  }
+
+  return null;
+};
+
+const normalizeChips = (raw: unknown): ChipAction[] | undefined => {
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const normalized = raw
+    .map(normalizeChip)
+    .filter((chip): chip is ChipAction => Boolean(chip));
+
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata | null => {
   if (!raw) {
     return null;
@@ -130,6 +210,8 @@ const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata | null
       return null;
     }
 
+    const normalizedMetadataChips = normalizeChips(parsed.chips);
+
     return {
       requestId: typeof parsed.requestId === 'string' ? parsed.requestId : '',
       modelId: typeof parsed.modelId === 'string' ? parsed.modelId : '',
@@ -141,6 +223,7 @@ const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata | null
       ...(typeof parsed.reasoningText === 'string' ? { reasoningText: parsed.reasoningText } : {}),
       ...(Array.isArray(parsed.stepDescriptions) ? { stepDescriptions: parsed.stepDescriptions } : {}),
       ...(typeof parsed.imageCount === 'number' ? { imageCount: parsed.imageCount } : {}),
+      ...(normalizedMetadataChips ? { chips: normalizedMetadataChips } : {}),
     };
   } catch {
     return null;
@@ -200,9 +283,21 @@ const parseImageCount = (raw: string | null): number | undefined => {
   }
 };
 
+const parseChips = (raw: string | null): ChipAction[] | undefined => {
+  if (!raw) return undefined;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeChips(parsed);
+  } catch {
+    return undefined;
+  }
+};
+
 const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
   const metadata = parseToolMetadata(message.toolCalls);
   const imageCount = metadata?.imageCount ?? parseImageCount(message.toolCalls);
+  const chips = parseChips(message.chips) ?? metadata?.chips;
 
   return {
     id: message.id,
@@ -214,6 +309,7 @@ const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
       ? reconstructStepsFromMetadata(metadata, message.content)
       : [],
     ...(imageCount ? { imageCount } : {}),
+    ...(chips ? { chips } : {}),
   };
 };
 
@@ -329,6 +425,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     pendingActions: [],
     pendingImages: [],
     processingImageCount: 0,
+    focusMessageId: null,
 
     initialize: async () => {
       if (get().isInitialized) {
@@ -354,9 +451,17 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
           const existingUnsubscribe = get().unsubscribeStream;
           existingUnsubscribe?.();
+          const existingFocusUnsubscribe = get().unsubscribeFocusMessage;
+          existingFocusUnsubscribe?.();
 
           const unsubscribeStream = getFlusk().chat.onStreamEvent((event) => {
             get().applyStreamEvent(event);
+          });
+          const unsubscribeFocusMessage = getFlusk().chat.onFocusMessage((payload) => {
+            if (!payload?.messageId) return;
+
+            useAppStore.getState().openChatOverlay();
+            set({ focusMessageId: payload.messageId });
           });
 
           set({
@@ -368,6 +473,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
             pendingActions: pending.actions,
             pendingViewSwitchByRequestId: {},
             unsubscribeStream,
+            unsubscribeFocusMessage,
             isInitialized: true,
             error: null,
           });
@@ -463,6 +569,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           requestPayloadByRequestId: {},
           lastStreamError: null,
           isSending: false,
+          focusMessageId: null,
           error: null,
         });
       } catch (error) {
@@ -529,7 +636,62 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     applyStreamEvent: (event) => {
-      const inFlight = get().inFlightByRequestId[event.requestId];
+      let inFlight = get().inFlightByRequestId[event.requestId];
+
+      // Auto-create inFlight for proactive messages (no preceding user send)
+      if (
+        !inFlight &&
+        event.requestId.startsWith('proactive-') &&
+        event.type !== 'error' &&
+        event.type !== 'assistant_done'
+      ) {
+        const placeholderId = `assistant-stream-${event.requestId}`;
+        const placeholder: ChatUiMessage = {
+          id: placeholderId,
+          role: 'assistant',
+          content: '',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        };
+        const newInFlight: InFlightStream = {
+          placeholderId,
+          actionCards: [],
+          steps: [],
+        };
+
+        set((state) => ({
+          messages: [...state.messages, placeholder],
+          inFlightByRequestId: {
+            ...state.inFlightByRequestId,
+            [event.requestId]: newInFlight,
+          },
+        }));
+
+        inFlight = newInFlight;
+      }
+
+      // For proactive assistant_done with no inFlight, just append the message
+      if (!inFlight && event.requestId.startsWith('proactive-') && event.type === 'assistant_done') {
+        const mapped = mapMessageToUi(event.assistantMessage);
+        const finalizedChips = event.chips ?? mapped.chips;
+        const finalMessage: ChatUiMessage = {
+          ...mapped,
+          ...(finalizedChips ? { chips: finalizedChips } : {}),
+        };
+
+        set((state) => ({
+          messages: upsertMessage(state.messages, finalMessage),
+        }));
+
+        revealPeekIfChatNotOpen();
+
+        if (shouldRefreshTasks(finalMessage.actionCards)) {
+          void useTaskStore.getState().fetchTasks();
+        }
+        return;
+      }
 
       if (
         event.type === 'reasoning' ||
@@ -646,6 +808,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           : inFlight.actionCards;
         const nextViewIntent =
           event.status === 'success' ? event.actionCard?.viewIntent ?? null : null;
+        const nextChips = event.chips ?? inFlight.chips;
 
         const resolvedToolStatus = event.status === 'confirmation_required'
           ? 'confirmation_required' as const
@@ -675,6 +838,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
               ...inFlight,
               actionCards: nextActionCards,
               steps: nextSteps,
+              chips: nextChips,
             },
           },
           pendingViewSwitchByRequestId: (() => {
@@ -697,7 +861,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           })(),
           messages: state.messages.map((message) =>
             message.id === inFlight.placeholderId
-              ? { ...message, actionCards: nextActionCards, steps: nextSteps }
+              ? { ...message, actionCards: nextActionCards, steps: nextSteps, ...(nextChips ? { chips: nextChips } : {}) }
               : message,
           ),
         }));
@@ -717,10 +881,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
           );
           const mapped = mapMessageToUi(event.assistantMessage);
           const finalizedSteps = inFlight?.steps ?? mapped.steps;
+          const finalizedChips = event.chips ?? inFlight?.chips ?? mapped.chips;
           const finalizedAssistantMessage: ChatUiMessage = {
             ...mapped,
             actionCards,
             steps: finalizedSteps,
+            ...(finalizedChips ? { chips: finalizedChips } : {}),
           };
           const nextMessages = upsertMessage(baseMessages, finalizedAssistantMessage);
           const remaining = {
@@ -929,6 +1095,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
     decrementProcessingImages: () =>
       set((state) => ({ processingImageCount: Math.max(0, state.processingImageCount - 1) })),
 
+    clearFocusMessageId: () => set({ focusMessageId: null }),
+
     clearError: () => set({ error: null }),
   };
 });
@@ -944,3 +1112,4 @@ export const selectAutonomyMode = (state: ChatStore) => state.autonomyMode;
 export const selectPendingActions = (state: ChatStore) => state.pendingActions;
 export const selectPendingImages = (state: ChatStore) => state.pendingImages;
 export const selectProcessingImageCount = (state: ChatStore) => state.processingImageCount;
+export const selectFocusMessageId = (state: ChatStore) => state.focusMessageId;

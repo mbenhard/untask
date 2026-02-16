@@ -211,14 +211,6 @@ describe('generateToolCallDescription', () => {
     expect(generateToolCallDescription('read_journal', {})).toBe('Reading journal entries');
   });
 
-  it('generates description for update_user_profile', () => {
-    expect(generateToolCallDescription('update_user_profile', {})).toBe('Saving profile memory');
-  });
-
-  it('generates description for update_patterns', () => {
-    expect(generateToolCallDescription('update_patterns', {})).toBe('Saving workflow pattern');
-  });
-
   it('generates description for improve_task', () => {
     expect(generateToolCallDescription('improve_task', { id: 'task-abc' })).toBe(
       'Analyzing task task-abc',

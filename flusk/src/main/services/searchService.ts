@@ -24,20 +24,22 @@ export type SearchResultItem = {
 };
 
 export type SearchQueryResult = {
-  active: SearchResultItem[];
-  done: SearchResultItem[];
+  results: SearchResultItem[];
   total: number;
 };
 
 /**
  * Initialize the FTS5 virtual table and sync triggers.
- * Safe to call multiple times — uses IF NOT EXISTS.
+ * Drops and recreates to eliminate corruption on every app start.
  */
 export function initSearchFts(): void {
   const db = getRawDb();
 
+  // Drop first to eliminate any corruption
+  db.exec(`DROP TABLE IF EXISTS tasks_fts;`);
+
   db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+    CREATE VIRTUAL TABLE tasks_fts USING fts5(
       title,
       body,
       client,
@@ -47,15 +49,17 @@ export function initSearchFts(): void {
   `);
 
   // Sync triggers — recreate to ensure they're current
+  db.exec(`DROP TRIGGER IF EXISTS tasks_fts_insert;`);
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS tasks_fts_insert AFTER INSERT ON tasks BEGIN
+    CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN
       INSERT INTO tasks_fts(rowid, title, body, client)
       VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, ''));
     END;
   `);
 
+  db.exec(`DROP TRIGGER IF EXISTS tasks_fts_update;`);
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS tasks_fts_update AFTER UPDATE ON tasks BEGIN
+    CREATE TRIGGER tasks_fts_update AFTER UPDATE ON tasks BEGIN
       INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client)
       VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''), COALESCE(OLD.client, ''));
       INSERT INTO tasks_fts(rowid, title, body, client)
@@ -63,24 +67,15 @@ export function initSearchFts(): void {
     END;
   `);
 
+  db.exec(`DROP TRIGGER IF EXISTS tasks_fts_delete;`);
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS tasks_fts_delete AFTER DELETE ON tasks BEGIN
+    CREATE TRIGGER tasks_fts_delete AFTER DELETE ON tasks BEGIN
       INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client)
       VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''), COALESCE(OLD.client, ''));
     END;
   `);
 
-  const taskCountRow = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as {
-    count: number;
-  };
-  const ftsCountRow = db.prepare('SELECT COUNT(*) as count FROM tasks_fts').get() as {
-    count: number;
-  };
-
-  // Rebuild only when FTS appears out-of-sync (new table, schema drift, or manual edits).
-  if (taskCountRow.count > 0 && ftsCountRow.count !== taskCountRow.count) {
-    rebuildSearchIndex();
-  }
+  rebuildSearchIndex();
 }
 
 /**
@@ -94,13 +89,11 @@ export function rebuildSearchIndex(): void {
 
 /**
  * Search tasks using FTS5 full-text search.
- * Returns results grouped into active and done arrays.
+ * Returns a flat list of results. On corruption, drops and rebuilds FTS then retries once.
  */
 export function searchTasks(input: SearchQueryInput): SearchQueryResult {
   const validated = searchQuerySchema.parse(input);
-  const db = getRawDb();
 
-  // Sanitize query for FTS5: escape double quotes, wrap each token in quotes
   const sanitized = validated.query
     .replace(/"/g, '""')
     .split(/\s+/)
@@ -109,8 +102,20 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
     .join(' ');
 
   if (sanitized.length === 0) {
-    return { active: [], done: [], total: 0 };
+    return { results: [], total: 0 };
   }
+
+  try {
+    return executeSearch(sanitized, validated.limit);
+  } catch {
+    // Corruption or malformed FTS — drop+rebuild and retry once
+    initSearchFts();
+    return executeSearch(sanitized, validated.limit);
+  }
+}
+
+function executeSearch(sanitized: string, limit: number): SearchQueryResult {
+  const db = getRawDb();
 
   const rows = db
     .prepare(
@@ -125,7 +130,7 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
       LIMIT ?
       `,
     )
-    .all(sanitized, validated.limit) as Array<{
+    .all(sanitized, limit) as Array<{
     id: string;
     parent_id: string | null;
     title: string;
@@ -138,29 +143,18 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
     snippet: string;
   }>;
 
-  const active: SearchResultItem[] = [];
-  const done: SearchResultItem[] = [];
+  const results: SearchResultItem[] = rows.map((row) => ({
+    id: row.id,
+    parentId: row.parent_id,
+    title: row.title,
+    body: row.body,
+    status: row.status as Task['status'],
+    today: Boolean(row.today),
+    client: row.client,
+    priority: row.priority as Task['priority'],
+    dueDate: row.due_date,
+    snippet: row.snippet,
+  }));
 
-  for (const row of rows) {
-    const item: SearchResultItem = {
-      id: row.id,
-      parentId: row.parent_id,
-      title: row.title,
-      body: row.body,
-      status: row.status as Task['status'],
-      today: Boolean(row.today),
-      client: row.client,
-      priority: row.priority as Task['priority'],
-      dueDate: row.due_date,
-      snippet: row.snippet,
-    };
-
-    if (row.status === 'done') {
-      done.push(item);
-    } else {
-      active.push(item);
-    }
-  }
-
-  return { active, done, total: active.length + done.length };
+  return { results, total: results.length };
 }

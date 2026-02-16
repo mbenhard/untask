@@ -6,9 +6,8 @@ import {
   type ChatKernelOrchestrationRequestPayload,
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
-  type ChatLiveThoughtResult,
+
   type ChatRetentionResult,
-  type ChatSendRequest,
   type ChatSendResult,
   type ChatSelectedModelResult,
   type ChatSetModelRequest,
@@ -20,6 +19,8 @@ import {
   type ChatResolvePendingActionRequest,
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
+  type ChatExecuteChipActionRequest,
+  type ChatExecuteChipActionResponse,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -52,16 +53,12 @@ import {
   type BackupImportDialogResponse,
   type WindowDismissModeResult,
 } from '../types/ipc';
-import { buildIdentityContext } from './ai/contextBuilder';
+import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
+import { buildSystemPrompt } from './ai/systemPrompt';
 import { closeDatabase, initDatabase } from './db';
 import { runMigrations } from './db/migrate';
-import { getPatterns, getProfile, getSoul, resetSoul, setPatterns, setProfile, setSoul } from './ai/memory';
-import {
-  evaluateMemoryPromotion,
-  resolveMemoryPromotionConfirmation,
-} from './assistant/memoryPolicy';
+import { getPatterns, getProfile, getSoul, resetSoul, setPatterns, setProfile, setSoul, getIdentity, getMemory, setIdentity, setMemory } from './ai/memory';
 import { evaluateProactiveTriggerPolicy } from './assistant/proactivePolicy';
-import { getIdentityKernelStatus, orchestrateChatWithIdentityKernel } from './assistant/identityKernel';
 import {
   listTasks,
   createTask,
@@ -91,7 +88,7 @@ import {
 import { initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
-import { generateLiveThought } from './ai/liveThought';
+
 import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
 import {
   getAutonomyMode,
@@ -122,12 +119,16 @@ const settingsMemoryUpdateSchema = z
     soul: z.string().optional(),
     profile: z.string().optional(),
     patterns: z.string().optional(),
+    identity: z.string().optional(),
+    memory: z.string().optional(),
   })
   .refine(
     (value) =>
       value.soul !== undefined ||
       value.profile !== undefined ||
-      value.patterns !== undefined,
+      value.patterns !== undefined ||
+      value.identity !== undefined ||
+      value.memory !== undefined,
     {
       message: 'At least one memory field must be provided.',
     },
@@ -162,7 +163,7 @@ const taskCompleteRequestSchema = z.union([
 ]);
 
 const memoryHistoryRequestSchema = z.object({
-  layer: z.enum(['soul', 'profile', 'patterns']).optional(),
+  layer: z.enum(['soul', 'profile', 'patterns', 'identity', 'memory']).optional(),
   limit: z.number().int().min(1).max(200).optional(),
 });
 
@@ -188,6 +189,8 @@ const getMemoryState = (): SettingsMemoryStatePayload => ({
   soul: getSoul(),
   profile: getProfile(),
   patterns: getPatterns(),
+  identity: getIdentity(),
+  memory: getMemory(),
 });
 
 const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
@@ -323,32 +326,51 @@ export const registerIpcHandlers = (): void => {
       _event,
       request?: IdentityContextSnapshotRequest,
     ): Promise<IdentityContextSnapshotResult> => {
-      return buildIdentityContext({
-        baseDir: process.cwd(),
-        userMessage: request?.request,
-        tokenBudget: request?.tokenBudget,
-        memory: request?.memory,
-        liveContext: request?.liveContext,
+      const { liveContext } = buildCanonicalRuntimeContext();
+      const result = buildSystemPrompt({
+        userMessage: request?.request ?? '',
+        liveContext: request?.liveContext
+          ? { ...liveContext, ...request.liveContext }
+          : liveContext,
       });
+      return result.contextSnapshot;
     },
   );
 
+  // Memory promotion removed — AI decides directly via tools.
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_EVALUATE_MEMORY_PROMOTION,
     (
       _event,
-      request: MemoryPromotionEvaluationRequestPayload,
-    ): MemoryPromotionEvaluationResultPayload =>
-      evaluateMemoryPromotion(request),
+      _request: MemoryPromotionEvaluationRequestPayload,
+    ): MemoryPromotionEvaluationResultPayload => ({
+      action: 'journal_only',
+      proposedLayer: 'journal',
+      proposedEntry: '',
+      confidence: 0,
+      requiresConfirmation: false,
+      reasons: [],
+      impactSignals: [],
+    }),
   );
 
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_CONFIRM_MEMORY_PROMOTION,
     (
       _event,
-      request: MemoryPromotionConfirmRequestPayload,
-    ): MemoryPromotionConfirmResultPayload =>
-      resolveMemoryPromotionConfirmation(request),
+      _request: MemoryPromotionConfirmRequestPayload,
+    ): MemoryPromotionConfirmResultPayload => ({
+      resolved: false,
+      decision: {
+        action: 'journal_only',
+        proposedLayer: 'journal',
+        proposedEntry: '',
+        confidence: 0,
+        requiresConfirmation: false,
+        reasons: [],
+        impactSignals: [],
+      },
+    }),
   );
 
   ipcMain.handle(
@@ -360,18 +382,36 @@ export const registerIpcHandlers = (): void => {
       evaluateProactiveTriggerPolicy(request),
   );
 
+  // Identity kernel status — always ready (identity is in DB now).
   ipcMain.handle(
     IPC_CHANNELS.CHAT_GET_KERNEL_STATUS,
-    async (): Promise<ChatKernelStatusResultPayload> => getIdentityKernelStatus(),
+    async (): Promise<ChatKernelStatusResultPayload> => ({
+      ready: true,
+      diagnostics: [],
+    }),
   );
 
+  // Orchestration endpoint — returns system prompt snapshot.
   ipcMain.handle(
     IPC_CHANNELS.CHAT_ORCHESTRATE_WITH_KERNEL,
     async (
       _event,
       request: ChatKernelOrchestrationRequestPayload,
-    ): Promise<ChatKernelOrchestrationResultPayload> =>
-      orchestrateChatWithIdentityKernel(request),
+    ): Promise<ChatKernelOrchestrationResultPayload> => {
+      const { liveContext } = buildCanonicalRuntimeContext();
+      const result = buildSystemPrompt({
+        userMessage: request.userMessage,
+        liveContext: request.liveContext
+          ? { ...liveContext, ...request.liveContext }
+          : liveContext,
+      });
+      return {
+        ok: true,
+        kernelStatus: { ready: true, diagnostics: [] },
+        context: result.contextSnapshot,
+        proactiveEvaluations: [],
+      };
+    },
   );
 
   // ─── Task handlers ────────────────────────────────────────
@@ -404,11 +444,11 @@ export const registerIpcHandlers = (): void => {
     try {
       const validated = taskCompleteRequestSchema.parse(request);
       const payload = typeof validated === 'string' ? { id: validated } : validated;
-      const result = completeTask(payload.id, 'user', {
+      const { completed } = completeTask(payload.id, 'user', {
         completeChildren: payload.completeChildren === true,
       });
       refreshTodayBadge();
-      return result;
+      return completed;
     }
     catch (e) { console.error('[ipc] TASK_COMPLETE:', e); throw e; }
   });
@@ -565,16 +605,6 @@ export const registerIpcHandlers = (): void => {
       catch (e) { console.error('[ipc] CHAT_SET_RETENTION_MODE:', e); throw e; }
     },
   );
-  ipcMain.handle(
-    IPC_CHANNELS.CHAT_GET_LIVE_THOUGHT,
-    (): ChatLiveThoughtResult => {
-      try {
-        return generateLiveThought();
-      }
-      catch (e) { console.error('[ipc] CHAT_GET_LIVE_THOUGHT:', e); throw e; }
-    },
-  );
-
   // ─── Autonomy handlers ────────────────────────────────────
   ipcMain.handle(
     IPC_CHANNELS.CHAT_GET_AUTONOMY_MODE,
@@ -677,6 +707,43 @@ export const registerIpcHandlers = (): void => {
         };
       }
       catch (e) { console.error('[ipc] CHAT_RESOLVE_PENDING_ACTION:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_EXECUTE_CHIP_ACTION,
+    async (_event, request: ChatExecuteChipActionRequest): Promise<ChatExecuteChipActionResponse> => {
+      try {
+        const toolName = request?.toolName;
+        const args = request?.args;
+
+        if (!toolName || typeof toolName !== 'string') {
+          return { ok: false, status: 'error', message: 'Missing tool name in chip action.' };
+        }
+
+        const result = await executeToolCall(
+          { name: toolName, input: args ?? {} },
+          { toolCallId: `chip-action-${Date.now()}` },
+        );
+
+        if (result.ok) {
+          return {
+            ok: true,
+            status: result.output.status,
+            message: result.output.message,
+            actionCard: result.output.actionCard,
+          };
+        }
+
+        return {
+          ok: false,
+          status: 'error',
+          message: result.error.message,
+        };
+      } catch (e) {
+        console.error('[ipc] CHAT_EXECUTE_CHIP_ACTION:', e);
+        throw e;
+      }
     },
   );
 
@@ -875,6 +942,12 @@ export const registerIpcHandlers = (): void => {
         }
         if (validated.patterns !== undefined) {
           setPatterns(validated.patterns);
+        }
+        if (validated.identity !== undefined) {
+          setIdentity(validated.identity);
+        }
+        if (validated.memory !== undefined) {
+          setMemory(validated.memory);
         }
 
         return getMemoryState();

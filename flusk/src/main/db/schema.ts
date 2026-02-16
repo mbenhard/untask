@@ -38,6 +38,8 @@ export const tasks = sqliteTable(
     }),
     valueAtRisk: real('value_at_risk'),
     lastClientTouchAt: text('last_client_touch_at'),
+    recurrence: text('recurrence'),
+    recurrenceSourceId: text('recurrence_source_id'),
     order: integer('order').default(0),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     completedAt: text('completed_at'),
@@ -67,6 +69,7 @@ export const chatMessages = sqliteTable(
     role: text('role', { enum: ['user', 'assistant'] }).notNull(),
     content: text('content').notNull(),
     toolCalls: text('tool_calls'),
+    chips: text('chips'),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
   },
   (table) => [index('chat_messages_created_at_idx').on(table.createdAt)],
@@ -110,6 +113,24 @@ export const aiJournal = sqliteTable(
   (table) => [index('ai_journal_created_at_idx').on(table.createdAt)],
 );
 
+// ─── ai_journal_archive ─────────────────────────────────────
+export const aiJournalArchive = sqliteTable(
+  'ai_journal_archive',
+  {
+    id: text('id').primaryKey(),
+    content: text('content').notNull(),
+    category: text('category', {
+      enum: ['pattern', 'progress', 'preference', 'summary'],
+    }).notNull(),
+    createdAt: text('created_at').notNull(),
+    archivedAt: text('archived_at').$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index('ai_journal_archive_created_at_idx').on(table.createdAt),
+    index('ai_journal_archive_archived_at_idx').on(table.archivedAt),
+  ],
+);
+
 // ─── settings ───────────────────────────────────────────────
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
@@ -123,7 +144,7 @@ export const memoryEvents = sqliteTable(
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    layer: text('layer', { enum: ['soul', 'profile', 'patterns'] }).notNull(),
+    layer: text('layer', { enum: ['soul', 'profile', 'patterns', 'identity', 'memory'] }).notNull(),
     before: text('before').notNull(),
     after: text('after').notNull(),
     source: text('source', { enum: ['user', 'ai', 'system'] }).notNull(),
@@ -149,6 +170,8 @@ export type NewTaskEvent = typeof taskEvents.$inferInsert;
 
 export type AiJournal = typeof aiJournal.$inferSelect;
 export type NewAiJournal = typeof aiJournal.$inferInsert;
+export type AiJournalArchive = typeof aiJournalArchive.$inferSelect;
+export type NewAiJournalArchive = typeof aiJournalArchive.$inferInsert;
 
 export type Setting = typeof settings.$inferSelect;
 export type MemoryEvent = typeof memoryEvents.$inferSelect;
