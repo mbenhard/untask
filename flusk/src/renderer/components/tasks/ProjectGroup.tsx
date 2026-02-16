@@ -22,7 +22,7 @@ export const ProjectGroup = ({
   allTasks,
   completedCount,
   totalCount,
-}: ProjectGroupProps): JSX.Element => {
+}: ProjectGroupProps) => {
   const prefersReducedMotion = useReducedMotion();
   const [isExpanded, setIsExpanded] = useState(true);
   const contentId = useMemo(() => `project-${parentTask.id}`, [parentTask.id]);

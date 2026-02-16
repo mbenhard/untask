@@ -121,6 +121,74 @@ const summarizeTask = (task: {
   return `${task.title}${tags.length > 0 ? ` (${tags.join(', ')})` : ''}`;
 };
 
+const AMBIGUOUS_TASK_TITLE_SET = new Set([
+  'for me',
+  'a task',
+  'task',
+  'something',
+  'todo',
+  'to do',
+  'this',
+  'that',
+]);
+
+const TASK_ACTION_VERBS = new Set([
+  'call',
+  'email',
+  'send',
+  'review',
+  'write',
+  'draft',
+  'fix',
+  'update',
+  'plan',
+  'prepare',
+  'ship',
+  'submit',
+  'pay',
+  'invoice',
+  'follow',
+]);
+
+export const assessCreateTaskTitle = (
+  title: string,
+): { ok: true } | { ok: false; message: string } => {
+  const normalized = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (normalized.length < 4) {
+    return {
+      ok: false,
+      message: 'Please provide a concrete task title before I create it.',
+    };
+  }
+
+  if (AMBIGUOUS_TASK_TITLE_SET.has(normalized)) {
+    return {
+      ok: false,
+      message:
+        'That title is ambiguous. Please provide a concrete task title (for example: "Call Acme about invoice follow-up").',
+    };
+  }
+
+  const words = normalized.split(' ').filter(Boolean);
+  const hasActionVerb = words.some((word) => TASK_ACTION_VERBS.has(word));
+
+  if (words.length <= 2 && !hasActionVerb) {
+    return {
+      ok: false,
+      message:
+        'Please provide a more actionable task title with the specific work to do.',
+    };
+  }
+
+  return { ok: true };
+};
+
 const createActionCard = (
   toolName: string,
   status: ChatToolStatus,
@@ -271,6 +339,18 @@ const createTaskTool = {
   description: 'Create a task or subtask and log an auditable task event.',
   schema: createTaskToolInputSchema,
   execute: async (input, context) => {
+    const quality = assessCreateTaskTitle(input.title);
+    if (!quality.ok) {
+      return {
+        status: 'error',
+        message: quality.message,
+        data: {
+          needsClarification: true,
+          attemptedTitle: input.title,
+        },
+      };
+    }
+
     const createdTask = createTask(input, 'ai');
     const event = getLastTaskEventForTask(createdTask.id);
 

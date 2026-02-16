@@ -11,13 +11,32 @@ import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
-import { setupTray } from './tray';
+import { getSetting } from './services/settingsService';
+import { setupTray, destroyTray } from './tray';
+import { initSummonController, summonWindow } from './window/summonController';
 
 if (started) {
   app.quit();
 }
 
+// ─── Single-instance lock ─────────────────────────────────
+const gotLock = app.requestSingleInstanceLock();
+
+if (!gotLock) {
+  app.quit();
+}
+
 let mainWindow: BrowserWindow | null = null;
+
+const canApplyLaunchAtLogin = (): boolean => {
+  if (process.platform === 'darwin') {
+    // Development Electron binaries on macOS commonly fail login item writes
+    // with "Operation not permitted".
+    return app.isPackaged;
+  }
+
+  return process.platform === 'win32';
+};
 
 const createMainWindow = (): BrowserWindow => {
   const window = new BrowserWindow({
@@ -41,21 +60,6 @@ const createMainWindow = (): BrowserWindow => {
     },
   });
 
-  const revealWindow = (): void => {
-    if (window.isDestroyed()) {
-      return;
-    }
-
-    if (!window.isVisible()) {
-      window.show();
-    }
-  };
-
-  window.once('ready-to-show', revealWindow);
-  window.webContents.once('did-finish-load', revealWindow);
-
-  setTimeout(revealWindow, 1500);
-
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
@@ -73,7 +77,8 @@ const bootstrap = (): void => {
   registerIpcHandlers();
 
   mainWindow = createMainWindow();
-  setupTray(mainWindow);
+  initSummonController(mainWindow);
+  setupTray();
   registerGlobalShortcuts(mainWindow);
 };
 
@@ -119,6 +124,25 @@ const runWeeklyDigestStartupCheck = (): void => {
   }, 0);
 };
 
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    summonWindow();
+  }
+});
+
+const applyLaunchAtLogin = (): void => {
+  try {
+    const stored = getSetting('app.launchAtLogin');
+    const enabled = stored === 'true';
+    if (!canApplyLaunchAtLogin()) {
+      return;
+    }
+    app.setLoginItemSettings({ openAtLogin: enabled });
+  } catch {
+    // Login item apply can fail in some environments; keep preference persisted
+  }
+};
+
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) {
     app.dock.hide();
@@ -126,17 +150,23 @@ app.whenReady().then(() => {
 
   void emitIdentityContextDebugSnapshot();
   bootstrap();
+  applyLaunchAtLogin();
   runWeeklyDigestStartupCheck();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow();
+      initSummonController(mainWindow);
+      summonWindow();
+    } else {
+      summonWindow();
     }
   });
 });
 
 app.on('will-quit', () => {
   unregisterGlobalShortcuts();
+  destroyTray();
   closeDatabase();
 });
 

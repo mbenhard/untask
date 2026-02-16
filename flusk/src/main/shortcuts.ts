@@ -1,19 +1,31 @@
-import { BrowserWindow, globalShortcut } from 'electron';
+import { type BrowserWindow, globalShortcut } from 'electron';
+
+import { toggleWindow, showQuickAdd } from './window/summonController';
 
 const TOGGLE_WINDOW_SHORTCUT = 'CommandOrControl+Shift+Space';
+const QUICK_ADD_SHORTCUT = 'CommandOrControl+Shift+A';
 
-export const registerGlobalShortcuts = (mainWindow: BrowserWindow): void => {
-  globalShortcut.unregister(TOGGLE_WINDOW_SHORTCUT);
+function registerShortcut(
+  accelerator: string,
+  callback: () => void,
+  label: string,
+): void {
+  globalShortcut.unregister(accelerator);
 
-  globalShortcut.register(TOGGLE_WINDOW_SHORTCUT, () => {
-    if (mainWindow.isVisible()) {
-      mainWindow.hide();
-      return;
-    }
+  const registered = globalShortcut.register(accelerator, callback);
 
-    mainWindow.show();
-    mainWindow.focus();
-  });
+  if (!registered) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[shortcuts] failed to register ${label} (${accelerator}) — may conflict with another app`,
+    );
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const registerGlobalShortcuts = (_mainWindow: BrowserWindow): void => {
+  registerShortcut(TOGGLE_WINDOW_SHORTCUT, toggleWindow, 'toggle-window');
+  registerShortcut(QUICK_ADD_SHORTCUT, showQuickAdd, 'quick-add');
 };
 
 export const unregisterGlobalShortcuts = (): void => {

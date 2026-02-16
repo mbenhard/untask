@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useQuickAddListener } from '../../hooks/useQuickAddListener';
 import {
   APP_VIEW_ORDER,
   type AppView,
@@ -20,6 +21,7 @@ import {
 } from '../../stores/taskStore';
 import { useChatStore } from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
+import { Scratchpad } from '../scratchpad/Scratchpad';
 import { SettingsMemory } from '../settings/SettingsMemory';
 import { InboxView } from '../views/InboxView';
 import { ProjectsView } from '../views/ProjectsView';
@@ -39,7 +41,7 @@ const getDirection = (activeView: AppView, previousViewIndex: number): number =>
   return activeViewIndex > previousViewIndex ? 1 : -1;
 };
 
-export const AppShell = (): JSX.Element => {
+export const AppShell = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [chatInputValue, setChatInputValue] = useState('');
 
@@ -72,6 +74,11 @@ export const AppShell = (): JSX.Element => {
     inputRef,
     inputValue: chatInputValue,
     clearInput,
+  });
+
+  useQuickAddListener({
+    inputRef,
+    onPrefill: setChatInputValue,
   });
 
   const handleSubmit = useCallback(() => {
@@ -108,7 +115,7 @@ export const AppShell = (): JSX.Element => {
         exit: (direction: number) => ({ x: direction * -200, opacity: 0 }),
       };
 
-  const activeViewComponent = useMemo((): JSX.Element => {
+  const activeViewComponent = useMemo(() => {
     if (activeView === 'today') {
       return <TodayView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
@@ -163,6 +170,7 @@ export const AppShell = (): JSX.Element => {
       </div>
 
       {isMemorySettingsOpen ? <SettingsMemory onClose={closeMemorySettings} /> : null}
+      <Scratchpad />
     </div>
   );
 };

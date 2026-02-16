@@ -14,7 +14,7 @@ const config: ForgeConfig = {
     extendInfo: {
       LSUIElement: true,
     },
-    extraResource: ['./drizzle'],
+    extraResource: ['./drizzle', './assets/tray'],
   },
   rebuildConfig: {},
   makers: [
@@ -36,7 +36,10 @@ const config: ForgeConfig = {
           target: 'main',
         },
         {
-          entry: 'src/preload/index.ts',
+          // Use a named input so preload emits `preload.js` instead of colliding with main `index.js`.
+          entry: {
+            preload: 'src/preload/index.ts',
+          },
           config: 'vite.preload.config.ts',
           target: 'preload',
         },

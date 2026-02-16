@@ -36,7 +36,7 @@ export const TaskItem = ({
   onToggleToday,
   onBodyEditModeChange,
   onFocus,
-}: TaskItemProps): JSX.Element => {
+}: TaskItemProps) => {
   const {
     attributes,
     listeners,

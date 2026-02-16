@@ -32,6 +32,13 @@ import type {
 import type { AiJournal } from './models';
 
 export const IPC_CHANNELS = {
+  // ─── App/window lifecycle channels ──────────────────────
+  APP_REQUEST_HIDE: 'app:request-hide',
+  APP_ESCAPE_LAYER_EXIT: 'app:escape-layer-exit',
+  APP_QUICK_ADD_PAYLOAD: 'app:quick-add-payload',
+  APP_GET_LAUNCH_AT_LOGIN: 'app:get-launch-at-login',
+  APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
+
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
   SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT:
     'settings:get-identity-context-snapshot',
@@ -130,4 +137,21 @@ export type SettingsReadJournalRequestPayload = {
 
 export type SettingsReadJournalResultPayload = {
   entries: AiJournal[];
+};
+
+// ─── App/window lifecycle payloads ────────────────────────
+
+export type QuickAddPayload = {
+  text: string;
+  source: 'clipboard-url' | 'clipboard-text' | 'empty';
+};
+
+export type LaunchAtLoginPayload = {
+  enabled: boolean;
+};
+
+export type LaunchAtLoginResult = {
+  enabled: boolean;
+  applied: boolean;
+  error?: string;
 };

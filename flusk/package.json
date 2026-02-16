@@ -11,6 +11,9 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
+    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.preload.json && tsc --noEmit -p tsconfig.renderer.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "rebuild:node": "npm rebuild better-sqlite3",
     "rebuild": "npm run rebuild:electron",
@@ -51,7 +54,8 @@
     "eslint-plugin-import": "^2.32.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.29",
@@ -59,6 +63,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/inter": "^5.2.8",
+    "@uiw/react-md-editor": "^4.0.11",
     "ai": "^6.0.86",
     "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { NotebookPen } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import {
@@ -8,6 +9,11 @@ import {
   selectIsMemorySettingsOpen,
   useAppStore,
 } from '../../stores/appStore';
+import {
+  selectScratchpadIsDirty,
+  selectScratchpadIsOpen,
+  useScratchpadStore,
+} from '../../stores/scratchpadStore';
 
 const TAB_LABELS: Record<AppView, string> = {
   today: 'Today',
@@ -15,11 +21,14 @@ const TAB_LABELS: Record<AppView, string> = {
   inbox: 'Inbox',
 };
 
-export const TitleBar = (): JSX.Element => {
+export const TitleBar = () => {
   const activeView = useAppStore(selectActiveView);
   const setView = useAppStore((state) => state.setView);
   const isMemorySettingsOpen = useAppStore(selectIsMemorySettingsOpen);
   const toggleMemorySettings = useAppStore((state) => state.toggleMemorySettings);
+  const isScratchpadOpen = useScratchpadStore(selectScratchpadIsOpen);
+  const isScratchpadDirty = useScratchpadStore(selectScratchpadIsDirty);
+  const toggleScratchpad = useScratchpadStore((state) => state.toggleOpen);
 
   return (
     <header className="drag-region flex h-10 items-end border-b border-border bg-card/80 px-3 backdrop-blur-sm">
@@ -55,7 +64,28 @@ export const TitleBar = (): JSX.Element => {
         })}
       </nav>
 
-      <div className="no-drag ml-auto flex h-full items-center">
+      <div className="no-drag ml-auto flex h-full items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            void toggleScratchpad();
+          }}
+          className={cn(
+            'relative flex h-7 items-center justify-center rounded-md px-2 text-[11px] font-medium tracking-[0.02em] transition-colors',
+            isScratchpadOpen
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+          )}
+          aria-pressed={isScratchpadOpen}
+          aria-label="Toggle scratchpad"
+          title="Scratchpad (Cmd+N)"
+        >
+          <NotebookPen size={14} />
+          {isScratchpadDirty ? (
+            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-foreground" />
+          ) : null}
+        </button>
+
         <button
           type="button"
           onClick={toggleMemorySettings}

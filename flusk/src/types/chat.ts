@@ -1,6 +1,12 @@
 import type { ChatMessage } from './models';
 
 export type ChatToolStatus = 'success' | 'error' | 'confirmation_required';
+export type ChatStreamErrorCode =
+  | 'config_error'
+  | 'provider_error'
+  | 'network_error'
+  | 'tool_error'
+  | 'unknown_error';
 
 export type AutonomyMode = 'manual' | 'safe' | 'autopilot';
 
@@ -32,11 +38,19 @@ export type ChatToolExecutionSummary = {
   actionCardId?: string;
 };
 
+export type ChatTurnTelemetry = {
+  startedAt: string;
+  firstTokenAt?: string;
+  completedAt?: string;
+  attemptCount: number;
+};
+
 export type PersistedChatToolMetadata = {
   requestId: string;
   modelId: string;
   actionCards: ChatActionCard[];
   toolExecutions: ChatToolExecutionSummary[];
+  telemetry?: ChatTurnTelemetry;
 };
 
 export type ChatStreamEvent =
@@ -70,6 +84,8 @@ export type ChatStreamEvent =
       type: 'error';
       requestId: string;
       message: string;
+      code: ChatStreamErrorCode;
+      retryable: boolean;
     };
 
 export type ChatSendRequestPayload = {

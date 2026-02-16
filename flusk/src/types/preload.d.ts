@@ -20,12 +20,14 @@ import type {
   ChatListPendingActionsResponse,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
+  LaunchAtLoginResult,
   MemoryPromotionConfirmRequestPayload,
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
   MemoryPromotionEvaluationResultPayload,
   ProactiveTriggerEvaluationRequestPayload,
   ProactiveTriggerEvaluationResultPayload,
+  QuickAddPayload,
   SettingsMemoryStatePayload,
   SettingsMemoryUpdateRequestPayload,
   SettingsReadJournalRequestPayload,
@@ -36,6 +38,15 @@ import type {
 import type { Task, ChatMessage, Scratchpad, Setting } from './models';
 
 export type FluskApi = {
+  // ─── App/window lifecycle APIs ──────────────────────────
+  app: {
+    requestHide: () => Promise<void>;
+    escapeLayerExit: () => Promise<void>;
+    onQuickAddPayload: (listener: (payload: QuickAddPayload) => void) => () => void;
+    getLaunchAtLogin: () => Promise<LaunchAtLoginResult>;
+    setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
+  };
+
   // ─── Existing kernel APIs ───────────────────────────────
   getBootstrapState: () => Promise<SettingsBootstrapState>;
   getIdentityContextSnapshot: (

@@ -813,7 +813,7 @@
           "6",
           "7"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -821,9 +821,10 @@
             "description": "Implement the macOS menu bar tray integration with a template icon and a dynamic badge that displays the count of remaining today tasks, updating in real-time as tasks are completed.",
             "dependencies": [],
             "details": "Create src/main/tray.ts with the following implementation:\n\n1. Create template icon assets:\n   - tray-icon-Template.png (16x16 for standard displays)\n   - tray-icon-Template@2x.png (32x32 for Retina displays)\n   - Icons must be monochrome (black with transparency) for macOS template behavior\n   - Place in src/assets/ or resources/ folder\n\n2. Initialize Tray in main process:\n   ```typescript\n   import { Tray, nativeImage, app } from 'electron';\n   \n   let tray: Tray | null = null;\n   \n   export function createTray(mainWindow: BrowserWindow): Tray {\n     const iconPath = path.join(__dirname, '../assets/tray-icon-Template.png');\n     const icon = nativeImage.createFromPath(iconPath);\n     icon.setTemplateImage(true);\n     \n     tray = new Tray(icon);\n     tray.setToolTip('TaskFlow');\n     return tray;\n   }\n   ```\n\n3. Implement badge functionality:\n   - Use tray.setTitle() for badge text (macOS shows this next to icon)\n   - Create updateBadge(count: number) function\n   - When count > 0, show the number; when 0, hide badge (empty string)\n   - Badge should reflect incomplete tasks with today=true flag\n\n4. Set up IPC listener for real-time updates:\n   ```typescript\n   ipcMain.on('today-count-changed', (_, count: number) => {\n     updateTrayBadge(count);\n   });\n   ```\n\n5. Add tray click handler to toggle window visibility:\n   ```typescript\n   tray.on('click', () => {\n     if (mainWindow.isVisible()) {\n       mainWindow.hide();\n     } else {\n       mainWindow.show();\n     }\n   });\n   ```\n\n6. Initialize tray after app is ready in main.ts, passing the main window reference.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Launch app - verify tray icon appears in macOS menu bar\n2. Verify icon adapts to light/dark menu bar (template image behavior)\n3. Add a task with today=true - verify badge shows '1'\n4. Add more today tasks - verify badge count increases\n5. Complete a today task - verify badge decrements in real-time\n6. Complete all today tasks - verify badge disappears (no '0' shown)\n7. Click tray icon - verify main window toggles visibility\n8. Hover over tray icon - verify tooltip shows app name",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T00:07:51.284Z"
           },
           {
             "id": 2,
@@ -833,9 +834,10 @@
               1
             ],
             "details": "Create src/main/shortcuts.ts with global shortcut registration:\n\n1. Import required modules:\n   ```typescript\n   import { globalShortcut, BrowserWindow } from 'electron';\n   ```\n\n2. Implement registerGlobalShortcuts function:\n   ```typescript\n   export function registerGlobalShortcuts(mainWindow: BrowserWindow): void {\n     // Toggle window visibility\n     globalShortcut.register('CommandOrControl+Shift+Space', () => {\n       toggleWindow(mainWindow);\n     });\n     \n     // Quick add with clipboard\n     globalShortcut.register('CommandOrControl+Shift+A', () => {\n       showQuickAdd(mainWindow);\n     });\n   }\n   ```\n\n3. Implement toggleWindow function:\n   ```typescript\n   function toggleWindow(win: BrowserWindow): void {\n     if (win.isVisible() && win.isFocused()) {\n       win.hide();\n     } else {\n       win.show();\n       win.focus();\n     }\n   }\n   ```\n\n4. Implement showQuickAdd function:\n   - Show window if hidden\n   - Focus window\n   - Send IPC message to renderer to focus chat input and trigger clipboard read\n   ```typescript\n   function showQuickAdd(win: BrowserWindow): void {\n     win.show();\n     win.focus();\n     win.webContents.send('quick-add-triggered');\n   }\n   ```\n\n5. Unregister shortcuts on app quit:\n   ```typescript\n   export function unregisterGlobalShortcuts(): void {\n     globalShortcut.unregisterAll();\n   }\n   ```\n\n6. Call registerGlobalShortcuts in app 'ready' event and unregisterGlobalShortcuts in 'will-quit' event\n\n7. Handle shortcut registration failures gracefully (shortcuts may be taken by other apps):\n   ```typescript\n   const success = globalShortcut.register('CommandOrControl+Shift+Space', callback);\n   if (!success) {\n     console.warn('Shortcut registration failed - may be in use by another app');\n   }\n   ```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Launch app and hide window manually\n2. Press Cmd+Shift+Space from any other application - verify window appears and is focused\n3. Press Cmd+Shift+Space again - verify window hides\n4. Press Cmd+Shift+A - verify window appears with chat input focused\n5. Quit app and verify no shortcuts remain registered (test with another app)\n6. Test with window already visible - Cmd+Shift+Space should hide it\n7. Test on fresh launch - first Cmd+Shift+Space should show and center window",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T00:07:51.286Z"
           },
           {
             "id": 3,
@@ -845,9 +847,10 @@
               2
             ],
             "details": "Create src/main/clipboard.ts for clipboard operations:\n\n1. Read clipboard text and classify as url/text/empty.\n2. Add IPC handler 'read-clipboard' returning normalized clipboard payload.\n3. In renderer, create useQuickAdd hook that listens to quick-add trigger and pre-fills input.\n4. AI title suggestion path:\n   - If AI stack is available, call suggestion helper for better titles.\n   - If AI is unavailable, use deterministic fallback so quick-add never blocks:\n     - URL => `Review <hostname>`\n     - Text => first actionable line trimmed to safe length\n5. Suggested title must remain editable before save.\n6. Log failures silently and continue with fallback title.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Copy a URL to clipboard, press Cmd+Shift+A - verify URL is detected and shown in input\n2. Copy plain text to clipboard, press Cmd+Shift+A - verify text is pre-filled\n3. Empty clipboard, press Cmd+Shift+A - verify input is empty/focused normally\n4. Copy a URL, trigger quick add - verify AI suggests relevant task title\n5. Copy a text snippet, trigger quick add - verify AI suggests actionable title\n6. Verify suggested title is editable (not forced)\n7. Test with very long clipboard content - verify graceful truncation",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T00:07:51.288Z"
           },
           {
             "id": 4,
@@ -858,9 +861,10 @@
               2
             ],
             "details": "Implement window positioning in src/main/windowManager.ts:\n\n1. Create window position manager:\n   ```typescript\n   import { BrowserWindow, screen } from 'electron';\n   import { db } from './db';\n   \n   interface WindowPosition {\n     x: number;\n     y: number;\n     width: number;\n     height: number;\n   }\n   \n   let hasBeenPositioned = false;\n   ```\n\n2. Implement position logic on window show:\n   ```typescript\n   export function positionWindow(win: BrowserWindow): void {\n     const savedPosition = getSavedPosition();\n     \n     if (savedPosition && hasBeenPositioned) {\n       // Use saved position\n       win.setBounds(savedPosition);\n     } else {\n       // Center on primary display\n       const { width, height } = screen.getPrimaryDisplay().workAreaSize;\n       const winBounds = win.getBounds();\n       win.setPosition(\n         Math.round((width - winBounds.width) / 2),\n         Math.round((height - winBounds.height) / 2)\n       );\n       hasBeenPositioned = true;\n     }\n   }\n   ```\n\n3. Save position on window move/resize:\n   ```typescript\n   win.on('moved', () => saveWindowPosition(win));\n   win.on('resized', () => saveWindowPosition(win));\n   \n   function saveWindowPosition(win: BrowserWindow): void {\n     const bounds = win.getBounds();\n     // Save to settings table in SQLite\n     db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', \n       ['windowPosition', JSON.stringify(bounds)]);\n   }\n   ```\n\n4. Implement click-outside-to-hide (Spotlight behavior):\n   ```typescript\n   // In BrowserWindow creation options\n   const mainWindow = new BrowserWindow({\n     // ... other options\n     skipTaskbar: true,  // Don't show in Dock taskbar\n   });\n   \n   // Hide on blur (click outside)\n   mainWindow.on('blur', () => {\n     // Only hide if not in dev tools or dialog\n     if (!mainWindow.webContents.isDevToolsOpened()) {\n       mainWindow.hide();\n     }\n   });\n   ```\n\n5. Implement layered Escape dismiss in renderer:\n   ```typescript\n   // In AppShell.tsx or global key handler\n   useEffect(() => {\n     const handleEscape = (e: KeyboardEvent) => {\n       if (e.key === 'Escape') {\n         if (isChatOpen) {\n           closeChat();\n         } else if (currentView !== 'today') {\n           setView('today');\n         } else {\n           window.electronAPI.hideWindow();\n         }\n       }\n     };\n     window.addEventListener('keydown', handleEscape);\n     return () => window.removeEventListener('keydown', handleEscape);\n   }, [isChatOpen, currentView]);\n   ```\n\n6. Add IPC for hiding window from renderer:\n   ```typescript\n   ipcMain.on('hide-window', () => {\n     mainWindow.hide();\n   });\n   ```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Fresh app launch, press Cmd+Shift+Space - verify window appears centered on screen\n2. Drag window to corner, hide and show again - verify window appears at last position\n3. Restart app, show window - verify position persists across restarts\n4. Click outside window - verify window hides (blur behavior)\n5. Open chat mode, press Escape - verify chat closes but window stays\n6. Press Escape in Today view - verify window hides\n7. Press Escape in Projects view - verify returns to Today view first\n8. Verify window doesn't hide when dev tools are open and you click dev tools",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T00:07:51.290Z"
           },
           {
             "id": 5,
@@ -870,14 +874,16 @@
               1
             ],
             "details": "Create src/main/appLifecycle.ts for app lifecycle management:\n\n1. Implement single instance lock at very start of main.ts:\n   ```typescript\n   const gotTheLock = app.requestSingleInstanceLock();\n   \n   if (!gotTheLock) {\n     app.quit();\n   } else {\n     app.on('second-instance', (event, commandLine, workingDirectory) => {\n       // Someone tried to run a second instance\n       // Focus our window instead\n       if (mainWindow) {\n         if (mainWindow.isMinimized()) mainWindow.restore();\n         mainWindow.show();\n         mainWindow.focus();\n       }\n     });\n   }\n   ```\n\n2. Implement launch at login:\n   ```typescript\n   export function setLaunchAtLogin(enabled: boolean): void {\n     app.setLoginItemSettings({\n       openAtLogin: enabled,\n       openAsHidden: true,  // Start hidden in tray\n       // macOS-specific: use launch agent\n       path: app.getPath('exe'),\n     });\n   }\n   \n   export function getLaunchAtLoginStatus(): boolean {\n     return app.getLoginItemSettings().openAtLogin;\n   }\n   ```\n\n3. Create IPC handlers for settings:\n   ```typescript\n   ipcMain.handle('get-launch-at-login', () => {\n     return getLaunchAtLoginStatus();\n   });\n   \n   ipcMain.handle('set-launch-at-login', (_, enabled: boolean) => {\n     setLaunchAtLogin(enabled);\n     // Also save to settings table for UI state\n     saveSetting('launchAtLogin', enabled);\n   });\n   ```\n\n4. Add setting to renderer settings page:\n   ```typescript\n   // In Settings component\n   const [launchAtLogin, setLaunchAtLogin] = useState(false);\n   \n   useEffect(() => {\n     window.electronAPI.getLaunchAtLogin().then(setLaunchAtLogin);\n   }, []);\n   \n   const handleToggle = async (enabled: boolean) => {\n     await window.electronAPI.setLaunchAtLogin(enabled);\n     setLaunchAtLogin(enabled);\n   };\n   ```\n\n5. Configure app to hide Dock icon (menu bar only):\n   ```typescript\n   // In main.ts after app ready\n   if (process.platform === 'darwin') {\n     app.dock.hide();  // Hide from Dock, show only in menu bar\n   }\n   ```\n\n6. Handle startup visibility:\n   ```typescript\n   // Check if launched at login (hidden) vs manual launch\n   const wasOpenedAsHidden = app.getLoginItemSettings().wasOpenedAsHidden;\n   \n   app.whenReady().then(() => {\n     createTray(mainWindow);\n     registerGlobalShortcuts(mainWindow);\n     \n     if (!wasOpenedAsHidden) {\n       mainWindow.show();\n     }\n   });\n   ```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Try to launch second instance of app - verify it focuses existing window instead of opening new\n2. Enable launch at login in settings - verify setting persists\n3. Restart Mac (or logout/login) - verify app starts automatically\n4. Verify app starts hidden (in tray) on automatic login launch\n5. Manual launch (clicking app icon) - verify window shows immediately\n6. Disable launch at login - verify app no longer auto-starts\n7. Verify Dock icon is hidden - app only appears in menu bar\n8. Verify single instance works when app is hidden in tray",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T00:07:51.293Z"
           }
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Create Tray with template icon and dynamic badge showing today count, 2) Implement global shortcuts (Cmd+Shift+Space, Cmd+Shift+A) with window toggle logic, 3) Create clipboard-aware capture with URL detection and AI title suggestion, 4) Implement window positioning (center on first summon, remember position), 5) Configure launch at login and single instance handling. Include click-outside-to-hide behavior."
+        "expansionPrompt": "Break down into: 1) Create Tray with template icon and dynamic badge showing today count, 2) Implement global shortcuts (Cmd+Shift+Space, Cmd+Shift+A) with window toggle logic, 3) Create clipboard-aware capture with URL detection and AI title suggestion, 4) Implement window positioning (center on first summon, remember position), 5) Configure launch at login and single instance handling. Include click-outside-to-hide behavior.",
+        "updatedAt": "2026-02-16T00:07:51.293Z"
       },
       {
         "id": "10",
@@ -891,17 +897,18 @@
           "7",
           "8"
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
             "title": "Create Scratchpad component with markdown editor and slide-up animation",
             "description": "Build the Scratchpad.tsx component that slides up as a panel triggered by Cmd+N or icon click, featuring a persistent markdown editor using @uiw/react-md-editor or similar library.",
             "dependencies": [],
-            "details": "Create src/renderer/components/scratchpad/Scratchpad.tsx with the following features:\n\n1. Panel animation:\n   - Implement slide-up animation using CSS transforms or Framer Motion\n   - Add overlay backdrop with click-to-close\n   - Support keyboard shortcut Cmd+N (register in global keymap)\n   - Add scratchpad icon button in UI header/toolbar\n\n2. Markdown editor integration:\n   - Install @uiw/react-md-editor: `npm install @uiw/react-md-editor`\n   - Configure editor with syntax highlighting for code blocks\n   - Set appropriate height (60-70% viewport)\n   - Add toolbar for common formatting (bold, italic, code, lists)\n\n3. Persistence:\n   - Create IPC handlers for scratchpad CRUD: 'scratchpad:get', 'scratchpad:save'\n   - Store single document in scratchpad table (id, content, updated_at)\n   - Implement auto-save on blur and panel close events\n   - Load content on panel open\n\n4. State management:\n   - Add scratchpad state to Zustand store (isOpen, content, isDirty)\n   - Track dirty state for unsaved changes indicator",
-            "status": "pending",
+            "details": "Create src/renderer/components/scratchpad/Scratchpad.tsx with the following features:\n\n1. Panel animation:\n   - Implement slide-up animation using CSS transforms or Framer Motion\n   - Add overlay backdrop with click-to-close\n   - Support keyboard shortcut Cmd+N (register in global keymap)\n   - Add scratchpad icon button in UI header/toolbar\n\n2. Markdown editor integration:\n   - Install @uiw/react-md-editor: `npm install @uiw/react-md-editor`\n   - Configure editor with syntax highlighting for code blocks\n   - Set appropriate height (60-70% viewport)\n   - Add toolbar for common formatting (bold, italic, code, lists)\n\n3. Persistence:\n   - Create IPC handlers for scratchpad CRUD: 'scratchpad:get', 'scratchpad:save'\n   - Store single document in scratchpad table (id, content, updated_at)\n   - Implement auto-save on blur and panel close events\n   - Load content on panel open\n\n4. State management:\n   - Add scratchpad state to Zustand store (isOpen, content, isDirty)\n   - Track dirty state for unsaved changes indicator\n<info added on 2026-02-16T00:39:22.954Z>\nBased on my analysis of the codebase, I can now generate the implementation notes update for subtask 10.1.\n\nImplementation complete. All renderer-side scratchpad functionality is now in place:\n\nFiles created/modified:\n- src/renderer/stores/scratchpadStore.ts: Zustand store with isOpen, content, isDirty, isLoading, isSaving, error state; open/close/toggleOpen/setContent/save/clearError actions; memoized selectors for each state slice\n- src/renderer/components/scratchpad/Scratchpad.tsx: Full panel component using Framer Motion (AnimatePresence with slide-up variants, reduced-motion support via useReducedMotion), @uiw/react-md-editor at 65vh height with edit-only preview, auto-save on blur via textareaProps.onBlur, backdrop click-to-close, status indicator (Unsaved/Saving.../Saved), error display\n- src/renderer/components/layout/TitleBar.tsx: Added NotebookPen icon button with toggle behavior, dirty indicator dot, aria-pressed and title tooltip\n- src/renderer/hooks/useKeyboardShortcuts.ts: Cmd+N triggers toggleScratchpad; Escape closes scratchpad as highest-priority layer before clearing input or exiting chat\n\nIPC integration: Reused existing typed channels scratchpad:get and scratchpad:save exposed through window.flusk.scratchpad in preload\n\nVerification: npm run lint, npm run typecheck, npm run test -- --run all passed\n</info added on 2026-02-16T00:39:22.954Z>",
+            "status": "done",
             "testStrategy": "1. Press Cmd+N - verify scratchpad slides up smoothly with animation\n2. Click scratchpad icon - same behavior as keyboard shortcut\n3. Type markdown content including headers, code blocks, lists\n4. Close panel, reopen - verify content persists exactly as typed\n5. Edit content, blur focus - verify auto-save triggers (check DB)\n6. Click outside panel on overlay - verify panel closes and saves\n7. Press Escape - verify panel closes",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T00:39:31.515Z"
           },
           {
             "id": 2,
@@ -963,7 +970,8 @@
         ],
         "complexity": 7,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: 1) Create Scratchpad component with markdown editor and slide-up animation, 2) Implement 'Send to AI' functionality that triggers parse_notes tool, 3) Build SearchModal with full-text search across tasks (SQLite FTS or LIKE queries), 4) Create Settings page structure with tabbed sections, 5) Implement backup system (daily auto-backup, export/import with optional encryption), 6) Create settings IPC handlers and state persistence. Focus on search performance with large datasets."
+        "expansionPrompt": "Break down into: 1) Create Scratchpad component with markdown editor and slide-up animation, 2) Implement 'Send to AI' functionality that triggers parse_notes tool, 3) Build SearchModal with full-text search across tasks (SQLite FTS or LIKE queries), 4) Create Settings page structure with tabbed sections, 5) Implement backup system (daily auto-backup, export/import with optional encryption), 6) Create settings IPC handlers and state persistence. Focus on search performance with large datasets.",
+        "updatedAt": "2026-02-16T00:39:31.515Z"
       },
       {
         "id": "11",
@@ -1119,9 +1127,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-15T22:58:39.541Z",
+      "lastModified": "2026-02-16T00:39:31.516Z",
       "taskCount": 13,
-      "completedCount": 10,
+      "completedCount": 11,
       "tags": [
         "master"
       ]

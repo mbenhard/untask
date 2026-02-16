@@ -23,12 +23,14 @@ import {
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
+  type LaunchAtLoginResult,
   type MemoryPromotionConfirmRequestPayload,
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
   type MemoryPromotionEvaluationResultPayload,
   type ProactiveTriggerEvaluationRequestPayload,
   type ProactiveTriggerEvaluationResultPayload,
+  type QuickAddPayload,
   type SettingsMemoryStatePayload,
   type SettingsMemoryUpdateRequestPayload,
   type SettingsReadJournalRequestPayload,
@@ -37,6 +39,32 @@ import {
 } from '../types/ipc';
 
 const fluskApi = {
+  // ─── App/window lifecycle APIs ──────────────────────────
+  app: {
+    requestHide: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_REQUEST_HIDE),
+    escapeLayerExit: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_ESCAPE_LAYER_EXIT),
+    onQuickAddPayload: (
+      listener: (payload: QuickAddPayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: QuickAddPayload,
+      ) => listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
+      };
+    },
+    getLaunchAtLogin: (): Promise<LaunchAtLoginResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN),
+    setLaunchAtLogin: (enabled: boolean): Promise<LaunchAtLoginResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN, enabled),
+  },
+
   getBootstrapState: (): Promise<SettingsBootstrapState> =>
     ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_STATE),
   getIdentityContextSnapshot: (

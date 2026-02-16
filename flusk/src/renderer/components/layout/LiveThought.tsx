@@ -11,7 +11,7 @@ type LiveThoughtProps = {
   refreshKey?: string;
 };
 
-export const LiveThought = ({ refreshKey }: LiveThoughtProps): JSX.Element => {
+export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [thought, setThought] = useState<ChatLiveThoughtResult | null>(null);

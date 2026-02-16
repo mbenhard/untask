@@ -17,7 +17,7 @@ export const TaskBody = ({
   task,
   isExpanded,
   onBodyEditModeChange,
-}: TaskBodyProps): JSX.Element => {
+}: TaskBodyProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
   const prefersReducedMotion = useReducedMotion();
   const [isEditing, setIsEditing] = useState(false);

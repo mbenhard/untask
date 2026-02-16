@@ -125,7 +125,7 @@ export const generateLiveThought = (
     };
   }
 
-  if (dueSoon.length > 0 && nowWindow !== 'morning') {
+  if (dueSoon.length > 0) {
     return {
       thought: `${dueSoon.length} task(s) are due in the next 24 hours. Finish one due-soon task before adding scope.`,
       actionLabel: 'Handle due soon',

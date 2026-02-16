@@ -22,7 +22,7 @@ export const ChatInput = ({
   value,
   onChange,
   onSubmit,
-}: ChatInputProps): JSX.Element => {
+}: ChatInputProps) => {
   const enterChatMode = useAppStore((state) => state.enterChatMode);
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {

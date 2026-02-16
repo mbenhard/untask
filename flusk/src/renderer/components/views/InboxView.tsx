@@ -14,7 +14,7 @@ export const InboxView = ({
   allTasks,
   isLoading,
   error,
-}: InboxViewProps): JSX.Element => {
+}: InboxViewProps) => {
   const inboxTasks = useMemo(
     () =>
       allTasks.filter(

@@ -1,4 +1,4 @@
-import { asc, eq, lt } from 'drizzle-orm';
+import { asc, desc, eq, lt } from 'drizzle-orm';
 
 import { getDb } from '../db';
 import {
@@ -66,6 +66,21 @@ export function getChatHistory(): ChatMessage[] {
   const db = getDb();
   sweepChatRetention();
   return db.select().from(chatMessages).orderBy(asc(chatMessages.createdAt)).all();
+}
+
+export function getRecentChatMessages(limit = 12): ChatMessage[] {
+  const db = getDb();
+  sweepChatRetention();
+
+  const boundedLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+  const rows = db
+    .select()
+    .from(chatMessages)
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(boundedLimit)
+    .all();
+
+  return rows.reverse();
 }
 
 export function saveChatMessage(message: Omit<NewChatMessage, 'id' | 'createdAt'>): ChatMessage {

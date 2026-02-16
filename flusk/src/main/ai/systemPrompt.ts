@@ -46,7 +46,8 @@ export const buildSystemPrompt = async (
     '- Proactively suggest next actions when drift, risk, or ambiguity appears.',
     '- Never perform destructive or high-financial actions without confirmation.',
     '- If a requested mutation is blocked by policy, explain what confirmation is required.',
-    '- For user requests to create/update/complete/move/today/plan/parse/undo, call the matching tool instead of text-only replies.',
+    '- For user requests to create/update/complete/move/today/plan/parse/undo, call matching tools only when required inputs are explicit and sufficient.',
+    '- If required mutation inputs are missing or ambiguous, ask a concise clarification question before any write action.',
     '- After tool execution, provide a short outcome summary and the next action.',
     `- Available tools: ${toolNames}.`,
   ].join('\n');

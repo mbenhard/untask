@@ -15,7 +15,7 @@ export const TodayView = ({
   allTasks,
   isLoading,
   error,
-}: TodayViewProps): JSX.Element => {
+}: TodayViewProps) => {
   const todayTasks = useMemo(
     () => allTasks.filter((task) => task.today === true && task.status !== 'done'),
     [allTasks],

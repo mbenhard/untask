@@ -1,11 +1,57 @@
-import type { BrowserWindow } from 'electron';
+import { Tray, Menu, nativeImage } from 'electron';
 
-let trackedWindow: BrowserWindow | null = null;
+import { listTasks } from './services/taskService';
+import { toggleWindow } from './window/summonController';
+import { getTrayIconPath } from './window/trayIcon';
 
-export const setupTray = (mainWindow: BrowserWindow): void => {
-  // The real tray module lands in a later task. Keep a window reference so
-  // keyboard shortcuts and follow-up tray work can share the same state.
-  trackedWindow = mainWindow;
-};
+let tray: Tray | null = null;
 
-export const getTrackedWindow = (): BrowserWindow | null => trackedWindow;
+export function setupTray(): void {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+
+  try {
+    const iconPath = getTrayIconPath();
+    const icon = nativeImage.createFromPath(iconPath);
+    icon.setTemplateImage(true);
+
+    tray = new Tray(icon);
+    tray.setToolTip('Flusk');
+
+    tray.on('click', () => {
+      toggleWindow();
+    });
+
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Toggle Window', click: toggleWindow },
+      { type: 'separator' },
+      { label: 'Quit', role: 'quit' },
+    ]);
+    tray.setContextMenu(contextMenu);
+
+    refreshTodayBadge();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tray] failed to initialize:', error);
+  }
+}
+
+export function refreshTodayBadge(): void {
+  if (!tray) return;
+
+  try {
+    const todayTasks = listTasks({ today: true });
+    const remaining = todayTasks.filter((t) => t.status !== 'done').length;
+    tray.setTitle(remaining > 0 ? String(remaining) : '');
+  } catch {
+    // Badge refresh failure should not disrupt task mutations
+  }
+}
+
+export function destroyTray(): void {
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+}

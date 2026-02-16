@@ -4,12 +4,18 @@ import { streamText } from 'ai';
 
 import type { AssistantLiveContext, AssistantMemorySnapshot } from '../../types/assistant';
 import type {
+  ChatStreamErrorCode,
   ChatSendResultPayload,
   ChatStreamEvent,
+  ChatTurnTelemetry,
   ChatToolExecutionSummary,
   PersistedChatToolMetadata,
 } from '../../types/chat';
-import { saveChatMessage, sweepChatRetention } from '../services/chatService';
+import {
+  getRecentChatMessages,
+  saveChatMessage,
+  sweepChatRetention,
+} from '../services/chatService';
 import { writeJournalEntry } from '../services/journalService';
 import { getSetting, setSetting } from '../services/settingsService';
 
@@ -25,6 +31,9 @@ const activeChatRequestIds = new Set<string>();
 const canceledChatRequestIds = new Set<string>();
 const AUTO_JOURNAL_LAST_WRITE_AT_KEY = 'ai_journal_last_auto_write_at';
 const AUTO_JOURNAL_COOLDOWN_MS = 20 * 60 * 1000;
+const STREAM_MAX_ATTEMPTS = 2;
+const STREAM_RETRY_BASE_DELAY_MS = 400;
+const HISTORY_WINDOW_LIMIT = 12;
 const TOOL_MUTATION_NAMES = new Set([
   'create_task',
   'update_task',
@@ -37,8 +46,145 @@ const TOOL_MUTATION_NAMES = new Set([
   'update_patterns',
 ]);
 
-const toErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unknown chat orchestration error.';
+type ClassifiedChatError = {
+  code: ChatStreamErrorCode;
+  retryable: boolean;
+  message: string;
+};
+
+type StreamRetryEvaluationInput = {
+  requestId: string;
+  attemptCount: number;
+  maxAttempts: number;
+  classifiedError: ClassifiedChatError;
+  hasToolExecution: boolean;
+  hasAssistantText: boolean;
+};
+
+const toErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return 'Unknown chat orchestration error.';
+};
+
+const normalizeErrorMessage = (message: string): string => message.toLowerCase();
+
+export const classifyChatError = (error: unknown): ClassifiedChatError => {
+  const message = toErrorMessage(error);
+  const normalized = normalizeErrorMessage(message);
+
+  if (
+    normalized.includes('api key') ||
+    normalized.includes('openrouter_api_key') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('forbidden') ||
+    normalized.includes('invalid model')
+  ) {
+    return {
+      code: 'config_error',
+      retryable: false,
+      message,
+    };
+  }
+
+  if (
+    normalized.includes('tool ') ||
+    normalized.includes('invalid payload for') ||
+    normalized.includes('unknown tool')
+  ) {
+    return {
+      code: 'tool_error',
+      retryable: false,
+      message,
+    };
+  }
+
+  if (
+    normalized.includes('econnreset') ||
+    normalized.includes('enotfound') ||
+    normalized.includes('etimedout') ||
+    normalized.includes('fetch failed') ||
+    normalized.includes('network') ||
+    normalized.includes('socket hang up')
+  ) {
+    return {
+      code: 'network_error',
+      retryable: true,
+      message,
+    };
+  }
+
+  if (
+    normalized.includes('429') ||
+    normalized.includes('rate limit') ||
+    normalized.includes('overloaded') ||
+    normalized.includes('503') ||
+    normalized.includes('502') ||
+    normalized.includes('provider')
+  ) {
+    return {
+      code: 'provider_error',
+      retryable: true,
+      message,
+    };
+  }
+
+  return {
+    code: 'unknown_error',
+    retryable: false,
+    message,
+  };
+};
+
+export const shouldRetryStreamAttempt = (
+  input: StreamRetryEvaluationInput,
+): boolean => {
+  if (isChatRequestCanceled(input.requestId)) {
+    return false;
+  }
+
+  if (!input.classifiedError.retryable) {
+    return false;
+  }
+
+  if (input.hasToolExecution || input.hasAssistantText) {
+    return false;
+  }
+
+  return input.attemptCount < input.maxAttempts;
+};
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const computeRetryDelayMs = (): number =>
+  STREAM_RETRY_BASE_DELAY_MS + Math.floor(Math.random() * 200);
+
+const buildPromptWithRecentHistory = (input: {
+  history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  userMessage: string;
+}): string => {
+  const historyLines = input.history
+    .map((entry) => ({
+      roleLabel: entry.role === 'assistant' ? 'Assistant' : 'User',
+      content: entry.content.trim(),
+    }))
+    .filter((entry) => entry.content.length > 0)
+    .map((entry) => `${entry.roleLabel}: ${entry.content}`);
+
+  if (historyLines.length === 0) {
+    return input.userMessage;
+  }
+
+  return [
+    'Recent conversation context (oldest to newest):',
+    ...historyLines,
+    `User: ${input.userMessage}`,
+  ].join('\n');
+};
 
 const isChatRequestCanceled = (requestId: string): boolean =>
   canceledChatRequestIds.has(requestId);
@@ -72,26 +218,56 @@ const toToolExecutionEnvelope = (
   return null;
 };
 
-const inferFallbackToolCall = (userMessage: string): AiToolCall | null => {
+const normalizeFallbackTaskTitle = (rawTitle: string): string =>
+  rawTitle.trim().replace(/^["']+|["']+$/g, '');
+
+const looksLikeQuestion = (message: string): boolean =>
+  message.includes('?') || /^(can|could|would|will|should|please)\b/i.test(message);
+
+export const parseExplicitFallbackToolCall = (
+  userMessage: string,
+): AiToolCall | null => {
   const normalized = userMessage.trim();
 
-  const createMatch = normalized.match(
-    /create(?:\s+a)?\s+task(?:\s*(?:called|named|titled))?[:\-\s]+(.+)/i,
-  );
-  if (createMatch && createMatch[1]) {
-    const title = createMatch[1].trim().replace(/^["']+|["'.]+$/g, '');
-    if (title.length > 0) {
-      return {
-        name: 'create_task',
-        input: { title },
-      };
-    }
+  if (normalized.length === 0 || looksLikeQuestion(normalized)) {
+    return null;
   }
 
-  if (/plan my day/i.test(normalized)) {
+  const createWithColonMatch = normalized.match(/^create\s+task:\s+(.+)$/i);
+  if (createWithColonMatch && createWithColonMatch[1]) {
+    const title = normalizeFallbackTaskTitle(createWithColonMatch[1]);
+    if (title.length === 0) {
+      return null;
+    }
     return {
-      name: 'suggest_daily_plan',
-      input: { maxTasks: 5 },
+      name: 'create_task',
+      input: { title },
+    };
+  }
+
+  const addWithColonMatch = normalized.match(/^add\s+task:\s+(.+)$/i);
+  if (addWithColonMatch && addWithColonMatch[1]) {
+    const title = normalizeFallbackTaskTitle(addWithColonMatch[1]);
+    if (title.length === 0) {
+      return null;
+    }
+    return {
+      name: 'create_task',
+      input: { title },
+    };
+  }
+
+  const calledMatch =
+    normalized.match(/^create\s+task\s+called\s+"([^"]+)"\s*$/i) ??
+    normalized.match(/^create\s+task\s+called\s+'([^']+)'\s*$/i);
+  if (calledMatch && calledMatch[1]) {
+    const title = normalizeFallbackTaskTitle(calledMatch[1]);
+    if (title.length === 0) {
+      return null;
+    }
+    return {
+      name: 'create_task',
+      input: { title },
     };
   }
 
@@ -242,200 +418,276 @@ const runAssistantStream = async (
 ): Promise<void> => {
   const actionCards: PersistedChatToolMetadata['actionCards'] = [];
   const toolExecutions: ChatToolExecutionSummary[] = [];
+  const telemetry: ChatTurnTelemetry = {
+    startedAt: new Date().toISOString(),
+    attemptCount: 0,
+  };
 
   const emit = input.emit;
+  let assistantText = '';
+  let finalizedTextFromModel = '';
 
   try {
-    const { memory, liveContext } = buildCanonicalRuntimeContext({
-      journalLimit: 24,
-    });
-    const builtPrompt = await buildSystemPrompt({
-      userMessage: input.userMessage,
-      tokenBudget: input.tokenBudget,
-      memory,
-      liveContext,
-    });
+    let streamCompleted = false;
 
-    const provider = createOpenRouterProviderFromEnv();
-    const model = provider(input.modelId);
+    for (let attempt = 1; attempt <= STREAM_MAX_ATTEMPTS; attempt += 1) {
+      telemetry.attemptCount = attempt;
+      let attemptHadToolExecution = false;
 
-    const result = streamText({
-      model,
-      system: builtPrompt.modelInputPrompt,
-      prompt: input.userMessage,
-      tools: createSdkTools({
-        onActionCard: (card) => {
-          actionCards.push(card);
-        },
-      }) as Parameters<typeof streamText>[0]['tools'],
-    });
+      try {
+        const { memory, liveContext } = buildCanonicalRuntimeContext({
+          journalLimit: 24,
+        });
+        const builtPrompt = await buildSystemPrompt({
+          userMessage: input.userMessage,
+          tokenBudget: input.tokenBudget,
+          memory,
+          liveContext,
+        });
 
-    let assistantText = '';
-
-    for await (const part of result.fullStream) {
-      if (isChatRequestCanceled(input.requestId)) {
-        return;
-      }
-
-      switch (part.type) {
-        case 'text-delta': {
-          assistantText += part.text;
-          emit({
-            type: 'token',
-            requestId: input.requestId,
-            text: part.text,
-          });
-          break;
+        const provider = createOpenRouterProviderFromEnv();
+        const model = provider(input.modelId);
+        const recentHistory = getRecentChatMessages(HISTORY_WINDOW_LIMIT).filter(
+          (message) => message.role === 'user' || message.role === 'assistant',
+        );
+        const historyWithoutCurrentTurn = [...recentHistory];
+        const lastHistoryEntry =
+          historyWithoutCurrentTurn[historyWithoutCurrentTurn.length - 1];
+        if (
+          lastHistoryEntry?.role === 'user' &&
+          lastHistoryEntry.content.trim() === input.userMessage
+        ) {
+          historyWithoutCurrentTurn.pop();
         }
-        case 'tool-call': {
-          emit({
-            type: 'tool_call_started',
-            requestId: input.requestId,
-            toolName: part.toolName,
-            toolCallId: part.toolCallId,
-          });
-          break;
-        }
-        case 'tool-result': {
-          const envelope = toToolExecutionEnvelope(part.output);
-          const status = envelope?.status ?? 'success';
-          const message = envelope?.message ?? `${part.toolName} completed.`;
-          const actionCard = envelope?.actionCard;
+        const promptWithHistory = buildPromptWithRecentHistory({
+          history: historyWithoutCurrentTurn.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          userMessage: input.userMessage,
+        });
 
-          if (actionCard) {
-            const exists = actionCards.some((card) => card.id === actionCard.id);
-            if (!exists) {
-              actionCards.push(actionCard);
-            }
+        const result = streamText({
+          model,
+          system: builtPrompt.modelInputPrompt,
+          prompt: promptWithHistory,
+          tools: createSdkTools({
+            onActionCard: (card) => {
+              actionCards.push(card);
+            },
+          }) as Parameters<typeof streamText>[0]['tools'],
+        });
+
+        for await (const part of result.fullStream) {
+          if (isChatRequestCanceled(input.requestId)) {
+            return;
           }
 
-          const execution: ChatToolExecutionSummary = {
-            toolName: part.toolName,
-            toolCallId: part.toolCallId,
-            status,
-            message,
-            actionCardId: actionCard?.id,
-          };
-          toolExecutions.push(execution);
+          switch (part.type) {
+            case 'text-delta': {
+              if (!telemetry.firstTokenAt) {
+                telemetry.firstTokenAt = new Date().toISOString();
+              }
 
-          emit({
-            type: 'tool_call_completed',
-            requestId: input.requestId,
-            toolName: part.toolName,
-            toolCallId: part.toolCallId,
-            status,
-            message,
-            actionCard,
-          });
-          break;
+              assistantText += part.text;
+              emit({
+                type: 'token',
+                requestId: input.requestId,
+                text: part.text,
+              });
+              break;
+            }
+            case 'tool-call': {
+              attemptHadToolExecution = true;
+              emit({
+                type: 'tool_call_started',
+                requestId: input.requestId,
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+              });
+              break;
+            }
+            case 'tool-result': {
+              attemptHadToolExecution = true;
+              const envelope = toToolExecutionEnvelope(part.output);
+              const status = envelope?.status ?? 'success';
+              const message = envelope?.message ?? `${part.toolName} completed.`;
+              const actionCard = envelope?.actionCard;
+
+              if (actionCard) {
+                const exists = actionCards.some((card) => card.id === actionCard.id);
+                if (!exists) {
+                  actionCards.push(actionCard);
+                }
+              }
+
+              const execution: ChatToolExecutionSummary = {
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                status,
+                message,
+                actionCardId: actionCard?.id,
+              };
+              toolExecutions.push(execution);
+
+              emit({
+                type: 'tool_call_completed',
+                requestId: input.requestId,
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                status,
+                message,
+                actionCard,
+              });
+              break;
+            }
+            case 'tool-error': {
+              attemptHadToolExecution = true;
+              const maybeErrorText =
+                'errorText' in part && typeof part.errorText === 'string'
+                  ? part.errorText
+                  : null;
+              const message = maybeErrorText ?? `${part.toolName} failed.`;
+
+              toolExecutions.push({
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                status: 'error',
+                message,
+              });
+
+              emit({
+                type: 'tool_call_completed',
+                requestId: input.requestId,
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                status: 'error',
+                message,
+              });
+              break;
+            }
+            case 'error':
+              throw part.error;
+            default:
+              break;
+          }
         }
-        case 'tool-error': {
-          const maybeErrorText =
-            'errorText' in part && typeof part.errorText === 'string'
-              ? part.errorText
-              : null;
-          const message = maybeErrorText ?? `${part.toolName} failed.`;
-
-          toolExecutions.push({
-            toolName: part.toolName,
-            toolCallId: part.toolCallId,
-            status: 'error',
-            message,
-          });
-
-          emit({
-            type: 'tool_call_completed',
-            requestId: input.requestId,
-            toolName: part.toolName,
-            toolCallId: part.toolCallId,
-            status: 'error',
-            message,
-          });
-          break;
-        }
-        case 'error': {
-          emit({
-            type: 'error',
-            requestId: input.requestId,
-            message: toErrorMessage(part.error),
-          });
-          break;
-        }
-        default:
-          break;
-      }
-    }
-
-    if (isChatRequestCanceled(input.requestId)) {
-      return;
-    }
-
-    if (toolExecutions.length === 0) {
-      const fallbackCall = inferFallbackToolCall(input.userMessage);
-
-      if (fallbackCall) {
-        const fallbackToolCallId = `heuristic-${randomUUID()}`;
-
-        emit({
-          type: 'tool_call_started',
-          requestId: input.requestId,
-          toolName: fallbackCall.name,
-          toolCallId: fallbackToolCallId,
-        });
-
-        const fallbackResult = await executeToolCall(fallbackCall, {
-          toolCallId: fallbackToolCallId,
-          onActionCard: (card) => {
-            actionCards.push(card);
-          },
-        });
 
         if (isChatRequestCanceled(input.requestId)) {
           return;
         }
 
-        if (fallbackResult.ok) {
-          const actionCard = fallbackResult.output.actionCard;
-          const execution: ChatToolExecutionSummary = {
-            toolName: fallbackResult.toolName,
-            toolCallId: fallbackToolCallId,
-            status: fallbackResult.output.status,
-            message: fallbackResult.output.message,
-            actionCardId: actionCard?.id,
-          };
-          toolExecutions.push(execution);
+        if (toolExecutions.length === 0) {
+          const fallbackCall = parseExplicitFallbackToolCall(input.userMessage);
 
-          emit({
-            type: 'tool_call_completed',
-            requestId: input.requestId,
-            toolName: fallbackResult.toolName,
-            toolCallId: fallbackToolCallId,
-            status: fallbackResult.output.status,
-            message: fallbackResult.output.message,
-            actionCard,
-          });
-        } else {
-          toolExecutions.push({
-            toolName: fallbackResult.toolName,
-            toolCallId: fallbackToolCallId,
-            status: 'error',
-            message: fallbackResult.error.message,
-          });
+          if (fallbackCall) {
+            attemptHadToolExecution = true;
+            const fallbackToolCallId = `heuristic-${randomUUID()}`;
 
-          emit({
-            type: 'tool_call_completed',
-            requestId: input.requestId,
-            toolName: fallbackResult.toolName,
-            toolCallId: fallbackToolCallId,
-            status: 'error',
-            message: fallbackResult.error.message,
-          });
+            emit({
+              type: 'tool_call_started',
+              requestId: input.requestId,
+              toolName: fallbackCall.name,
+              toolCallId: fallbackToolCallId,
+            });
+
+            const fallbackResult = await executeToolCall(fallbackCall, {
+              toolCallId: fallbackToolCallId,
+              onActionCard: (card) => {
+                actionCards.push(card);
+              },
+            });
+
+            if (isChatRequestCanceled(input.requestId)) {
+              return;
+            }
+
+            if (fallbackResult.ok) {
+              const actionCard = fallbackResult.output.actionCard;
+              const execution: ChatToolExecutionSummary = {
+                toolName: fallbackResult.toolName,
+                toolCallId: fallbackToolCallId,
+                status: fallbackResult.output.status,
+                message: fallbackResult.output.message,
+                actionCardId: actionCard?.id,
+              };
+              toolExecutions.push(execution);
+
+              emit({
+                type: 'tool_call_completed',
+                requestId: input.requestId,
+                toolName: fallbackResult.toolName,
+                toolCallId: fallbackToolCallId,
+                status: fallbackResult.output.status,
+                message: fallbackResult.output.message,
+                actionCard,
+              });
+            } else {
+              toolExecutions.push({
+                toolName: fallbackResult.toolName,
+                toolCallId: fallbackToolCallId,
+                status: 'error',
+                message: fallbackResult.error.message,
+              });
+
+              emit({
+                type: 'tool_call_completed',
+                requestId: input.requestId,
+                toolName: fallbackResult.toolName,
+                toolCallId: fallbackToolCallId,
+                status: 'error',
+                message: fallbackResult.error.message,
+              });
+            }
+          }
         }
+
+        finalizedTextFromModel = (await result.text).trim() || assistantText.trim();
+        if (isChatRequestCanceled(input.requestId)) {
+          return;
+        }
+
+        streamCompleted = true;
+        break;
+      } catch (error) {
+        if (isChatRequestCanceled(input.requestId)) {
+          return;
+        }
+
+        const classified = classifyChatError(error);
+        const shouldRetry = shouldRetryStreamAttempt({
+          requestId: input.requestId,
+          attemptCount: attempt,
+          maxAttempts: STREAM_MAX_ATTEMPTS,
+          classifiedError: classified,
+          hasToolExecution: toolExecutions.length > 0 || attemptHadToolExecution,
+          hasAssistantText: assistantText.trim().length > 0,
+        });
+
+        if (shouldRetry) {
+          await sleep(computeRetryDelayMs());
+          continue;
+        }
+
+        emit({
+          type: 'error',
+          requestId: input.requestId,
+          message: classified.message,
+          code: classified.code,
+          retryable: classified.retryable,
+        });
+        return;
       }
     }
 
-    const finalizedTextFromModel = (await result.text).trim() || assistantText.trim();
-    if (isChatRequestCanceled(input.requestId)) {
+    if (!streamCompleted) {
+      emit({
+        type: 'error',
+        requestId: input.requestId,
+        message: 'Assistant stream did not complete.',
+        code: 'unknown_error',
+        retryable: false,
+      });
       return;
     }
 
@@ -455,6 +707,10 @@ const runAssistantStream = async (
       modelId: input.modelId,
       actionCards,
       toolExecutions,
+      telemetry: {
+        ...telemetry,
+        completedAt: new Date().toISOString(),
+      },
     };
 
     if (isChatRequestCanceled(input.requestId)) {
@@ -491,10 +747,13 @@ const runAssistantStream = async (
       return;
     }
 
+    const classified = classifyChatError(error);
     emit({
       type: 'error',
       requestId: input.requestId,
-      message: toErrorMessage(error),
+      message: classified.message,
+      code: classified.code,
+      retryable: classified.retryable,
     });
   } finally {
     activeChatRequestIds.delete(input.requestId);

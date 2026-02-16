@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from 'react';
 
 import type { AiJournal } from '../../../types/models';
 import type {
@@ -13,15 +19,16 @@ type SettingsMemoryProps = {
   onClose: () => void;
 };
 
-type MemoryTab = 'soul' | 'profile' | 'patterns' | 'journal';
+type MemoryTab = 'soul' | 'profile' | 'patterns' | 'journal' | 'app';
 
-const TAB_ORDER: MemoryTab[] = ['soul', 'profile', 'patterns', 'journal'];
+const TAB_ORDER: MemoryTab[] = ['soul', 'profile', 'patterns', 'journal', 'app'];
 
 const TAB_LABELS: Record<MemoryTab, string> = {
   soul: 'Soul',
   profile: 'Profile',
   patterns: 'Patterns',
   journal: 'Journal',
+  app: 'App',
 };
 
 const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
@@ -34,6 +41,7 @@ const DEFAULT_JOURNAL_FILTERS: SettingsReadJournalRequestPayload = {
   limit: 20,
   days_back: 30,
 };
+const OPENROUTER_API_KEY_SETTING_KEY = 'ai_openrouter_key';
 
 const flusk = () => {
   if (!window.flusk) {
@@ -43,7 +51,7 @@ const flusk = () => {
   return window.flusk;
 };
 
-export const SettingsMemory = ({ onClose }: SettingsMemoryProps): JSX.Element => {
+export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
   const [activeTab, setActiveTab] = useState<MemoryTab>('soul');
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
   const [journalEntries, setJournalEntries] = useState<AiJournal[]>([]);
@@ -55,6 +63,15 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps): JSX.Element =>
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [launchAtLoginEnabled, setLaunchAtLoginEnabled] = useState(false);
+  const [launchAtLoginApplied, setLaunchAtLoginApplied] = useState(false);
+  const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
+  const [isLoadingLaunchAtLogin, setIsLoadingLaunchAtLogin] = useState(false);
+  const [isSavingLaunchAtLogin, setIsSavingLaunchAtLogin] = useState(false);
+  const [openRouterApiKeyInput, setOpenRouterApiKeyInput] = useState('');
+  const [hasOpenRouterApiKey, setHasOpenRouterApiKey] = useState(false);
+  const [isLoadingOpenRouterApiKey, setIsLoadingOpenRouterApiKey] = useState(false);
+  const [isSavingOpenRouterApiKey, setIsSavingOpenRouterApiKey] = useState(false);
 
   const loadMemoryState = useCallback(async () => {
     try {
@@ -82,6 +99,41 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps): JSX.Element =>
     }
   }, [journalFilters]);
 
+  const loadLaunchAtLogin = useCallback(async () => {
+    try {
+      setIsLoadingLaunchAtLogin(true);
+      setLaunchAtLoginError(null);
+      const result = await flusk().app.getLaunchAtLogin();
+      setLaunchAtLoginEnabled(result.enabled);
+      setLaunchAtLoginApplied(result.applied);
+      if (result.error) {
+        setLaunchAtLoginError(result.error);
+      }
+    } catch (loadError) {
+      setLaunchAtLoginError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Failed to load launch-at-login settings.',
+      );
+    } finally {
+      setIsLoadingLaunchAtLogin(false);
+    }
+  }, []);
+
+  const loadOpenRouterApiKey = useCallback(async () => {
+    try {
+      setIsLoadingOpenRouterApiKey(true);
+      setError(null);
+      const stored = await flusk().settings.get(OPENROUTER_API_KEY_SETTING_KEY);
+      setHasOpenRouterApiKey(Boolean(stored && stored.trim().length > 0));
+      setOpenRouterApiKeyInput('');
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load OpenRouter API key.');
+    } finally {
+      setIsLoadingOpenRouterApiKey(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadMemoryState();
   }, [loadMemoryState]);
@@ -93,6 +145,15 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps): JSX.Element =>
 
     void loadJournal();
   }, [activeTab, loadJournal]);
+
+  useEffect(() => {
+    if (activeTab !== 'app') {
+      return;
+    }
+
+    void loadLaunchAtLogin();
+    void loadOpenRouterApiKey();
+  }, [activeTab, loadLaunchAtLogin, loadOpenRouterApiKey]);
 
   const saveField = useCallback(
     async (field: 'soul' | 'profile' | 'patterns') => {
@@ -115,15 +176,90 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps): JSX.Element =>
   const resetSoulField = useCallback(async () => {
     try {
       setIsSaving(true);
-        setNotice(null);
-        setError(null);
-        const updated = await flusk().settings.resetSoul();
-        setDraft(updated);
-        setNotice('Soul reset to default.');
+      setNotice(null);
+      setError(null);
+      const updated = await flusk().settings.resetSoul();
+      setDraft(updated);
+      setNotice('Soul reset to default.');
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Failed to reset soul.');
     } finally {
       setIsSaving(false);
+    }
+  }, []);
+
+  const handleLaunchAtLoginChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const nextEnabled = event.target.checked;
+      const previousEnabled = launchAtLoginEnabled;
+
+      setLaunchAtLoginEnabled(nextEnabled);
+      setNotice(null);
+      setLaunchAtLoginError(null);
+
+      try {
+        setIsSavingLaunchAtLogin(true);
+        const result = await flusk().app.setLaunchAtLogin(nextEnabled);
+        setLaunchAtLoginEnabled(result.enabled);
+        setLaunchAtLoginApplied(result.applied);
+        if (result.error) {
+          setLaunchAtLoginError(result.error);
+          setNotice('Preference saved, but this runtime could not apply it.');
+          return;
+        }
+
+        setNotice(
+          result.enabled ? 'Launch at login enabled.' : 'Launch at login disabled.',
+        );
+      } catch (saveError) {
+        setLaunchAtLoginEnabled(previousEnabled);
+        setLaunchAtLoginError(
+          saveError instanceof Error
+            ? saveError.message
+            : 'Failed to update launch-at-login setting.',
+        );
+      } finally {
+        setIsSavingLaunchAtLogin(false);
+      }
+    },
+    [launchAtLoginEnabled],
+  );
+
+  const saveOpenRouterApiKey = useCallback(async () => {
+    const normalized = openRouterApiKeyInput.trim();
+    if (normalized.length === 0) {
+      setError('Enter an OpenRouter API key before saving.');
+      return;
+    }
+
+    try {
+      setIsSavingOpenRouterApiKey(true);
+      setError(null);
+      setNotice(null);
+      await flusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, normalized);
+      setHasOpenRouterApiKey(true);
+      setOpenRouterApiKeyInput('');
+      setNotice('OpenRouter API key saved.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save OpenRouter API key.');
+    } finally {
+      setIsSavingOpenRouterApiKey(false);
+    }
+  }, [openRouterApiKeyInput]);
+
+  const clearOpenRouterApiKey = useCallback(async () => {
+    try {
+      setIsSavingOpenRouterApiKey(true);
+      setError(null);
+      setNotice(null);
+      await flusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, '');
+      setHasOpenRouterApiKey(false);
+      setOpenRouterApiKeyInput('');
+      setNotice('OpenRouter API key cleared.');
+    } catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : 'Failed to clear OpenRouter API key.');
+    } finally {
+      setIsSavingOpenRouterApiKey(false);
     }
   }, []);
 
@@ -316,6 +452,93 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps): JSX.Element =>
                   </p>
                 </article>
               ))}
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'app' ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Configure desktop startup behavior.
+            </p>
+            <div className="rounded-md border border-border bg-card px-3 py-3">
+              <p className="text-sm text-foreground">OpenRouter API key</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used for AI chat requests when the shell environment variable is not set.
+              </p>
+              <Input
+                type="password"
+                value={openRouterApiKeyInput}
+                onChange={(event) => setOpenRouterApiKeyInput(event.target.value)}
+                placeholder={hasOpenRouterApiKey ? 'Saved key (enter to replace)' : 'sk-or-...'}
+                disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
+                className="mt-3"
+                aria-label="OpenRouter API key"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isLoadingOpenRouterApiKey
+                  ? 'Checking key status...'
+                  : hasOpenRouterApiKey
+                    ? 'A key is currently saved.'
+                    : 'No key saved yet.'}
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void saveOpenRouterApiKey()}
+                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
+                >
+                  Save key
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void clearOpenRouterApiKey()}
+                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey || !hasOpenRouterApiKey}
+                >
+                  Clear key
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-md border border-border bg-card px-3 py-3">
+              <label className="flex items-center justify-between gap-3 text-sm text-foreground">
+                <span>Launch Flusk at login</span>
+                <input
+                  type="checkbox"
+                  checked={launchAtLoginEnabled}
+                  onChange={(event) => void handleLaunchAtLoginChange(event)}
+                  disabled={isLoadingLaunchAtLogin || isSavingLaunchAtLogin}
+                  className="h-4 w-4 rounded border border-input bg-background accent-foreground"
+                />
+              </label>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isLoadingLaunchAtLogin
+                  ? 'Checking availability...'
+                  : launchAtLoginApplied
+                    ? 'Supported in this runtime.'
+                    : 'Not supported in this runtime (preference is still saved).'}
+              </p>
+
+              {launchAtLoginError ? (
+                <p className="mt-2 text-xs text-destructive">{launchAtLoginError}</p>
+              ) : null}
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void loadLaunchAtLogin();
+                  void loadOpenRouterApiKey();
+                }}
+                disabled={isLoadingLaunchAtLogin || isLoadingOpenRouterApiKey}
+              >
+                Refresh app settings
+              </Button>
             </div>
           </div>
         ) : null}

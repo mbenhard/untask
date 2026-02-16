@@ -23,7 +23,7 @@ class AppErrorBoundary extends React.Component<
     console.error('[renderer] unhandled render error', error, info.componentStack);
   }
 
-  render(): JSX.Element {
+  render(): React.ReactNode {
     if (!this.state.error) {
       return <>{this.props.children}</>;
     }
@@ -41,7 +41,7 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-const App = (): JSX.Element => (
+const App = () => (
   <AppErrorBoundary>
     <AppShell />
   </AppErrorBoundary>

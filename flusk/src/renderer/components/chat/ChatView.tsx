@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 import {
   selectChatError,
   selectChatIsSending,
+  selectChatLastStreamError,
   selectChatMessages,
   selectChatModels,
   selectChatRetentionMode,
@@ -66,7 +67,7 @@ const formatTimestamp = (createdAt: string | null): string => {
   }).format(parsed);
 };
 
-const ActionCard = ({ card, onUndo, onApprove, onReject }: ActionCardProps): JSX.Element => {
+const ActionCard = ({ card, onUndo, onApprove, onReject }: ActionCardProps) => {
   const isPending = card.lifecycle === 'pending';
   const isExecuted = card.lifecycle === 'executed' || (!card.lifecycle && card.status === 'success');
 
@@ -157,7 +158,7 @@ const ConfirmationDialog = ({
   target: ConfirmationTarget;
   onConfirm: () => void;
   onCancel: () => void;
-}): JSX.Element | null => {
+}) => {
   if (!target) return null;
 
   return (
@@ -184,10 +185,11 @@ const ConfirmationDialog = ({
   );
 };
 
-export const ChatView = (): JSX.Element => {
+export const ChatView = () => {
   const messages = useChatStore(selectChatMessages);
   const isSending = useChatStore(selectChatIsSending);
   const error = useChatStore(selectChatError);
+  const lastStreamError = useChatStore(selectChatLastStreamError);
   const models = useChatStore(selectChatModels);
   const selectedModelId = useChatStore(selectChatSelectedModelId);
   const retentionMode = useChatStore(selectChatRetentionMode);
@@ -198,6 +200,7 @@ export const ChatView = (): JSX.Element => {
   const setRetentionMode = useChatStore((state) => state.setRetentionMode);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
+  const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
 
   const [confirmationTarget, setConfirmationTarget] = useState<ConfirmationTarget>(null);
 
@@ -358,8 +361,28 @@ export const ChatView = (): JSX.Element => {
       </header>
 
       {error ? (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {error}
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div className="min-w-0">
+            <p className="truncate">{error}</p>
+            {lastStreamError ? (
+              <p className="mt-1 text-[10px] uppercase tracking-[0.06em] text-destructive/80">
+                {lastStreamError.code.replaceAll('_', ' ')}
+              </p>
+            ) : null}
+          </div>
+          {lastStreamError?.retryable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => {
+                void retryLastFailedMessage();
+              }}
+              className="shrink-0"
+            >
+              Retry last message
+            </Button>
+          ) : null}
         </div>
       ) : null}
 

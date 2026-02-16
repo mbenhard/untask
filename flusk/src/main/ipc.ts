@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import { z } from 'zod';
 import {
   type ChatModelCatalogResult,
@@ -74,6 +74,11 @@ import {
   getPendingAction,
 } from './ai/autonomy';
 import { executeToolCall } from './ai/tools';
+import { refreshTodayBadge } from './tray';
+import {
+  requestHideFromRenderer,
+  onEscapeLayerExit,
+} from './window/summonController';
 
 type ChatSendInput = {
   content: string;
@@ -108,6 +113,8 @@ const resolvePendingActionSchema = z.object({
   decision: z.enum(['approve', 'reject']),
 });
 
+const launchAtLoginSchema = z.boolean();
+
 const getMemoryState = (): SettingsMemoryStatePayload => ({
   soul: getSoul(),
   profile: getProfile(),
@@ -125,6 +132,49 @@ export const registerIpcHandlers = (): void => {
       status: 'ready',
     }),
   );
+
+  // ─── App/window lifecycle handlers ─────────────────────
+  ipcMain.handle(IPC_CHANNELS.APP_REQUEST_HIDE, () => {
+    requestHideFromRenderer();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.APP_ESCAPE_LAYER_EXIT, () => {
+    onEscapeLayerExit();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN, () => {
+    const stored = getSetting('app.launchAtLogin');
+    const enabled = stored === 'true';
+    const supported =
+      process.platform === 'win32' || (process.platform === 'darwin' && app.isPackaged);
+    return { enabled, applied: supported };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN, (_event, enabledInput: unknown) => {
+    const enabled = launchAtLoginSchema.parse(enabledInput);
+    setSetting('app.launchAtLogin', String(enabled));
+    const supported =
+      process.platform === 'win32' || (process.platform === 'darwin' && app.isPackaged);
+
+    if (!supported) {
+      return {
+        enabled,
+        applied: false,
+        error: 'Launch at login is unavailable in this runtime.',
+      };
+    }
+
+    try {
+      app.setLoginItemSettings({ openAtLogin: enabled });
+      return { enabled, applied: true };
+    } catch (error) {
+      return {
+        enabled,
+        applied: false,
+        error: error instanceof Error ? error.message : 'Failed to apply login item setting',
+      };
+    }
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT,
@@ -189,15 +239,15 @@ export const registerIpcHandlers = (): void => {
     catch (e) { console.error('[ipc] TASK_LIST:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_CREATE, (_event, input) => {
-    try { return createTask(input); }
+    try { const result = createTask(input); refreshTodayBadge(); return result; }
     catch (e) { console.error('[ipc] TASK_CREATE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_UPDATE, (_event, input) => {
-    try { return updateTask(input); }
+    try { const result = updateTask(input); refreshTodayBadge(); return result; }
     catch (e) { console.error('[ipc] TASK_UPDATE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_DELETE, (_event, id: string) => {
-    try { deleteTask(id); }
+    try { deleteTask(id); refreshTodayBadge(); }
     catch (e) { console.error('[ipc] TASK_DELETE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_REORDER, (_event, ids: string[]) => {
@@ -205,11 +255,11 @@ export const registerIpcHandlers = (): void => {
     catch (e) { console.error('[ipc] TASK_REORDER:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_COMPLETE, (_event, id: string) => {
-    try { return completeTask(id); }
+    try { const result = completeTask(id); refreshTodayBadge(); return result; }
     catch (e) { console.error('[ipc] TASK_COMPLETE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_TOGGLE_TODAY, (_event, id: string) => {
-    try { return toggleToday(id); }
+    try { const result = toggleToday(id); refreshTodayBadge(); return result; }
     catch (e) { console.error('[ipc] TASK_TOGGLE_TODAY:', e); throw e; }
   });
 

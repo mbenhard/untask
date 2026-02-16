@@ -65,7 +65,7 @@ export const TaskList = ({
   ariaLabel,
   scopeId,
   indentPx = 0,
-}: TaskListProps): JSX.Element => {
+}: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);

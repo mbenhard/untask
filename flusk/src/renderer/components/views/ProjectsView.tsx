@@ -14,7 +14,7 @@ export const ProjectsView = ({
   allTasks,
   isLoading,
   error,
-}: ProjectsViewProps): JSX.Element => {
+}: ProjectsViewProps) => {
   const projectGroups = useMemo(() => {
     const activeParents = allTasks.filter(
       (task) =>

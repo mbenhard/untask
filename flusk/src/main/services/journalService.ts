@@ -36,7 +36,7 @@ export function writeJournalEntry(
 }
 
 export function readJournalEntries(
-  input?: Partial<z.infer<typeof readJournalEntriesSchema>>,
+  input?: Partial<z.input<typeof readJournalEntriesSchema>>,
 ): AiJournal[] {
   const validated = readJournalEntriesSchema.parse({
     limit: input?.limit,

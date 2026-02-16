@@ -9,7 +9,7 @@ type InlineTaskInputProps = {
   parentId: string;
 };
 
-export const InlineTaskInput = ({ parentId }: InlineTaskInputProps): JSX.Element => {
+export const InlineTaskInput = ({ parentId }: InlineTaskInputProps) => {
   const createTask = useTaskStore((state) => state.createTask);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);

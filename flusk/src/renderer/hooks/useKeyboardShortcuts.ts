@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 
 import { useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
+import { useScratchpadStore } from '../stores/scratchpadStore';
 
 type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLInputElement | null>;
@@ -28,11 +29,18 @@ export const useKeyboardShortcuts = ({
 }: UseKeyboardShortcutsOptions): void => {
   const setView = useAppStore((state) => state.setView);
   const isChatMode = useAppStore((state) => state.isChatMode);
+  const isMemorySettingsOpen = useAppStore((state) => state.isMemorySettingsOpen);
   const exitChatMode = useAppStore((state) => state.exitChatMode);
+  const closeMemorySettings = useAppStore((state) => state.closeMemorySettings);
   const undoAction = useChatStore((state) => state.undoAction);
+  const isScratchpadOpen = useScratchpadStore((state) => state.isOpen);
+  const closeScratchpad = useScratchpadStore((state) => state.close);
+  const toggleScratchpad = useScratchpadStore((state) => state.toggleOpen);
 
   const inputValueRef = useRef(inputValue);
   const isChatModeRef = useRef(isChatMode);
+  const isMemorySettingsOpenRef = useRef(isMemorySettingsOpen);
+  const isScratchpadOpenRef = useRef(isScratchpadOpen);
 
   useEffect(() => {
     inputValueRef.current = inputValue;
@@ -43,10 +51,24 @@ export const useKeyboardShortcuts = ({
   }, [isChatMode]);
 
   useEffect(() => {
+    isMemorySettingsOpenRef.current = isMemorySettingsOpen;
+  }, [isMemorySettingsOpen]);
+
+  useEffect(() => {
+    isScratchpadOpenRef.current = isScratchpadOpen;
+  }, [isScratchpadOpen]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         inputRef.current?.focus();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        void toggleScratchpad();
         return;
       }
 
@@ -59,18 +81,38 @@ export const useKeyboardShortcuts = ({
       }
 
       if (event.key === 'Escape') {
+        // Layer 1: close scratchpad overlay
+        if (isScratchpadOpenRef.current) {
+          event.preventDefault();
+          void closeScratchpad();
+          return;
+        }
+
+        // Layer 2: clear input text
         if (inputValueRef.current.length > 0) {
           event.preventDefault();
           clearInput();
           return;
         }
 
+        // Layer 3: close memory settings overlay
+        if (isMemorySettingsOpenRef.current) {
+          event.preventDefault();
+          closeMemorySettings();
+          return;
+        }
+
+        // Layer 4: exit chat mode
         if (isChatModeRef.current) {
           event.preventDefault();
           exitChatMode();
           inputRef.current?.blur();
+          return;
         }
 
+        // Layer 5: request window hide from main process
+        event.preventDefault();
+        void window.flusk?.app.requestHide();
         return;
       }
 
@@ -102,5 +144,14 @@ export const useKeyboardShortcuts = ({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [clearInput, exitChatMode, inputRef, setView, undoAction]);
+  }, [
+    clearInput,
+    closeMemorySettings,
+    closeScratchpad,
+    exitChatMode,
+    inputRef,
+    setView,
+    toggleScratchpad,
+    undoAction,
+  ]);
 };
