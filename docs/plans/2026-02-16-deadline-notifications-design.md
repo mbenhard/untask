@@ -11,6 +11,8 @@ Make deadline reminders reliable and impossible to miss. One notification at the
 - **No working hours gate**: if the app is running, the assistant is active. Removed from all proactive triggers, not just deadlines.
 - **No over-engineering**: no cron, no persistence layer, no settings UI for schedules
 
+> **Note:** The PRD lists "Notifications and reminders" as post-MVP and "Flexible deadlines (hard/soft)" as in-scope. This design intentionally pulls notifications forward and retires hard/soft as unnecessary complexity. The proactive assistant OS design doc references `dueType` in its auto-escalation rules (Section 3.4) — that should be updated to treat all deadlines the same.
+
 ---
 
 ## 1. Reminder Timing
@@ -31,15 +33,23 @@ Past-due tasks don't get scheduled — they're already overdue.
 Replace the current ~35-minute rolling horizon with a full scan approach:
 
 - **On app launch** → scan all active tasks with `dueDate`, schedule a `setTimeout` for each future deadline
-- **On any task change** (create, update, complete, delete) → clear all timers, reschedule from scratch
+- **On any task change** (create, update, complete, delete) → clear all timers, reschedule from scratch (debounced — same 2-second debounce as the existing `evaluate()` call in `onTaskChange()`)
 - **On task completion** → cancel that task's timer
-- **Date-only deadlines** → compute 9:00 AM local time on the due date as the target timestamp
+- **Date-only deadlines** → construct 9 AM local time using `new Date("YYYY-MM-DDT09:00")` (parsed as local time by the JS engine, avoiding the UTC midnight trap of `Date.parse("YYYY-MM-DD")`)
 
-Implementation is `setTimeout` with `delay = targetMs - Date.now()`. No external scheduler, no persistence.
+Implementation is `setTimeout` with `delay = targetMs - Date.now()`.
+
+**setTimeout overflow guard:** JavaScript's `setTimeout` maxes out at ~24.8 days (2^31 - 1 ms). Any deadline further than 24 days out is skipped during scheduling. The next app launch or task change reschedule will pick it up once it falls within range.
+
+**Sleep/wake behavior:** macOS sleep can cause `setTimeout` to fire late on wake. This is acceptable — the notification still delivers, and the overdue badge covers the gap.
 
 If the app isn't running when a deadline hits, the task is overdue on next launch. The assistant picks it up in its first evaluation cycle and the overdue badge is immediately visible.
 
 The 30-minute evaluation interval stays for situational triggers (overdue accumulation, stale clients, empty Today list, etc.).
+
+### Trigger message context
+
+When a `time_reminder` fires, the trigger message must include the specific task ID and title so the assistant can reference the exact task without scanning all tasks. Current template is generic ("A task with a time-based reminder is due now") — update to inject the task context.
 
 ---
 
@@ -52,29 +62,40 @@ Native macOS notification via Electron `Notification` API:
 - Click action: focus app window, scroll to the chat message
 
 ### App focused
-- Red dot badge on the chat tab/icon
+- Red dot on the chat peek button (bottom-right "Chat" button in `AppShell.tsx`, line 250-262)
 - Opening chat reveals the assistant's reminder message
 
 ### Chat message
-The proactive loop fires a `time_reminder` trigger through the existing chat pipeline. The assistant composes a brief reminder with action chips (same as today's behavior, just with reliable timing).
+The proactive loop fires a `time_reminder` trigger through the existing chat pipeline. The assistant composes a brief reminder with action chips.
 
 ---
 
 ## 4. Overdue Visual
 
-When `isDueDateOverdue(task.dueDate, Date.now())` returns true and the task status is not `done`:
+When a task's due date has passed and the task status is not `done`:
 - The due date badge text in `TaskItem` turns red (`text-destructive`)
 - Same size, same position, just the color
 
-No icons, no animations, no tooltips. The `isDueDateOverdue` utility already exists in `dueDateParser.ts` and handles both date-only and date+time formats.
+**Overdue definition change:** The current `isDueDateOverdue` in `dueDateParser.ts` considers date-only tasks overdue only after midnight of the next day. This contradicts the 9 AM notification — a task that fired a notification 15 hours ago wouldn't show as overdue. Update the function: date-only tasks are overdue after 9:00 AM on the due date (matching the notification trigger). For date+time tasks, overdue after the exact time (unchanged).
+
+```typescript
+// Before (date-only): overdue after end of day (midnight next day)
+const endOfDay = new Date(parsed.dateStr);
+endOfDay.setDate(endOfDay.getDate() + 1);
+return endOfDay.getTime() <= nowMs;
+
+// After (date-only): overdue after 9 AM on the due date
+const nineAm = new Date(parsed.dateStr + 'T09:00');
+return nineAm.getTime() <= nowMs;
+```
 
 ---
 
 ## 5. Chat Red Dot
 
-- Proactive message fires → set `unreadProactive` flag in renderer state
-- Chat tab renders a small red dot when flag is true
-- User opens/views chat → flag clears, dot disappears
+- Proactive message fires → set `unreadProactive` flag in renderer state (chatStore or appStore)
+- The chat peek button (`AppShell.tsx` line 257, the "Chat" button at bottom-right) renders a small red dot when the flag is true
+- User opens chat overlay → flag clears, dot disappears
 - Multiple unread messages → still one dot (not a count)
 - No persistence — app restart clears it
 
@@ -83,12 +104,33 @@ No icons, no animations, no tooltips. The `isDueDateOverdue` utility already exi
 ## 6. What Changes
 
 ### Modified
-- `proactiveLoop.ts` → remove `isWorkingHours` gate from `evaluate()` and `onAppOpen()`. Replace rolling horizon scheduling with full scan on startup + task change. Add 9 AM scheduling for date-only deadlines.
-- `TaskItem.tsx` → add red text color to due date badge when overdue
-- Chat navigation component → add red dot for unread proactive messages
+
+**`proactiveLoop.ts`**
+- Remove `isWorkingHours` gate from `evaluate()` (line 273) and `onAppOpen()` (line 203)
+- Replace rolling ~35-min horizon in `scheduleUpcomingReminders()` with full scan
+- Add 9 AM local time scheduling for date-only deadlines using `new Date("YYYY-MM-DDT09:00")`
+- Add 24-day overflow guard for `setTimeout`
+- Debounce reschedule on task change (2-second delay)
+- Pass task ID and title into `time_reminder` trigger message
+
+**`proactivePolicy.ts`**
+- Remove `isWorkingHours` gate from `evaluateProactiveTriggerPolicy()` (line 261). This is a separate code path used by the IPC handler that the proactive loop doesn't call — but it must also be ungated for consistency.
+
+**`dueDateParser.ts`**
+- Update `isDueDateOverdue` for date-only tasks: overdue after 9 AM on the due date instead of midnight next day
+
+**`TaskItem.tsx`**
+- Add red text color (`text-destructive`) to due date badge when overdue
+
+**`AppShell.tsx`**
+- Add red dot indicator on the chat peek button when `unreadProactive` flag is true
+
+**`chatStore.ts` or `appStore.ts`**
+- Add `unreadProactive` boolean flag, set on proactive message receipt, clear on chat overlay open
 
 ### Removed
-- `isWorkingHours()` usage in evaluate/onAppOpen (function can stay for reference but is no longer called)
+- `isWorkingHours()` usage in `proactiveLoop.ts` evaluate/onAppOpen
+- `isWorkingHours()` usage in `proactivePolicy.ts` evaluateProactiveTriggerPolicy
 - 35-minute scheduling horizon limit
 
 ### Unchanged
@@ -97,7 +139,7 @@ No icons, no animations, no tooltips. The `isDueDateOverdue` utility already exi
 - Native notification delivery mechanism
 - Morning briefing on first app open
 - `dueType` column in DB (no migration)
-- `dueDateParser.ts` utilities (already correct)
+- AI tool schemas still accept `dueType` on create/update — cleanup is a separate follow-up
 
 ---
 
@@ -108,3 +150,4 @@ No icons, no animations, no tooltips. The `isDueDateOverdue` utility already exi
 - Recurring reminder notifications
 - Settings UI for notification preferences
 - Sound customization
+- Cleaning `dueType` from AI tool Zod schemas (follow-up)
