@@ -115,6 +115,7 @@ const fluskApi = {
   chat: {
     send: (message: ChatSendRequest): Promise<ChatSendResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_SEND, message),
+    cancel: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CANCEL),
     onStreamEvent: (
       listener: (event: ChatStreamEventPayload) => void,
     ): (() => void) => {

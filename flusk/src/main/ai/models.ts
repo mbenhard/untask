@@ -14,9 +14,10 @@ export type ModelCatalogEntry = {
   inputCostPerMillion: number | null;
   outputCostPerMillion: number | null;
   defaultSelected: boolean;
+  supportsReasoning: boolean;
 };
 
-const DEFAULT_MODEL_ID: ChatModelId = 'minimax/minimax-m2.5';
+const DEFAULT_MODEL_ID: ChatModelId = 'moonshotai/kimi-k2.5';
 const MODEL_SETTING_KEY = 'ai_selected_model';
 
 const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
@@ -25,14 +26,16 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     label: 'MiniMax M2.5',
     inputCostPerMillion: 0.3,
     outputCostPerMillion: 1.2,
-    defaultSelected: true,
+    defaultSelected: false,
+    supportsReasoning: true,
   },
   {
     id: 'moonshotai/kimi-k2.5',
     label: 'Moonshot Kimi K2.5',
     inputCostPerMillion: 0.45,
     outputCostPerMillion: 2.8,
-    defaultSelected: false,
+    defaultSelected: true,
+    supportsReasoning: true,
   },
   {
     id: 'z-ai/glm-5',
@@ -40,6 +43,7 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     inputCostPerMillion: null,
     outputCostPerMillion: null,
     defaultSelected: false,
+    supportsReasoning: false,
   },
 ] as const;
 
@@ -60,6 +64,9 @@ export class InvalidModelSelectionError extends Error {
 export const getDefaultModelId = (): ChatModelId => DEFAULT_MODEL_ID;
 
 export const getModels = (): ModelCatalogEntry[] => [...MODEL_CATALOG];
+
+export const modelSupportsReasoning = (modelId: ChatModelId): boolean =>
+  MODEL_CATALOG.find((entry) => entry.id === modelId)?.supportsReasoning ?? false;
 
 export const isSupportedModelId = (value: string): value is ChatModelId =>
   SUPPORTED_MODEL_IDS.includes(value as ChatModelId);

@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { Check, Loader2, ShieldAlert, Trash2, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Square, Trash2, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
-import type { ChatActionCard, ChatRetentionMode } from '../../../types/chat';
+import type { ChatRetentionMode, TurnStep } from '../../../types/chat';
 import { cn } from '../../lib/utils';
 import {
   selectChatError,
@@ -16,40 +16,6 @@ import {
   useChatStore,
 } from '../../stores/chatStore';
 import { Button } from '../ui/button';
-
-type ActionCardProps = {
-  card: ChatActionCard;
-  onUndo: (taskEventId?: string) => void;
-  onApprove: (actionId: string) => void;
-  onReject: (actionId: string) => void;
-};
-
-const statusBadgeClass = (status: ChatActionCard['status']): string => {
-  if (status === 'success') {
-    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
-  }
-
-  if (status === 'confirmation_required') {
-    return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
-  }
-
-  return 'border-destructive/40 bg-destructive/10 text-destructive';
-};
-
-const lifecycleBadgeClass = (lifecycle: ChatActionCard['lifecycle']): string => {
-  switch (lifecycle) {
-    case 'pending':
-      return 'border-amber-500/40 bg-amber-500/10 text-amber-200';
-    case 'executed':
-      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
-    case 'rejected':
-      return 'border-destructive/40 bg-destructive/10 text-destructive';
-    case 'undone':
-      return 'border-muted-foreground/40 bg-muted/20 text-muted-foreground';
-    default:
-      return '';
-  }
-};
 
 const formatTimestamp = (createdAt: string | null): string => {
   if (!createdAt) {
@@ -67,119 +33,122 @@ const formatTimestamp = (createdAt: string | null): string => {
   }).format(parsed);
 };
 
-const ActionCard = ({ card, onUndo, onApprove, onReject }: ActionCardProps) => {
-  const isPending = card.lifecycle === 'pending';
-  const isExecuted = card.lifecycle === 'executed' || (!card.lifecycle && card.status === 'success');
+const toolStatusIcon = (status: string) => {
+  switch (status) {
+    case 'running':
+      return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+    case 'success':
+      return <Check className="size-3 text-emerald-400" />;
+    case 'error':
+      return <X className="size-3 text-destructive" />;
+    case 'confirmation_required':
+      return <AlertTriangle className="size-3 text-amber-400" />;
+    default:
+      return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+  }
+};
 
-  const badgeLabel = card.lifecycle ?? card.status.replace('_', ' ');
-  const badgeStyle = card.lifecycle
-    ? lifecycleBadgeClass(card.lifecycle)
-    : statusBadgeClass(card.status);
+type ThinkingStepProps = {
+  content: string;
+  isStreaming: boolean;
+};
+
+const ThinkingStep = ({ content, isStreaming }: ThinkingStepProps) => {
+  const [expanded, setExpanded] = useState(isStreaming);
 
   return (
-    <div className="rounded-lg border border-border/80 bg-card/70 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div
-              className={cn(
-                'inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]',
-                badgeStyle,
-              )}
-            >
-              {badgeLabel}
-            </div>
-            {card.riskLevel ? (
-              <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-                {card.riskLevel} risk
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-2 text-sm font-medium text-foreground">{card.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
-          {card.rationale && card.rationale !== card.detail ? (
-            <p className="mt-1 text-xs text-muted-foreground/70 italic">{card.rationale}</p>
-          ) : null}
+    <div className="text-xs text-muted-foreground/70">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1 hover:text-muted-foreground transition-colors"
+      >
+        {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+        <span className="italic">Thinking{isStreaming ? '...' : ''}</span>
+      </button>
+      {expanded ? (
+        <div className="mt-1 ml-4 whitespace-pre-wrap text-muted-foreground/60 leading-relaxed">
+          {content}
         </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          {isPending && card.actionId ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => { if (card.actionId) onApprove(card.actionId); }}
-              >
-                <Check className="size-3" />
-                Approve
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                onClick={() => { if (card.actionId) onReject(card.actionId); }}
-              >
-                <X className="size-3" />
-                Reject
-              </Button>
-            </>
-          ) : null}
-
-          {isExecuted && card.undoable && card.taskEventId ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => onUndo(card.taskEventId)}
-              className="shrink-0"
-            >
-              <Undo2 className="size-3" />
-              Undo
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 };
 
-type ConfirmationTarget = {
-  actionId: string;
-  rationale: string;
-  riskLevel: string;
-} | null;
+type ToolStepProps = {
+  step: Extract<TurnStep, { kind: 'tool' }>;
+  onUndo: (taskEventId?: string) => void;
+  onApprove: (actionId: string) => void;
+  onReject: (actionId: string) => void;
+};
 
-const ConfirmationDialog = ({
-  target,
-  onConfirm,
-  onCancel,
-}: {
-  target: ConfirmationTarget;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) => {
-  if (!target) return null;
+const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
+  const card = step.actionCard;
+  const isPending = card?.lifecycle === 'pending';
+  const isExecuted = card?.lifecycle === 'executed' || (!card?.lifecycle && step.status === 'success');
+  const isUndone = card?.lifecycle === 'undone';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-lg">
-        <div className="flex items-center gap-2 text-amber-300">
-          <ShieldAlert className="size-4" />
-          <h3 className="text-sm font-semibold">Confirm {target.riskLevel}-risk action</h3>
-        </div>
-        <p className="mt-3 text-sm text-muted-foreground">{target.rationale}</p>
-        <p className="mt-2 text-xs text-muted-foreground/70">
-          This action has elevated risk and requires explicit confirmation.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
+    <div className={cn(
+      'flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs',
+      step.status === 'error' ? 'border-destructive/30 bg-destructive/5' :
+      step.status === 'confirmation_required' ? 'border-amber-500/30 bg-amber-500/5' :
+      isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
+      'border-border/60 bg-card/40',
+    )}>
+      <div className="mt-0.5 shrink-0">
+        {toolStatusIcon(isUndone ? 'success' : step.status)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-foreground/90">{step.description}</p>
+        {step.summary && step.status !== 'running' ? (
+          <p className="mt-0.5 text-muted-foreground">{step.summary}</p>
+        ) : null}
+        {card?.riskLevel && (card.riskLevel === 'high' || card.riskLevel === 'critical') ? (
+          <p className="mt-0.5 text-amber-400/80 text-[10px] uppercase tracking-wide">
+            {card.riskLevel} risk{card.rationale ? ` — ${card.rationale}` : ''}
+          </p>
+        ) : null}
+        {isUndone ? (
+          <p className="mt-0.5 text-muted-foreground/60 italic">Undone</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        {isPending && card?.actionId ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => { if (card.actionId) onApprove(card.actionId); }}
+            >
+              <Check className="size-3" />
+              Approve
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => { if (card.actionId) onReject(card.actionId); }}
+            >
+              <X className="size-3" />
+              Reject
+            </Button>
+          </>
+        ) : null}
+
+        {isExecuted && card?.undoable && card?.taskEventId ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => onUndo(card.taskEventId)}
+            className="shrink-0"
+          >
+            <Undo2 className="size-3" />
+            Undo
           </Button>
-          <Button type="button" variant="default" size="sm" onClick={onConfirm}>
-            Confirm &amp; Execute
-          </Button>
-        </div>
+        ) : null}
       </div>
     </div>
   );
@@ -200,13 +169,17 @@ export const ChatView = () => {
   const setRetentionMode = useChatStore((state) => state.setRetentionMode);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
+  const cancelStream = useChatStore((state) => state.cancelStream);
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
 
-  const [confirmationTarget, setConfirmationTarget] = useState<ConfirmationTarget>(null);
+  const [confirmationTarget, setConfirmationTarget] = useState<{
+    actionId: string;
+    rationale: string;
+    riskLevel: string;
+  } | null>(null);
 
   const handleApprove = useCallback(
     (actionId: string) => {
-      // Find the card to check risk level
       const card = messages
         .flatMap((m) => m.actionCards)
         .find((c) => c.actionId === actionId);
@@ -237,56 +210,103 @@ export const ChatView = () => {
       messages.map((message) => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
+        const hasSteps = isAssistant && message.steps.length > 0;
 
         return (
           <article
             key={message.id}
             className={cn(
-              'flex w-full flex-col gap-2',
+              'flex w-full flex-col gap-1.5',
               isAssistant ? 'items-start' : 'items-end',
             )}
           >
-            <div
-              className={cn(
-                'max-w-[88%] rounded-xl border px-3 py-2 text-sm shadow-sm',
-                isAssistant
-                  ? 'border-border bg-card/80 text-foreground'
-                  : 'border-border/70 bg-secondary text-secondary-foreground',
-              )}
-            >
-              {isAssistant ? (
+            {isAssistant && hasSteps ? (
+              <div className="flex w-full max-w-[88%] flex-col gap-1.5">
+                {message.steps.map((step, index) => {
+                  if (step.kind === 'thinking') {
+                    return (
+                      <ThinkingStep
+                        key={`thinking-${index}`}
+                        content={step.content}
+                        isStreaming={Boolean(message.isStreaming)}
+                      />
+                    );
+                  }
+
+                  if (step.kind === 'text') {
+                    return (
+                      <div
+                        key={`text-${index}`}
+                        className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm shadow-sm"
+                      >
+                        <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+                          <ReactMarkdown>{step.content}</ReactMarkdown>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (step.kind === 'tool') {
+                    return (
+                      <ToolStep
+                        key={step.toolCallId || `tool-${index}`}
+                        step={step}
+                        onUndo={(taskEventId) => {
+                          void undoAction(taskEventId);
+                        }}
+                        onApprove={handleApprove}
+                        onReject={(actionId) => {
+                          void rejectPendingAction(actionId);
+                        }}
+                      />
+                    );
+                  }
+
+                  return null;
+                })}
+
+                {message.isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={() => { void cancelStream(); }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                  >
+                    <Square className="size-3 fill-current" />
+                    Stop
+                  </button>
+                ) : null}
+              </div>
+            ) : isAssistant ? (
+              <div
+                className={cn(
+                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm shadow-sm',
+                  'border-border bg-card/80 text-foreground',
+                )}
+              >
                 <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                 </div>
-              ) : (
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              )}
-
-              {message.isStreaming ? (
-                <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Streaming...
-                </p>
-              ) : null}
-            </div>
-
-            {(isAssistant && message.actionCards.length > 0) ? (
-              <div className="flex w-full max-w-[88%] flex-col gap-2">
-                {message.actionCards.map((card) => (
-                  <ActionCard
-                    key={card.id}
-                    card={card}
-                    onUndo={(taskEventId) => {
-                      void undoAction(taskEventId);
-                    }}
-                    onApprove={handleApprove}
-                    onReject={(actionId) => {
-                      void rejectPendingAction(actionId);
-                    }}
-                  />
-                ))}
+                {message.isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={() => { void cancelStream(); }}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                  >
+                    <Square className="size-3 fill-current" />
+                    Stop
+                  </button>
+                ) : null}
               </div>
-            ) : null}
+            ) : (
+              <div
+                className={cn(
+                  'max-w-[88%] rounded-xl border px-3 py-2 text-sm shadow-sm',
+                  'border-border/70 bg-secondary text-secondary-foreground',
+                )}
+              >
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              </div>
+            )}
 
             {timestamp ? (
               <time className="px-1 text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80">
@@ -396,18 +416,39 @@ export const ChatView = () => {
         )}
 
         {isSending ? (
-          <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Waiting for assistant...
-          </p>
+          <button
+            type="button"
+            onClick={() => { void cancelStream(); }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+          >
+            <Square className="size-3 fill-current" />
+            Stop
+          </button>
         ) : null}
       </div>
 
-      <ConfirmationDialog
-        target={confirmationTarget}
-        onConfirm={handleConfirmApprove}
-        onCancel={() => setConfirmationTarget(null)}
-      />
+      {confirmationTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-lg">
+            <div className="flex items-center gap-2 text-amber-300">
+              <AlertTriangle className="size-4" />
+              <h3 className="text-sm font-semibold">Confirm {confirmationTarget.riskLevel}-risk action</h3>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">{confirmationTarget.rationale}</p>
+            <p className="mt-2 text-xs text-muted-foreground/70">
+              This action has elevated risk and requires explicit confirmation.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmationTarget(null)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="default" size="sm" onClick={handleConfirmApprove}>
+                Confirm &amp; Execute
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

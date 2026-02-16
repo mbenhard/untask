@@ -78,6 +78,7 @@ export type FluskApi = {
   };
   chat: {
     send: (message: ChatSendRequest) => Promise<ChatSendResult>;
+    cancel: () => Promise<void>;
     onStreamEvent: (
       listener: (event: ChatStreamEventPayload) => void,
     ) => () => void;

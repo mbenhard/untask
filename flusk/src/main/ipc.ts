@@ -263,6 +263,11 @@ export const registerIpcHandlers = (): void => {
     catch (e) { console.error('[ipc] TASK_TOGGLE_TODAY:', e); throw e; }
   });
 
+  ipcMain.handle(IPC_CHANNELS.CHAT_CANCEL, () => {
+    try { cancelActiveChatTurns(); }
+    catch (e) { console.error('[ipc] CHAT_CANCEL:', e); throw e; }
+  });
+
   // ─── Chat handlers ───────────────────────────────────────
   ipcMain.handle(
     IPC_CHANNELS.CHAT_SEND,

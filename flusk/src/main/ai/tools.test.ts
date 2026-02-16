@@ -74,43 +74,15 @@ vi.mock('./memory', () => ({
 }));
 
 import * as taskService from '../services/taskService';
-import { assessCreateTaskTitle, executeToolCall } from './tools';
+import { executeToolCall } from './tools';
 
 const createTaskMock = vi.mocked(taskService.createTask);
 const getLastTaskEventForTaskMock = vi.mocked(taskService.getLastTaskEventForTask);
 
-describe('assessCreateTaskTitle', () => {
-  it('marks vague titles as ambiguous', () => {
-    expect(assessCreateTaskTitle('for me?').ok).toBe(false);
-    expect(assessCreateTaskTitle('a task').ok).toBe(false);
-    expect(assessCreateTaskTitle('ok').ok).toBe(false);
-  });
-
-  it('allows concrete action-oriented titles', () => {
-    expect(assessCreateTaskTitle('Call Acme about invoice')).toEqual({ ok: true });
-  });
-});
-
-describe('create_task tool quality guard', () => {
+describe('create_task tool', () => {
   beforeEach(() => {
     createTaskMock.mockReset();
     getLastTaskEventForTaskMock.mockReset();
-  });
-
-  it('rejects ambiguous titles before task creation', async () => {
-    const result = await executeToolCall({
-      name: 'create_task',
-      input: {
-        title: 'for me?',
-      },
-    });
-
-    expect(createTaskMock).not.toHaveBeenCalled();
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.output.status).toBe('error');
-      expect(result.output.message).toContain('ambiguous');
-    }
   });
 
   it('creates a task for explicit actionable titles', async () => {

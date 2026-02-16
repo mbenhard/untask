@@ -51,7 +51,22 @@ export type PersistedChatToolMetadata = {
   actionCards: ChatActionCard[];
   toolExecutions: ChatToolExecutionSummary[];
   telemetry?: ChatTurnTelemetry;
+  reasoningText?: string;
+  stepDescriptions?: string[];
 };
+
+export type TurnStep =
+  | { kind: 'thinking'; content: string }
+  | { kind: 'text'; content: string }
+  | {
+      kind: 'tool';
+      toolName: string;
+      toolCallId: string;
+      description: string;
+      status: 'running' | 'success' | 'error' | 'confirmation_required';
+      summary?: string;
+      actionCard?: ChatActionCard;
+    };
 
 export type ChatStreamEvent =
   | {
@@ -60,10 +75,16 @@ export type ChatStreamEvent =
       text: string;
     }
   | {
+      type: 'reasoning';
+      requestId: string;
+      text: string;
+    }
+  | {
       type: 'tool_call_started';
       requestId: string;
       toolName: string;
       toolCallId?: string;
+      description?: string;
     }
   | {
       type: 'tool_call_completed';
@@ -72,6 +93,7 @@ export type ChatStreamEvent =
       toolCallId?: string;
       status: ChatToolStatus;
       message: string;
+      summary?: string;
       actionCard?: ChatActionCard;
     }
   | {

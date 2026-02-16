@@ -10,6 +10,7 @@ import type {
   ChatStreamErrorCode,
   ChatStreamEvent,
   PersistedChatToolMetadata,
+  TurnStep,
 } from '../../types/chat';
 import type { ChatMessage } from '../../types/models';
 import { useTaskStore } from './taskStore';
@@ -21,11 +22,13 @@ type ChatUiMessage = {
   createdAt: string | null;
   isStreaming?: boolean;
   actionCards: ChatActionCard[];
+  steps: TurnStep[];
 };
 
 type InFlightStream = {
   placeholderId: string;
   actionCards: ChatActionCard[];
+  steps: TurnStep[];
 };
 
 type ChatRequestPayload = {
@@ -67,6 +70,7 @@ type ChatStore = {
   approvePendingAction: (actionId: string) => Promise<void>;
   rejectPendingAction: (actionId: string) => Promise<void>;
   refreshPendingActions: () => Promise<void>;
+  cancelStream: () => Promise<void>;
   retryLastFailedMessage: () => Promise<void>;
   updateCardLifecycle: (
     actionId: string,
@@ -124,10 +128,54 @@ const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata | null
       toolExecutions: Array.isArray(parsed.toolExecutions)
         ? parsed.toolExecutions
         : [],
+      ...(parsed.telemetry ? { telemetry: parsed.telemetry } : {}),
+      ...(typeof parsed.reasoningText === 'string' ? { reasoningText: parsed.reasoningText } : {}),
+      ...(Array.isArray(parsed.stepDescriptions) ? { stepDescriptions: parsed.stepDescriptions } : {}),
     };
   } catch {
     return null;
   }
+};
+
+const reconstructStepsFromMetadata = (
+  metadata: PersistedChatToolMetadata | null,
+  content: string,
+): TurnStep[] => {
+  if (!metadata) {
+    return content.trim().length > 0 ? [{ kind: 'text', content }] : [];
+  }
+
+  const steps: TurnStep[] = [];
+
+  if (metadata.reasoningText && metadata.reasoningText.trim().length > 0) {
+    steps.push({ kind: 'thinking', content: metadata.reasoningText });
+  }
+
+  if (content.trim().length > 0) {
+    steps.push({ kind: 'text', content });
+  }
+
+  const actionCardMap = new Map<string, ChatActionCard>();
+  for (const card of metadata.actionCards) {
+    if (card.id) {
+      actionCardMap.set(card.id, card);
+    }
+  }
+
+  for (const exec of metadata.toolExecutions) {
+    const card = exec.actionCardId ? actionCardMap.get(exec.actionCardId) : undefined;
+    steps.push({
+      kind: 'tool',
+      toolName: exec.toolName,
+      toolCallId: exec.toolCallId ?? '',
+      description: card?.title ?? exec.toolName,
+      status: exec.status === 'confirmation_required' ? 'confirmation_required' : exec.status,
+      summary: exec.message,
+      actionCard: card,
+    });
+  }
+
+  return steps;
 };
 
 const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
@@ -139,6 +187,9 @@ const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
     content: message.content,
     createdAt: message.createdAt,
     actionCards: dedupeActionCards(metadata?.actionCards ?? []),
+    steps: message.role === 'assistant'
+      ? reconstructStepsFromMetadata(metadata, message.content)
+      : [],
   };
 };
 
@@ -184,6 +235,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         createdAt: new Date().toISOString(),
         isStreaming: true,
         actionCards: [],
+        steps: [],
       };
 
       set((state) => ({
@@ -196,6 +248,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           [response.requestId]: {
             placeholderId,
             actionCards: [],
+            steps: [],
           },
         },
         requestPayloadByRequestId: {
@@ -286,6 +339,22 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     sendMessage: async (content) => {
       await sendPreparedMessage(content, get().selectedModelId);
+    },
+
+    cancelStream: async () => {
+      await flusk().chat.cancel();
+      const { messages } = get();
+      const updatedMessages = messages.map((msg) => {
+        if (msg.isStreaming) {
+          return { ...msg, isStreaming: false };
+        }
+        return msg;
+      });
+      set({
+        messages: updatedMessages,
+        isSending: false,
+        inFlightByRequestId: {},
+      });
     },
 
     retryLastFailedMessage: async () => {
@@ -393,15 +462,94 @@ export const useChatStore = create<ChatStore>((set, get) => {
     applyStreamEvent: (event) => {
       const inFlight = get().inFlightByRequestId[event.requestId];
 
+      if (event.type === 'reasoning') {
+        if (!inFlight) {
+          return;
+        }
+
+        const nextSteps = [...inFlight.steps];
+        const lastStep = nextSteps[nextSteps.length - 1];
+        if (lastStep?.kind === 'thinking') {
+          nextSteps[nextSteps.length - 1] = {
+            ...lastStep,
+            content: lastStep.content + event.text,
+          };
+        } else {
+          nextSteps.push({ kind: 'thinking', content: event.text });
+        }
+
+        set((state) => ({
+          inFlightByRequestId: {
+            ...state.inFlightByRequestId,
+            [event.requestId]: { ...inFlight, steps: nextSteps },
+          },
+          messages: state.messages.map((message) =>
+            message.id === inFlight.placeholderId
+              ? { ...message, steps: nextSteps }
+              : message,
+          ),
+        }));
+
+        return;
+      }
+
       if (event.type === 'token') {
         if (!inFlight) {
           return;
         }
 
+        const nextSteps = [...inFlight.steps];
+        const lastStep = nextSteps[nextSteps.length - 1];
+        if (lastStep?.kind === 'text') {
+          nextSteps[nextSteps.length - 1] = {
+            ...lastStep,
+            content: lastStep.content + event.text,
+          };
+        } else {
+          nextSteps.push({ kind: 'text', content: event.text });
+        }
+
         set((state) => ({
+          inFlightByRequestId: {
+            ...state.inFlightByRequestId,
+            [event.requestId]: { ...inFlight, steps: nextSteps },
+          },
           messages: state.messages.map((message) =>
             message.id === inFlight.placeholderId
-              ? { ...message, content: `${message.content}${event.text}` }
+              ? {
+                  ...message,
+                  content: `${message.content}${event.text}`,
+                  steps: nextSteps,
+                }
+              : message,
+          ),
+        }));
+
+        return;
+      }
+
+      if (event.type === 'tool_call_started') {
+        if (!inFlight) {
+          return;
+        }
+
+        const toolStep: TurnStep = {
+          kind: 'tool',
+          toolName: event.toolName,
+          toolCallId: event.toolCallId ?? '',
+          description: event.description ?? event.toolName,
+          status: 'running',
+        };
+        const nextSteps = [...inFlight.steps, toolStep];
+
+        set((state) => ({
+          inFlightByRequestId: {
+            ...state.inFlightByRequestId,
+            [event.requestId]: { ...inFlight, steps: nextSteps },
+          },
+          messages: state.messages.map((message) =>
+            message.id === inFlight.placeholderId
+              ? { ...message, steps: nextSteps }
               : message,
           ),
         }));
@@ -410,14 +558,34 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }
 
       if (event.type === 'tool_call_completed') {
-        if (!inFlight || !event.actionCard) {
+        if (!inFlight) {
           return;
         }
 
-        const nextActionCards = dedupeActionCards([
-          ...inFlight.actionCards,
-          event.actionCard,
-        ]);
+        const nextActionCards = event.actionCard
+          ? dedupeActionCards([...inFlight.actionCards, event.actionCard])
+          : inFlight.actionCards;
+
+        const resolvedToolStatus = event.status === 'confirmation_required'
+          ? 'confirmation_required' as const
+          : event.status === 'error'
+            ? 'error' as const
+            : 'success' as const;
+        const nextSteps: TurnStep[] = inFlight.steps.map((step) => {
+          if (
+            step.kind === 'tool' &&
+            step.toolCallId === (event.toolCallId ?? '') &&
+            step.status === 'running'
+          ) {
+            return {
+              ...step,
+              status: resolvedToolStatus,
+              summary: event.summary ?? event.message,
+              actionCard: event.actionCard,
+            };
+          }
+          return step;
+        });
 
         set((state) => ({
           inFlightByRequestId: {
@@ -425,11 +593,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
             [event.requestId]: {
               ...inFlight,
               actionCards: nextActionCards,
+              steps: nextSteps,
             },
           },
           messages: state.messages.map((message) =>
             message.id === inFlight.placeholderId
-              ? { ...message, actionCards: nextActionCards }
+              ? { ...message, actionCards: nextActionCards, steps: nextSteps }
               : message,
           ),
         }));
@@ -446,9 +615,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
           const baseMessages = state.messages.filter(
             (message) => message.id !== inFlight?.placeholderId,
           );
+          const mapped = mapMessageToUi(event.assistantMessage);
+          const finalizedSteps = inFlight?.steps ?? mapped.steps;
           const finalizedAssistantMessage: ChatUiMessage = {
-            ...mapMessageToUi(event.assistantMessage),
+            ...mapped,
             actionCards,
+            steps: finalizedSteps,
           };
           const nextMessages = upsertMessage(baseMessages, finalizedAssistantMessage);
           const remaining = {

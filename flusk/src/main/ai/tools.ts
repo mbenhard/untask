@@ -121,74 +121,6 @@ const summarizeTask = (task: {
   return `${task.title}${tags.length > 0 ? ` (${tags.join(', ')})` : ''}`;
 };
 
-const AMBIGUOUS_TASK_TITLE_SET = new Set([
-  'for me',
-  'a task',
-  'task',
-  'something',
-  'todo',
-  'to do',
-  'this',
-  'that',
-]);
-
-const TASK_ACTION_VERBS = new Set([
-  'call',
-  'email',
-  'send',
-  'review',
-  'write',
-  'draft',
-  'fix',
-  'update',
-  'plan',
-  'prepare',
-  'ship',
-  'submit',
-  'pay',
-  'invoice',
-  'follow',
-]);
-
-export const assessCreateTaskTitle = (
-  title: string,
-): { ok: true } | { ok: false; message: string } => {
-  const normalized = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (normalized.length < 4) {
-    return {
-      ok: false,
-      message: 'Please provide a concrete task title before I create it.',
-    };
-  }
-
-  if (AMBIGUOUS_TASK_TITLE_SET.has(normalized)) {
-    return {
-      ok: false,
-      message:
-        'That title is ambiguous. Please provide a concrete task title (for example: "Call Acme about invoice follow-up").',
-    };
-  }
-
-  const words = normalized.split(' ').filter(Boolean);
-  const hasActionVerb = words.some((word) => TASK_ACTION_VERBS.has(word));
-
-  if (words.length <= 2 && !hasActionVerb) {
-    return {
-      ok: false,
-      message:
-        'Please provide a more actionable task title with the specific work to do.',
-    };
-  }
-
-  return { ok: true };
-};
-
 const createActionCard = (
   toolName: string,
   status: ChatToolStatus,
@@ -336,21 +268,9 @@ const generateLiveThoughtInputSchema = z.object({
 
 const createTaskTool = {
   name: 'create_task',
-  description: 'Create a task or subtask and log an auditable task event.',
+  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Optional: priority, dueDate, client, parentId, status.',
   schema: createTaskToolInputSchema,
   execute: async (input, context) => {
-    const quality = assessCreateTaskTitle(input.title);
-    if (!quality.ok) {
-      return {
-        status: 'error',
-        message: quality.message,
-        data: {
-          needsClarification: true,
-          attemptedTitle: input.title,
-        },
-      };
-    }
-
     const createdTask = createTask(input, 'ai');
     const event = getLastTaskEventForTask(createdTask.id);
 
@@ -371,7 +291,7 @@ const createTaskTool = {
 
 const updateTaskTool = {
   name: 'update_task',
-  description: 'Update task fields with policy checks for high-risk changes.',
+  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, client, notes, or invoice fields. Requires the task id. High-risk changes (invoice transitions, rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
   schema: updateTaskSchema.strict(),
   execute: async (input, context) => {
     const before = getTaskById(input.id);
@@ -426,7 +346,7 @@ const updateTaskTool = {
 
 const completeTaskTool = {
   name: 'complete_task',
-  description: 'Mark a task as done and set completedAt.',
+  description: 'Mark a task as done. Use when the user says a task is finished, completed, or done. Requires the task id. Sets completedAt timestamp and status to done. Undoable via undo_last_action.',
   schema: completeTaskToolInputSchema,
   execute: async (input, context) => {
     const completed = completeTask(input.id, 'ai');
@@ -449,7 +369,7 @@ const completeTaskTool = {
 
 const deleteTaskTool = {
   name: 'delete_task',
-  description: 'Delete a task. Always requires explicit confirmation.',
+  description: 'Permanently delete a task. Use only when the user explicitly asks to delete or remove a task. Always requires confirmation before execution. This is destructive and not undoable. Requires the task id.',
   schema: deleteTaskToolInputSchema,
   execute: async (input, context) => {
     const task = getTaskById(input.id);
@@ -482,7 +402,7 @@ const deleteTaskTool = {
 
 const moveTaskTool = {
   name: 'move_task',
-  description: 'Re-parent a task (project/subtask move).',
+  description: 'Move a task to a different parent (re-parent as subtask or promote to top-level). Use when the user wants to reorganize tasks, nest a task under a project, or extract a subtask. Requires task id and target parentId (null for top-level).',
   schema: moveTaskToolInputSchema,
   execute: async (input, context) => {
     const before = getTaskById(input.id);
@@ -518,7 +438,7 @@ const moveTaskTool = {
 
 const setTodayTool = {
   name: 'set_today',
-  description: 'Set or toggle a task on the Today list.',
+  description: 'Add or remove a task from the Today focus list. Use when the user wants to focus on a task today, or remove it from today. Requires task id. Pass today=true to add, today=false to remove, or omit to toggle.',
   schema: setTodayToolInputSchema,
   execute: async (input, context) => {
     const task = getTaskById(input.id);
@@ -551,7 +471,7 @@ const setTodayTool = {
 const suggestDailyPlanTool = {
   name: 'suggest_daily_plan',
   description:
-    'Suggest a focused daily plan using due dates, priority, and value-at-risk context.',
+    'Generate a focused daily plan. Use when the user asks to plan their day, prioritize work, or figure out what to focus on. Ranks tasks by Today list membership, due date proximity, priority level, and value-at-risk. Returns up to maxTasks suggestions (default 5, max 8).',
   schema: suggestDailyPlanInputSchema,
   execute: async (input) => {
     const activeTasks = listTasks().filter((task) => task.status !== 'done');
@@ -588,7 +508,7 @@ const suggestDailyPlanTool = {
 
 const parseNotesTool = {
   name: 'parse_notes',
-  description: 'Extract task candidates from raw notes and create tasks when safe.',
+  description: 'Parse raw text into individual tasks. Use when the user pastes notes, a list, or bullet points and wants them converted to tasks. Extracts one task per line, deduplicates, and creates them. Bulk writes above 5 tasks require confirmation. Optional: default status and priority for all created tasks.',
   schema: parseNotesToolInputSchema,
   execute: async (input, context) => {
     const titles = extractTaskTitlesFromNotes(input.text);
@@ -652,7 +572,7 @@ const parseNotesTool = {
 
 const undoLastActionTool = {
   name: 'undo_last_action',
-  description: 'Undo the latest AI task mutation or a specific task event.',
+  description: 'Undo the most recent AI task mutation, or a specific task event by id. Use when the user says "undo", "revert", or "that was wrong". Without taskEventId, reverts the latest AI-initiated change. With taskEventId, reverts that specific event. Not all events are undoable.',
   schema: undoLastActionInputSchema,
   execute: async (input, context) => {
     const undoResult = input.taskEventId
@@ -692,7 +612,7 @@ const undoLastActionTool = {
 
 const writeJournalTool = {
   name: 'write_journal',
-  description: 'Write an AI journal entry for pattern/progress/preference tracking.',
+  description: 'Write a journal entry to record observations about the user. Use to log patterns (recurring workflows), progress (task completion milestones), preferences (stated likes/dislikes), or summaries (session recaps). Entries persist across sessions and inform future context. Keep entries atomic and factual.',
   schema: writeJournalEntrySchema,
   execute: async (input) => {
     const entry = writeJournalEntry(input);
@@ -707,7 +627,7 @@ const writeJournalTool = {
 
 const readJournalTool = {
   name: 'read_journal',
-  description: 'Read recent AI journal entries.',
+  description: 'Read recent journal entries to recall past observations. Use when you need context about previous sessions, user patterns, or past decisions before responding. Supports filtering by category and limiting result count. Read before writing to avoid duplicate entries.',
   schema: readJournalEntriesSchema,
   execute: async (input) => {
     const entries = readJournalEntries(input);
@@ -722,7 +642,7 @@ const readJournalTool = {
 
 const generateLiveThoughtTool = {
   name: 'generate_live_thought',
-  description: 'Generate a concise, outcome-focused live thought for the current context.',
+  description: 'Generate a live thought — a short, outcome-focused insight shown in the UI sidebar. Use proactively when you notice something worth surfacing: a deadline approaching, a pattern in the user workflow, or a suggestion that does not warrant a full message. Optional focus parameter narrows the thought topic.',
   schema: generateLiveThoughtInputSchema,
   execute: async (input) => {
     const liveThought = generateLiveThought({
@@ -742,7 +662,7 @@ const generateLiveThoughtTool = {
 
 const updateUserProfileTool = {
   name: 'update_user_profile',
-  description: 'Append a confirmed profile memory entry.',
+  description: 'Save a fact about the user to their profile. Use when the user shares a stable personal detail (name, role, timezone, communication preference) or explicitly asks you to remember something. Only save high-confidence facts. Entry should be a concise, atomic statement.',
   schema: updateUserProfileInputSchema,
   execute: async (input) => {
     const content = appendProfileEntry(input.entry);
@@ -759,7 +679,7 @@ const updateUserProfileTool = {
 
 const updatePatternsTool = {
   name: 'update_patterns',
-  description: 'Append a confirmed workflow pattern entry.',
+  description: 'Save a recurring workflow pattern the user follows. Use when you observe a repeated behavior across multiple interactions (e.g., "Reviews invoices every Monday", "Prefers tasks broken into subtasks"). Only save after confirming the pattern is stable, not a one-off.',
   schema: updatePatternsInputSchema,
   execute: async (input) => {
     const content = appendPatternEntry(input.entry);
@@ -776,7 +696,7 @@ const updatePatternsTool = {
 
 const improveTaskTool = {
   name: 'improve_task',
-  description: 'Suggest concrete improvements for task clarity and execution readiness.',
+  description: 'Analyze a task and suggest improvements. Use when the user asks to refine, improve, or review a specific task. Checks for missing body, due date, client, and priority. Returns actionable suggestions to make the task more concrete and execution-ready. Requires task id.',
   schema: improveTaskInputSchema,
   execute: async (input) => {
     const task = getTaskById(input.id);
@@ -1047,7 +967,7 @@ export const createSdkTools = (context: ToolExecutionContext = {}) => {
 
         return {
           status: 'error' as const,
-          message: result.error.message,
+          message: `${result.error.message} — Do not retry this tool. Tell the user what happened.`,
         };
       },
     });

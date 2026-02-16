@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { streamText } from 'ai';
+import { stepCountIs, streamText } from 'ai';
 
 import type { AssistantLiveContext, AssistantMemorySnapshot } from '../../types/assistant';
 import type {
@@ -33,7 +33,9 @@ const AUTO_JOURNAL_LAST_WRITE_AT_KEY = 'ai_journal_last_auto_write_at';
 const AUTO_JOURNAL_COOLDOWN_MS = 20 * 60 * 1000;
 const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
-const HISTORY_WINDOW_LIMIT = 12;
+const DEFAULT_TOKEN_BUDGET = 12_000;
+const HISTORY_WINDOW_LIMIT = 60;
+const STREAM_TOOL_LOOP_MAX_STEPS = 25;
 const TOOL_MUTATION_NAMES = new Set([
   'create_task',
   'update_task',
@@ -121,7 +123,8 @@ export const classifyChatError = (error: unknown): ClassifiedChatError => {
     normalized.includes('overloaded') ||
     normalized.includes('503') ||
     normalized.includes('502') ||
-    normalized.includes('provider')
+    normalized.includes('provider') ||
+    normalized.includes('empty response')
   ) {
     return {
       code: 'provider_error',
@@ -163,27 +166,42 @@ const sleep = (ms: number): Promise<void> =>
 const computeRetryDelayMs = (): number =>
   STREAM_RETRY_BASE_DELAY_MS + Math.floor(Math.random() * 200);
 
-const buildPromptWithRecentHistory = (input: {
+type ConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export const buildConversationMessages = (input: {
   history: Array<{ role: 'user' | 'assistant'; content: string }>;
   userMessage: string;
-}): string => {
-  const historyLines = input.history
+}): ConversationMessage[] => {
+  const normalizedHistory = input.history
     .map((entry) => ({
-      roleLabel: entry.role === 'assistant' ? 'Assistant' : 'User',
+      role: entry.role,
       content: entry.content.trim(),
     }))
-    .filter((entry) => entry.content.length > 0)
-    .map((entry) => `${entry.roleLabel}: ${entry.content}`);
+    .filter((entry) => entry.content.length > 0);
 
-  if (historyLines.length === 0) {
-    return input.userMessage;
+  const normalizedUserMessage = input.userMessage.trim();
+  if (normalizedUserMessage.length === 0) {
+    return normalizedHistory;
+  }
+
+  const last = normalizedHistory[normalizedHistory.length - 1];
+  if (
+    last?.role === 'user' &&
+    last.content.trim().toLowerCase() === normalizedUserMessage.toLowerCase()
+  ) {
+    return normalizedHistory;
   }
 
   return [
-    'Recent conversation context (oldest to newest):',
-    ...historyLines,
-    `User: ${input.userMessage}`,
-  ].join('\n');
+    ...normalizedHistory,
+    {
+      role: 'user',
+      content: normalizedUserMessage,
+    },
+  ];
 };
 
 const isChatRequestCanceled = (requestId: string): boolean =>
@@ -223,6 +241,48 @@ const normalizeFallbackTaskTitle = (rawTitle: string): string =>
 
 const looksLikeQuestion = (message: string): boolean =>
   message.includes('?') || /^(can|could|would|will|should|please)\b/i.test(message);
+
+const TASK_MUTATION_VERB_PATTERN =
+  /\b(create|add|update|edit|complete|finish|move|schedule|plan|undo)\b/i;
+const TASK_ENTITY_PATTERN = /\b(task|todo|to-do|today|inbox)\b/i;
+const TASK_CLARIFICATION_PATTERN =
+  /\b(what(?:'| i)s the task|give me a title|title and any details|which task|clarify)\b/i;
+
+export const shouldRequireToolChoice = (input: {
+  userMessage: string;
+  history: ConversationMessage[];
+}): boolean => {
+  const normalizedMessage = input.userMessage.trim();
+  if (normalizedMessage.length === 0) {
+    return false;
+  }
+
+  const explicitCommand = parseExplicitFallbackToolCall(normalizedMessage);
+  if (explicitCommand) {
+    return true;
+  }
+
+  const mutationIntent =
+    TASK_MUTATION_VERB_PATTERN.test(normalizedMessage) &&
+    TASK_ENTITY_PATTERN.test(normalizedMessage);
+  if (mutationIntent && !looksLikeQuestion(normalizedMessage)) {
+    return true;
+  }
+
+  const lastAssistantMessage = [...input.history]
+    .reverse()
+    .find((entry) => entry.role === 'assistant');
+  if (!lastAssistantMessage) {
+    return false;
+  }
+
+  const isClarificationFollowup =
+    TASK_CLARIFICATION_PATTERN.test(lastAssistantMessage.content.toLowerCase()) &&
+    !looksLikeQuestion(normalizedMessage) &&
+    normalizedMessage.split(/\s+/).length >= 2;
+
+  return isClarificationFollowup;
+};
 
 export const parseExplicitFallbackToolCall = (
   userMessage: string,
@@ -276,6 +336,57 @@ export const parseExplicitFallbackToolCall = (
 
 const truncate = (value: string, max: number): string =>
   value.length <= max ? value : `${value.slice(0, max - 3).trimEnd()}...`;
+
+export const generateToolCallDescription = (
+  toolName: string,
+  args: unknown,
+): string => {
+  const input = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+  switch (toolName) {
+    case 'create_task':
+      return input.title ? `Creating task "${truncate(String(input.title), 60)}"` : 'Creating task';
+    case 'update_task':
+      return input.id ? `Updating task ${String(input.id)}` : 'Updating task';
+    case 'complete_task':
+      return input.id ? `Completing task ${String(input.id)}` : 'Completing task';
+    case 'delete_task':
+      return input.id ? `Deleting task ${String(input.id)}` : 'Deleting task';
+    case 'move_task':
+      return input.id ? `Moving task ${String(input.id)}` : 'Moving task';
+    case 'set_today':
+      return input.id ? `Updating Today list for task ${String(input.id)}` : 'Updating Today list';
+    case 'suggest_daily_plan':
+      return 'Generating daily plan';
+    case 'parse_notes':
+      return 'Extracting tasks from notes';
+    case 'undo_last_action':
+      return input.taskEventId ? `Undoing event ${String(input.taskEventId)}` : 'Undoing last action';
+    case 'write_journal':
+      return 'Writing journal entry';
+    case 'read_journal':
+      return 'Reading journal entries';
+    case 'generate_live_thought':
+      return 'Generating live thought';
+    case 'update_user_profile':
+      return 'Saving profile memory';
+    case 'update_patterns':
+      return 'Saving workflow pattern';
+    case 'improve_task':
+      return input.id ? `Analyzing task ${String(input.id)}` : 'Analyzing task';
+    default:
+      return `Running ${toolName}`;
+  }
+};
+
+const generateToolCallSummary = (
+  toolName: string,
+  envelope: ToolExecutionEnvelope | null,
+): string => {
+  if (!envelope) {
+    return `${toolName} completed.`;
+  }
+  return truncate(envelope.message, 120);
+};
 
 const isPlanningIntent = (message: string): boolean =>
   /\b(plan|prioriti[sz]e|today|next step|focus|schedule)\b/i.test(message);
@@ -395,7 +506,7 @@ export const prepareChatTurn = async (
 
   const built = await buildSystemPrompt({
     userMessage: trimmedMessage,
-    tokenBudget: input.tokenBudget,
+    tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
     memory,
     liveContext,
   });
@@ -425,6 +536,8 @@ const runAssistantStream = async (
 
   const emit = input.emit;
   let assistantText = '';
+  let reasoningText = '';
+  const stepDescriptions: string[] = [];
   let finalizedTextFromModel = '';
 
   try {
@@ -440,37 +553,75 @@ const runAssistantStream = async (
         });
         const builtPrompt = await buildSystemPrompt({
           userMessage: input.userMessage,
-          tokenBudget: input.tokenBudget,
+          tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
           memory,
           liveContext,
         });
 
         const provider = createOpenRouterProviderFromEnv();
-        const model = provider(input.modelId);
+        const model = provider.chat(input.modelId);
         const recentHistory = getRecentChatMessages(HISTORY_WINDOW_LIMIT).filter(
           (message) => message.role === 'user' || message.role === 'assistant',
         );
-        const historyWithoutCurrentTurn = [...recentHistory];
-        const lastHistoryEntry =
-          historyWithoutCurrentTurn[historyWithoutCurrentTurn.length - 1];
-        if (
-          lastHistoryEntry?.role === 'user' &&
-          lastHistoryEntry.content.trim() === input.userMessage
-        ) {
-          historyWithoutCurrentTurn.pop();
-        }
-        const promptWithHistory = buildPromptWithRecentHistory({
-          history: historyWithoutCurrentTurn.map((message) => ({
+        const conversationMessages = buildConversationMessages({
+          history: recentHistory.map((message) => ({
             role: message.role,
             content: message.content,
           })),
           userMessage: input.userMessage,
         });
+        const requireToolChoice = shouldRequireToolChoice({
+          userMessage: input.userMessage,
+          history: conversationMessages,
+        });
 
         const result = streamText({
           model,
           system: builtPrompt.modelInputPrompt,
-          prompt: promptWithHistory,
+          messages: conversationMessages,
+          toolChoice: requireToolChoice ? 'required' : 'auto',
+          stopWhen: stepCountIs(STREAM_TOOL_LOOP_MAX_STEPS),
+          prepareStep: async ({ steps }) => {
+            const failedTools = new Set<string>();
+            const toolCallsByStep: string[][] = [];
+
+            for (const step of steps) {
+              const stepToolNames: string[] = [];
+              for (const part of step.content) {
+                if (part.type === 'tool-call') stepToolNames.push(part.toolName);
+                if (part.type === 'tool-error') failedTools.add(part.toolName);
+                if (
+                  part.type === 'tool-result' &&
+                  typeof part.output === 'object' && part.output !== null &&
+                  'status' in part.output && part.output.status === 'error'
+                ) {
+                  failedTools.add(part.toolName);
+                }
+              }
+              toolCallsByStep.push(stepToolNames);
+            }
+
+            // If any tool failed, force text response
+            if (failedTools.size > 0) {
+              return { toolChoice: 'none' as const };
+            }
+
+            // Detect same tool in consecutive steps (spiral)
+            if (toolCallsByStep.length >= 2) {
+              const last = toolCallsByStep[toolCallsByStep.length - 1];
+              const prev = toolCallsByStep[toolCallsByStep.length - 2];
+              if (last.some(name => prev.includes(name))) {
+                return { toolChoice: 'none' as const };
+              }
+            }
+
+            // After first step, relax toolChoice
+            if (steps.length > 0) {
+              return { toolChoice: 'auto' as const };
+            }
+
+            return {};
+          },
           tools: createSdkTools({
             onActionCard: (card) => {
               actionCards.push(card);
@@ -484,6 +635,18 @@ const runAssistantStream = async (
           }
 
           switch (part.type) {
+            case 'reasoning-delta': {
+              reasoningText += part.text;
+              emit({
+                type: 'reasoning',
+                requestId: input.requestId,
+                text: part.text,
+              });
+              break;
+            }
+            case 'reasoning-start':
+            case 'reasoning-end':
+              break;
             case 'text-delta': {
               if (!telemetry.firstTokenAt) {
                 telemetry.firstTokenAt = new Date().toISOString();
@@ -499,11 +662,14 @@ const runAssistantStream = async (
             }
             case 'tool-call': {
               attemptHadToolExecution = true;
+              const description = generateToolCallDescription(part.toolName, part.input);
+              stepDescriptions.push(description);
               emit({
                 type: 'tool_call_started',
                 requestId: input.requestId,
                 toolName: part.toolName,
                 toolCallId: part.toolCallId,
+                description,
               });
               break;
             }
@@ -512,6 +678,7 @@ const runAssistantStream = async (
               const envelope = toToolExecutionEnvelope(part.output);
               const status = envelope?.status ?? 'success';
               const message = envelope?.message ?? `${part.toolName} completed.`;
+              const summary = generateToolCallSummary(part.toolName, envelope);
               const actionCard = envelope?.actionCard;
 
               if (actionCard) {
@@ -537,6 +704,7 @@ const runAssistantStream = async (
                 toolCallId: part.toolCallId,
                 status,
                 message,
+                summary,
                 actionCard,
               });
               break;
@@ -563,6 +731,7 @@ const runAssistantStream = async (
                 toolCallId: part.toolCallId,
                 status: 'error',
                 message,
+                summary: message,
               });
               break;
             }
@@ -583,12 +752,15 @@ const runAssistantStream = async (
           if (fallbackCall) {
             attemptHadToolExecution = true;
             const fallbackToolCallId = `heuristic-${randomUUID()}`;
+            const fallbackDescription = generateToolCallDescription(fallbackCall.name, fallbackCall.input);
+            stepDescriptions.push(fallbackDescription);
 
             emit({
               type: 'tool_call_started',
               requestId: input.requestId,
               toolName: fallbackCall.name,
               toolCallId: fallbackToolCallId,
+              description: fallbackDescription,
             });
 
             const fallbackResult = await executeToolCall(fallbackCall, {
@@ -604,6 +776,7 @@ const runAssistantStream = async (
 
             if (fallbackResult.ok) {
               const actionCard = fallbackResult.output.actionCard;
+              const fallbackSummary = generateToolCallSummary(fallbackResult.toolName, fallbackResult.output);
               const execution: ChatToolExecutionSummary = {
                 toolName: fallbackResult.toolName,
                 toolCallId: fallbackToolCallId,
@@ -620,6 +793,7 @@ const runAssistantStream = async (
                 toolCallId: fallbackToolCallId,
                 status: fallbackResult.output.status,
                 message: fallbackResult.output.message,
+                summary: fallbackSummary,
                 actionCard,
               });
             } else {
@@ -637,12 +811,16 @@ const runAssistantStream = async (
                 toolCallId: fallbackToolCallId,
                 status: 'error',
                 message: fallbackResult.error.message,
+                summary: fallbackResult.error.message,
               });
             }
           }
         }
 
         finalizedTextFromModel = (await result.text).trim() || assistantText.trim();
+        if (finalizedTextFromModel.length === 0 && toolExecutions.length === 0) {
+          throw new Error('Provider returned empty response.');
+        }
         if (isChatRequestCanceled(input.requestId)) {
           return;
         }
@@ -711,6 +889,8 @@ const runAssistantStream = async (
         ...telemetry,
         completedAt: new Date().toISOString(),
       },
+      ...(reasoningText.length > 0 ? { reasoningText } : {}),
+      ...(stepDescriptions.length > 0 ? { stepDescriptions } : {}),
     };
 
     if (isChatRequestCanceled(input.requestId)) {

@@ -69,6 +69,7 @@ export const IPC_CHANNELS = {
   CHAT_GET_AUTONOMY_MODE: 'chat:get-autonomy-mode',
   CHAT_SET_AUTONOMY_MODE: 'chat:set-autonomy-mode',
   CHAT_RESOLVE_PENDING_ACTION: 'chat:resolve-pending-action',
+  CHAT_CANCEL: 'chat:cancel',
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
   SCRATCHPAD_GET: 'scratchpad:get',
   SCRATCHPAD_SAVE: 'scratchpad:save',
