@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 
 import type { ChatLiveThoughtResult } from '../../../types/ipc';
@@ -17,6 +17,7 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
   const [thought, setThought] = useState<ChatLiveThoughtResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sendMessage = useChatStore((state) => state.sendMessage);
+  const prefersReducedMotion = useReducedMotion();
 
   const loadLiveThought = useCallback(async () => {
     if (!window.flusk) {
@@ -42,55 +43,56 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
     void loadLiveThought();
   }, [loadLiveThought, refreshKey]);
 
-  if (!isVisible) {
-    return null;
-  }
-
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2"
-      aria-live="polite"
-    >
-      <Sparkles className="size-4 text-muted-foreground" />
+    <AnimatePresence>
+      {isVisible ? (
+        <motion.section
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+          transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
+          className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2"
+          aria-live="polite"
+        >
+          <Sparkles className="size-4 text-muted-foreground" />
 
-      <p className="flex-1 text-[13px] text-muted-foreground">
-        {isLoading
-          ? 'Loading live thought...'
-          : error
-            ? 'Live thought unavailable. Use chat to get a quick focus recommendation.'
-            : thought?.thought ?? 'Live thought unavailable.'}
-      </p>
+          <p className="flex-1 text-[13px] text-muted-foreground">
+            {isLoading
+              ? 'Loading live thought...'
+              : error
+                ? 'Live thought unavailable. Use chat to get a quick focus recommendation.'
+                : thought?.thought ?? 'Live thought unavailable.'}
+          </p>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-[11px] text-muted-foreground"
-        disabled={!thought || isLoading}
-        onClick={() => {
-          if (!thought?.suggestedPrompt) {
-            return;
-          }
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px] text-muted-foreground"
+            disabled={!thought || isLoading}
+            onClick={() => {
+              if (!thought?.suggestedPrompt) {
+                return;
+              }
 
-          void sendMessage(thought.suggestedPrompt);
-        }}
-      >
-        {thought?.actionLabel ?? 'Act'}
-      </Button>
+              void sendMessage(thought.suggestedPrompt);
+            }}
+          >
+            {thought?.actionLabel ?? 'Act'}
+          </Button>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="text-muted-foreground"
-        aria-label="Dismiss live thought"
-        onClick={() => setIsVisible(false)}
-      >
-        <X />
-      </Button>
-    </motion.section>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="text-muted-foreground"
+            aria-label="Dismiss live thought"
+            onClick={() => setIsVisible(false)}
+          >
+            <X />
+          </Button>
+        </motion.section>
+      ) : null}
+    </AnimatePresence>
   );
 };
