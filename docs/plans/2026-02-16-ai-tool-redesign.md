@@ -29,7 +29,7 @@ To:
 - [t_abc123] Task title (today, priority:high, client:Acme, due:2026-02-20)
 ```
 
-Increase the task slice from 8 to 15 items. The ID prefix adds ~12 chars per task, well within token budget.
+Increase the task slice from 8 to 15 items. The ID prefix adds ~12 chars per task. Increase the live-context section `maxTokens` budget from 420 to 620 to accommodate the larger slice. Also add IDs to the overdue task slice (currently formatted separately without IDs).
 
 **1b. Add `list_tasks` tool**
 
@@ -43,11 +43,13 @@ Read-only tool that searches/filters the full task list. Accepts optional parame
 
 Returns array of: `{ id, title, status, priority, client, dueDate, today, parentId }`.
 
-No autonomy gate needed (read-only). The AI uses this when it needs to find a task beyond the top-15 visible in context, or when resolving a user's natural-language reference ("the Acme invoice thing") to a task ID.
+No autonomy gate needed (read-only). Must be added to `READ_ONLY_TOOLS` set in `autonomy.ts` to avoid being treated as a mutation tool. The AI uses this when it needs to find a task beyond the top-15 visible in context, or when resolving a user's natural-language reference ("the Acme invoice thing") to a task ID.
+
+**Service layer change:** The current `listTasks()` in `taskService.ts` only supports `status`, `parentId`, and `today` filters. Must be extended with `priority`, `client` (case-insensitive partial match), `search` (case-insensitive title substring), and `limit` parameters. For MVP, apply these filters at the application level after fetching all tasks from SQLite — the dataset is small enough.
 
 **1c. Add `get_task` tool**
 
-Read-only tool that fetches full details of a single task by ID. Returns all fields including body, notes, subtasks, invoice fields, timestamps. Used when the AI needs complete context before acting on a task.
+Read-only tool that fetches full details of a single task by ID. Returns all task fields (body, notes, invoice fields, timestamps) plus child subtasks via a second `listTasks({ parentId: id })` call. Must be added to `READ_ONLY_TOOLS` in `autonomy.ts`. Used when the AI needs complete context before acting on a task.
 
 ### 2. Fix Tool-Calling Reliability
 
@@ -69,8 +71,9 @@ Expand `shouldRequireToolChoice` in `chat.ts`:
 
 - Add verbs: "mark", "finish", "done", "remove", "delete", "set", "change", "rename", "prioritize", "defer", "remember", "save", "note", "log"
 - Add entities: "it", "that", "this", "them" (pronoun references to previous context)
-- Add follow-up confirmations: detect "yes", "yeah", "yep", "do it", "go ahead", "sure", "ok", "confirmed", "approve" after an assistant message that proposed or described an action
+- Add follow-up confirmations: detect "yes", "yeah", "yep", "do it", "go ahead", "sure", "ok", "confirmed", "approve" when `loadPendingActions()` returns non-empty (reliable signal that the assistant proposed an action requiring confirmation)
 - Detect "search for", "look up", "find out", "what is" patterns for web search intent
+- **Pronoun caution**: "it", "that", "this" matching must be paired with strong verb patterns to avoid false positives (e.g., "what is that?" should not force tool use)
 
 **2c. Add task title → ID resolution guidance**
 
@@ -106,6 +109,12 @@ In `chat.ts`, when building the tools for `streamText()`:
 
 The model decides autonomously when to search. No explicit `web_search` tool in our registry — the search is a model-level capability, not an application tool.
 
+**RISK: OpenRouter passthrough is unvalidated.** Both Kimi's `builtin_function` and Claude's `web_search_20250305` tool types are provider-native. Whether OpenRouter passes them through correctly is undocumented. The Vercel AI SDK's `streamText()` `tools` parameter expects a specific type shape — mixing raw provider objects with SDK tool objects may fail at TypeScript or runtime level.
+
+**Mitigation:** Implementation must start with a spike/prototype step to verify both tool injections work through OpenRouter before building the full integration. If passthrough fails, fallback to making web search an application-level tool using a search API (Tavily or similar) rather than silently failing.
+
+**Note:** `buildSystemPrompt()` currently does not receive the `modelId`. Must pass `modelId` through `BuildSystemPromptInput` to conditionally include web search guidance in the system prompt.
+
 Add system prompt guidance:
 ```
 ### Web Search
@@ -116,7 +125,14 @@ Add system prompt guidance:
 
 **3c. Add `fetch_url` tool**
 
-Application-level tool (in our registry) that fetches a URL and returns readable content. For when the user pastes a link. Implementation: use `fetch()` + HTML-to-text extraction (e.g., `@extractus/article-extractor` or similar). Read-only, no autonomy gate.
+Application-level tool (in our registry) that fetches a URL and returns readable content. For when the user pastes a link. Implementation: use `fetch()` + HTML-to-text extraction (e.g., `@extractus/article-extractor` or similar). Read-only, must be added to `READ_ONLY_TOOLS` in `autonomy.ts`.
+
+**Security requirements:**
+- Block private/internal IPs (localhost, 127.0.0.1, 169.254.x.x, 10.x.x.x, 192.168.x.x) to prevent SSRF
+- Enforce 10-second fetch timeout
+- Only process text/HTML content types, reject binaries
+- Cap raw response body at 500KB before extraction
+- New dependency: `@extractus/article-extractor` (verify Electron main process compatibility)
 
 Schema:
 ```typescript
@@ -147,13 +163,17 @@ Updated catalog:
 
 ## Files to Change
 
+All paths relative to `flusk/`.
+
 | File | Changes |
 |------|---------|
-| `src/main/ai/tools.ts` | Add `list_tasks`, `get_task`, `fetch_url` tools |
-| `src/main/ai/chat.ts` | Broaden `shouldRequireToolChoice`, inject model-native search tools |
-| `src/main/ai/systemPrompt.ts` | Add Action Bias, Task Resolution, Web Search policy sections |
-| `src/main/ai/models.ts` | Add `supportsWebSearch` and `webSearchMethod` fields |
-| `src/main/assistant/contextCompiler.ts` | Add task IDs to format, increase slice to 15 |
+| `src/main/ai/tools.ts` | Add `list_tasks`, `get_task`, `fetch_url` tools + `generateToolCallDescription` cases |
+| `src/main/ai/chat.ts` | Broaden `shouldRequireToolChoice`, inject model-native search tools, pass `modelId` to `buildSystemPrompt` |
+| `src/main/ai/systemPrompt.ts` | Add Action Bias, Task Resolution, Web Search policy sections; accept `modelId` in input type |
+| `src/main/ai/models.ts` | Add `supportsWebSearch` and `webSearchMethod` fields to catalog |
+| `src/main/ai/autonomy.ts` | Add `list_tasks`, `get_task`, `fetch_url` to `READ_ONLY_TOOLS` set |
+| `src/main/assistant/contextCompiler.ts` | Add task IDs to active + overdue format, increase slice to 15, increase `maxTokens` from 420 to 620 |
+| `src/main/services/taskService.ts` | Extend `listTasks()` with `priority`, `client`, `search`, `limit` filters |
 | `src/types/chat.ts` | Add web search event types if needed |
 
 ## Not Doing (YAGNI)
