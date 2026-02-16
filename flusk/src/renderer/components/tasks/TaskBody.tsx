@@ -1,13 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Calendar as CalendarIcon, FolderOpen } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { FolderOpen } from 'lucide-react';
+
+import type { BlockNoteEditor } from '@blocknote/core';
+import {
+  type DefaultReactSuggestionItem,
+  getDefaultReactSlashMenuItems,
+} from '@blocknote/react';
 
 import type { Task, TaskStatus } from '../../../types/models';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
-import { Button, Calendar, Popover, PopoverContent, Textarea } from '../ui';
+import { BlockEditor } from '../editor/BlockEditor';
+import { isEmptyDocument } from '../editor/editorUtils';
 import { InlineTaskInput } from './InlineTaskInput';
+import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { TaskList } from './TaskList';
 
 // ─── Metadata Field Sub-Components ──────────────────────────
@@ -47,83 +54,22 @@ const TaskFieldPriority = ({
   </select>
 );
 
-/** Format a YYYY-MM-DD string as DD.MM.YYYY */
-const formatDueDate = (iso: string): string => {
-  const [y, m, d] = iso.split('-');
-  return `${d}.${m}.${y}`;
-};
-
-/** Convert a Date to YYYY-MM-DD for storage */
-const toISODate = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
 const TaskFieldDueDate = ({
   task,
   onUpdate,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
-}) => {
-  const [open, setOpen] = useState(false);
-
-  const selected = task.dueDate ? new Date(task.dueDate + 'T00:00:00') : undefined;
-
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        {task.dueDate ? (
-          <Button
-            variant="outline"
-            size="xs"
-            className="gap-1 font-normal text-muted-foreground"
-            aria-label="Due date"
-          >
-            <CalendarIcon className="size-3" />
-            {formatDueDate(task.dueDate)}
-          </Button>
-        ) : (
-          <button
-            type="button"
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <CalendarIcon className="size-3" />+ Due date
-          </button>
-        )}
-      </Popover.Trigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={(date) => {
-            const value = date ? toISODate(date) : null;
-            void onUpdate({ id: task.id, dueDate: value });
-            setOpen(false);
-          }}
-          defaultMonth={selected}
-        />
-        {task.dueDate && (
-          <div className="border-t border-border px-3 py-2">
-            <Button
-              variant="ghost"
-              size="xs"
-              className="w-full text-muted-foreground"
-              onClick={() => {
-                void onUpdate({ id: task.id, dueDate: null });
-                setOpen(false);
-              }}
-            >
-              Clear due date
-            </Button>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover.Root>
-  );
-};
+}) => (
+  <TaskDueDatePicker
+    dueDate={task.dueDate}
+    emptyLabel="+ Due date"
+    variant="meta"
+    onChange={(nextDueDate) => {
+      void onUpdate({ id: task.id, dueDate: nextDueDate });
+    }}
+  />
+);
 
 const TaskFieldClient = ({
   task,
@@ -248,6 +194,11 @@ const TaskFieldToday = ({
   </button>
 );
 
+const MEDIA_SLASH_ITEMS = new Set(['Image', 'Video', 'Audio', 'File']);
+
+const getTextOnlySlashMenuItems = (editor: BlockNoteEditor): DefaultReactSuggestionItem[] =>
+  getDefaultReactSlashMenuItems(editor).filter((item) => !MEDIA_SLASH_ITEMS.has(item.title));
+
 const TaskFieldProject = ({
   task,
   onUpdate,
@@ -269,24 +220,14 @@ const TaskFieldProject = ({
     [allTasks, task.id],
   );
 
-  if (hasChildren) {
-    return (
-      <div
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-muted/40 px-2 text-xs text-muted-foreground"
-        title="This task has subtasks and acts as a project parent."
-      >
-        <FolderOpen className="size-3" />
-        Project parent
-      </div>
-    );
-  }
+  // Subtasks don't need a project dropdown
+  if (task.parentId !== null) return null;
 
-  const emptyOptionLabel =
-    task.parentId !== null
-      ? 'No project'
-      : projects.length > 0
-        ? 'Move to project...'
-        : 'No project';
+  // Parent tasks with children don't need the "Project parent" badge
+  if (hasChildren) return null;
+
+  // Standalone root tasks: show dropdown only if there are projects to move into
+  if (projects.length === 0) return null;
 
   return (
     <div className="flex items-center gap-1">
@@ -303,7 +244,7 @@ const TaskFieldProject = ({
         className="h-7 max-w-[160px] truncate rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         aria-label="Project"
       >
-        <option value="">{emptyOptionLabel}</option>
+        <option value="">Move to project...</option>
         {projects.map((project) => (
           <option key={project.id} value={project.id}>
             {project.title}
@@ -328,59 +269,62 @@ export const TaskBody = ({
   const updateTask = useTaskStore((state) => state.updateTask);
   const allTasks = useTaskStore((state) => state.tasks);
   const prefersReducedMotion = useReducedMotion();
-  const [isEditing, setIsEditingRaw] = useState(false);
-  const [draftBody, setDraftBody] = useState(task.body ?? '');
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Wrap setIsEditing to notify parent directly (avoids effect-based sync
-  // which fires on mount for every TaskBody and can interfere across instances).
-  const setIsEditing = useCallback(
-    (editing: boolean) => {
-      setIsEditingRaw(editing);
-      onBodyEditModeChange?.(editing);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBodyRef = useRef<string | null>(null);
+
+  const flushSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    if (pendingBodyRef.current !== null) {
+      const body = isEmptyDocument(pendingBodyRef.current) ? null : pendingBodyRef.current;
+      pendingBodyRef.current = null;
+      void updateTask({ id: task.id, body });
+    }
+  }, [task.id, updateTask]);
+
+  const handleBodyChange = useCallback(
+    (json: string) => {
+      pendingBodyRef.current = json;
+
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        const body = isEmptyDocument(json) ? null : json;
+        pendingBodyRef.current = null;
+        void updateTask({ id: task.id, body });
+      }, 2000);
     },
-    [onBodyEditModeChange],
+    [task.id, updateTask],
   );
 
+  // Flush pending save on unmount or collapse
   useEffect(() => {
     if (!isExpanded) {
-      setIsEditingRaw(false);
-      onBodyEditModeChange?.(false);
+      flushSave();
     }
-  }, [isExpanded, onBodyEditModeChange]);
+  }, [isExpanded, flushSave]);
 
   useEffect(() => {
-    if (!isEditing) {
-      setDraftBody(task.body ?? '');
-    }
-  }, [isEditing, task.body, task.id]);
+    return () => {
+      flushSave();
+    };
+  }, [flushSave]);
 
-  const persistBody = useCallback(async () => {
-    if (isSaving) {
-      return;
-    }
+  const handleFocus = useCallback(() => {
+    onBodyEditModeChange?.(true);
+  }, [onBodyEditModeChange]);
 
-    setIsSaving(true);
-    const normalizedBody = draftBody.trim().length > 0 ? draftBody : null;
-    const updatedTask = await updateTask({ id: task.id, body: normalizedBody });
+  const handleBlur = useCallback(() => {
+    onBodyEditModeChange?.(false);
+  }, [onBodyEditModeChange]);
 
-    if (updatedTask) {
-      setIsEditing(false);
-      setDraftBody(updatedTask.body ?? '');
-    }
-
-    setIsSaving(false);
-  }, [draftBody, isSaving, task.id, updateTask]);
-
-  const cancelEdit = useCallback(() => {
-    setDraftBody(task.body ?? '');
-    setIsEditing(false);
-  }, [task.body]);
-
-  const markdownBody = useMemo(
-    () => (task.body && task.body.trim().length > 0 ? task.body : null),
-    [task.body],
-  );
   const canOwnSubtasks = task.parentId === null;
   const subtasks = useMemo(
     () =>
@@ -402,55 +346,14 @@ export const TaskBody = ({
           className="overflow-hidden"
         >
           <div className="border-t border-border/80 px-3 py-2">
-            {isEditing ? (
-              <div className="space-y-2">
-                <Textarea
-                  autoFocus
-                  value={draftBody}
-                  placeholder="Add notes..."
-                  className="min-h-24"
-                  onChange={(event) => setDraftBody(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      cancelEdit();
-                      return;
-                    }
-
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                      event.preventDefault();
-                      void persistBody();
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Save with Cmd+Enter or Ctrl+Enter.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="w-full rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {markdownBody ? (
-                  <div className="text-sm text-foreground [&_ol]:my-1 [&_ol]:ml-5 [&_ol]:list-decimal [&_p+_p]:mt-2 [&_ul]:my-1 [&_ul]:ml-5 [&_ul]:list-disc">
-                    <ReactMarkdown>{markdownBody}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Add notes...</span>
-                )}
-              </button>
-            )}
+            <BlockEditor
+              content={task.body ?? ''}
+              onChange={handleBodyChange}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              className="flusk-task-editor"
+              getSlashMenuItems={task.parentId !== null ? getTextOnlySlashMenuItems : undefined}
+            />
           </div>
 
           {canOwnSubtasks ? (
@@ -481,10 +384,14 @@ export const TaskBody = ({
             <div className="flex flex-wrap items-center gap-2">
               <TaskFieldPriority task={task} onUpdate={updateTask} />
               <TaskFieldDueDate task={task} onUpdate={updateTask} />
-              <TaskFieldClient task={task} onUpdate={updateTask} />
-              <TaskFieldStatus task={task} onUpdate={updateTask} />
               <TaskFieldToday task={task} onUpdate={updateTask} />
-              <TaskFieldProject task={task} onUpdate={updateTask} hasChildren={hasChildren} />
+              {task.parentId === null && (
+                <>
+                  <TaskFieldClient task={task} onUpdate={updateTask} />
+                  <TaskFieldStatus task={task} onUpdate={updateTask} />
+                  <TaskFieldProject task={task} onUpdate={updateTask} hasChildren={hasChildren} />
+                </>
+              )}
             </div>
           </div>
         </motion.div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { isBlockNoteJson } from '../components/editor/editorUtils';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
 
@@ -28,19 +29,6 @@ const flusk = () => {
 
 const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Scratchpad operation failed.';
-
-const isBlockNoteJson = (content: string): boolean => {
-  if (!content.trim()) {
-    return false;
-  }
-
-  try {
-    const parsed = JSON.parse(content) as Array<{ type?: string }>;
-    return Array.isArray(parsed) && (parsed.length === 0 || parsed[0]?.type !== undefined);
-  } catch {
-    return false;
-  }
-};
 
 export const useScratchpadStore = create<ScratchpadStore>((set, get) => ({
   content: '',
@@ -126,7 +114,7 @@ export const useScratchpadStore = create<ScratchpadStore>((set, get) => ({
     try {
       const prompt = `Parse the following notes and extract any tasks:\n\n${promptContent}`;
       await useChatStore.getState().sendMessage(prompt);
-      useAppStore.getState().enterChatMode();
+      useAppStore.getState().openChatOverlay();
       set({ isSendingToAI: false });
     } catch (error) {
       set({

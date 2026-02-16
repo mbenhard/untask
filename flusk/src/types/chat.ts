@@ -13,6 +13,7 @@ export type AutonomyMode = 'manual' | 'safe' | 'autopilot';
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export type ActionLifecycle = 'pending' | 'executed' | 'rejected' | 'undone';
+export type ChatViewIntent = 'today' | 'tasks' | 'inbox' | 'scratchpad';
 
 export type ChatActionCard = {
   id: string;
@@ -28,6 +29,7 @@ export type ChatActionCard = {
   riskLevel?: RiskLevel;
   rationale?: string;
   lifecycle?: ActionLifecycle;
+  viewIntent?: ChatViewIntent;
 };
 
 export type ChatToolExecutionSummary = {

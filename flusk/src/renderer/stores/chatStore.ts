@@ -9,10 +9,12 @@ import type {
   ChatRetentionMode,
   ChatStreamErrorCode,
   ChatStreamEvent,
+  ChatViewIntent,
   PersistedChatToolMetadata,
   TurnStep,
 } from '../../types/chat';
 import type { ChatMessage } from '../../types/models';
+import { useAppStore } from './appStore';
 import { useTaskStore } from './taskStore';
 
 type ChatUiMessage = {
@@ -29,6 +31,11 @@ type InFlightStream = {
   placeholderId: string;
   actionCards: ChatActionCard[];
   steps: TurnStep[];
+};
+
+type PendingViewSwitch = {
+  manualNavigationVersionAtStart: number;
+  pendingViewIntent: ChatViewIntent | null;
 };
 
 type ChatRequestPayload = {
@@ -52,6 +59,7 @@ type ChatStore = {
   selectedModelId: string | null;
   retentionMode: ChatRetentionMode;
   inFlightByRequestId: Record<string, InFlightStream>;
+  pendingViewSwitchByRequestId: Record<string, PendingViewSwitch>;
   requestPayloadByRequestId: Record<string, ChatRequestPayload>;
   lastStreamError: ChatLastStreamError | null;
   unsubscribeStream?: () => void;
@@ -206,6 +214,14 @@ const upsertMessage = (messages: ChatUiMessage[], message: ChatUiMessage): ChatU
 const shouldRefreshTasks = (actionCards: ChatActionCard[]): boolean =>
   actionCards.some((card) => card.status === 'success');
 
+const revealPeekIfChatOverlayHidden = (): void => {
+  const appStore = useAppStore.getState();
+
+  if (appStore.chatOverlayState === 'hidden') {
+    appStore.peekChatOverlay();
+  }
+};
+
 export const useChatStore = create<ChatStore>((set, get) => {
   let initializePromise: Promise<void> | null = null;
 
@@ -258,6 +274,14 @@ export const useChatStore = create<ChatStore>((set, get) => {
             modelId,
           },
         },
+        pendingViewSwitchByRequestId: {
+          ...state.pendingViewSwitchByRequestId,
+          [response.requestId]: {
+            manualNavigationVersionAtStart:
+              useAppStore.getState().manualNavigationVersion,
+            pendingViewIntent: null,
+          },
+        },
         lastStreamError:
           state.lastStreamError?.requestId === response.requestId
             ? null
@@ -280,6 +304,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     selectedModelId: null,
     retentionMode: '30d',
     inFlightByRequestId: {},
+    pendingViewSwitchByRequestId: {},
     requestPayloadByRequestId: {},
     lastStreamError: null,
     autonomyMode: 'safe',
@@ -321,6 +346,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
             retentionMode: retention.mode,
             autonomyMode: autonomy.mode,
             pendingActions: pending.actions,
+            pendingViewSwitchByRequestId: {},
             unsubscribeStream,
             isInitialized: true,
             error: null,
@@ -358,6 +384,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         messages: updatedMessages,
         isSending: false,
         inFlightByRequestId: {},
+        pendingViewSwitchByRequestId: {},
       });
     },
 
@@ -379,8 +406,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
       set((state) => {
         const nextPayloads = { ...state.requestPayloadByRequestId };
         delete nextPayloads[failed.requestId];
+        const nextPendingViewSwitches = {
+          ...state.pendingViewSwitchByRequestId,
+        };
+        delete nextPendingViewSwitches[failed.requestId];
         return {
           requestPayloadByRequestId: nextPayloads,
+          pendingViewSwitchByRequestId: nextPendingViewSwitches,
           lastStreamError: null,
           error: null,
         };
@@ -395,6 +427,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         set({
           messages: [],
           inFlightByRequestId: {},
+          pendingViewSwitchByRequestId: {},
           requestPayloadByRequestId: {},
           lastStreamError: null,
           isSending: false,
@@ -465,6 +498,16 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     applyStreamEvent: (event) => {
       const inFlight = get().inFlightByRequestId[event.requestId];
+
+      if (
+        event.type === 'reasoning' ||
+        event.type === 'token' ||
+        event.type === 'tool_call_started' ||
+        event.type === 'tool_call_completed' ||
+        event.type === 'assistant_done'
+      ) {
+        revealPeekIfChatOverlayHidden();
+      }
 
       if (event.type === 'reasoning') {
         if (!inFlight) {
@@ -569,6 +612,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
         const nextActionCards = event.actionCard
           ? dedupeActionCards([...inFlight.actionCards, event.actionCard])
           : inFlight.actionCards;
+        const nextViewIntent =
+          event.status === 'success' ? event.actionCard?.viewIntent ?? null : null;
 
         const resolvedToolStatus = event.status === 'confirmation_required'
           ? 'confirmation_required' as const
@@ -600,6 +645,24 @@ export const useChatStore = create<ChatStore>((set, get) => {
               steps: nextSteps,
             },
           },
+          pendingViewSwitchByRequestId: (() => {
+            if (!nextViewIntent) {
+              return state.pendingViewSwitchByRequestId;
+            }
+
+            const existing = state.pendingViewSwitchByRequestId[event.requestId];
+            if (!existing) {
+              return state.pendingViewSwitchByRequestId;
+            }
+
+            return {
+              ...state.pendingViewSwitchByRequestId,
+              [event.requestId]: {
+                ...existing,
+                pendingViewIntent: nextViewIntent,
+              },
+            };
+          })(),
           messages: state.messages.map((message) =>
             message.id === inFlight.placeholderId
               ? { ...message, actionCards: nextActionCards, steps: nextSteps }
@@ -614,6 +677,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         const actionCards = dedupeActionCards(
           event.actionCards.length > 0 ? event.actionCards : inFlight?.actionCards ?? [],
         );
+        const pendingViewSwitch = get().pendingViewSwitchByRequestId[event.requestId];
 
         set((state) => {
           const baseMessages = state.messages.filter(
@@ -635,10 +699,15 @@ export const useChatStore = create<ChatStore>((set, get) => {
             ...state.requestPayloadByRequestId,
           };
           delete nextPayloads[event.requestId];
+          const nextPendingViewSwitches = {
+            ...state.pendingViewSwitchByRequestId,
+          };
+          delete nextPendingViewSwitches[event.requestId];
 
           return {
             messages: nextMessages,
             inFlightByRequestId: remaining,
+            pendingViewSwitchByRequestId: nextPendingViewSwitches,
             requestPayloadByRequestId: nextPayloads,
             isSending: Object.keys(remaining).length > 0,
             error: null,
@@ -648,6 +717,17 @@ export const useChatStore = create<ChatStore>((set, get) => {
                 : state.lastStreamError,
           };
         });
+
+        if (pendingViewSwitch?.pendingViewIntent) {
+          const appStore = useAppStore.getState();
+          const userNavigatedDuringTurn =
+            appStore.manualNavigationVersion >
+            pendingViewSwitch.manualNavigationVersionAtStart;
+
+          if (!userNavigatedDuringTurn) {
+            appStore.setViewFromAssistant(pendingViewSwitch.pendingViewIntent);
+          }
+        }
 
         if (shouldRefreshTasks(actionCards)) {
           void useTaskStore.getState().fetchTasks();
@@ -685,10 +765,15 @@ export const useChatStore = create<ChatStore>((set, get) => {
           if (!event.retryable) {
             delete nextPayloads[event.requestId];
           }
+          const nextPendingViewSwitches = {
+            ...state.pendingViewSwitchByRequestId,
+          };
+          delete nextPendingViewSwitches[event.requestId];
 
           return {
             messages: nextMessages,
             inFlightByRequestId: remaining,
+            pendingViewSwitchByRequestId: nextPendingViewSwitches,
             requestPayloadByRequestId: nextPayloads,
             isSending: Object.keys(remaining).length > 0,
             error: event.message,

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ChatMessage } from '../../types/models';
 import type { ChatActionCard, TurnStep } from '../../types/chat';
+import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
 
 const createMockChatApi = () => {
@@ -53,11 +54,20 @@ describe('chatStore stream reliability', () => {
       selectedModelId: null,
       retentionMode: '30d',
       inFlightByRequestId: {},
+      pendingViewSwitchByRequestId: {},
       requestPayloadByRequestId: {},
       lastStreamError: null,
       unsubscribeStream: undefined,
       autonomyMode: 'safe',
       pendingActions: [],
+    });
+
+    useAppStore.setState({
+      activeView: 'today',
+      manualNavigationVersion: 0,
+      chatOverlayState: 'hidden',
+
+      newTaskTrigger: 0,
     });
   });
 
@@ -131,6 +141,238 @@ describe('chatStore stream reliability', () => {
     expect(
       state.messages.find((message) => message.id === 'assistant-stream-req-1')?.actionCards,
     ).toHaveLength(1);
+  });
+
+  it('reveals peek rail on assistant activity while overlay is hidden', () => {
+    useAppStore.setState({ chatOverlayState: 'hidden' });
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-peek-1',
+          role: 'assistant',
+          content: '',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-peek-1': {
+          placeholderId: 'assistant-stream-req-peek-1',
+          actionCards: [],
+          steps: [],
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'token',
+      requestId: 'req-peek-1',
+      text: 'Hello',
+    });
+
+    expect(useAppStore.getState().chatOverlayState).toBe('peek');
+  });
+
+  it('does not collapse an open overlay on stream activity', () => {
+    useAppStore.setState({ chatOverlayState: 'open' });
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-peek-2',
+          role: 'assistant',
+          content: '',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-peek-2': {
+          placeholderId: 'assistant-stream-req-peek-2',
+          actionCards: [],
+          steps: [],
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'token',
+      requestId: 'req-peek-2',
+      text: 'Still open',
+    });
+
+    expect(useAppStore.getState().chatOverlayState).toBe('open');
+  });
+
+  it('applies only the last tool view intent when a turn completes', () => {
+    const now = new Date().toISOString();
+    const assistantMessage: ChatMessage = {
+      id: 'assistant-auto-switch-1',
+      role: 'assistant',
+      content: 'Done.',
+      toolCalls: null,
+      createdAt: now,
+    };
+
+    useAppStore.setState({
+      activeView: 'tasks',
+      manualNavigationVersion: 0,
+      chatOverlayState: 'hidden',
+
+      newTaskTrigger: 0,
+    });
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-auto-1',
+          role: 'assistant',
+          content: '',
+          createdAt: now,
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-auto-1': {
+          placeholderId: 'assistant-stream-req-auto-1',
+          actionCards: [],
+          steps: [],
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-auto-1': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'tool_call_completed',
+      requestId: 'req-auto-1',
+      toolName: 'edit_scratchpad',
+      toolCallId: 'tc-1',
+      status: 'success',
+      message: 'Edited scratchpad',
+      actionCard: {
+        id: 'card-auto-1',
+        toolName: 'edit_scratchpad',
+        status: 'success',
+        title: 'Scratchpad updated',
+        detail: 'Edited notes',
+        undoable: false,
+        createdAt: now,
+        viewIntent: 'scratchpad',
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'tool_call_completed',
+      requestId: 'req-auto-1',
+      toolName: 'set_today',
+      toolCallId: 'tc-2',
+      status: 'success',
+      message: 'Task added to Today',
+      actionCard: {
+        id: 'card-auto-2',
+        toolName: 'set_today',
+        status: 'success',
+        title: 'Task added to Today',
+        detail: 'Added to Today',
+        undoable: true,
+        createdAt: now,
+        viewIntent: 'today',
+      },
+    });
+
+    expect(useAppStore.getState().activeView).toBe('tasks');
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'req-auto-1',
+      assistantMessage,
+      actionCards: [],
+    });
+
+    const appState = useAppStore.getState();
+    const chatState = useChatStore.getState();
+    expect(appState.activeView).toBe('today');
+    expect(chatState.pendingViewSwitchByRequestId['req-auto-1']).toBeUndefined();
+  });
+
+  it('suppresses auto-switch when user navigates during the same turn', () => {
+    const now = new Date().toISOString();
+    const assistantMessage: ChatMessage = {
+      id: 'assistant-auto-switch-2',
+      role: 'assistant',
+      content: 'Done.',
+      toolCalls: null,
+      createdAt: now,
+    };
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-auto-2',
+          role: 'assistant',
+          content: '',
+          createdAt: now,
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-auto-2': {
+          placeholderId: 'assistant-stream-req-auto-2',
+          actionCards: [],
+          steps: [],
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-auto-2': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'tool_call_completed',
+      requestId: 'req-auto-2',
+      toolName: 'create_task',
+      toolCallId: 'tc-3',
+      status: 'success',
+      message: 'Task created',
+      actionCard: {
+        id: 'card-auto-3',
+        toolName: 'create_task',
+        status: 'success',
+        title: 'Task created',
+        detail: 'Created task',
+        undoable: true,
+        createdAt: now,
+        viewIntent: 'inbox',
+      },
+    });
+
+    useAppStore.getState().setView('tasks');
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'req-auto-2',
+      assistantMessage,
+      actionCards: [],
+    });
+
+    expect(useAppStore.getState().activeView).toBe('tasks');
   });
 
   it('upserts assistant_done by persisted message id', () => {
@@ -365,6 +607,7 @@ describe('chatStore stream reliability', () => {
           detail: 'Call Acme',
           undoable: true,
           createdAt: new Date().toISOString(),
+          viewIntent: 'inbox' as const,
         },
       ],
       toolExecutions: [
@@ -412,6 +655,7 @@ describe('chatStore stream reliability', () => {
       expect(toolStep).toBeDefined();
       expect(toolStep?.status).toBe('success');
       expect(toolStep?.toolName).toBe('create_task');
+      expect(toolStep?.actionCard?.viewIntent).toBe('inbox');
     });
   });
 

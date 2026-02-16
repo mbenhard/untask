@@ -21,6 +21,8 @@ import type {
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   LaunchAtLoginResult,
+  WindowDismissMode,
+  WindowDismissModeResult,
   MemoryPromotionConfirmRequestPayload,
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
@@ -56,6 +58,8 @@ export type FluskApi = {
     onBackupRestored: (listener: () => void) => () => void;
     getLaunchAtLogin: () => Promise<LaunchAtLoginResult>;
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
+    getWindowDismissMode: () => Promise<WindowDismissModeResult>;
+    setWindowDismissMode: (mode: WindowDismissMode) => Promise<WindowDismissModeResult>;
   };
 
   // ─── Existing kernel APIs ───────────────────────────────

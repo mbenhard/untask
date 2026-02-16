@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ChangeEvent,
 } from 'react';
@@ -14,15 +13,12 @@ import type {
   BackupMetadataPayload,
   SettingsMemoryStatePayload,
   SettingsReadJournalRequestPayload,
+  WindowDismissMode,
 } from '../../../types/ipc';
+import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
-
-type SettingsMemoryProps = {
-  onClose: () => void;
-};
 
 type SettingsTab = 'general' | 'ai' | 'memory' | 'journal' | 'chat' | 'shortcuts' | 'backup';
 
@@ -78,9 +74,7 @@ const flusk = () => {
   return window.flusk;
 };
 
-export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
-  const settingsRef = useRef<HTMLElement>(null);
-  useFocusTrap(settingsRef, true);
+export const SettingsMemory = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -104,6 +98,9 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
   const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
   const [isLoadingLaunchAtLogin, setIsLoadingLaunchAtLogin] = useState(false);
   const [isSavingLaunchAtLogin, setIsSavingLaunchAtLogin] = useState(false);
+  const [windowDismissMode, setWindowDismissModeState] = useState<WindowDismissMode>('persistent');
+  const [isLoadingWindowDismissMode, setIsLoadingWindowDismissMode] = useState(false);
+  const [isSavingWindowDismissMode, setIsSavingWindowDismissMode] = useState(false);
 
   // AI tab state
   const [openRouterApiKeyInput, setOpenRouterApiKeyInput] = useState('');
@@ -195,6 +192,23 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load OpenRouter API key.');
     } finally {
       setIsLoadingOpenRouterApiKey(false);
+    }
+  }, []);
+
+  const loadWindowDismissMode = useCallback(async () => {
+    try {
+      setIsLoadingWindowDismissMode(true);
+      setError(null);
+      const result = await flusk().app.getWindowDismissMode();
+      setWindowDismissModeState(result.mode);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Failed to load window behavior setting.',
+      );
+    } finally {
+      setIsLoadingWindowDismissMode(false);
     }
   }, []);
 
@@ -396,8 +410,9 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
   useEffect(() => {
     if (activeTab === 'general') {
       void loadLaunchAtLogin();
+      void loadWindowDismissMode();
     }
-  }, [activeTab, loadLaunchAtLogin]);
+  }, [activeTab, loadLaunchAtLogin, loadWindowDismissMode]);
 
   useEffect(() => {
     if (activeTab === 'ai') {
@@ -503,6 +518,36 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
     [launchAtLoginEnabled],
   );
 
+  const handleWindowDismissModeChange = useCallback(
+    async (mode: WindowDismissMode) => {
+      const previousMode = windowDismissMode;
+      setWindowDismissModeState(mode);
+      setNotice(null);
+      setError(null);
+
+      try {
+        setIsSavingWindowDismissMode(true);
+        const result = await flusk().app.setWindowDismissMode(mode);
+        setWindowDismissModeState(result.mode);
+        setNotice(
+          result.mode === 'persistent'
+            ? 'Window dismiss mode set to Persistent.'
+            : 'Window dismiss mode set to Quick-hide.',
+        );
+      } catch (saveError) {
+        setWindowDismissModeState(previousMode);
+        setError(
+          saveError instanceof Error
+            ? saveError.message
+            : 'Failed to update window behavior setting.',
+        );
+      } finally {
+        setIsSavingWindowDismissMode(false);
+      }
+    },
+    [windowDismissMode],
+  );
+
   const saveOpenRouterApiKey = useCallback(async () => {
     const normalized = openRouterApiKeyInput.trim();
     if (normalized.length === 0) {
@@ -600,50 +645,40 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
   // ─── Render ──────────────────────────────────────────────
 
   return (
-    <section
-      ref={settingsRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-      className="no-drag absolute inset-0 z-30 flex flex-col bg-background/95 backdrop-blur-sm"
-    >
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div>
-          <h2 id="settings-title" className="text-sm font-semibold text-foreground">Settings</h2>
-          <p className="text-xs text-muted-foreground">
-            General, AI, memory, journal, and chat configuration.
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={onClose}>
-          Close
-        </Button>
-      </header>
+    <div className="h-full overflow-y-auto p-3">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+        <nav className="flex items-center gap-1" role="tablist" aria-label="Settings sections">
+          {TAB_ORDER.map((tab) => {
+            const isActive = activeTab === tab;
 
-      <nav className="flex items-center gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="Settings sections">
-        {TAB_ORDER.map((tab) => (
-          <Button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            aria-controls={`settings-panel-${tab}`}
-            variant={activeTab === tab ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab(tab)}
-          >
-            {TAB_LABELS[tab]}
-          </Button>
-        ))}
-      </nav>
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`settings-panel-${tab}`}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  'relative rounded-md px-2.5 py-1.5 text-xs font-medium tracking-[0.01em] transition-colors',
+                  isActive
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground/80',
+                )}
+              >
+                {TAB_LABELS[tab]}
+              </button>
+            );
+          })}
+        </nav>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3">
         {error ? (
-          <p className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
             {error}
           </p>
         ) : null}
         {notice ? (
-          <p className="mb-3 rounded-md border border-border bg-secondary px-3 py-2 text-xs text-foreground">
+          <p className="rounded-md border border-border bg-secondary px-3 py-2 text-xs text-foreground">
             {notice}
           </p>
         ) : null}
@@ -660,9 +695,9 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
             {activeTab === 'general' ? (
               <div role="tabpanel" id="settings-panel-general" className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Configure desktop startup behavior.
+                  Configure desktop startup and window behavior.
                 </p>
-                <div className="rounded-md border border-border bg-card px-3 py-3">
+                <div className="rounded-md border border-border/60 px-3 py-3">
                   <label className="flex items-center justify-between gap-3 text-sm text-foreground">
                     <span>Launch Flusk at login</span>
                     <input
@@ -686,6 +721,42 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                     <p className="mt-2 text-xs text-destructive">{launchAtLoginError}</p>
                   ) : null}
                 </div>
+
+                <div className="rounded-md border border-border/60 px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">Window dismiss mode</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose how Flusk behaves when the window loses focus.
+                  </p>
+                  {isLoadingWindowDismissMode ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Loading window behavior...</p>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={windowDismissMode === 'persistent' ? 'default' : 'outline'}
+                        onClick={() => void handleWindowDismissModeChange('persistent')}
+                        disabled={isSavingWindowDismissMode}
+                      >
+                        Persistent
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={windowDismissMode === 'quick-hide' ? 'default' : 'outline'}
+                        onClick={() => void handleWindowDismissModeChange('quick-hide')}
+                        disabled={isSavingWindowDismissMode}
+                      >
+                        Quick-hide
+                      </Button>
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {windowDismissMode === 'persistent'
+                      ? 'Persistent: Stay visible when focus changes.'
+                      : 'Quick-hide: Hide when window loses focus.'}
+                  </p>
+                </div>
               </div>
             ) : null}
 
@@ -697,7 +768,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                 </p>
 
                 {/* Model selector */}
-                <div className="rounded-md border border-border bg-card px-3 py-3">
+                <div className="rounded-md border border-border/60 px-3 py-3">
                   <p className="text-sm font-medium text-foreground">Model</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Select the AI model used for chat responses.
@@ -721,7 +792,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                 </div>
 
                 {/* Autonomy mode */}
-                <div className="rounded-md border border-border bg-card px-3 py-3">
+                <div className="rounded-md border border-border/60 px-3 py-3">
                   <p className="text-sm font-medium text-foreground">Autonomy mode</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Controls how much the AI can act on its own.
@@ -746,7 +817,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                 </div>
 
                 {/* API key */}
-                <div className="rounded-md border border-border bg-card px-3 py-3">
+                <div className="rounded-md border border-border/60 px-3 py-3">
                   <p className="text-sm font-medium text-foreground">OpenRouter API key</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Used for AI chat requests when the shell environment variable is not set.
@@ -943,7 +1014,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                   {journalEntries.map((entry) => (
                     <article
                       key={entry.id}
-                      className="rounded-md border border-border bg-card px-3 py-2"
+                      className="rounded-md border border-border/60 px-3 py-2"
                     >
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                         {entry.category} · {entry.createdAt ?? 'unknown time'}
@@ -963,7 +1034,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                 <p className="text-xs text-muted-foreground">
                   Configure chat message retention.
                 </p>
-                <div className="rounded-md border border-border bg-card px-3 py-3">
+                <div className="rounded-md border border-border/60 px-3 py-3">
                   <p className="text-sm font-medium text-foreground">Retention period</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     How long chat messages are stored before being cleaned up.
@@ -1005,7 +1076,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                   SHORTCUT_ENTRIES.map((entry) => (
                     <div
                       key={entry.key}
-                      className="rounded-md border border-border bg-card px-3 py-3"
+                      className="rounded-md border border-border/60 px-3 py-3"
                     >
                       <p className="text-sm font-medium text-foreground">{entry.label}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -1094,7 +1165,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <div className="rounded-md border border-border/60 px-3 py-3">
                     <p className="text-sm font-medium text-foreground">Export encryption</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Optional passphrase used for encrypted export files.
@@ -1108,7 +1179,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                       aria-label="Backup export passphrase"
                     />
                   </div>
-                  <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <div className="rounded-md border border-border/60 px-3 py-3">
                     <p className="text-sm font-medium text-foreground">Import passphrase</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Required only when importing encrypted backups.
@@ -1134,7 +1205,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
                   {backups.map((backup) => (
                     <div
                       key={backup.filename}
-                      className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2"
+                      className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2"
                     >
                       <div>
                         <p className="text-sm text-foreground">{backup.filename}</p>
@@ -1160,6 +1231,6 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
           </motion.div>
         </AnimatePresence>
       </div>
-    </section>
+    </div>
   );
 };

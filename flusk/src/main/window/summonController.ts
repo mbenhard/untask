@@ -9,6 +9,11 @@ import {
   resolveTargetBounds,
   rectangleToBounds,
 } from './bounds';
+import {
+  WINDOW_DISMISS_MODE_KEY,
+  type WindowDismissMode,
+  sanitizeWindowDismissMode,
+} from './dismissMode';
 
 const BOUNDS_KEY = 'window.bounds';
 const DEFAULT_WIDTH = 680;
@@ -20,16 +25,21 @@ let win: BrowserWindow | null = null;
 let hasEverSummoned = false;
 let blurSuppressedUntil = 0;
 let boundsSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let windowDismissMode: WindowDismissMode = sanitizeWindowDismissMode(null);
 
 export function initSummonController(mainWindow: BrowserWindow): void {
   win = mainWindow;
   hasEverSummoned = false;
+  windowDismissMode = getWindowDismissMode();
 
   mainWindow.on('move', scheduleBoundsSave);
   mainWindow.on('resize', scheduleBoundsSave);
 
   mainWindow.on('blur', () => {
     if (Date.now() < blurSuppressedUntil) {
+      return;
+    }
+    if (getWindowDismissMode() !== 'quick-hide') {
       return;
     }
     if (mainWindow.isVisible() && !mainWindow.isDestroyed()) {
@@ -90,6 +100,19 @@ export function onEscapeLayerExit(): void {
 
 export function getMainWindow(): BrowserWindow | null {
   return win;
+}
+
+export function getWindowDismissMode(): WindowDismissMode {
+  windowDismissMode = sanitizeWindowDismissMode(
+    getSetting(WINDOW_DISMISS_MODE_KEY),
+  );
+  return windowDismissMode;
+}
+
+export function setWindowDismissMode(mode: WindowDismissMode): WindowDismissMode {
+  windowDismissMode = mode;
+  setSetting(WINDOW_DISMISS_MODE_KEY, mode);
+  return windowDismissMode;
 }
 
 function suppressBlur(): void {

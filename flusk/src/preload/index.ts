@@ -24,6 +24,8 @@ import {
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
   type LaunchAtLoginResult,
+  type WindowDismissMode,
+  type WindowDismissModeResult,
   type MemoryPromotionConfirmRequestPayload,
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
@@ -83,6 +85,10 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN),
     setLaunchAtLogin: (enabled: boolean): Promise<LaunchAtLoginResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN, enabled),
+    getWindowDismissMode: (): Promise<WindowDismissModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE),
+    setWindowDismissMode: (mode: WindowDismissMode): Promise<WindowDismissModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE, mode),
   },
 
   getBootstrapState: (): Promise<SettingsBootstrapState> =>

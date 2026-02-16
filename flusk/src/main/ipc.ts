@@ -44,6 +44,7 @@ import {
   type BackupImportRequest,
   type BackupImportDialogRequest,
   type BackupImportDialogResponse,
+  type WindowDismissModeResult,
 } from '../types/ipc';
 import { buildIdentityContext } from './ai/contextBuilder';
 import { closeDatabase, initDatabase } from './db';
@@ -98,7 +99,10 @@ import { refreshTodayBadge } from './tray';
 import {
   requestHideFromRenderer,
   onEscapeLayerExit,
+  getWindowDismissMode,
+  setWindowDismissMode,
 } from './window/summonController';
+import { windowDismissModeSchema } from './window/dismissMode';
 
 type ChatSendInput = {
   content: string;
@@ -240,6 +244,21 @@ export const registerIpcHandlers = (): void => {
       };
     }
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE,
+    (): WindowDismissModeResult => {
+      return { mode: getWindowDismissMode() };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE,
+    (_event, modeInput: unknown): WindowDismissModeResult => {
+      const mode = windowDismissModeSchema.parse(modeInput);
+      return { mode: setWindowDismissMode(mode) };
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT,

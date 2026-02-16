@@ -7,7 +7,12 @@ import { tool } from 'ai';
 import { extractFromHtml } from '@extractus/article-extractor';
 import { z } from 'zod';
 
-import type { ChatActionCard, ChatToolStatus, ActionLifecycle } from '../../types/chat';
+import type {
+  ActionLifecycle,
+  ChatActionCard,
+  ChatToolStatus,
+  ChatViewIntent,
+} from '../../types/chat';
 import { TASK_STATUS_VALUES } from '../../types/models';
 import {
   classifyRisk,
@@ -37,6 +42,7 @@ import {
   writeJournalEntry,
   writeJournalEntrySchema,
 } from '../services/journalService';
+import { getScratchpad, saveScratchpad } from '../services/scratchpadService';
 import { generateLiveThought } from './liveThought';
 import { appendPatternEntry, appendProfileEntry } from './memory';
 
@@ -126,6 +132,32 @@ const summarizeTask = (task: {
   return `${task.title}${tags.length > 0 ? ` (${tags.join(', ')})` : ''}`;
 };
 
+const normalizeForSummary = (value: string, maxLength: number): string => {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length === 0) {
+    return '(empty)';
+  }
+
+  return normalized.length <= maxLength
+    ? normalized
+    : `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
+};
+
+const resolveTaskLensViewIntent = (task: {
+  today?: boolean | null;
+  status?: string | null;
+}): ChatViewIntent => {
+  if (task.today) {
+    return 'today';
+  }
+
+  if (task.status === 'inbox') {
+    return 'inbox';
+  }
+
+  return 'tasks';
+};
+
 const createActionCard = (
   toolName: string,
   status: ChatToolStatus,
@@ -139,6 +171,7 @@ const createActionCard = (
     riskLevel?: ChatActionCard['riskLevel'];
     rationale?: string;
     lifecycle?: ActionLifecycle;
+    viewIntent?: ChatViewIntent;
   },
 ): ChatActionCard => ({
   id: randomUUID(),
@@ -154,6 +187,7 @@ const createActionCard = (
   riskLevel: options?.riskLevel,
   rationale: options?.rationale,
   lifecycle: options?.lifecycle,
+  viewIntent: options?.viewIntent,
 });
 
 export type ToolExecutionEnvelope = {
@@ -222,6 +256,7 @@ const successResult = (
     taskId?: string;
     taskEventId?: string;
     undoable?: boolean;
+    viewIntent?: ChatViewIntent;
   },
 ): ToolExecutionEnvelope => {
   const actionCard = createActionCard(toolName, 'success', title, detail, options);
@@ -288,6 +323,22 @@ const fetchUrlToolInputSchema = z.object({
 const generateLiveThoughtInputSchema = z.object({
   focus: z.string().trim().optional(),
 });
+const readScratchpadToolInputSchema = z.object({});
+const editScratchpadToolInputSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('append'),
+    content: z.string().trim().min(1),
+  }),
+  z.object({
+    action: z.literal('replace'),
+    target: z.string().trim().min(1),
+    replacement: z.string(),
+  }),
+  z.object({
+    action: z.literal('rewrite'),
+    content: z.string().trim().min(1),
+  }),
+]);
 
 const createTaskTool = {
   name: 'create_task',
@@ -307,6 +358,7 @@ const createTaskTool = {
         taskId: createdTask.id,
         taskEventId: event?.id,
         undoable: Boolean(event?.id),
+        viewIntent: resolveTaskLensViewIntent(createdTask),
       },
     );
   },
@@ -362,6 +414,7 @@ const updateTaskTool = {
         taskId: updatedTask.id,
         taskEventId: event?.id,
         undoable: Boolean(event?.id),
+        viewIntent: resolveTaskLensViewIntent(updatedTask),
       },
     );
   },
@@ -385,6 +438,7 @@ const completeTaskTool = {
         taskId: completed.id,
         taskEventId: event?.id,
         undoable: Boolean(event?.id),
+        viewIntent: resolveTaskLensViewIntent(completed),
       },
     );
   },
@@ -486,6 +540,7 @@ const setTodayTool = {
         taskId: updated.id,
         taskEventId: event?.id,
         undoable: Boolean(event?.id),
+        viewIntent: 'today',
       },
     );
   },
@@ -578,6 +633,8 @@ const parseNotesTool = {
       `${created.length} tasks created: ${summary}`,
       {
         undoable: false,
+        viewIntent:
+          (input.status ?? 'inbox') === 'inbox' ? 'inbox' : 'today',
       },
     );
     emitActionCard(context, actionCard);
@@ -592,6 +649,104 @@ const parseNotesTool = {
     };
   },
 } satisfies ToolRegistryEntry<'parse_notes', typeof parseNotesToolInputSchema>;
+
+const readScratchpadTool = {
+  name: 'read_scratchpad',
+  description: 'Read the current scratchpad content. Use before editing notes to understand current context and avoid overwriting important text.',
+  schema: readScratchpadToolInputSchema,
+  execute: async () => {
+    const scratchpad = getScratchpad();
+    const hasContent = scratchpad.content.trim().length > 0;
+
+    return {
+      status: 'success',
+      message: hasContent
+        ? `Loaded scratchpad (${scratchpad.content.length} chars).`
+        : 'Scratchpad is currently empty.',
+      data: { scratchpad },
+    };
+  },
+} satisfies ToolRegistryEntry<'read_scratchpad', typeof readScratchpadToolInputSchema>;
+
+const editScratchpadTool = {
+  name: 'edit_scratchpad',
+  description: 'Edit scratchpad content. Use action=append to add text, action=replace to update one specific section, and action=rewrite to replace the full document.',
+  schema: editScratchpadToolInputSchema,
+  execute: async (input, context) => {
+    const current = getScratchpad();
+    const beforeContent = current.content;
+
+    if (input.action === 'append') {
+      const separator =
+        beforeContent.length === 0 || beforeContent.endsWith('\n') ? '' : '\n\n';
+      const nextContent = `${beforeContent}${separator}${input.content}`;
+      const saved = saveScratchpad(nextContent);
+
+      return successResult(
+        context,
+        'edit_scratchpad',
+        'Scratchpad appended',
+        `Added ${input.content.length} characters.`,
+        {
+          before: beforeContent,
+          after: nextContent,
+          scratchpad: saved,
+        },
+        { viewIntent: 'scratchpad' },
+      );
+    }
+
+    if (input.action === 'replace') {
+      const startIndex = beforeContent.indexOf(input.target);
+      if (startIndex === -1) {
+        throw new Error('Scratchpad replace target was not found.');
+      }
+
+      const nextContent = `${beforeContent.slice(0, startIndex)}${input.replacement}${beforeContent.slice(
+        startIndex + input.target.length,
+      )}`;
+      const saved = saveScratchpad(nextContent);
+
+      return successResult(
+        context,
+        'edit_scratchpad',
+        'Scratchpad section replaced',
+        [
+          'Updated one section.',
+          `Before: "${normalizeForSummary(input.target, 72)}"`,
+          `After: "${normalizeForSummary(input.replacement, 72)}"`,
+        ].join(' '),
+        {
+          before: beforeContent,
+          after: nextContent,
+          diff: {
+            before: input.target,
+            after: input.replacement,
+            startIndex,
+          },
+          scratchpad: saved,
+        },
+        { viewIntent: 'scratchpad' },
+      );
+    }
+
+    const nextContent = input.content;
+    const saved = saveScratchpad(nextContent);
+
+    return successResult(
+      context,
+      'edit_scratchpad',
+      'Scratchpad rewritten',
+      `Replaced full scratchpad (${beforeContent.length} -> ${nextContent.length} chars).`,
+      {
+        before: beforeContent,
+        after: nextContent,
+        scratchpad: saved,
+      },
+      { viewIntent: 'scratchpad' },
+    );
+  },
+} satisfies ToolRegistryEntry<'edit_scratchpad', typeof editScratchpadToolInputSchema>;
 
 const undoLastActionTool = {
   name: 'undo_last_action',
@@ -1064,6 +1219,8 @@ export const AI_TOOL_REGISTRY = {
   set_today: setTodayTool,
   suggest_daily_plan: suggestDailyPlanTool,
   parse_notes: parseNotesTool,
+  read_scratchpad: readScratchpadTool,
+  edit_scratchpad: editScratchpadTool,
   undo_last_action: undoLastActionTool,
   write_journal: writeJournalTool,
   read_journal: readJournalTool,
@@ -1152,6 +1309,18 @@ const buildPendingRationale = (toolName: string, input: Record<string, unknown>)
       return `Toggle Today for task ${String(input.id)}.`;
     case 'parse_notes':
       return `Create tasks from notes.`;
+    case 'edit_scratchpad': {
+      const action = String(input.action ?? '');
+      if (action === 'rewrite') {
+        return 'Rewrite the full scratchpad content.';
+      }
+      if (action === 'replace') {
+        const before = normalizeForSummary(String(input.target ?? ''), 48);
+        const after = normalizeForSummary(String(input.replacement ?? ''), 48);
+        return `Replace scratchpad section "${before}" with "${after}".`;
+      }
+      return 'Append content to scratchpad.';
+    }
     default:
       return `Execute ${toolName}.`;
   }
@@ -1193,6 +1362,7 @@ export const executeToolCall = async (
   }
 
   // ─── Autonomy gate ─────────────────────────────────────
+  let gateApproved = false;
   if (!context.autonomyBypass && isMutationTool(rawToolName)) {
     const hint = buildRiskHint(rawToolName, parsed.data as Record<string, unknown>);
     const risk = classifyRisk(hint);
@@ -1234,10 +1404,12 @@ export const executeToolCall = async (
         },
       };
     }
+
+    gateApproved = true;
   }
 
   // ─── Execute tool ──────────────────────────────────────
-  const execContext: ToolExecutionContext = context.autonomyBypass
+  const execContext: ToolExecutionContext = context.autonomyBypass || gateApproved
     ? { ...context, skipInternalConfirmation: true }
     : context;
 

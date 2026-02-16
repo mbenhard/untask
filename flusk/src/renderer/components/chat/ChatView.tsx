@@ -376,7 +376,7 @@ export const ChatView = () => {
           renderedMessages
         ) : (
           <div className="rounded-xl border border-dashed border-border/80 bg-card/20 p-4 text-sm text-muted-foreground">
-            Open the Chat tab or focus the input below to start a conversation.
+            Start a conversation here. Ask Flusk to plan, edit tasks, or work with your notes.
           </div>
         )}
 

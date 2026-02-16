@@ -39,6 +39,8 @@ export const IPC_CHANNELS = {
   APP_BACKUP_RESTORED: 'app:backup-restored',
   APP_GET_LAUNCH_AT_LOGIN: 'app:get-launch-at-login',
   APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
+  APP_GET_WINDOW_DISMISS_MODE: 'app:get-window-dismiss-mode',
+  APP_SET_WINDOW_DISMISS_MODE: 'app:set-window-dismiss-mode',
 
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
   SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT:
@@ -163,6 +165,12 @@ export type LaunchAtLoginResult = {
   enabled: boolean;
   applied: boolean;
   error?: string;
+};
+
+export type WindowDismissMode = 'persistent' | 'quick-hide';
+
+export type WindowDismissModeResult = {
+  mode: WindowDismissMode;
 };
 
 // ─── Backup payloads ──────────────────────────────────────

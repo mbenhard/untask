@@ -67,7 +67,6 @@ export const SearchModal = () => {
   const getSelectedResult = useSearchStore((state) => state.getSelectedResult);
 
   const setView = useAppStore((state) => state.setView);
-  const exitChatMode = useAppStore((state) => state.exitChatMode);
   const selectTask = useTaskStore((state) => state.selectTask);
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -119,13 +118,11 @@ export const SearchModal = () => {
   const navigateToResult = useCallback(
     (result: SearchResultItem) => {
       close();
-      exitChatMode();
-
       setView(resolveSearchResultView(result));
 
       selectTask(result.id);
     },
-    [close, exitChatMode, selectTask, setView],
+    [close, selectTask, setView],
   );
 
   const handleKeyDown = useCallback(

@@ -1,13 +1,14 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 
-import { useSortable } from '@dnd-kit/sortable';
+import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { Check, GripVertical, Pencil, Sun } from 'lucide-react';
+import { Check, Crosshair, GripVertical, Pencil } from 'lucide-react';
 
-import type { Task, TaskStatus } from '../../../types/models';
+import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
+import { formatDueDateDisplay } from './dueDate';
 import { getNextPriority } from './taskInteraction';
 import { TaskBody } from './TaskBody';
 
@@ -25,32 +26,17 @@ export interface TaskItemProps {
   onFocus?: () => void;
 }
 
-const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'active', label: 'Active' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'waiting', label: 'Waiting' },
-  { value: 'done', label: 'Done' },
-];
-
-const formatDueDate = (iso: string): string => {
-  const date = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return iso;
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-};
-
 const PRIORITY_CLASSNAME: Record<NonNullable<Task['priority']>, string> = {
   none: 'border-border bg-transparent',
   low: 'border-emerald-500/60 bg-emerald-500/20',
   medium: 'border-amber-500/70 bg-amber-500/30',
   high: 'border-rose-500/80 bg-rose-500/40',
 };
+
+const SORTABLE_TRANSITION = {
+  duration: 220,
+  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+} as const;
 
 export const TaskItem = ({
   task,
@@ -67,26 +53,10 @@ export const TaskItem = ({
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
   const [titleDraft, setTitleDraft] = useState(task.title);
-  const [clientDraft, setClientDraft] = useState(task.client ?? '');
-  const [dueDateDraft, setDueDateDraft] = useState(task.dueDate ?? '');
-  const [isEditingClient, setIsEditingClient] = useState(false);
-  const [isEditingDueDate, setIsEditingDueDate] = useState(false);
 
   useEffect(() => {
     setTitleDraft(task.title);
   }, [task.title]);
-
-  useEffect(() => {
-    if (!isEditingClient) {
-      setClientDraft(task.client ?? '');
-    }
-  }, [isEditingClient, task.client]);
-
-  useEffect(() => {
-    if (!isEditingDueDate) {
-      setDueDateDraft(task.dueDate ?? '');
-    }
-  }, [isEditingDueDate, task.dueDate]);
 
   const {
     attributes,
@@ -97,6 +67,12 @@ export const TaskItem = ({
     isDragging,
   } = useSortable({
     id: task.id,
+    transition: SORTABLE_TRANSITION,
+    animateLayoutChanges: (args) =>
+      defaultAnimateLayoutChanges({
+        ...args,
+        wasDragging: true,
+      }),
   });
 
   const style: CSSProperties = {
@@ -107,7 +83,10 @@ export const TaskItem = ({
   const isCompleted = task.status === 'done';
   const isToday = task.today === true;
   const priority = task.priority ?? 'none';
-  const status = task.status ?? 'active';
+  const dueDateLabel = useMemo(
+    () => (task.dueDate ? formatDueDateDisplay(task.dueDate) : null),
+    [task.dueDate],
+  );
 
   const completedAtLabel = useMemo(() => {
     if (!task.completedAt) {
@@ -140,16 +119,6 @@ export const TaskItem = ({
     onEndTitleEdit();
   };
 
-  const saveClient = () => {
-    void updateTask({ id: task.id, client: clientDraft.trim() || null });
-    setIsEditingClient(false);
-  };
-
-  const saveDueDate = () => {
-    void updateTask({ id: task.id, dueDate: dueDateDraft.trim() || null });
-    setIsEditingDueDate(false);
-  };
-
   return (
     <div
       ref={setNodeRef}
@@ -165,10 +134,7 @@ export const TaskItem = ({
         isDragging && 'z-10 opacity-80',
       )}
     >
-      <div
-        onClick={() => onToggleExpand(task.id)}
-        className="group flex min-h-10 items-center gap-2 px-1.5"
-      >
+      <div onClick={() => onToggleExpand(task.id)} className="flex min-h-10 items-center gap-2 px-1.5">
         <button
           type="button"
           onClick={(event) => {
@@ -185,16 +151,16 @@ export const TaskItem = ({
           <motion.span
             initial={false}
             animate={{
-              scale: isCompleted ? 1 : 0.9,
+              scale: isCompleted ? 1 : 0.96,
               backgroundColor: isCompleted ? 'var(--foreground)' : 'transparent',
               borderColor: isCompleted ? 'var(--foreground)' : 'var(--border)',
             }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="inline-flex size-4 items-center justify-center border"
+            className="inline-flex size-4 items-center justify-center rounded-full border"
           >
             <Check
               className={cn(
-                'size-3 transition-opacity duration-300',
+                'size-2.5 transition-opacity duration-300',
                 isCompleted ? 'opacity-100 text-background' : 'opacity-0',
               )}
             />
@@ -258,122 +224,22 @@ export const TaskItem = ({
         </div>
 
         <div className="ml-auto flex items-center gap-1">
-          {isEditingClient ? (
-            <input
-              autoFocus
-              type="text"
-              value={clientDraft}
-              onChange={(event) => setClientDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  saveClient();
-                  return;
-                }
+          {task.client ? (
+            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+              {task.client}
+            </span>
+          ) : null}
 
-                if (event.key === 'Escape') {
-                  event.preventDefault();
-                  setClientDraft(task.client ?? '');
-                  setIsEditingClient(false);
-                }
-              }}
-              onBlur={saveClient}
-              onClick={(event) => event.stopPropagation()}
-              className="h-6 w-24 rounded border border-border bg-transparent px-1.5 text-[11px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              placeholder="Client"
-              aria-label="Client"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setIsEditingClient(true);
-              }}
-              className={cn(
-                'h-6 rounded border px-1.5 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
-                task.client
-                  ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
-                  : 'border-dashed border-border text-muted-foreground hover:text-foreground',
-              )}
-              aria-label={task.client ? 'Edit client' : 'Add client'}
-            >
-              {task.client ? `@${task.client}` : '+ Client'}
-            </button>
-          )}
-
-          {isEditingDueDate ? (
-            <input
-              autoFocus
-              type="date"
-              value={dueDateDraft}
-              onChange={(event) => setDueDateDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  saveDueDate();
-                  return;
-                }
-
-                if (event.key === 'Escape') {
-                  event.preventDefault();
-                  setDueDateDraft(task.dueDate ?? '');
-                  setIsEditingDueDate(false);
-                }
-              }}
-              onBlur={saveDueDate}
-              onClick={(event) => event.stopPropagation()}
-              className="h-6 rounded border border-border bg-transparent px-1 text-[11px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              aria-label="Due date"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setIsEditingDueDate(true);
-              }}
-              className={cn(
-                'h-6 rounded border px-1.5 text-[11px] outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
-                task.dueDate
-                  ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
-                  : 'border-dashed border-border text-muted-foreground hover:text-foreground',
-              )}
-              aria-label={task.dueDate ? 'Edit due date' : 'Add due date'}
-            >
-              {task.dueDate ? formatDueDate(task.dueDate) : '+ Due'}
-            </button>
-          )}
-
-          <select
-            value={status}
-            onClick={(event) => event.stopPropagation()}
-            onChange={(event) => {
-              event.stopPropagation();
-              const nextStatus = event.target.value as TaskStatus;
-              if (nextStatus === status) {
-                return;
-              }
-
-              if (nextStatus === 'done') {
-                onComplete(task.id);
-                return;
-              }
-
-              void updateTask({ id: task.id, status: nextStatus });
-            }}
-            className="h-6 rounded border border-border bg-transparent px-1.5 text-[11px] text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            aria-label="Status"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          {dueDateLabel ? (
+            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+              {dueDateLabel}
+            </span>
+          ) : null}
 
           {isCompleted && completedAtLabel ? (
-            <span className="text-[11px] text-muted-foreground">{completedAtLabel}</span>
+            <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 text-[10px] text-muted-foreground">
+              {completedAtLabel}
+            </span>
           ) : null}
 
           <button
@@ -382,7 +248,7 @@ export const TaskItem = ({
               event.stopPropagation();
               onStartTitleEdit(task.id);
             }}
-            className="hidden size-5 items-center justify-center text-muted-foreground opacity-0 transition-opacity group-hover:flex group-hover:opacity-100 hover:text-foreground focus-visible:flex focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            className="inline-flex size-5 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
             aria-label={`Edit title for "${task.title}"`}
           >
             <Pencil className="size-3" />
@@ -402,7 +268,7 @@ export const TaskItem = ({
                 : 'hover:text-foreground',
             )}
           >
-            <Sun className="size-3.5" />
+            <Crosshair className="size-3.5" />
           </button>
 
           <button

@@ -70,6 +70,19 @@ vi.mock('../services/journalService', () => ({
   }),
 }));
 
+vi.mock('../services/scratchpadService', () => ({
+  getScratchpad: vi.fn(() => ({
+    id: 'main',
+    content: '',
+    updatedAt: '2026-02-16T00:00:00.000Z',
+  })),
+  saveScratchpad: vi.fn((content: string) => ({
+    id: 'main',
+    content,
+    updatedAt: '2026-02-16T00:01:00.000Z',
+  })),
+}));
+
 vi.mock('./liveThought', () => ({
   generateLiveThought: vi.fn(() => ({
     thought: 'Focus on one high-impact task.',
@@ -85,14 +98,20 @@ vi.mock('./memory', () => ({
 }));
 
 import * as taskService from '../services/taskService';
+import * as scratchpadService from '../services/scratchpadService';
 import { lookup } from 'node:dns/promises';
 import { extractFromHtml } from '@extractus/article-extractor';
 import { executeToolCall } from './tools';
 
 const createTaskMock = vi.mocked(taskService.createTask);
+const updateTaskMock = vi.mocked(taskService.updateTask);
+const completeTaskMock = vi.mocked(taskService.completeTask);
+const toggleTodayMock = vi.mocked(taskService.toggleToday);
 const getLastTaskEventForTaskMock = vi.mocked(taskService.getLastTaskEventForTask);
 const getTaskByIdMock = vi.mocked(taskService.getTaskById);
 const listTasksMock = vi.mocked(taskService.listTasks);
+const getScratchpadMock = vi.mocked(scratchpadService.getScratchpad);
+const saveScratchpadMock = vi.mocked(scratchpadService.saveScratchpad);
 const lookupMock = vi.mocked(lookup);
 const extractFromHtmlMock = vi.mocked(extractFromHtml);
 const originalFetch = globalThis.fetch;
@@ -104,11 +123,26 @@ afterAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   createTaskMock.mockReset();
+  updateTaskMock.mockReset();
+  completeTaskMock.mockReset();
+  toggleTodayMock.mockReset();
   getLastTaskEventForTaskMock.mockReset();
   getTaskByIdMock.mockReset();
   listTasksMock.mockReset();
+  getScratchpadMock.mockReset();
+  saveScratchpadMock.mockReset();
   lookupMock.mockReset();
   extractFromHtmlMock.mockReset();
+  getScratchpadMock.mockReturnValue({
+    id: 'main',
+    content: '',
+    updatedAt: '2026-02-16T00:00:00.000Z',
+  } as never);
+  saveScratchpadMock.mockImplementation((content: string) => ({
+    id: 'main',
+    content,
+    updatedAt: '2026-02-16T00:01:00.000Z',
+  }) as never);
   lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
   extractFromHtmlMock.mockResolvedValue({
     title: 'Extracted title',
@@ -123,6 +157,8 @@ describe('create_task tool', () => {
     createTaskMock.mockReturnValue({
       id: 'task-1',
       title: 'Call Acme about invoice',
+      status: 'active',
+      today: true,
       priority: 'none',
       dueDate: null,
       client: null,
@@ -141,6 +177,102 @@ describe('create_task tool', () => {
     if (result.ok) {
       expect(result.output.status).toBe('success');
       expect(result.output.message).toContain('Call Acme about invoice');
+      expect(result.output.actionCard?.viewIntent).toBe('today');
+    }
+  });
+});
+
+describe('view intent mapping', () => {
+  it('maps update_task to inbox view when resulting task is in inbox', async () => {
+    getTaskByIdMock.mockReturnValue({
+      id: 'task-upd-1',
+      title: 'Follow up with client',
+      status: 'active',
+      today: false,
+      invoiceStatus: 'none',
+    } as never);
+    updateTaskMock.mockReturnValue({
+      id: 'task-upd-1',
+      title: 'Follow up with client',
+      status: 'inbox',
+      today: false,
+      priority: 'none',
+      dueDate: null,
+      client: null,
+      invoiceStatus: 'none',
+    } as never);
+    getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-upd-1' } as never);
+
+    const result = await executeToolCall({
+      name: 'update_task',
+      input: {
+        id: 'task-upd-1',
+        title: 'Follow up with client',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.actionCard?.viewIntent).toBe('inbox');
+    }
+  });
+
+  it('maps complete_task to tasks view when item is not Today or Inbox', async () => {
+    completeTaskMock.mockReturnValue({
+      id: 'task-done-1',
+      title: 'Write summary',
+      status: 'done',
+      today: false,
+      priority: 'none',
+      dueDate: null,
+      client: null,
+    } as never);
+    getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-done-1' } as never);
+
+    const result = await executeToolCall({
+      name: 'complete_task',
+      input: { id: 'task-done-1' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.actionCard?.viewIntent).toBe('tasks');
+    }
+  });
+
+  it('maps parse_notes non-inbox destination to today view', async () => {
+    createTaskMock
+      .mockReturnValueOnce({
+        id: 'task-note-1',
+        title: 'First',
+        status: 'active',
+        today: false,
+        priority: 'none',
+        dueDate: null,
+        client: null,
+      } as never)
+      .mockReturnValueOnce({
+        id: 'task-note-2',
+        title: 'Second',
+        status: 'active',
+        today: false,
+        priority: 'none',
+        dueDate: null,
+        client: null,
+      } as never);
+    getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-note' } as never);
+
+    const result = await executeToolCall({
+      name: 'parse_notes',
+      input: {
+        text: '- First\n- Second',
+        status: 'active',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.actionCard?.viewIntent).toBe('today');
     }
   });
 });
@@ -241,6 +373,62 @@ describe('get_task tool', () => {
           },
         ],
       });
+    }
+  });
+});
+
+describe('scratchpad tools', () => {
+  it('reads the current scratchpad content', async () => {
+    getScratchpadMock.mockReturnValue({
+      id: 'main',
+      content: 'Draft notes for Tuesday.',
+      updatedAt: '2026-02-16T12:00:00.000Z',
+    } as never);
+
+    const result = await executeToolCall({
+      name: 'read_scratchpad',
+      input: {},
+    });
+
+    expect(getScratchpadMock).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+      expect(result.output.data).toEqual({
+        scratchpad: {
+          id: 'main',
+          content: 'Draft notes for Tuesday.',
+          updatedAt: '2026-02-16T12:00:00.000Z',
+        },
+      });
+    }
+  });
+
+  it('returns replace diff summary when editing scratchpad', async () => {
+    getScratchpadMock.mockReturnValue({
+      id: 'main',
+      content: 'One old sentence.\nAnother line.',
+      updatedAt: '2026-02-16T12:00:00.000Z',
+    } as never);
+
+    const result = await executeToolCall({
+      name: 'edit_scratchpad',
+      input: {
+        action: 'replace',
+        target: 'One old sentence.',
+        replacement: 'One improved sentence.',
+      },
+    });
+
+    expect(saveScratchpadMock).toHaveBeenCalledWith(
+      'One improved sentence.\nAnother line.',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+      expect(result.output.message).toContain('Before: "One old sentence."');
+      expect(result.output.message).toContain('After: "One improved sentence."');
+      expect(result.output.actionCard?.viewIntent).toBe('scratchpad');
     }
   });
 });

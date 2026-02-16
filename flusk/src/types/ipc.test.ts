@@ -9,6 +9,8 @@ describe('IPC_CHANNELS', () => {
     expect(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD).toBe('app:quick-add-payload');
     expect(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN).toBe('app:get-launch-at-login');
     expect(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN).toBe('app:set-launch-at-login');
+    expect(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE).toBe('app:get-window-dismiss-mode');
+    expect(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE).toBe('app:set-window-dismiss-mode');
   });
 
   it('contains all expected domain prefixes', () => {

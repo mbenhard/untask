@@ -1,15 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { type Block, type BlockNoteEditor, type PartialBlock } from '@blocknote/core';
-import { filterSuggestionItems } from '@blocknote/core/extensions';
-import '@blocknote/core/fonts/inter.css';
-import { BlockNoteView } from '@blocknote/mantine';
-import '@blocknote/mantine/style.css';
+import type { BlockNoteEditor } from '@blocknote/core';
 import {
   type DefaultReactSuggestionItem,
   getDefaultReactSlashMenuItems,
-  SuggestionMenuController,
-  useCreateBlockNote,
 } from '@blocknote/react';
 import { CheckSquare, Sparkles } from 'lucide-react';
 
@@ -17,14 +11,13 @@ import {
   selectScratchpadContent,
   selectScratchpadError,
   selectScratchpadIsDirty,
-  selectScratchpadIsLegacyMarkdown,
   selectScratchpadIsLoading,
   selectScratchpadIsSaving,
   selectScratchpadIsSendingToAI,
   useScratchpadStore,
 } from '../../stores/scratchpadStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { useTheme } from '../providers/ThemeProvider';
+import { BlockEditor } from '../editor/BlockEditor';
 import { Button } from '../ui/button';
 
 const createTaskFromCursor = async (editor: BlockNoteEditor): Promise<void> => {
@@ -73,27 +66,8 @@ const getSlashMenuItems = (editor: BlockNoteEditor): DefaultReactSuggestionItem[
   createSendToAiItem(editor),
 ];
 
-const parseStoredBlocks = (content: string): PartialBlock[] | null => {
-  if (!content.trim()) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(content) as Block[];
-    if (!Array.isArray(parsed)) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
 export const ScratchpadView = () => {
-  const { resolvedTheme } = useTheme();
   const content = useScratchpadStore(selectScratchpadContent);
-  const isLegacyMarkdown = useScratchpadStore(selectScratchpadIsLegacyMarkdown);
   const isDirty = useScratchpadStore(selectScratchpadIsDirty);
   const isLoading = useScratchpadStore(selectScratchpadIsLoading);
   const isSaving = useScratchpadStore(selectScratchpadIsSaving);
@@ -103,10 +77,7 @@ export const ScratchpadView = () => {
   const setContent = useScratchpadStore((state) => state.setContent);
   const sendToAI = useScratchpadStore((state) => state.sendToAI);
 
-  const editor = useCreateBlockNote();
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const hasHydratedEditorRef = useRef(false);
-  const isHydratingEditorRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -126,60 +97,22 @@ export const ScratchpadView = () => {
     };
   }, [load]);
 
-  useEffect(() => {
-    if (!initialLoadComplete || hasHydratedEditorRef.current) {
-      return;
-    }
+  const handleChange = useCallback(
+    (json: string) => {
+      setContent(json);
 
-    hasHydratedEditorRef.current = true;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
 
-    if (!content.trim()) {
-      return;
-    }
+      saveTimerRef.current = setTimeout(() => {
+        void useScratchpadStore.getState().save();
+      }, 2000);
+    },
+    [setContent],
+  );
 
-    const applyBlocks = (blocks: PartialBlock[]): void => {
-      isHydratingEditorRef.current = true;
-      editor.replaceBlocks(editor.document, blocks);
-      queueMicrotask(() => {
-        isHydratingEditorRef.current = false;
-      });
-    };
-
-    if (isLegacyMarkdown) {
-      const blocks = editor.tryParseMarkdownToBlocks(content);
-      applyBlocks(blocks);
-
-      const convertedJson = JSON.stringify(editor.document);
-      setContent(convertedJson);
-      void useScratchpadStore.getState().save();
-      return;
-    }
-
-    const blocks = parseStoredBlocks(content);
-    if (!blocks) {
-      return;
-    }
-
-    applyBlocks(blocks);
-  }, [content, editor, initialLoadComplete, isLegacyMarkdown, setContent]);
-
-  const handleEditorChange = useCallback(() => {
-    if (isHydratingEditorRef.current) {
-      return;
-    }
-
-    const json = JSON.stringify(editor.document);
-    setContent(json);
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = setTimeout(() => {
-      void useScratchpadStore.getState().save();
-    }, 2000);
-  }, [editor, setContent]);
-
+  // Flush on unmount
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
@@ -194,32 +127,10 @@ export const ScratchpadView = () => {
   }, []);
 
   const handleSendToAI = useCallback(async () => {
-    const markdown = editor.blocksToMarkdownLossy(editor.document).trim();
-    if (!markdown) {
-      return;
-    }
-
-    await sendToAI(markdown);
-  }, [editor, sendToAI]);
-
-  const handleEditorSurfaceMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    const shouldFocusSurface =
-      target === event.currentTarget ||
-      target.classList.contains('bn-container') ||
-      target.classList.contains('bn-editor');
-
-    if (!shouldFocusSurface) {
-      return;
-    }
-
-    event.preventDefault();
-    editor.focus();
-    const lastBlock = editor.document[editor.document.length - 1];
-    if (lastBlock) {
-      editor.setTextCursorPosition(lastBlock, 'end');
-    }
-  }, [editor]);
+    // We can't easily extract markdown from shared BlockEditor here,
+    // so just delegate to the store which uses its content.
+    await sendToAI();
+  }, [sendToAI]);
 
   if (isLoading && !initialLoadComplete) {
     return (
@@ -258,17 +169,16 @@ export const ScratchpadView = () => {
         </p>
       ) : null}
 
-      <div
-        className="flusk-notes-editor min-h-0 flex-1 overflow-y-auto"
-        onMouseDown={handleEditorSurfaceMouseDown}
-      >
-        <BlockNoteView editor={editor} theme={resolvedTheme} onChange={handleEditorChange} slashMenu={false}>
-          <SuggestionMenuController
-            triggerCharacter="/"
-            getItems={async (query) => filterSuggestionItems(getSlashMenuItems(editor), query)}
+      {initialLoadComplete ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <BlockEditor
+            content={content}
+            onChange={handleChange}
+            className="flusk-notes-editor"
+            getSlashMenuItems={getSlashMenuItems}
           />
-        </BlockNoteView>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };

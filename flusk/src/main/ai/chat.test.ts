@@ -183,6 +183,16 @@ describe('generateToolCallDescription', () => {
     );
   });
 
+  it('generates description for read_scratchpad', () => {
+    expect(generateToolCallDescription('read_scratchpad', {})).toBe('Reading scratchpad');
+  });
+
+  it('generates description for edit_scratchpad rewrite', () => {
+    expect(generateToolCallDescription('edit_scratchpad', { action: 'rewrite' })).toBe(
+      'Rewriting scratchpad',
+    );
+  });
+
   it('generates description for undo_last_action without event id', () => {
     expect(generateToolCallDescription('undo_last_action', {})).toBe('Undoing last action');
   });

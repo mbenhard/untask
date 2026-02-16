@@ -44,6 +44,7 @@ const TOOL_MUTATION_NAMES = new Set([
   'move_task',
   'set_today',
   'parse_notes',
+  'edit_scratchpad',
   'undo_last_action',
   'update_user_profile',
   'update_patterns',
@@ -388,6 +389,14 @@ export const generateToolCallDescription = (
       return 'Generating daily plan';
     case 'parse_notes':
       return 'Extracting tasks from notes';
+    case 'read_scratchpad':
+      return 'Reading scratchpad';
+    case 'edit_scratchpad':
+      return input.action === 'rewrite'
+        ? 'Rewriting scratchpad'
+        : input.action === 'replace'
+          ? 'Replacing scratchpad section'
+          : 'Appending to scratchpad';
     case 'undo_last_action':
       return input.taskEventId ? `Undoing event ${String(input.taskEventId)}` : 'Undoing last action';
     case 'write_journal':

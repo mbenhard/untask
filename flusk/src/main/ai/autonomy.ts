@@ -82,11 +82,27 @@ const isBulkWrite = (hint: ToolRiskHint): boolean => {
   return typeof count === 'number' && count > 5;
 };
 
+const scratchpadEditAction = (
+  hint: ToolRiskHint,
+): 'append' | 'replace' | 'rewrite' | null => {
+  if (hint.toolName !== 'edit_scratchpad') return null;
+  const action = hint.input.action;
+  if (action === 'append' || action === 'replace' || action === 'rewrite') {
+    return action;
+  }
+  return null;
+};
+
 export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return 'critical';
   if (isInvoiceRisk(hint)) return 'critical';
   if (isCompletedRewrite(hint)) return 'critical';
   if (isBulkWrite(hint)) return 'high';
+
+  const scratchpadAction = scratchpadEditAction(hint);
+  if (scratchpadAction === 'rewrite') return 'high';
+  if (scratchpadAction === 'replace') return 'medium';
+  if (scratchpadAction === 'append') return 'low';
 
   switch (hint.toolName) {
     case 'create_task':
@@ -130,7 +146,7 @@ export const evaluateGate = (
   risk: RiskLevel,
   hardOverride: boolean,
 ): GateDecision => {
-  if (hardOverride) {
+  if (hardOverride && mode !== 'autopilot') {
     return { action: 'pending', reason: 'Hard safety override requires confirmation.' };
   }
 
@@ -146,11 +162,7 @@ export const evaluateGate = (
       };
 
     case 'autopilot':
-      if (risk === 'low' || risk === 'medium') return { action: 'execute' };
-      return {
-        action: 'pending',
-        reason: `Autopilot mode: ${risk}-risk actions require approval.`,
-      };
+      return { action: 'execute' };
 
     default:
       return { action: 'pending', reason: 'Unknown mode: defaulting to pending.' };
@@ -253,6 +265,7 @@ export const getPendingAction = (actionId: string): PendingAction | null => {
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'suggest_daily_plan',
   'read_journal',
+  'read_scratchpad',
   'generate_live_thought',
   'improve_task',
   'undo_last_action',

@@ -27,6 +27,7 @@ import {
   getNextStatusInCycle,
   getStatusAfterToggleComplete,
 } from './taskInteraction';
+import { reconcileScopedReorder } from './statusLaneDrag';
 import { TaskItem } from './TaskItem';
 
 export interface TaskListProps {
@@ -37,30 +38,9 @@ export interface TaskListProps {
   ariaLabel: string;
   scopeId: string;
   indentPx?: number;
+  dndMode?: 'local' | 'shared';
+  sharedActiveDragId?: string | null;
 }
-
-const reconcileScopedReorder = (
-  globalIds: string[],
-  scopedIds: string[],
-  reorderedScopedIds: string[],
-): string[] => {
-  if (scopedIds.length === 0) {
-    return globalIds;
-  }
-
-  const scopedSet = new Set(scopedIds);
-  let reorderedIndex = 0;
-
-  return globalIds.map((id) => {
-    if (!scopedSet.has(id)) {
-      return id;
-    }
-
-    const nextId = reorderedScopedIds[reorderedIndex];
-    reorderedIndex += 1;
-    return nextId ?? id;
-  });
-};
 
 export const TaskList = ({
   tasks,
@@ -70,6 +50,8 @@ export const TaskList = ({
   ariaLabel,
   scopeId,
   indentPx = 0,
+  dndMode = 'local',
+  sharedActiveDragId = null,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -86,9 +68,10 @@ export const TaskList = ({
   const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
 
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
+  const effectiveActiveDragId = dndMode === 'shared' ? sharedActiveDragId : activeDragId;
   const activeDragTask = useMemo(
-    () => tasks.find((task) => task.id === activeDragId) ?? null,
-    [activeDragId, tasks],
+    () => tasks.find((task) => task.id === effectiveActiveDragId) ?? null,
+    [effectiveActiveDragId, tasks],
   );
 
   useEffect(() => {
@@ -296,7 +279,7 @@ export const TaskList = ({
     onCyclePriority: handleCyclePriority,
     onCycleStatus: handleCycleStatus,
     isAnyBodyEditing,
-    isDragActive: activeDragId !== null,
+    isDragActive: effectiveActiveDragId !== null,
     containerRef,
     onStartTitleEdit: setEditingTitleTaskId,
     isEditingTitle: editingTitleTaskId !== null,
@@ -315,6 +298,48 @@ export const TaskList = ({
     );
   }
 
+  const listContent = (
+    <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+      <div
+        ref={containerRef}
+        role="listbox"
+        aria-label={ariaLabel}
+        aria-describedby={`${scopeId}-hint`}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        className="space-y-1 outline-none"
+      >
+        <p id={`${scopeId}-hint`} className="sr-only">
+          Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
+          Press Space to complete or reopen. Press T to toggle today.
+          Press P to cycle priority. Press S to cycle status.
+          In Tasks view, drag tasks between status groups or drop onto tasks for exact placement.
+          Press E to edit title.
+        </p>
+        {tasks.map((task, index) => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            isExpanded={expandedTaskId === task.id}
+            isFocused={focusedIndex === index}
+            isEditingTitle={editingTitleTaskId === task.id}
+            onStartTitleEdit={setEditingTitleTaskId}
+            onEndTitleEdit={() => setEditingTitleTaskId(null)}
+            onToggleExpand={handleToggleExpand}
+            onComplete={handleComplete}
+            onToggleToday={handleToggleToday}
+            onBodyEditModeChange={setIsAnyBodyEditing}
+            onFocus={() => setFocusedIndex(index)}
+          />
+        ))}
+      </div>
+    </SortableContext>
+  );
+
+  if (dndMode === 'shared') {
+    return <div style={indentPx > 0 ? { paddingLeft: indentPx } : undefined}>{listContent}</div>;
+  }
+
   return (
     <div style={indentPx > 0 ? { paddingLeft: indentPx } : undefined}>
       <DndContext
@@ -324,39 +349,7 @@ export const TaskList = ({
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveDragId(null)}
       >
-        <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-          <div
-            ref={containerRef}
-            role="listbox"
-            aria-label={ariaLabel}
-            aria-describedby={`${scopeId}-hint`}
-            tabIndex={0}
-            onKeyDown={onKeyDown}
-            className="space-y-1 outline-none"
-          >
-            <p id={`${scopeId}-hint`} className="sr-only">
-              Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
-              Press Space to complete or reopen. Press T to toggle today.
-              Press P to cycle priority. Press S to cycle status. Press E to edit title.
-            </p>
-            {tasks.map((task, index) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                isExpanded={expandedTaskId === task.id}
-                isFocused={focusedIndex === index}
-                isEditingTitle={editingTitleTaskId === task.id}
-                onStartTitleEdit={setEditingTitleTaskId}
-                onEndTitleEdit={() => setEditingTitleTaskId(null)}
-                onToggleExpand={handleToggleExpand}
-                onComplete={handleComplete}
-                onToggleToday={handleToggleToday}
-                onBodyEditModeChange={setIsAnyBodyEditing}
-                onFocus={() => setFocusedIndex(index)}
-              />
-            ))}
-          </div>
-        </SortableContext>
+        {listContent}
 
         <DragOverlay>
           {activeDragTask ? (

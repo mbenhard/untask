@@ -29,11 +29,9 @@ export const useKeyboardShortcuts = ({
 }: UseKeyboardShortcutsOptions): void => {
   const setView = useAppStore((state) => state.setView);
   const activeView = useAppStore((state) => state.activeView);
-  const isChatMode = useAppStore((state) => state.isChatMode);
-  const isMemorySettingsOpen = useAppStore((state) => state.isMemorySettingsOpen);
   const triggerNewTask = useAppStore((state) => state.triggerNewTask);
-  const exitChatMode = useAppStore((state) => state.exitChatMode);
-  const closeMemorySettings = useAppStore((state) => state.closeMemorySettings);
+  const toggleChatOverlay = useAppStore((state) => state.toggleChatOverlay);
+  const closeChatOverlayLayer = useAppStore((state) => state.closeChatOverlayLayer);
   const undoAction = useChatStore((state) => state.undoAction);
   const isSearchOpen = useSearchStore((state) => state.isOpen);
   const openSearch = useSearchStore((state) => state.open);
@@ -41,8 +39,6 @@ export const useKeyboardShortcuts = ({
 
   const inputValueRef = useRef(inputValue);
   const activeViewRef = useRef(activeView);
-  const isChatModeRef = useRef(isChatMode);
-  const isMemorySettingsOpenRef = useRef(isMemorySettingsOpen);
   const isSearchOpenRef = useRef(isSearchOpen);
 
   useEffect(() => {
@@ -54,22 +50,22 @@ export const useKeyboardShortcuts = ({
   }, [activeView]);
 
   useEffect(() => {
-    isChatModeRef.current = isChatMode;
-  }, [isChatMode]);
-
-  useEffect(() => {
-    isMemorySettingsOpenRef.current = isMemorySettingsOpen;
-  }, [isMemorySettingsOpen]);
-
-  useEffect(() => {
     isSearchOpenRef.current = isSearchOpen;
   }, [isSearchOpen]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      const chatOverlayState = useAppStore.getState().chatOverlayState;
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        inputRef.current?.focus();
+        const isOpen = chatOverlayState === 'open';
+        toggleChatOverlay();
+        if (isOpen) {
+          inputRef.current?.blur();
+        } else {
+          inputRef.current?.focus();
+        }
         return;
       }
 
@@ -90,7 +86,7 @@ export const useKeyboardShortcuts = ({
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
-        if (isChatModeRef.current && !isTextInputElement(document.activeElement)) {
+        if (chatOverlayState === 'open' && !isTextInputElement(document.activeElement)) {
           event.preventDefault();
           void undoAction();
           return;
@@ -112,17 +108,17 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        // Layer 2: close memory settings overlay
-        if (isMemorySettingsOpenRef.current) {
+        // Layer 2: navigate away from settings view
+        if (activeViewRef.current === 'settings') {
           event.preventDefault();
-          closeMemorySettings();
+          setView('today');
           return;
         }
 
-        // Layer 3: exit chat mode
-        if (isChatModeRef.current) {
+        // Layer 3: close chat overlay step (open -> peek -> hidden)
+        if (chatOverlayState !== 'hidden') {
           event.preventDefault();
-          exitChatMode();
+          closeChatOverlayLayer();
           inputRef.current?.blur();
           return;
         }
@@ -159,6 +155,25 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
+      if (event.key === '4') {
+        event.preventDefault();
+        const isOpen = chatOverlayState === 'open';
+        toggleChatOverlay();
+        if (isOpen) {
+          inputRef.current?.blur();
+        } else {
+          inputRef.current?.focus();
+        }
+        return;
+      }
+
+      // Comma opens settings
+      if (event.key === ',') {
+        event.preventDefault();
+        setView('settings');
+        return;
+      }
+
       if (
         event.key.toLowerCase() === 'n' &&
         (
@@ -166,8 +181,7 @@ export const useKeyboardShortcuts = ({
           activeViewRef.current === 'tasks' ||
           activeViewRef.current === 'inbox'
         ) &&
-        !isChatModeRef.current &&
-        !isMemorySettingsOpenRef.current &&
+        chatOverlayState === 'hidden' &&
         !isSearchOpenRef.current
       ) {
         event.preventDefault();
@@ -179,12 +193,12 @@ export const useKeyboardShortcuts = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     clearInput,
-    closeMemorySettings,
     closeSearch,
-    exitChatMode,
+    closeChatOverlayLayer,
     inputRef,
     openSearch,
     setView,
+    toggleChatOverlay,
     triggerNewTask,
     undoAction,
   ]);
