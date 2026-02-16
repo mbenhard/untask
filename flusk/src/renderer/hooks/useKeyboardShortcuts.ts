@@ -31,6 +31,7 @@ export const useKeyboardShortcuts = ({
   const setView = useAppStore((state) => state.setView);
   const isChatMode = useAppStore((state) => state.isChatMode);
   const isMemorySettingsOpen = useAppStore((state) => state.isMemorySettingsOpen);
+  const triggerNewTask = useAppStore((state) => state.triggerNewTask);
   const exitChatMode = useAppStore((state) => state.exitChatMode);
   const closeMemorySettings = useAppStore((state) => state.closeMemorySettings);
   const undoAction = useChatStore((state) => state.undoAction);
@@ -165,6 +166,18 @@ export const useKeyboardShortcuts = ({
       if (event.key === '3') {
         event.preventDefault();
         setView('inbox');
+        return;
+      }
+
+      if (
+        event.key.toLowerCase() === 'n' &&
+        !isChatModeRef.current &&
+        !isMemorySettingsOpenRef.current &&
+        !isScratchpadOpenRef.current &&
+        !isSearchOpenRef.current
+      ) {
+        event.preventDefault();
+        triggerNewTask();
       }
     };
 
@@ -180,6 +193,7 @@ export const useKeyboardShortcuts = ({
     openSearch,
     setView,
     toggleScratchpad,
+    triggerNewTask,
     undoAction,
   ]);
 };

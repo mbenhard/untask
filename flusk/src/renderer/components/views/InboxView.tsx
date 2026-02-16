@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 
 import type { Task } from '../../../types/models';
 
+import { useAppStore } from '../../stores/appStore';
+import { InlineTaskInput } from '../tasks/InlineTaskInput';
 import { TaskList } from '../tasks/TaskList';
 
 type InboxViewProps = {
@@ -15,6 +17,9 @@ export const InboxView = ({
   isLoading,
   error,
 }: InboxViewProps) => {
+  const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
+  const activeView = useAppStore((state) => state.activeView);
+
   const inboxTasks = useMemo(
     () =>
       allTasks.filter(
@@ -48,6 +53,14 @@ export const InboxView = ({
             scopeId="inbox"
           />
         ) : null}
+
+        <InlineTaskInput
+          parentId={null}
+          defaultStatus="inbox"
+          label="Add task"
+          placeholder="New inbox item..."
+          triggerOpen={activeView === 'inbox' ? newTaskTrigger : undefined}
+        />
       </div>
     </div>
   );

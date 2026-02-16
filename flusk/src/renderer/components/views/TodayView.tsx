@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 
 import type { Task } from '../../../types/models';
 
+import { useAppStore } from '../../stores/appStore';
 import { LiveThought } from '../layout/LiveThought';
+import { InlineTaskInput } from '../tasks/InlineTaskInput';
 import { TaskList } from '../tasks/TaskList';
 
 type TodayViewProps = {
@@ -16,6 +18,9 @@ export const TodayView = ({
   isLoading,
   error,
 }: TodayViewProps) => {
+  const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
+  const activeView = useAppStore((state) => state.activeView);
+
   const todayTasks = useMemo(
     () => allTasks.filter((task) => task.today === true && task.status !== 'done'),
     [allTasks],
@@ -53,6 +58,15 @@ export const TodayView = ({
             scopeId="today"
           />
         ) : null}
+
+        <InlineTaskInput
+          parentId={null}
+          defaultStatus="active"
+          defaultToday={true}
+          label="Add task"
+          placeholder="Add to today..."
+          triggerOpen={activeView === 'today' ? newTaskTrigger : undefined}
+        />
       </div>
     </div>
   );

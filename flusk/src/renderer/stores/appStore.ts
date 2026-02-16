@@ -9,12 +9,14 @@ type AppStore = {
   previousViewIndex: number;
   isChatMode: boolean;
   isMemorySettingsOpen: boolean;
+  newTaskTrigger: number;
   setView: (view: AppView) => void;
   enterChatMode: () => void;
   exitChatMode: () => void;
   openMemorySettings: () => void;
   closeMemorySettings: () => void;
   toggleMemorySettings: () => void;
+  triggerNewTask: () => void;
 };
 
 const getViewIndex = (view: AppView): number => APP_VIEW_ORDER.indexOf(view);
@@ -24,6 +26,7 @@ export const useAppStore = create<AppStore>((set) => ({
   previousViewIndex: getViewIndex('today'),
   isChatMode: false,
   isMemorySettingsOpen: false,
+  newTaskTrigger: 0,
   setView: (view) =>
     set((state) => {
       if (state.activeView === view) {
@@ -41,6 +44,8 @@ export const useAppStore = create<AppStore>((set) => ({
   closeMemorySettings: () => set({ isMemorySettingsOpen: false }),
   toggleMemorySettings: () =>
     set((state) => ({ isMemorySettingsOpen: !state.isMemorySettingsOpen })),
+  triggerNewTask: () =>
+    set((state) => ({ newTaskTrigger: state.newTaskTrigger + 1 })),
 }));
 
 export const selectActiveView = (state: AppStore) => state.activeView;
@@ -49,3 +54,5 @@ export const selectPreviousViewIndex = (state: AppStore) =>
 export const selectIsChatMode = (state: AppStore) => state.isChatMode;
 export const selectIsMemorySettingsOpen = (state: AppStore) =>
   state.isMemorySettingsOpen;
+export const selectNewTaskTrigger = (state: AppStore) =>
+  state.newTaskTrigger;
