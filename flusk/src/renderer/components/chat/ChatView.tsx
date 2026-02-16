@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Square, Trash2, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -172,6 +173,9 @@ export const ChatView = () => {
   const cancelStream = useChatStore((state) => state.cancelStream);
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
 
+  const prefersReducedMotion = useReducedMotion();
+  const lastAnimatedIdRef = useRef<string | null>(null);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
 
@@ -238,15 +242,30 @@ export const ChatView = () => {
   }, [confirmationTarget, approvePendingAction]);
 
   const renderedMessages = useMemo(
-    () =>
-      messages.map((message) => {
+    () => {
+      const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
+
+      return messages.map((message) => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
         const hasSteps = isAssistant && message.steps.length > 0;
 
+        const isLatest = message.id === lastMessageId;
+        const shouldAnimate = isLatest && message.id !== lastAnimatedIdRef.current;
+
+        if (shouldAnimate) {
+          lastAnimatedIdRef.current = message.id;
+        }
+
         return (
-          <article
+          <motion.article
             key={message.id}
+            initial={shouldAnimate ? { opacity: 0, y: 8 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: prefersReducedMotion ? 0.05 : 0.15,
+              ease: 'easeOut',
+            }}
             className={cn(
               'flex w-full flex-col gap-1.5',
               isAssistant ? 'items-start' : 'items-end',
@@ -345,10 +364,11 @@ export const ChatView = () => {
                 {timestamp}
               </time>
             ) : null}
-          </article>
+          </motion.article>
         );
-      }),
-    [messages, undoAction, handleApprove, rejectPendingAction],
+      });
+    },
+    [messages, undoAction, handleApprove, rejectPendingAction, prefersReducedMotion],
   );
 
   return (
@@ -438,7 +458,7 @@ export const ChatView = () => {
         </div>
       ) : null}
 
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 space-y-4 overflow-y-auto pr-1 pb-16">
+      <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 pb-16">
         {renderedMessages.length > 0 ? (
           renderedMessages
         ) : (
@@ -459,28 +479,46 @@ export const ChatView = () => {
         ) : null}
       </div>
 
-      {confirmationTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-lg">
-            <div className="flex items-center gap-2 text-amber-300">
-              <AlertTriangle className="size-4" />
-              <h3 className="text-sm font-semibold">Confirm {confirmationTarget.riskLevel}-risk action</h3>
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">{confirmationTarget.rationale}</p>
-            <p className="mt-2 text-xs text-muted-foreground/70">
-              This action has elevated risk and requires explicit confirmation.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmationTarget(null)}>
-                Cancel
-              </Button>
-              <Button type="button" variant="default" size="sm" onClick={handleConfirmApprove}>
-                Confirm &amp; Execute
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {confirmationTarget ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0.05 : 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
+            aria-describedby="confirm-dialog-desc"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
+              className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-lg"
+            >
+              <div className="flex items-center gap-2 text-amber-300">
+                <AlertTriangle className="size-4" />
+                <h3 id="confirm-dialog-title" className="text-sm font-semibold">Confirm {confirmationTarget.riskLevel}-risk action</h3>
+              </div>
+              <p id="confirm-dialog-desc" className="mt-3 text-sm text-muted-foreground">{confirmationTarget.rationale}</p>
+              <p className="mt-2 text-xs text-muted-foreground/70">
+                This action has elevated risk and requires explicit confirmation.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmationTarget(null)}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="default" size="sm" onClick={handleConfirmApprove}>
+                  Confirm &amp; Execute
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };
