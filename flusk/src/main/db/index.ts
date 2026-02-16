@@ -34,6 +34,11 @@ export function getDb(): BetterSQLite3Database<typeof schema> {
   return _db;
 }
 
+export function getRawDb(): Database.Database {
+  if (!_sqlite) throw new Error('Database not initialized. Call initDatabase() first.');
+  return _sqlite;
+}
+
 export function closeDatabase(): void {
   if (_sqlite) {
     _sqlite.close();

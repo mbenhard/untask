@@ -7,7 +7,9 @@ import {
 } from 'react';
 
 import type { AiJournal } from '../../../types/models';
+import type { ChatModelCatalogEntry } from '../../../types/chat';
 import type {
+  BackupMetadataPayload,
   SettingsMemoryStatePayload,
   SettingsReadJournalRequestPayload,
 } from '../../../types/ipc';
@@ -19,16 +21,35 @@ type SettingsMemoryProps = {
   onClose: () => void;
 };
 
-type MemoryTab = 'soul' | 'profile' | 'patterns' | 'journal' | 'app';
+type SettingsTab = 'general' | 'ai' | 'memory' | 'journal' | 'chat' | 'shortcuts' | 'backup';
 
-const TAB_ORDER: MemoryTab[] = ['soul', 'profile', 'patterns', 'journal', 'app'];
+const TAB_ORDER: SettingsTab[] = ['general', 'ai', 'memory', 'journal', 'chat', 'shortcuts', 'backup'];
 
-const TAB_LABELS: Record<MemoryTab, string> = {
+const TAB_LABELS: Record<SettingsTab, string> = {
+  general: 'General',
+  ai: 'AI',
+  memory: 'Memory',
+  journal: 'Journal',
+  chat: 'Chat',
+  shortcuts: 'Shortcuts',
+  backup: 'Backup',
+};
+
+type ShortcutEntry = {
+  key: string;
+  label: string;
+  defaultAccelerator: string;
+};
+
+const SHORTCUT_ENTRIES: ShortcutEntry[] = [
+  { key: 'shortcut.toggleWindow', label: 'Toggle window', defaultAccelerator: 'CommandOrControl+Shift+Space' },
+  { key: 'shortcut.quickAdd', label: 'Quick add', defaultAccelerator: 'CommandOrControl+Shift+A' },
+];
+
+const MEMORY_FIELD_LABELS: Record<'soul' | 'profile' | 'patterns', string> = {
   soul: 'Soul',
   profile: 'Profile',
   patterns: 'Patterns',
-  journal: 'Journal',
-  app: 'App',
 };
 
 const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
@@ -41,7 +62,10 @@ const DEFAULT_JOURNAL_FILTERS: SettingsReadJournalRequestPayload = {
   limit: 20,
   days_back: 30,
 };
+
 const OPENROUTER_API_KEY_SETTING_KEY = 'ai_openrouter_key';
+
+type MemorySubTab = 'soul' | 'profile' | 'patterns';
 
 const flusk = () => {
   if (!window.flusk) {
@@ -52,26 +76,54 @@ const flusk = () => {
 };
 
 export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
-  const [activeTab, setActiveTab] = useState<MemoryTab>('soul');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('soul');
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
   const [journalEntries, setJournalEntries] = useState<AiJournal[]>([]);
   const [journalFilters, setJournalFilters] = useState<SettingsReadJournalRequestPayload>(
     DEFAULT_JOURNAL_FILTERS,
   );
+
+  // Loading / saving states
   const [isLoadingMemory, setIsLoadingMemory] = useState(true);
   const [isLoadingJournal, setIsLoadingJournal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // General tab state
   const [launchAtLoginEnabled, setLaunchAtLoginEnabled] = useState(false);
   const [launchAtLoginApplied, setLaunchAtLoginApplied] = useState(false);
   const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
   const [isLoadingLaunchAtLogin, setIsLoadingLaunchAtLogin] = useState(false);
   const [isSavingLaunchAtLogin, setIsSavingLaunchAtLogin] = useState(false);
+
+  // AI tab state
   const [openRouterApiKeyInput, setOpenRouterApiKeyInput] = useState('');
   const [hasOpenRouterApiKey, setHasOpenRouterApiKey] = useState(false);
   const [isLoadingOpenRouterApiKey, setIsLoadingOpenRouterApiKey] = useState(false);
   const [isSavingOpenRouterApiKey, setIsSavingOpenRouterApiKey] = useState(false);
+  const [models, setModels] = useState<ChatModelCatalogEntry[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [autonomyMode, setAutonomyMode] = useState<'manual' | 'safe' | 'autopilot'>('safe');
+  const [isLoadingAutonomy, setIsLoadingAutonomy] = useState(false);
+
+  // Chat tab state
+  const [retentionMode, setRetentionMode] = useState<'session' | '30d' | 'forever'>('session');
+  const [isLoadingRetention, setIsLoadingRetention] = useState(false);
+
+  // Backup tab state
+  const [backups, setBackups] = useState<BackupMetadataPayload[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+
+  // Shortcuts tab state
+  const [shortcutDrafts, setShortcutDrafts] = useState<Record<string, string>>({});
+  const [isLoadingShortcuts, setIsLoadingShortcuts] = useState(false);
+  const [isSavingShortcut, setIsSavingShortcut] = useState(false);
+
+  // ─── Load actions ────────────────────────────────────────
 
   const loadMemoryState = useCallback(async () => {
     try {
@@ -134,26 +186,167 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
     }
   }, []);
 
+  const loadModels = useCallback(async () => {
+    try {
+      setIsLoadingModels(true);
+      const catalog = await flusk().chat.getModels();
+      setModels(catalog);
+      const selected = catalog.find((m) => m.selected);
+      if (selected) {
+        setSelectedModelId(selected.id);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load models.');
+    } finally {
+      setIsLoadingModels(false);
+    }
+  }, []);
+
+  const loadAutonomyMode = useCallback(async () => {
+    try {
+      setIsLoadingAutonomy(true);
+      const result = await flusk().chat.getAutonomyMode();
+      setAutonomyMode(result.mode);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load autonomy mode.');
+    } finally {
+      setIsLoadingAutonomy(false);
+    }
+  }, []);
+
+  const loadRetentionMode = useCallback(async () => {
+    try {
+      setIsLoadingRetention(true);
+      const result = await flusk().chat.getRetentionMode();
+      setRetentionMode(result.mode);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load retention mode.');
+    } finally {
+      setIsLoadingRetention(false);
+    }
+  }, []);
+
+  const loadShortcuts = useCallback(async () => {
+    try {
+      setIsLoadingShortcuts(true);
+      setError(null);
+      const drafts: Record<string, string> = {};
+      for (const entry of SHORTCUT_ENTRIES) {
+        const stored = await flusk().settings.get(entry.key);
+        drafts[entry.key] = stored && stored.trim().length > 0
+          ? stored
+          : entry.defaultAccelerator;
+      }
+      setShortcutDrafts(drafts);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load shortcuts.');
+    } finally {
+      setIsLoadingShortcuts(false);
+    }
+  }, []);
+
+  const saveShortcut = useCallback(async (key: string, value: string) => {
+    try {
+      setIsSavingShortcut(true);
+      setError(null);
+      setNotice(null);
+      await flusk().settings.set(key, value);
+      setNotice('Shortcut saved. Restart app to apply.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save shortcut.');
+    } finally {
+      setIsSavingShortcut(false);
+    }
+  }, []);
+
+  const resetShortcut = useCallback(async (key: string, defaultValue: string) => {
+    setShortcutDrafts((current) => ({ ...current, [key]: defaultValue }));
+    try {
+      setIsSavingShortcut(true);
+      setError(null);
+      setNotice(null);
+      await flusk().settings.set(key, defaultValue);
+      setNotice('Shortcut reset to default. Restart app to apply.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to reset shortcut.');
+    } finally {
+      setIsSavingShortcut(false);
+    }
+  }, []);
+
+  const loadBackups = useCallback(async () => {
+    try {
+      setIsLoadingBackups(true);
+      setError(null);
+      const result = await flusk().backup.list();
+      setBackups(result.backups);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load backups.');
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  }, []);
+
+  const handleCreateBackup = useCallback(async () => {
+    try {
+      setIsCreatingBackup(true);
+      setError(null);
+      setNotice(null);
+      await flusk().backup.create();
+      setNotice('Backup created successfully.');
+      await loadBackups();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Failed to create backup.');
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  }, [loadBackups]);
+
+  // ─── Lifecycle effects ───────────────────────────────────
+
   useEffect(() => {
     void loadMemoryState();
   }, [loadMemoryState]);
 
   useEffect(() => {
-    if (activeTab !== 'journal') {
-      return;
+    if (activeTab === 'general') {
+      void loadLaunchAtLogin();
     }
+  }, [activeTab, loadLaunchAtLogin]);
 
-    void loadJournal();
+  useEffect(() => {
+    if (activeTab === 'ai') {
+      void loadOpenRouterApiKey();
+      void loadModels();
+      void loadAutonomyMode();
+    }
+  }, [activeTab, loadOpenRouterApiKey, loadModels, loadAutonomyMode]);
+
+  useEffect(() => {
+    if (activeTab === 'journal') {
+      void loadJournal();
+    }
   }, [activeTab, loadJournal]);
 
   useEffect(() => {
-    if (activeTab !== 'app') {
-      return;
+    if (activeTab === 'chat') {
+      void loadRetentionMode();
     }
+  }, [activeTab, loadRetentionMode]);
 
-    void loadLaunchAtLogin();
-    void loadOpenRouterApiKey();
-  }, [activeTab, loadLaunchAtLogin, loadOpenRouterApiKey]);
+  useEffect(() => {
+    if (activeTab === 'shortcuts') {
+      void loadShortcuts();
+    }
+  }, [activeTab, loadShortcuts]);
+
+  useEffect(() => {
+    if (activeTab === 'backup') {
+      void loadBackups();
+    }
+  }, [activeTab, loadBackups]);
+
+  // ─── Save actions ────────────────────────────────────────
 
   const saveField = useCallback(
     async (field: 'soul' | 'profile' | 'patterns') => {
@@ -163,7 +356,7 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
         setError(null);
         const updated = await flusk().settings.updateMemoryState({ [field]: draft[field] });
         setDraft(updated);
-        setNotice(`${TAB_LABELS[field]} saved.`);
+        setNotice(`${MEMORY_FIELD_LABELS[field]} saved.`);
       } catch (saveError) {
         setError(saveError instanceof Error ? saveError.message : 'Failed to save memory.');
       } finally {
@@ -263,6 +456,54 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
     }
   }, []);
 
+  const handleModelChange = useCallback(async (modelId: string) => {
+    const previousId = selectedModelId;
+    setSelectedModelId(modelId);
+    setNotice(null);
+    setError(null);
+
+    try {
+      const result = await flusk().chat.setSelectedModel({ modelId });
+      setSelectedModelId(result.modelId);
+      setNotice('Model updated.');
+    } catch (saveError) {
+      setSelectedModelId(previousId);
+      setError(saveError instanceof Error ? saveError.message : 'Failed to update model.');
+    }
+  }, [selectedModelId]);
+
+  const handleAutonomyChange = useCallback(async (mode: 'manual' | 'safe' | 'autopilot') => {
+    const previousMode = autonomyMode;
+    setAutonomyMode(mode);
+    setNotice(null);
+    setError(null);
+
+    try {
+      const result = await flusk().chat.setAutonomyMode({ mode });
+      setAutonomyMode(result.mode);
+      setNotice(`Autonomy mode set to ${result.mode}.`);
+    } catch (saveError) {
+      setAutonomyMode(previousMode);
+      setError(saveError instanceof Error ? saveError.message : 'Failed to update autonomy mode.');
+    }
+  }, [autonomyMode]);
+
+  const handleRetentionChange = useCallback(async (mode: 'session' | '30d' | 'forever') => {
+    const previousMode = retentionMode;
+    setRetentionMode(mode);
+    setNotice(null);
+    setError(null);
+
+    try {
+      const result = await flusk().chat.setRetentionMode({ mode });
+      setRetentionMode(result.mode);
+      setNotice(`Chat retention set to ${mode === '30d' ? '30 days' : mode}.`);
+    } catch (saveError) {
+      setRetentionMode(previousMode);
+      setError(saveError instanceof Error ? saveError.message : 'Failed to update retention mode.');
+    }
+  }, [retentionMode]);
+
   const journalSummary = useMemo(() => {
     if (journalEntries.length === 0) {
       return 'No journal entries found for current filters.';
@@ -271,13 +512,15 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
     return `${journalEntries.length} entries loaded`;
   }, [journalEntries.length]);
 
+  // ─── Render ──────────────────────────────────────────────
+
   return (
     <section className="no-drag absolute inset-0 z-30 flex flex-col bg-background/95 backdrop-blur-sm">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Memory Settings</h2>
+          <h2 className="text-sm font-semibold text-foreground">Settings</h2>
           <p className="text-xs text-muted-foreground">
-            Edit Soul, Profile, Patterns, and browse journal history.
+            General, AI, memory, journal, and chat configuration.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onClose}>
@@ -311,69 +554,225 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
           </p>
         ) : null}
 
-        {isLoadingMemory && activeTab !== 'journal' ? (
-          <p className="text-sm text-muted-foreground">Loading memory state...</p>
-        ) : null}
-
-        {activeTab === 'soul' ? (
+        {/* ─── General tab ─────────────────────────────── */}
+        {activeTab === 'general' ? (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Soul is your editable personality overlay on top of base assistant contracts.
+              Configure desktop startup behavior.
             </p>
-            <Textarea
-              value={draft.soul}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, soul: event.target.value }))
-              }
-              className="min-h-52"
-            />
-            <div className="flex items-center gap-2">
-              <Button type="button" size="sm" onClick={() => void saveField('soul')} disabled={isSaving}>
-                Save Soul
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => void resetSoulField()} disabled={isSaving}>
-                Reset Soul
-              </Button>
+            <div className="rounded-md border border-border bg-card px-3 py-3">
+              <label className="flex items-center justify-between gap-3 text-sm text-foreground">
+                <span>Launch Flusk at login</span>
+                <input
+                  type="checkbox"
+                  checked={launchAtLoginEnabled}
+                  onChange={(event) => void handleLaunchAtLoginChange(event)}
+                  disabled={isLoadingLaunchAtLogin || isSavingLaunchAtLogin}
+                  className="h-4 w-4 rounded border border-input bg-background accent-foreground"
+                />
+              </label>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isLoadingLaunchAtLogin
+                  ? 'Checking availability...'
+                  : launchAtLoginApplied
+                    ? 'Supported in this runtime.'
+                    : 'Not supported in this runtime (preference is still saved).'}
+              </p>
+
+              {launchAtLoginError ? (
+                <p className="mt-2 text-xs text-destructive">{launchAtLoginError}</p>
+              ) : null}
             </div>
           </div>
         ) : null}
 
-        {activeTab === 'profile' ? (
+        {/* ─── AI tab ──────────────────────────────────── */}
+        {activeTab === 'ai' ? (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Profile stores durable user facts and preferences.
+              Configure AI model, autonomy mode, and API credentials.
             </p>
-            <Textarea
-              value={draft.profile}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, profile: event.target.value }))
-              }
-              className="min-h-52"
-            />
-            <Button type="button" size="sm" onClick={() => void saveField('profile')} disabled={isSaving}>
-              Save Profile
-            </Button>
+
+            {/* Model selector */}
+            <div className="rounded-md border border-border bg-card px-3 py-3">
+              <p className="text-sm font-medium text-foreground">Model</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Select the AI model used for chat responses.
+              </p>
+              {isLoadingModels ? (
+                <p className="mt-2 text-xs text-muted-foreground">Loading models...</p>
+              ) : (
+                <select
+                  value={selectedModelId ?? ''}
+                  onChange={(event) => void handleModelChange(event.target.value)}
+                  className="mt-2 h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                  aria-label="AI model"
+                >
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Autonomy mode */}
+            <div className="rounded-md border border-border bg-card px-3 py-3">
+              <p className="text-sm font-medium text-foreground">Autonomy mode</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Controls how much the AI can act on its own.
+              </p>
+              {isLoadingAutonomy ? (
+                <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
+              ) : (
+                <div className="mt-2 flex items-center gap-2">
+                  {(['manual', 'safe', 'autopilot'] as const).map((mode) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant={autonomyMode === mode ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => void handleAutonomyChange(mode)}
+                    >
+                      {mode === 'manual' ? 'Manual' : mode === 'safe' ? 'Safe' : 'Autopilot'}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* API key */}
+            <div className="rounded-md border border-border bg-card px-3 py-3">
+              <p className="text-sm font-medium text-foreground">OpenRouter API key</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used for AI chat requests when the shell environment variable is not set.
+              </p>
+              <Input
+                type="password"
+                value={openRouterApiKeyInput}
+                onChange={(event) => setOpenRouterApiKeyInput(event.target.value)}
+                placeholder={hasOpenRouterApiKey ? 'Saved key (enter to replace)' : 'sk-or-...'}
+                disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
+                className="mt-3"
+                aria-label="OpenRouter API key"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isLoadingOpenRouterApiKey
+                  ? 'Checking key status...'
+                  : hasOpenRouterApiKey
+                    ? 'A key is currently saved.'
+                    : 'No key saved yet.'}
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void saveOpenRouterApiKey()}
+                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
+                >
+                  Save key
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void clearOpenRouterApiKey()}
+                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey || !hasOpenRouterApiKey}
+                >
+                  Clear key
+                </Button>
+              </div>
+            </div>
           </div>
         ) : null}
 
-        {activeTab === 'patterns' ? (
+        {/* ─── Memory tab ──────────────────────────────── */}
+        {activeTab === 'memory' ? (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Patterns capture repeated workflows and recurring structures.
-            </p>
-            <Textarea
-              value={draft.patterns}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, patterns: event.target.value }))
-              }
-              className="min-h-52"
-            />
-            <Button type="button" size="sm" onClick={() => void saveField('patterns')} disabled={isSaving}>
-              Save Patterns
-            </Button>
+            {isLoadingMemory ? (
+              <p className="text-sm text-muted-foreground">Loading memory state...</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  {(['soul', 'profile', 'patterns'] as const).map((sub) => (
+                    <Button
+                      key={sub}
+                      type="button"
+                      variant={memorySubTab === sub ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setMemorySubTab(sub)}
+                    >
+                      {MEMORY_FIELD_LABELS[sub]}
+                    </Button>
+                  ))}
+                </div>
+
+                {memorySubTab === 'soul' ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Soul is your editable personality overlay on top of base assistant contracts.
+                    </p>
+                    <Textarea
+                      value={draft.soul}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, soul: event.target.value }))
+                      }
+                      className="min-h-52"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button type="button" size="sm" onClick={() => void saveField('soul')} disabled={isSaving}>
+                        Save Soul
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => void resetSoulField()} disabled={isSaving}>
+                        Reset Soul
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {memorySubTab === 'profile' ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Profile stores durable user facts and preferences.
+                    </p>
+                    <Textarea
+                      value={draft.profile}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, profile: event.target.value }))
+                      }
+                      className="min-h-52"
+                    />
+                    <Button type="button" size="sm" onClick={() => void saveField('profile')} disabled={isSaving}>
+                      Save Profile
+                    </Button>
+                  </div>
+                ) : null}
+
+                {memorySubTab === 'patterns' ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Patterns capture repeated workflows and recurring structures.
+                    </p>
+                    <Textarea
+                      value={draft.patterns}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, patterns: event.target.value }))
+                      }
+                      className="min-h-52"
+                    />
+                    <Button type="button" size="sm" onClick={() => void saveField('patterns')} disabled={isSaving}>
+                      Save Patterns
+                    </Button>
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
 
+        {/* ─── Journal tab ─────────────────────────────── */}
         {activeTab === 'journal' ? (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
@@ -456,89 +855,145 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
           </div>
         ) : null}
 
-        {activeTab === 'app' ? (
+        {/* ─── Chat tab ────────────────────────────────── */}
+        {activeTab === 'chat' ? (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Configure desktop startup behavior.
+              Configure chat message retention.
             </p>
             <div className="rounded-md border border-border bg-card px-3 py-3">
-              <p className="text-sm text-foreground">OpenRouter API key</p>
+              <p className="text-sm font-medium text-foreground">Retention period</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Used for AI chat requests when the shell environment variable is not set.
+                How long chat messages are stored before being cleaned up.
               </p>
-              <Input
-                type="password"
-                value={openRouterApiKeyInput}
-                onChange={(event) => setOpenRouterApiKeyInput(event.target.value)}
-                placeholder={hasOpenRouterApiKey ? 'Saved key (enter to replace)' : 'sk-or-...'}
-                disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
-                className="mt-3"
-                aria-label="OpenRouter API key"
-              />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {isLoadingOpenRouterApiKey
-                  ? 'Checking key status...'
-                  : hasOpenRouterApiKey
-                    ? 'A key is currently saved.'
-                    : 'No key saved yet.'}
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void saveOpenRouterApiKey()}
-                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
-                >
-                  Save key
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void clearOpenRouterApiKey()}
-                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey || !hasOpenRouterApiKey}
-                >
-                  Clear key
-                </Button>
-              </div>
+              {isLoadingRetention ? (
+                <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
+              ) : (
+                <div className="mt-2 flex items-center gap-2">
+                  {([
+                    { mode: 'session' as const, label: 'Session only' },
+                    { mode: '30d' as const, label: '30 days' },
+                    { mode: 'forever' as const, label: 'Forever' },
+                  ]).map(({ mode, label }) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant={retentionMode === mode ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => void handleRetentionChange(mode)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="rounded-md border border-border bg-card px-3 py-3">
-              <label className="flex items-center justify-between gap-3 text-sm text-foreground">
-                <span>Launch Flusk at login</span>
-                <input
-                  type="checkbox"
-                  checked={launchAtLoginEnabled}
-                  onChange={(event) => void handleLaunchAtLoginChange(event)}
-                  disabled={isLoadingLaunchAtLogin || isSavingLaunchAtLogin}
-                  className="h-4 w-4 rounded border border-input bg-background accent-foreground"
-                />
-              </label>
+          </div>
+        ) : null}
 
-              <p className="mt-2 text-xs text-muted-foreground">
-                {isLoadingLaunchAtLogin
-                  ? 'Checking availability...'
-                  : launchAtLoginApplied
-                    ? 'Supported in this runtime.'
-                    : 'Not supported in this runtime (preference is still saved).'}
-              </p>
+        {/* ─── Shortcuts tab ────────────────────────────── */}
+        {activeTab === 'shortcuts' ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Configure global keyboard shortcuts. Changes take effect after restart.
+            </p>
+            {isLoadingShortcuts ? (
+              <p className="text-sm text-muted-foreground">Loading shortcuts...</p>
+            ) : (
+              SHORTCUT_ENTRIES.map((entry) => (
+                <div
+                  key={entry.key}
+                  className="rounded-md border border-border bg-card px-3 py-3"
+                >
+                  <p className="text-sm font-medium text-foreground">{entry.label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Default: {entry.defaultAccelerator}
+                  </p>
+                  <Input
+                    type="text"
+                    value={shortcutDrafts[entry.key] ?? entry.defaultAccelerator}
+                    onChange={(event) =>
+                      setShortcutDrafts((current) => ({
+                        ...current,
+                        [entry.key]: event.target.value,
+                      }))
+                    }
+                    className="mt-2"
+                    aria-label={`${entry.label} shortcut`}
+                  />
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void saveShortcut(entry.key, shortcutDrafts[entry.key] ?? entry.defaultAccelerator)}
+                      disabled={isSavingShortcut}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void resetShortcut(entry.key, entry.defaultAccelerator)}
+                      disabled={isSavingShortcut}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : null}
 
-              {launchAtLoginError ? (
-                <p className="mt-2 text-xs text-destructive">{launchAtLoginError}</p>
-              ) : null}
-            </div>
-            <div className="flex justify-end">
+        {/* ─── Backup tab ──────────────────────────────── */}
+        {activeTab === 'backup' ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Database backups are created daily and the 30 most recent are kept.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleCreateBackup()}
+                disabled={isCreatingBackup}
+              >
+                {isCreatingBackup ? 'Creating...' : 'Create backup now'}
+              </Button>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => {
-                  void loadLaunchAtLogin();
-                  void loadOpenRouterApiKey();
-                }}
-                disabled={isLoadingLaunchAtLogin || isLoadingOpenRouterApiKey}
+                onClick={() => void loadBackups()}
+                disabled={isLoadingBackups}
               >
-                Refresh app settings
+                Refresh
               </Button>
+            </div>
+
+            <div className="space-y-2">
+              {isLoadingBackups ? (
+                <p className="text-sm text-muted-foreground">Loading backups...</p>
+              ) : null}
+              {!isLoadingBackups && backups.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No backups found.</p>
+              ) : null}
+              {backups.map((backup) => (
+                <div
+                  key={backup.filename}
+                  className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2"
+                >
+                  <div>
+                    <p className="text-sm text-foreground">{backup.filename}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(backup.createdAt).toLocaleString()} &middot;{' '}
+                      {(backup.sizeBytes / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : null}

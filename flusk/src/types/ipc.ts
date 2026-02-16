@@ -71,6 +71,11 @@ export const IPC_CHANNELS = {
   CHAT_RESOLVE_PENDING_ACTION: 'chat:resolve-pending-action',
   CHAT_CANCEL: 'chat:cancel',
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
+  BACKUP_LIST: 'backup:list',
+  BACKUP_CREATE: 'backup:create',
+  BACKUP_EXPORT: 'backup:export',
+  BACKUP_IMPORT: 'backup:import',
+  SEARCH_QUERY: 'search:query',
   SCRATCHPAD_GET: 'scratchpad:get',
   SCRATCHPAD_SAVE: 'scratchpad:save',
   SETTINGS_GET: 'settings:get',
@@ -155,4 +160,51 @@ export type LaunchAtLoginResult = {
   enabled: boolean;
   applied: boolean;
   error?: string;
+};
+
+// ─── Backup payloads ──────────────────────────────────────
+
+export type BackupMetadataPayload = {
+  filename: string;
+  path: string;
+  createdAt: string;
+  sizeBytes: number;
+};
+
+export type BackupListResponse = {
+  backups: BackupMetadataPayload[];
+};
+
+export type BackupExportRequest = {
+  destination: string;
+  passphrase?: string;
+};
+
+export type BackupImportRequest = {
+  source: string;
+  passphrase?: string;
+};
+
+// ─── Search payloads ──────────────────────────────────────
+
+export type SearchQueryRequest = {
+  query: string;
+  limit?: number;
+};
+
+export type SearchResultItem = {
+  id: string;
+  title: string;
+  body: string | null;
+  status: string | null;
+  client: string | null;
+  priority: string | null;
+  dueDate: string | null;
+  snippet: string;
+};
+
+export type SearchQueryResponse = {
+  active: SearchResultItem[];
+  done: SearchResultItem[];
+  total: number;
 };

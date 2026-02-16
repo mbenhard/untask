@@ -97,7 +97,7 @@ export const TitleBar = () => {
           )}
           aria-pressed={isMemorySettingsOpen}
         >
-          Memory
+          Settings
         </button>
       </div>
     </header>

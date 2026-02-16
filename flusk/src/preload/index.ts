@@ -30,7 +30,13 @@ import {
   type MemoryPromotionEvaluationResultPayload,
   type ProactiveTriggerEvaluationRequestPayload,
   type ProactiveTriggerEvaluationResultPayload,
+  type BackupExportRequest,
+  type BackupImportRequest,
+  type BackupListResponse,
+  type BackupMetadataPayload,
   type QuickAddPayload,
+  type SearchQueryRequest,
+  type SearchQueryResponse,
   type SettingsMemoryStatePayload,
   type SettingsMemoryUpdateRequestPayload,
   type SettingsReadJournalRequestPayload,
@@ -160,6 +166,20 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION, payload),
     listPendingActions: (): Promise<ChatListPendingActionsResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
+  },
+  backup: {
+    list: (): Promise<BackupListResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_LIST),
+    create: (): Promise<BackupMetadataPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_CREATE),
+    export: (request: BackupExportRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_EXPORT, request),
+    import: (request: BackupImportRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_IMPORT, request),
+  },
+  search: {
+    query: (request: SearchQueryRequest): Promise<SearchQueryResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SEARCH_QUERY, request),
   },
   scratchpad: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SCRATCHPAD_GET),

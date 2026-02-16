@@ -10,6 +10,11 @@ import { checkAndGenerateWeeklyDigest } from './ai/weeklyDigest';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
+import {
+  startDailyBackupScheduler,
+  stopDailyBackupScheduler,
+} from './services/backupService';
+import { initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting } from './services/settingsService';
 import { setupTray, destroyTray } from './tray';
@@ -74,6 +79,7 @@ const createMainWindow = (): BrowserWindow => {
 const bootstrap = (): void => {
   initDatabase();
   runMigrations();
+  initSearchFts();
   registerIpcHandlers();
 
   mainWindow = createMainWindow();
@@ -144,13 +150,10 @@ const applyLaunchAtLogin = (): void => {
 };
 
 app.whenReady().then(() => {
-  if (process.platform === 'darwin' && app.dock) {
-    app.dock.hide();
-  }
-
   void emitIdentityContextDebugSnapshot();
   bootstrap();
   applyLaunchAtLogin();
+  startDailyBackupScheduler();
   runWeeklyDigestStartupCheck();
 
   app.on('activate', () => {
@@ -165,6 +168,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  stopDailyBackupScheduler();
   unregisterGlobalShortcuts();
   destroyTray();
   closeDatabase();

@@ -4,6 +4,8 @@ export const SUPPORTED_MODEL_IDS = [
   'minimax/minimax-m2.5',
   'moonshotai/kimi-k2.5',
   'z-ai/glm-5',
+  'anthropic/claude-haiku-4.5',
+  'google/gemini-3-flash-preview',
 ] as const;
 
 export type ChatModelId = (typeof SUPPORTED_MODEL_IDS)[number];
@@ -44,6 +46,22 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     outputCostPerMillion: null,
     defaultSelected: false,
     supportsReasoning: false,
+  },
+  {
+    id: 'anthropic/claude-haiku-4.5',
+    label: 'Claude Haiku 4.5',
+    inputCostPerMillion: 0.8,
+    outputCostPerMillion: 4.0,
+    defaultSelected: false,
+    supportsReasoning: false,
+  },
+  {
+    id: 'google/gemini-3-flash-preview',
+    label: 'Gemini 3 Flash',
+    inputCostPerMillion: null,
+    outputCostPerMillion: null,
+    defaultSelected: false,
+    supportsReasoning: true,
   },
 ] as const;
 

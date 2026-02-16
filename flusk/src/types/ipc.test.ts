@@ -20,6 +20,8 @@ describe('IPC_CHANNELS', () => {
     expect(prefixes).toContain('task');
     expect(prefixes).toContain('chat');
     expect(prefixes).toContain('scratchpad');
+    expect(prefixes).toContain('search');
+    expect(prefixes).toContain('backup');
   });
 
   it('has no duplicate channel values', () => {

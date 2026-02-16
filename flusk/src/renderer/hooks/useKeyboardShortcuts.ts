@@ -3,6 +3,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
 import { useScratchpadStore } from '../stores/scratchpadStore';
+import { useSearchStore } from '../stores/searchStore';
 
 type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLInputElement | null>;
@@ -36,11 +37,15 @@ export const useKeyboardShortcuts = ({
   const isScratchpadOpen = useScratchpadStore((state) => state.isOpen);
   const closeScratchpad = useScratchpadStore((state) => state.close);
   const toggleScratchpad = useScratchpadStore((state) => state.toggleOpen);
+  const isSearchOpen = useSearchStore((state) => state.isOpen);
+  const openSearch = useSearchStore((state) => state.open);
+  const closeSearch = useSearchStore((state) => state.close);
 
   const inputValueRef = useRef(inputValue);
   const isChatModeRef = useRef(isChatMode);
   const isMemorySettingsOpenRef = useRef(isMemorySettingsOpen);
   const isScratchpadOpenRef = useRef(isScratchpadOpen);
+  const isSearchOpenRef = useRef(isSearchOpen);
 
   useEffect(() => {
     inputValueRef.current = inputValue;
@@ -59,10 +64,24 @@ export const useKeyboardShortcuts = ({
   }, [isScratchpadOpen]);
 
   useEffect(() => {
+    isSearchOpenRef.current = isSearchOpen;
+  }, [isSearchOpen]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         inputRef.current?.focus();
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        if (isSearchOpenRef.current) {
+          closeSearch();
+        } else {
+          openSearch();
+        }
         return;
       }
 
@@ -81,6 +100,13 @@ export const useKeyboardShortcuts = ({
       }
 
       if (event.key === 'Escape') {
+        // Layer 0: close search overlay (highest z-index)
+        if (isSearchOpenRef.current) {
+          event.preventDefault();
+          closeSearch();
+          return;
+        }
+
         // Layer 1: close scratchpad overlay
         if (isScratchpadOpenRef.current) {
           event.preventDefault();
@@ -147,9 +173,11 @@ export const useKeyboardShortcuts = ({
   }, [
     clearInput,
     closeMemorySettings,
+    closeSearch,
     closeScratchpad,
     exitChatMode,
     inputRef,
+    openSearch,
     setView,
     toggleScratchpad,
     undoAction,

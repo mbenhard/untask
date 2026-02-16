@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import MDEditor from '@uiw/react-md-editor';
-import { X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 
 import { useTheme } from '../providers/ThemeProvider';
 import { Button } from '../ui/button';
@@ -13,6 +13,7 @@ import {
   selectScratchpadIsLoading,
   selectScratchpadIsOpen,
   selectScratchpadIsSaving,
+  selectScratchpadIsSendingToAI,
   useScratchpadStore,
 } from '../../stores/scratchpadStore';
 
@@ -25,10 +26,12 @@ export const Scratchpad = () => {
   const isDirty = useScratchpadStore(selectScratchpadIsDirty);
   const isLoading = useScratchpadStore(selectScratchpadIsLoading);
   const isSaving = useScratchpadStore(selectScratchpadIsSaving);
+  const isSendingToAI = useScratchpadStore(selectScratchpadIsSendingToAI);
   const error = useScratchpadStore(selectScratchpadError);
   const setContent = useScratchpadStore((state) => state.setContent);
   const close = useScratchpadStore((state) => state.close);
   const save = useScratchpadStore((state) => state.save);
+  const sendToAI = useScratchpadStore((state) => state.sendToAI);
   const prefersReducedMotion = useReducedMotion();
 
   const panelTransition = useMemo(
@@ -92,6 +95,18 @@ export const Scratchpad = () => {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void sendToAI();
+                  }}
+                  disabled={!content.trim() || isSendingToAI}
+                >
+                  <Sparkles size={14} className="mr-1" />
+                  {isSendingToAI ? 'Sending...' : 'Send to AI'}
+                </Button>
                 <Button
                   type="button"
                   size="sm"

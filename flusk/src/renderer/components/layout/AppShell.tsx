@@ -22,6 +22,7 @@ import {
 import { useChatStore } from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
 import { Scratchpad } from '../scratchpad/Scratchpad';
+import { SearchModal } from '../search/SearchModal';
 import { SettingsMemory } from '../settings/SettingsMemory';
 import { InboxView } from '../views/InboxView';
 import { ProjectsView } from '../views/ProjectsView';
@@ -171,6 +172,7 @@ export const AppShell = () => {
 
       {isMemorySettingsOpen ? <SettingsMemory onClose={closeMemorySettings} /> : null}
       <Scratchpad />
+      <SearchModal />
     </div>
   );
 };

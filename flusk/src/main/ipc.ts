@@ -33,6 +33,12 @@ import {
   type SettingsMemoryUpdateRequestPayload,
   type SettingsReadJournalRequestPayload,
   type SettingsReadJournalResultPayload,
+  type SearchQueryRequest,
+  type SearchQueryResponse,
+  type BackupListResponse,
+  type BackupMetadataPayload,
+  type BackupExportRequest,
+  type BackupImportRequest,
 } from '../types/ipc';
 import { buildIdentityContext } from './ai/contextBuilder';
 import { getPatterns, getProfile, getSoul, resetSoul, setPatterns, setProfile, setSoul } from './ai/memory';
@@ -61,6 +67,13 @@ import {
 } from './services/chatService';
 import { readJournalEntries } from './services/journalService';
 import { getScratchpad, saveScratchpad } from './services/scratchpadService';
+import {
+  createBackup,
+  exportBackup,
+  importBackup,
+  listBackups,
+} from './services/backupService';
+import { searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 import { generateLiveThought } from './ai/liveThought';
@@ -534,6 +547,58 @@ export const registerIpcHandlers = (): void => {
     try { return saveScratchpad(content); }
     catch (e) { console.error('[ipc] SCRATCHPAD_SAVE:', e); throw e; }
   });
+
+  // ─── Backup handlers ─────────────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_LIST,
+    (): BackupListResponse => {
+      try {
+        return { backups: listBackups() };
+      }
+      catch (e) { console.error('[ipc] BACKUP_LIST:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_CREATE,
+    (): BackupMetadataPayload => {
+      try {
+        return createBackup();
+      }
+      catch (e) { console.error('[ipc] BACKUP_CREATE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_EXPORT,
+    (_event, request: BackupExportRequest): void => {
+      try {
+        exportBackup(request.destination, request.passphrase);
+      }
+      catch (e) { console.error('[ipc] BACKUP_EXPORT:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_IMPORT,
+    (_event, request: BackupImportRequest): void => {
+      try {
+        importBackup(request.source, request.passphrase);
+      }
+      catch (e) { console.error('[ipc] BACKUP_IMPORT:', e); throw e; }
+    },
+  );
+
+  // ─── Search handlers ─────────────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.SEARCH_QUERY,
+    (_event, request: SearchQueryRequest): SearchQueryResponse => {
+      try {
+        return searchTasks({
+          query: request.query,
+          limit: request.limit,
+        });
+      }
+      catch (e) { console.error('[ipc] SEARCH_QUERY:', e); throw e; }
+    },
+  );
 
   // ─── Settings handlers ───────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_event, key: string) => {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Square, Trash2, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -171,6 +171,38 @@ export const ChatView = () => {
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
   const cancelStream = useChatStore((state) => state.cancelStream);
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+
+  const SCROLL_THRESHOLD = 80;
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      isNearBottomRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD;
+    }
+  }, []);
+
+  // Scroll to bottom on mount (when chat view opens)
+  useLayoutEffect(() => {
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  // Auto-scroll when messages change (new messages or streaming tokens)
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    }
+  }, [messages, isSending, scrollToBottom]);
 
   const [confirmationTarget, setConfirmationTarget] = useState<{
     actionId: string;
@@ -406,7 +438,7 @@ export const ChatView = () => {
         </div>
       ) : null}
 
-      <div className="flex-1 space-y-4 overflow-y-auto pr-1 pb-16">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 space-y-4 overflow-y-auto pr-1 pb-16">
         {renderedMessages.length > 0 ? (
           renderedMessages
         ) : (

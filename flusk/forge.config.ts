@@ -11,9 +11,6 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    extendInfo: {
-      LSUIElement: true,
-    },
     extraResource: ['./drizzle', './assets/tray'],
   },
   rebuildConfig: {},

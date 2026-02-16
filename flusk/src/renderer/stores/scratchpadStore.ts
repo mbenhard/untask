@@ -1,17 +1,22 @@
 import { create } from 'zustand';
 
+import { useChatStore } from './chatStore';
+import { useAppStore } from './appStore';
+
 type ScratchpadStore = {
   isOpen: boolean;
   content: string;
   isDirty: boolean;
   isLoading: boolean;
   isSaving: boolean;
+  isSendingToAI: boolean;
   error: string | null;
   open: () => Promise<void>;
   close: () => Promise<void>;
   toggleOpen: () => Promise<void>;
   setContent: (content: string) => void;
   save: () => Promise<void>;
+  sendToAI: () => Promise<void>;
   clearError: () => void;
 };
 
@@ -32,6 +37,7 @@ export const useScratchpadStore = create<ScratchpadStore>((set, get) => ({
   isDirty: false,
   isLoading: false,
   isSaving: false,
+  isSendingToAI: false,
   error: null,
 
   open: async () => {
@@ -133,6 +139,36 @@ export const useScratchpadStore = create<ScratchpadStore>((set, get) => ({
     }
   },
 
+  sendToAI: async () => {
+    const { content, isDirty, isSendingToAI } = get();
+    const trimmed = content.trim();
+
+    if (!trimmed || isSendingToAI) {
+      return;
+    }
+
+    if (isDirty) {
+      await get().save();
+      if (get().isDirty) {
+        return;
+      }
+    }
+
+    set({ isSendingToAI: true, error: null });
+
+    try {
+      const prompt = `Parse the following notes and extract any tasks:\n\n${trimmed}`;
+      await useChatStore.getState().sendMessage(prompt);
+      useAppStore.getState().enterChatMode();
+      set({ isOpen: false, isSendingToAI: false });
+    } catch (error) {
+      set({
+        isSendingToAI: false,
+        error: error instanceof Error ? error.message : 'Failed to send to AI.',
+      });
+    }
+  },
+
   clearError: () => set({ error: null }),
 }));
 
@@ -141,4 +177,5 @@ export const selectScratchpadContent = (state: ScratchpadStore) => state.content
 export const selectScratchpadIsDirty = (state: ScratchpadStore) => state.isDirty;
 export const selectScratchpadIsLoading = (state: ScratchpadStore) => state.isLoading;
 export const selectScratchpadIsSaving = (state: ScratchpadStore) => state.isSaving;
+export const selectScratchpadIsSendingToAI = (state: ScratchpadStore) => state.isSendingToAI;
 export const selectScratchpadError = (state: ScratchpadStore) => state.error;

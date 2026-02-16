@@ -27,7 +27,13 @@ import type {
   MemoryPromotionEvaluationResultPayload,
   ProactiveTriggerEvaluationRequestPayload,
   ProactiveTriggerEvaluationResultPayload,
+  BackupExportRequest,
+  BackupImportRequest,
+  BackupListResponse,
+  BackupMetadataPayload,
   QuickAddPayload,
+  SearchQueryRequest,
+  SearchQueryResponse,
   SettingsMemoryStatePayload,
   SettingsMemoryUpdateRequestPayload,
   SettingsReadJournalRequestPayload,
@@ -95,6 +101,15 @@ export type FluskApi = {
     setAutonomyMode: (payload: ChatSetAutonomyModeRequest) => Promise<ChatAutonomyModeResult>;
     resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
     listPendingActions: () => Promise<ChatListPendingActionsResponse>;
+  };
+  backup: {
+    list: () => Promise<BackupListResponse>;
+    create: () => Promise<BackupMetadataPayload>;
+    export: (request: BackupExportRequest) => Promise<void>;
+    import: (request: BackupImportRequest) => Promise<void>;
+  };
+  search: {
+    query: (request: SearchQueryRequest) => Promise<SearchQueryResponse>;
   };
   scratchpad: {
     get: () => Promise<Scratchpad>;

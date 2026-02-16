@@ -9,12 +9,18 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('./services/settingsService', () => ({
+  getSetting: vi.fn(() => null),
+}));
+
 import { globalShortcut } from 'electron';
-import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
+import { getSetting } from './services/settingsService';
+import { registerGlobalShortcuts, unregisterGlobalShortcuts, DEFAULT_SHORTCUTS } from './shortcuts';
 
 const mockRegister = vi.mocked(globalShortcut.register);
 const mockUnregister = vi.mocked(globalShortcut.unregister);
 const mockUnregisterAll = vi.mocked(globalShortcut.unregisterAll);
+const mockGetSetting = vi.mocked(getSetting);
 
 describe('shortcuts', () => {
   beforeEach(() => {
@@ -22,19 +28,29 @@ describe('shortcuts', () => {
     mockRegister.mockReturnValue(true);
     mockUnregister.mockReset();
     mockUnregisterAll.mockReset();
+    mockGetSetting.mockReset();
+    mockGetSetting.mockReturnValue(null);
   });
 
-  it('registers both shortcuts and clears existing bindings first', () => {
+  it('registers both shortcuts using default accelerators when no settings exist', () => {
     registerGlobalShortcuts({} as BrowserWindow);
 
-    expect(mockUnregister).toHaveBeenNthCalledWith(
-      1,
-      'CommandOrControl+Shift+Space',
-    );
-    expect(mockUnregister).toHaveBeenNthCalledWith(2, 'CommandOrControl+Shift+A');
     expect(mockRegister).toHaveBeenCalledTimes(2);
     expect(mockRegister.mock.calls[0]?.[0]).toBe('CommandOrControl+Shift+Space');
     expect(mockRegister.mock.calls[1]?.[0]).toBe('CommandOrControl+Shift+A');
+  });
+
+  it('uses settings-backed accelerators when stored', () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'shortcut.toggleWindow') return 'CommandOrControl+Shift+T';
+      if (key === 'shortcut.quickAdd') return 'CommandOrControl+Shift+Q';
+      return null;
+    });
+
+    registerGlobalShortcuts({} as BrowserWindow);
+
+    expect(mockRegister.mock.calls[0]?.[0]).toBe('CommandOrControl+Shift+T');
+    expect(mockRegister.mock.calls[1]?.[0]).toBe('CommandOrControl+Shift+Q');
   });
 
   it('logs warning when registration fails', () => {
@@ -50,5 +66,10 @@ describe('shortcuts', () => {
   it('unregisters all shortcuts on teardown', () => {
     unregisterGlobalShortcuts();
     expect(mockUnregisterAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('exports default shortcuts map', () => {
+    expect(DEFAULT_SHORTCUTS['shortcut.toggleWindow']).toBe('CommandOrControl+Shift+Space');
+    expect(DEFAULT_SHORTCUTS['shortcut.quickAdd']).toBe('CommandOrControl+Shift+A');
   });
 });

@@ -897,7 +897,7 @@
           "7",
           "8"
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -918,9 +918,10 @@
               1
             ],
             "details": "Extend the Scratchpad component with AI integration:\n\n1. UI elements:\n   - Add 'Send to AI' button in scratchpad header or footer\n   - Style button prominently (primary action color)\n   - Add loading state while AI processes content\n   - Show success/error toast notifications\n\n2. Integration with chat system:\n   - Create sendToAI action in scratchpad store\n   - Format scratchpad content as a user message\n   - Prepend system instruction: 'Parse the following notes and extract any tasks:'\n   - Call chat IPC to add message and trigger AI response\n\n3. AI tool integration:\n   - Ensure parse_notes tool is available in AI tool definitions\n   - Tool should extract: task titles, descriptions, due dates, priorities\n   - Return structured task objects for user confirmation\n\n4. Post-send behavior:\n   - Option to clear scratchpad after sending (user preference)\n   - Close scratchpad panel after successful send\n   - Navigate to chat view to show AI response\n   - Generated tasks should appear as action cards for confirmation",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Write notes with task-like content in scratchpad\n2. Click 'Send to AI' - verify content appears in chat\n3. Verify AI responds with parsed tasks using parse_notes tool\n4. Check action cards appear for each extracted task\n5. Confirm a task - verify it's created in task list\n6. Test with various note formats: bullet lists, paragraphs, mixed content\n7. Test loading state appears during AI processing\n8. Test error handling when AI fails",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T09:14:06.842Z"
           },
           {
             "id": 3,
@@ -928,9 +929,10 @@
             "description": "Create a search modal triggered by Cmd+F that performs efficient full-text search across all tasks (active and completed), with results grouped by status.",
             "dependencies": [],
             "details": "Implement comprehensive search functionality:\n\n1. SQLite FTS5 setup (in main process):\n   - Create FTS5 virtual table: tasks_fts (title, body, client)\n   - Add triggers to sync FTS with main tasks table on INSERT/UPDATE/DELETE\n   - Migration script to populate FTS from existing tasks\n   ```sql\n   CREATE VIRTUAL TABLE tasks_fts USING fts5(title, body, client, content=tasks, content_rowid=rowid);\n   ```\n\n2. Create src/renderer/components/search/SearchModal.tsx:\n   - Modal overlay with search input at top\n   - Keyboard shortcut Cmd+F to open (register globally)\n   - Auto-focus search input on open\n   - Debounced search (300ms) as user types\n   - Close on Escape or click outside\n\n3. Search implementation:\n   - IPC handler 'search:query' that runs FTS5 MATCH query\n   - Return results with snippet highlighting\n   - Sort by relevance score, then by status (active first)\n   - Limit results (50 max) for performance\n\n4. Results display:\n   - Group results: 'Active Tasks' section, then 'Completed Tasks'\n   - Show task title, client name, snippet with highlighted match\n   - Keyboard navigation (arrow keys, Enter to select)\n   - Click or Enter navigates to task in main view",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Press Cmd+F - search modal opens with focus on input\n2. Type search term - results appear after debounce delay\n3. Search by task title - verify matching tasks appear\n4. Search by client name - verify client field is searchable\n5. Search by task body content - verify body is indexed\n6. Verify active tasks appear before completed tasks\n7. Click result - modal closes, task is selected/highlighted\n8. Arrow keys + Enter - same navigation behavior\n9. Press Escape - modal closes without navigation\n10. Test with 1000+ tasks - verify search responds within 200ms",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T09:12:20.131Z"
           },
           {
             "id": 4,
@@ -938,9 +940,10 @@
             "description": "Build the Settings page with a tabbed interface containing sections for General, AI, Memory, Shortcuts, Backup, and Chat configuration options.",
             "dependencies": [],
             "details": "Create comprehensive Settings UI:\n\n1. Create src/renderer/pages/Settings.tsx:\n   - Route accessible from app header/menu\n   - Vertical tabs on left, content on right (or horizontal tabs for mobile)\n   - Each tab loads corresponding section component\n\n2. Tab sections (create separate components in src/renderer/components/settings/):\n   - GeneralSettings.tsx: Launch at login toggle, theme selector (system/light/dark)\n   - AISettings.tsx: Model dropdown (3 models), API key input (masked), autonomy mode radio\n   - MemorySettings.tsx: Soul/Profile/Patterns text editors, Journal browser with date picker\n   - ShortcutsSettings.tsx: List of actions with editable key binding inputs\n   - BackupSettings.tsx: Export/Import buttons, manual backup trigger, backup history list\n   - ChatSettings.tsx: Retention period radio (session/30 days/forever)\n\n3. Settings state:\n   - Create settingsStore in Zustand with all settings fields\n   - Load settings from DB on app start\n   - Save individual settings on change (no global save button)\n   - Show saving indicator for async operations\n\n4. Form controls:\n   - Use consistent form components (toggles, inputs, selects)\n   - Add validation for API key format\n   - Add confirmation for destructive actions",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Navigate to Settings - page loads with first tab active\n2. Click each tab - corresponding content displays\n3. Toggle 'Launch at login' - verify setting persists after restart\n4. Change theme - verify UI updates immediately\n5. Enter API key - verify it's saved and masked on reload\n6. Change autonomy mode - verify setting persists\n7. Edit Soul text - verify auto-saves on blur\n8. Browse Journal entries - verify entries display correctly\n9. Change retention period - verify setting persists\n10. All settings persist after app restart",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T09:12:20.863Z"
           },
           {
             "id": 5,
@@ -950,9 +953,10 @@
               4
             ],
             "details": "Create src/main/backup.ts with full backup functionality:\n\n1. Auto-backup system:\n   - Schedule daily backup using node-schedule or setInterval\n   - Copy SQLite file to backups directory: ~/Library/Application Support/[app]/backups/\n   - Filename format: backup-YYYY-MM-DD-HHmmss.db\n   - Run backup on app startup if >24 hours since last backup\n   - Keep only 30 most recent snapshots (delete oldest)\n\n2. Export with encryption:\n   - IPC handler 'backup:export' accepts { path: string, passphrase?: string }\n   - If passphrase provided, encrypt using AES-256-GCM:\n     - Derive key from passphrase using PBKDF2 (100k iterations)\n     - Generate random IV, prepend to encrypted data\n     - Add magic bytes header to identify encrypted files\n   - Use native file dialog to select export location\n   - Export as .taskdb or .taskdb.enc extension\n\n3. Import/Restore:\n   - IPC handler 'backup:import' accepts file path\n   - Detect if file is encrypted (check magic bytes)\n   - If encrypted, prompt for passphrase, decrypt with AES-256-GCM\n   - Validate SQLite file integrity before replacing\n   - Create safety backup of current DB before restore\n   - Replace current database, reload app state\n\n4. Backup history UI integration:\n   - IPC handler 'backup:list' returns available local backups\n   - Allow restore from backup history in Settings",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. App runs for first time - verify backup directory created\n2. Wait 24+ hours (or mock time) - verify auto-backup triggers\n3. Create 35 backups - verify only 30 most recent exist\n4. Click Export without passphrase - verify .taskdb file created\n5. Click Export with passphrase - verify .taskdb.enc file created\n6. Import unencrypted backup - verify data restores correctly\n7. Import encrypted backup - verify passphrase prompt appears\n8. Enter wrong passphrase - verify error message shown\n9. Enter correct passphrase - verify data restores correctly\n10. Restore from backup - verify safety backup of current DB created first\n11. Import corrupted file - verify validation catches it, shows error",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T09:12:21.661Z"
           },
           {
             "id": 6,
@@ -963,15 +967,16 @@
               5
             ],
             "details": "Build complete settings persistence infrastructure:\n\n1. Settings IPC handlers in src/main/ipc/settings.ts:\n   - 'settings:get' - retrieve single setting by key\n   - 'settings:getAll' - retrieve all settings as object\n   - 'settings:set' - save single setting { key, value }\n   - 'settings:setMultiple' - batch update multiple settings\n   - 'settings:reset' - reset setting to default value\n\n2. Database layer:\n   - Settings table schema: { key: string (PK), value: text (JSON), updated_at }\n   - Define default values for all settings in constants file\n   - Serialize complex values (arrays, objects) as JSON strings\n   - Parse JSON on retrieval with type safety\n\n3. Type definitions:\n   - Create src/shared/types/settings.ts with full settings interface\n   - Define settings keys as enum/const for type safety\n   - Export settings defaults object\n\n4. Renderer integration:\n   - Update settingsStore to use IPC for persistence\n   - Implement optimistic updates with rollback on failure\n   - Add settings change listener for cross-window sync\n   - Preload settings on app initialization\n\n5. Specific setting handlers:\n   - Launch at login: Use electron app.setLoginItemSettings()\n   - Theme: Apply to document.documentElement className\n   - Keyboard shortcuts: Update global shortcut registrations\n   - Chat retention: Schedule cleanup job based on setting",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "1. Change any setting - verify IPC call to main process\n2. Restart app - verify all settings load correctly from DB\n3. Set complex value (object) - verify JSON serialization works\n4. Toggle 'Launch at login' - verify system login items updated\n5. Change theme setting - verify UI updates across all windows\n6. Update keyboard shortcut - verify new binding works immediately\n7. Set chat retention to 30 days - verify old messages cleaned up\n8. Open app in two windows - change setting in one, verify other updates\n9. Set invalid value - verify validation error returned\n10. Reset to defaults - verify all settings return to default values",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-02-16T09:12:22.415Z"
           }
         ],
         "complexity": 7,
         "recommendedSubtasks": 6,
         "expansionPrompt": "Break down into: 1) Create Scratchpad component with markdown editor and slide-up animation, 2) Implement 'Send to AI' functionality that triggers parse_notes tool, 3) Build SearchModal with full-text search across tasks (SQLite FTS or LIKE queries), 4) Create Settings page structure with tabbed sections, 5) Implement backup system (daily auto-backup, export/import with optional encryption), 6) Create settings IPC handlers and state persistence. Focus on search performance with large datasets.",
-        "updatedAt": "2026-02-16T00:39:31.515Z"
+        "updatedAt": "2026-02-16T09:14:06.842Z"
       },
       {
         "id": "11",
@@ -1127,9 +1132,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-16T00:39:31.516Z",
+      "lastModified": "2026-02-16T09:14:06.842Z",
       "taskCount": 13,
-      "completedCount": 11,
+      "completedCount": 12,
       "tags": [
         "master"
       ]
