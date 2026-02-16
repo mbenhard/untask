@@ -29,6 +29,7 @@ export const useKeyboardShortcuts = ({
   clearInput,
 }: UseKeyboardShortcutsOptions): void => {
   const setView = useAppStore((state) => state.setView);
+  const activeView = useAppStore((state) => state.activeView);
   const isChatMode = useAppStore((state) => state.isChatMode);
   const isMemorySettingsOpen = useAppStore((state) => state.isMemorySettingsOpen);
   const triggerNewTask = useAppStore((state) => state.triggerNewTask);
@@ -43,6 +44,7 @@ export const useKeyboardShortcuts = ({
   const closeSearch = useSearchStore((state) => state.close);
 
   const inputValueRef = useRef(inputValue);
+  const activeViewRef = useRef(activeView);
   const isChatModeRef = useRef(isChatMode);
   const isMemorySettingsOpenRef = useRef(isMemorySettingsOpen);
   const isScratchpadOpenRef = useRef(isScratchpadOpen);
@@ -51,6 +53,10 @@ export const useKeyboardShortcuts = ({
   useEffect(() => {
     inputValueRef.current = inputValue;
   }, [inputValue]);
+
+  useEffect(() => {
+    activeViewRef.current = activeView;
+  }, [activeView]);
 
   useEffect(() => {
     isChatModeRef.current = isChatMode;
@@ -171,6 +177,7 @@ export const useKeyboardShortcuts = ({
 
       if (
         event.key.toLowerCase() === 'n' &&
+        (activeViewRef.current === 'today' || activeViewRef.current === 'inbox') &&
         !isChatModeRef.current &&
         !isMemorySettingsOpenRef.current &&
         !isScratchpadOpenRef.current &&

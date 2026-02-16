@@ -25,6 +25,7 @@ export const InlineTaskInput = ({
 }: InlineTaskInputProps) => {
   const createTask = useTaskStore((state) => state.createTask);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSeenTriggerRef = useRef<number | undefined>(triggerOpen);
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -36,9 +37,15 @@ export const InlineTaskInput = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (triggerOpen && triggerOpen > 0) {
+    if (
+      typeof triggerOpen === 'number' &&
+      typeof lastSeenTriggerRef.current === 'number' &&
+      triggerOpen > lastSeenTriggerRef.current
+    ) {
       setIsOpen(true);
     }
+
+    lastSeenTriggerRef.current = triggerOpen;
   }, [triggerOpen]);
 
   const handleSubmit = useCallback(async (): Promise<void> => {
