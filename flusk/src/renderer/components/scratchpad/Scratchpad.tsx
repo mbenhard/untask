@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import MDEditor from '@uiw/react-md-editor';
 import { Sparkles, X } from 'lucide-react';
 
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useTheme } from '../providers/ThemeProvider';
 import { Button } from '../ui/button';
 import {
@@ -20,6 +21,7 @@ import {
 import '@uiw/react-md-editor/markdown-editor.css';
 
 export const Scratchpad = () => {
+  const panelRef = useRef<HTMLElement>(null);
   const { resolvedTheme } = useTheme();
   const isOpen = useScratchpadStore(selectScratchpadIsOpen);
   const content = useScratchpadStore(selectScratchpadContent);
@@ -33,6 +35,7 @@ export const Scratchpad = () => {
   const save = useScratchpadStore((state) => state.save);
   const sendToAI = useScratchpadStore((state) => state.sendToAI);
   const prefersReducedMotion = useReducedMotion();
+  useFocusTrap(panelRef, isOpen);
 
   const panelTransition = useMemo(
     () =>
@@ -58,6 +61,7 @@ export const Scratchpad = () => {
     <AnimatePresence>
       {isOpen ? (
         <section
+          ref={panelRef}
           className="no-drag absolute inset-0 z-40 flex items-end"
           aria-label="Scratchpad panel"
           role="dialog"
