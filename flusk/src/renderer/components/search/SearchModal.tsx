@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef } from 'react';
 
+import { useFocusTrap } from '../../hooks/useFocusTrap';
+
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Search, X } from 'lucide-react';
 
@@ -67,8 +69,11 @@ export const SearchModal = () => {
   const exitChatMode = useAppStore((state) => state.exitChatMode);
   const selectTask = useTaskStore((state) => state.selectTask);
 
+  const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useFocusTrap(modalRef, isOpen);
 
   const prefersReducedMotion = useReducedMotion();
 
@@ -167,33 +172,43 @@ export const SearchModal = () => {
     const isSelected = flatIndex === selectedIndex;
 
     return (
-      <button
+      <motion.div
         key={result.id}
-        type="button"
-        className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
-          isSelected
-            ? 'bg-accent text-accent-foreground'
-            : 'hover:bg-accent/50'
-        }`}
-        onClick={() => navigateToResult(result)}
-        onMouseEnter={() =>
-          useSearchStore.setState({ selectedIndex: flatIndex })
-        }
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: prefersReducedMotion ? 0.05 : 0.12,
+          delay: prefersReducedMotion ? 0 : flatIndex * 0.03,
+          ease: 'easeOut',
+        }}
       >
-        <p className="truncate text-sm font-medium text-foreground">
-          {result.title}
-        </p>
-        {result.client ? (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {result.client}
+        <button
+          type="button"
+          className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
+            isSelected
+              ? 'bg-accent text-accent-foreground'
+              : 'hover:bg-accent/50'
+          }`}
+          onClick={() => navigateToResult(result)}
+          onMouseEnter={() =>
+            useSearchStore.setState({ selectedIndex: flatIndex })
+          }
+        >
+          <p className="truncate text-sm font-medium text-foreground">
+            {result.title}
           </p>
-        ) : null}
-        {result.snippet ? (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {renderSafeSnippet(result.snippet)}
-          </p>
-        ) : null}
-      </button>
+          {result.client ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {result.client}
+            </p>
+          ) : null}
+          {result.snippet ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {renderSafeSnippet(result.snippet)}
+            </p>
+          ) : null}
+        </button>
+      </motion.div>
     );
   };
 
@@ -201,7 +216,11 @@ export const SearchModal = () => {
     <AnimatePresence>
       {isOpen ? (
         <motion.div
+          ref={modalRef}
           key="search-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search tasks"
           initial="hidden"
           animate="visible"
           exit="hidden"
