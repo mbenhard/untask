@@ -70,6 +70,7 @@ export const TaskList = ({
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
+  const selectTask = useTaskStore((state) => state.selectTask);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -115,9 +116,17 @@ export const TaskList = ({
     const nextFocused = container.querySelector<HTMLElement>(
       `[data-task-id="${focusedTaskId}"]`,
     );
-    if (nextFocused && nextFocused !== activeElement) {
-      nextFocused.focus();
+    if (!nextFocused || nextFocused === activeElement) {
+      return;
     }
+
+    // Don't steal focus from interactive elements inside the focused task
+    // (e.g. metadata selects, inputs, date pickers in the expanded body).
+    if (nextFocused.contains(activeElement)) {
+      return;
+    }
+
+    nextFocused.focus();
   }, [focusedIndex, tasks]);
 
   useEffect(() => {
@@ -129,6 +138,9 @@ export const TaskList = ({
     if (selectedIndex < 0) {
       return;
     }
+
+    // Consume the selection so this effect doesn't re-fire on every tasks change.
+    selectTask(null);
 
     setFocusedIndex(selectedIndex);
     setExpandedTaskId(selectedTaskId);
@@ -151,7 +163,7 @@ export const TaskList = ({
       target.scrollIntoView({ block: 'nearest' });
       target.focus();
     });
-  }, [selectedTaskId, tasks]);
+  }, [selectTask, selectedTaskId, tasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -239,11 +251,11 @@ export const TaskList = ({
 
   if (tasks.length === 0) {
     return (
-      <div className="grid min-h-44 place-items-center rounded-lg border border-dashed border-border bg-card/40 px-4 text-center">
+      <div className="grid min-h-28 place-items-center px-1 text-center">
         <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          <p className="text-[13px] text-muted-foreground">{emptyMessage}</p>
           {emptyAction ? (
-            <p className="text-xs text-muted-foreground">{emptyAction}</p>
+            <p className="text-[11px] text-muted-foreground">{emptyAction}</p>
           ) : null}
         </div>
       </div>
@@ -267,7 +279,7 @@ export const TaskList = ({
             aria-describedby={`${scopeId}-hint`}
             tabIndex={0}
             onKeyDown={onKeyDown}
-            className="space-y-2 outline-none"
+            className="space-y-1 outline-none"
           >
             <p id={`${scopeId}-hint`} className="sr-only">
               Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
@@ -296,8 +308,7 @@ export const TaskList = ({
           {activeDragTask ? (
             <div
               className={cn(
-                'min-h-11 rounded-md border border-border bg-card/95 px-3 py-2 shadow-xl',
-                'text-sm text-foreground',
+                'min-h-9 bg-background/90 px-2 py-1 text-[12px] text-foreground/90',
               )}
             >
               {activeDragTask.title}

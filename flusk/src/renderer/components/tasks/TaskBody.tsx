@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Calendar, FolderOpen } from 'lucide-react';
+import { Calendar as CalendarIcon, FolderOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import type { Task } from '../../../types/models';
-import { useTaskStore } from '../../stores/taskStore';
-import { Textarea } from '../ui';
+import { useAppStore } from '../../stores/appStore';
+import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
+import { Button, Calendar, Popover, PopoverContent, Textarea } from '../ui';
 
 // ─── Metadata Field Sub-Components ──────────────────────────
+
+type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
 const PRIORITY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'none', label: 'None' },
@@ -22,7 +25,7 @@ const TaskFieldPriority = ({
   onUpdate,
 }: {
   task: Task;
-  onUpdate: (input: any) => Promise<any>;
+  onUpdate: UpdateTaskAction;
 }) => (
   <select
     value={task.priority ?? 'none'}
@@ -40,43 +43,81 @@ const TaskFieldPriority = ({
   </select>
 );
 
+/** Format a YYYY-MM-DD string as DD.MM.YYYY */
+const formatDueDate = (iso: string): string => {
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+};
+
+/** Convert a Date to YYYY-MM-DD for storage */
+const toISODate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const TaskFieldDueDate = ({
   task,
   onUpdate,
 }: {
   task: Task;
-  onUpdate: (input: any) => Promise<any>;
+  onUpdate: UpdateTaskAction;
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  if (!isEditing && !task.dueDate) {
-    return (
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        <Calendar className="size-3" />+ Due date
-      </button>
-    );
-  }
+  const selected = task.dueDate ? new Date(task.dueDate + 'T00:00:00') : undefined;
 
   return (
-    <input
-      type="date"
-      value={task.dueDate ?? ''}
-      onChange={(event) => {
-        const value = event.target.value || null;
-        void onUpdate({ id: task.id, dueDate: value });
-        if (!value) setIsEditing(false);
-      }}
-      onBlur={() => {
-        if (!task.dueDate) setIsEditing(false);
-      }}
-      autoFocus={isEditing && !task.dueDate}
-      className="h-7 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      aria-label="Due date"
-    />
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        {task.dueDate ? (
+          <Button
+            variant="outline"
+            size="xs"
+            className="gap-1 font-normal text-muted-foreground"
+            aria-label="Due date"
+          >
+            <CalendarIcon className="size-3" />
+            {formatDueDate(task.dueDate)}
+          </Button>
+        ) : (
+          <button
+            type="button"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <CalendarIcon className="size-3" />+ Due date
+          </button>
+        )}
+      </Popover.Trigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={(date) => {
+            const value = date ? toISODate(date) : null;
+            void onUpdate({ id: task.id, dueDate: value });
+            setOpen(false);
+          }}
+          defaultMonth={selected}
+        />
+        {task.dueDate && (
+          <div className="border-t border-border px-3 py-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-full text-muted-foreground"
+              onClick={() => {
+                void onUpdate({ id: task.id, dueDate: null });
+                setOpen(false);
+              }}
+            >
+              Clear due date
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover.Root>
   );
 };
 
@@ -85,7 +126,7 @@ const TaskFieldClient = ({
   onUpdate,
 }: {
   task: Task;
-  onUpdate: (input: any) => Promise<any>;
+  onUpdate: UpdateTaskAction;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(task.client ?? '');
@@ -161,7 +202,7 @@ const TaskFieldEffort = ({
   onUpdate,
 }: {
   task: Task;
-  onUpdate: (input: any) => Promise<any>;
+  onUpdate: UpdateTaskAction;
 }) => (
   <select
     value={task.effort ?? 'unknown'}
@@ -182,34 +223,59 @@ const TaskFieldEffort = ({
 const TaskFieldProject = ({
   task,
   onUpdate,
+  hasChildren,
 }: {
   task: Task;
-  onUpdate: (input: any) => Promise<any>;
+  onUpdate: UpdateTaskAction;
+  hasChildren: boolean;
 }) => {
-  const projects = useTaskStore((state) =>
-    state.tasks.filter(
-      (t) =>
-        t.parentId === null &&
-        t.id !== task.id &&
-        (t.status === 'active' || t.status === 'in_progress'),
-    ),
+  const allTasks = useTaskStore((state) => state.tasks);
+  const projects = useMemo(
+    () =>
+      allTasks.filter(
+        (t) =>
+          t.parentId === null &&
+          t.id !== task.id &&
+          t.status !== 'done',
+      ),
+    [allTasks, task.id],
   );
+
+  if (hasChildren) {
+    return (
+      <div
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-muted/40 px-2 text-xs text-muted-foreground"
+        title="This task has subtasks and acts as a project parent."
+      >
+        <FolderOpen className="size-3" />
+        Project parent
+      </div>
+    );
+  }
+
+  const emptyOptionLabel =
+    task.parentId !== null
+      ? 'No project'
+      : projects.length > 0
+        ? 'Move to project...'
+        : 'No project';
 
   return (
     <div className="flex items-center gap-1">
       <FolderOpen className="size-3 text-muted-foreground" />
       <select
+        data-task-project-select={task.id}
         value={task.parentId ?? ''}
         onChange={(event) => {
           const nextParentId = event.target.value || null;
-          const updates: any = { id: task.id, parentId: nextParentId };
+          const updates: TaskUpdateInput = { id: task.id, parentId: nextParentId };
           if (nextParentId && task.status === 'inbox') updates.status = 'active';
           void onUpdate(updates);
         }}
         className="h-7 max-w-[160px] truncate rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         aria-label="Project"
       >
-        <option value="">No project</option>
+        <option value="">{emptyOptionLabel}</option>
         {projects.map((project) => (
           <option key={project.id} value={project.id}>
             {project.title}
@@ -231,27 +297,37 @@ export const TaskBody = ({
   isExpanded,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
+  const setView = useAppStore((state) => state.setView);
   const updateTask = useTaskStore((state) => state.updateTask);
+  const allTasks = useTaskStore((state) => state.tasks);
+  const selectTask = useTaskStore((state) => state.selectTask);
   const prefersReducedMotion = useReducedMotion();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditingRaw] = useState(false);
   const [draftBody, setDraftBody] = useState(task.body ?? '');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Wrap setIsEditing to notify parent directly (avoids effect-based sync
+  // which fires on mount for every TaskBody and can interfere across instances).
+  const setIsEditing = useCallback(
+    (editing: boolean) => {
+      setIsEditingRaw(editing);
+      onBodyEditModeChange?.(editing);
+    },
+    [onBodyEditModeChange],
+  );
+
   useEffect(() => {
     if (!isExpanded) {
-      setIsEditing(false);
+      setIsEditingRaw(false);
+      onBodyEditModeChange?.(false);
     }
-  }, [isExpanded]);
+  }, [isExpanded, onBodyEditModeChange]);
 
   useEffect(() => {
     if (!isEditing) {
       setDraftBody(task.body ?? '');
     }
   }, [isEditing, task.body, task.id]);
-
-  useEffect(() => {
-    onBodyEditModeChange?.(isEditing);
-  }, [isEditing, onBodyEditModeChange]);
 
   const persistBody = useCallback(async () => {
     if (isSaving) {
@@ -279,6 +355,20 @@ export const TaskBody = ({
     () => (task.body && task.body.trim().length > 0 ? task.body : null),
     [task.body],
   );
+  const subtasks = useMemo(
+    () => allTasks.filter((candidate) => candidate.parentId === task.id),
+    [allTasks, task.id],
+  );
+  const activeSubtasks = useMemo(
+    () => subtasks.filter((subtask) => subtask.status !== 'done'),
+    [subtasks],
+  );
+  const hasChildren = subtasks.length > 0;
+
+  const handleOpenInProjects = useCallback(() => {
+    selectTask(task.id);
+    setView('projects');
+  }, [selectTask, setView, task.id]);
 
   return (
     <AnimatePresence initial={false}>
@@ -342,6 +432,43 @@ export const TaskBody = ({
             )}
           </div>
 
+          {hasChildren ? (
+            <div className="border-t border-border/80 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {activeSubtasks.length} active / {subtasks.length} total subtasks
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenInProjects}
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Manage in Projects
+                </button>
+              </div>
+              <ul className="mt-2 space-y-1">
+                {activeSubtasks.slice(0, 3).map((subtask) => (
+                  <li
+                    key={subtask.id}
+                    className="truncate text-xs text-muted-foreground"
+                  >
+                    {subtask.title}
+                  </li>
+                ))}
+                {activeSubtasks.length === 0 ? (
+                  <li className="truncate text-xs text-muted-foreground">
+                    All subtasks complete.
+                  </li>
+                ) : null}
+                {activeSubtasks.length > 3 ? (
+                  <li className="truncate text-xs text-muted-foreground">
+                    +{activeSubtasks.length - 3} more
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+
           {/* Metadata fields */}
           <div className="border-t border-border/80 px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -349,7 +476,7 @@ export const TaskBody = ({
               <TaskFieldDueDate task={task} onUpdate={updateTask} />
               <TaskFieldClient task={task} onUpdate={updateTask} />
               <TaskFieldEffort task={task} onUpdate={updateTask} />
-              <TaskFieldProject task={task} onUpdate={updateTask} />
+              <TaskFieldProject task={task} onUpdate={updateTask} hasChildren={hasChildren} />
             </div>
           </div>
         </motion.div>

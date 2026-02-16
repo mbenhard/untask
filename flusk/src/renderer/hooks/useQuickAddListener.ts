@@ -3,7 +3,7 @@ import { useEffect, type RefObject } from 'react';
 import type { QuickAddPayload } from '../../types/ipc';
 
 type UseQuickAddListenerOptions = {
-  inputRef: RefObject<HTMLInputElement | null>;
+  inputRef: RefObject<HTMLTextAreaElement | null>;
   onPrefill: (text: string) => void;
 };
 

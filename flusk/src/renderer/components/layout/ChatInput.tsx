@@ -5,12 +5,14 @@ import {
 } from 'react';
 
 import { cn } from '../../lib/utils';
-import { useAppStore } from '../../stores/appStore';
-import { Input } from '../ui/input';
+import { selectIsChatMode, useAppStore } from '../../stores/appStore';
+import { useChatStore } from '../../stores/chatStore';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
 
 type ChatInputProps = {
   className?: string;
-  inputRef: RefObject<HTMLInputElement | null>;
+  inputRef: RefObject<HTMLTextAreaElement | null>;
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
@@ -24,8 +26,11 @@ export const ChatInput = ({
   onSubmit,
 }: ChatInputProps) => {
   const enterChatMode = useAppStore((state) => state.enterChatMode);
+  const isChatMode = useAppStore(selectIsChatMode);
+  const messageCount = useChatStore((state) => state.messages.length);
+  const clearHistory = useChatStore((state) => state.clearHistory);
 
-  const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+  const handleChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
     const nextValue = event.target.value;
     onChange(nextValue);
 
@@ -34,7 +39,11 @@ export const ChatInput = ({
     }
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       onSubmit();
@@ -44,28 +53,40 @@ export const ChatInput = ({
   return (
     <footer
       className={cn(
-        'flex h-14 items-center gap-3 border-t border-border bg-card px-4',
+        'flex min-h-11 items-end gap-2 px-3 py-1.5',
         className,
       )}
     >
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => {
-          if (value.trim().length > 0) {
+      <div className="flex w-full items-end px-0 py-0">
+        <Textarea
+          ref={inputRef}
+          rows={1}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
             enterChatMode();
-          }
-        }}
-        placeholder="Ask anything..."
-        aria-label="Chat input"
-        className="h-9 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:border-0 focus-visible:ring-0"
-      />
-
-      <span className="select-none text-[11px] font-medium tracking-[0.02em] text-muted-foreground">
-        Cmd+K
-      </span>
+          }}
+          placeholder="Ask Flusk..."
+          aria-label="Chat input"
+          className="h-7 max-h-32 !min-h-0 resize-none overflow-y-auto !border-0 !bg-transparent !px-0 py-1 text-[13px] leading-5 !shadow-none focus-visible:!border-0 focus-visible:!ring-0"
+        />
+      </div>
+      {isChatMode ? (
+        messageCount > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              void clearHistory();
+            }}
+          >
+            Clear
+          </Button>
+        ) : null
+      ) : null}
     </footer>
   );
 };

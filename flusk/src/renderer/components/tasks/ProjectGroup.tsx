@@ -28,24 +28,24 @@ export const ProjectGroup = ({
   const contentId = useMemo(() => `project-${parentTask.id}`, [parentTask.id]);
 
   return (
-    <section className="rounded-lg border border-border/80 bg-card/60">
+    <section>
       <button
         type="button"
         onClick={() => setIsExpanded((current) => !current)}
         aria-expanded={isExpanded}
         aria-controls={contentId}
-        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left outline-none transition-colors hover:bg-accent/40 focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex w-full items-center gap-2 px-1 py-1.5 text-left outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
       >
         <ChevronRight
           className={cn(
-            'size-4 text-muted-foreground transition-transform',
+            'size-3.5 text-muted-foreground transition-transform',
             isExpanded && 'rotate-90',
           )}
         />
-        <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+        <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
           {parentTask.title}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[11px] text-muted-foreground">
           {completedCount}/{totalCount}
         </span>
       </button>
@@ -58,18 +58,27 @@ export const ProjectGroup = ({
             animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
             exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
             transition={{ duration: prefersReducedMotion ? 0.1 : 0.2, ease: 'easeOut' }}
-            className="overflow-hidden border-t border-border/70"
+            className="overflow-hidden"
           >
-            <div className="space-y-2 px-3 py-2">
-              <TaskList
-                tasks={subtasks}
-                allTasks={allTasks}
-                emptyMessage="No active subtasks."
-                ariaLabel={`Subtasks for ${parentTask.title}`}
-                scopeId={`project:${parentTask.id}`}
-                indentPx={20}
-              />
-              <div className="pl-5">
+            <div className="space-y-2 px-1 pb-2">
+              <div>
+                <TaskList
+                  tasks={[parentTask]}
+                  allTasks={allTasks}
+                  emptyMessage="No project details."
+                  ariaLabel={`Project details for ${parentTask.title}`}
+                  scopeId={`project-parent:${parentTask.id}`}
+                />
+              </div>
+
+              <div className="space-y-1 pl-4">
+                <TaskList
+                  tasks={subtasks}
+                  allTasks={allTasks}
+                  emptyMessage="No active subtasks."
+                  ariaLabel={`Subtasks for ${parentTask.title}`}
+                  scopeId={`project:${parentTask.id}`}
+                />
                 <InlineTaskInput parentId={parentTask.id} />
               </div>
             </div>

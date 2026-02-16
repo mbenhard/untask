@@ -76,10 +76,11 @@ export const InlineTaskInput = ({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="inline-flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        aria-label={label}
+        title={label}
       >
         <Plus className="size-3.5" />
-        {label}
       </button>
     );
   }
@@ -110,10 +111,10 @@ export const InlineTaskInput = ({
       placeholder={
         isCreating
           ? 'Creating...'
-          : (placeholder ?? `Write a ${label.toLowerCase()} and press Enter`)
+          : (placeholder ?? 'Type and press Enter')
       }
       disabled={isCreating}
-      className="h-8 text-xs"
+      className="h-8 border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
       aria-label={label}
     />
   );

@@ -74,6 +74,29 @@ const updateTaskFromSnapshot = (id: string, snapshot: Task): Task => {
   return updated;
 };
 
+const assertTopLevelParentExists = (
+  db: ReturnType<typeof getDb>,
+  parentId: string,
+): Task => {
+  const [parent] = db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.id, parentId))
+    .all();
+
+  if (!parent) {
+    throw new Error(`Parent task not found: ${parentId}`);
+  }
+
+  if (parent.parentId !== null) {
+    throw new Error(
+      'Tasks support one nesting level only. Choose a top-level parent task.',
+    );
+  }
+
+  return parent;
+};
+
 export function listTasks(filter?: {
   status?: 'inbox' | 'active' | 'in_progress' | 'done';
   parentId?: string | null;
@@ -294,6 +317,11 @@ export function createTask(
 ): Task {
   const validated = createTaskSchema.parse(input);
   const db = getDb();
+  let parentTask: Task | null = null;
+
+  if (validated.parentId) {
+    parentTask = assertTopLevelParentExists(db, validated.parentId);
+  }
 
   const [created] = db
     .insert(tasks)
@@ -302,6 +330,18 @@ export function createTask(
     .all();
 
   logTaskEvent(created.id, 'create', source, null, created);
+
+  if (parentTask && parentTask.status === 'inbox') {
+    const [promotedParent] = db
+      .update(tasks)
+      .set({ status: 'active' })
+      .where(eq(tasks.id, parentTask.id))
+      .returning()
+      .all();
+
+    logTaskEvent(parentTask.id, 'update', source, parentTask, promotedParent);
+  }
+
   return created;
 }
 
@@ -315,6 +355,34 @@ export function updateTask(
 
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
   if (!before) throw new Error(`Task not found: ${id}`);
+
+  if (validated.parentId !== undefined) {
+    const nextParentId = validated.parentId;
+
+    if (nextParentId === id) {
+      throw new Error('A task cannot be its own parent.');
+    }
+
+    if (nextParentId) {
+      assertTopLevelParentExists(db, nextParentId);
+    }
+
+    const hasChildren = db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.parentId, id))
+      .all().length > 0;
+
+    if (nextParentId && hasChildren) {
+      throw new Error(
+        'Cannot move a task with subtasks under another parent. Move or complete subtasks first.',
+      );
+    }
+
+    if (nextParentId !== null && updates.status === undefined && before.status === 'inbox') {
+      updates.status = 'active';
+    }
+  }
 
   const [updated] = db
     .update(tasks)

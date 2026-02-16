@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Square, Trash2, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Square, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 
-import type { ChatRetentionMode, TurnStep } from '../../../types/chat';
+import type { TurnStep } from '../../../types/chat';
 import { cn } from '../../lib/utils';
 import {
   selectChatError,
   selectChatIsSending,
   selectChatLastStreamError,
   selectChatMessages,
-  selectChatModels,
-  selectChatRetentionMode,
-  selectChatSelectedModelId,
   useChatStore,
 } from '../../stores/chatStore';
 import { Button } from '../ui/button';
@@ -160,14 +158,8 @@ export const ChatView = () => {
   const isSending = useChatStore(selectChatIsSending);
   const error = useChatStore(selectChatError);
   const lastStreamError = useChatStore(selectChatLastStreamError);
-  const models = useChatStore(selectChatModels);
-  const selectedModelId = useChatStore(selectChatSelectedModelId);
-  const retentionMode = useChatStore(selectChatRetentionMode);
 
-  const clearHistory = useChatStore((state) => state.clearHistory);
   const undoAction = useChatStore((state) => state.undoAction);
-  const setSelectedModel = useChatStore((state) => state.setSelectedModel);
-  const setRetentionMode = useChatStore((state) => state.setRetentionMode);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
   const cancelStream = useChatStore((state) => state.cancelStream);
@@ -290,8 +282,8 @@ export const ChatView = () => {
                         key={`text-${index}`}
                         className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm shadow-sm"
                       >
-                        <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
-                          <ReactMarkdown>{step.content}</ReactMarkdown>
+                        <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                          <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
                         </div>
                       </div>
                     );
@@ -316,16 +308,6 @@ export const ChatView = () => {
                   return null;
                 })}
 
-                {message.isStreaming ? (
-                  <button
-                    type="button"
-                    onClick={() => { void cancelStream(); }}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-                  >
-                    <Square className="size-3 fill-current" />
-                    Stop
-                  </button>
-                ) : null}
               </div>
             ) : isAssistant ? (
               <div
@@ -334,19 +316,9 @@ export const ChatView = () => {
                   'border-border bg-card/80 text-foreground',
                 )}
               >
-                <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                  <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
                 </div>
-                {message.isStreaming ? (
-                  <button
-                    type="button"
-                    onClick={() => { void cancelStream(); }}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-                  >
-                    <Square className="size-3 fill-current" />
-                    Stop
-                  </button>
-                ) : null}
               </div>
             ) : (
               <div
@@ -373,65 +345,6 @@ export const ChatView = () => {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-3">
-      <header className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-card/40 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
-            Model
-          </label>
-          <select
-            value={selectedModelId ?? ''}
-            onChange={(event) => {
-              const nextModelId = event.target.value;
-              if (nextModelId.length === 0) {
-                return;
-              }
-              void setSelectedModel(nextModelId);
-            }}
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-            aria-label="Model selector"
-          >
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
-            Retention
-          </label>
-          <select
-            value={retentionMode}
-            onChange={(event) => {
-              const nextMode = event.target.value as ChatRetentionMode;
-              if (nextMode === 'session' || nextMode === '30d' || nextMode === 'forever') {
-                void setRetentionMode(nextMode);
-              }
-            }}
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-            aria-label="Chat retention mode"
-          >
-            <option value="session">Session only</option>
-            <option value="30d">30 days</option>
-            <option value="forever">Forever</option>
-          </select>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => {
-              void clearHistory();
-            }}
-          >
-            <Trash2 className="size-3" />
-            Clear
-          </Button>
-        </div>
-      </header>
-
       {error ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <div className="min-w-0">
@@ -463,7 +376,7 @@ export const ChatView = () => {
           renderedMessages
         ) : (
           <div className="rounded-xl border border-dashed border-border/80 bg-card/20 p-4 text-sm text-muted-foreground">
-            Start typing below to open chat mode and stream responses.
+            Open the Chat tab or focus the input below to start a conversation.
           </div>
         )}
 

@@ -20,6 +20,7 @@ export type TaskCreateInput = {
 
 export type TaskUpdateInput = {
   id: string;
+  parentId?: string | null;
   title?: string;
   body?: string | null;
   status?: Task['status'];

@@ -338,7 +338,11 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     sendMessage: async (content) => {
-      await sendPreparedMessage(content, get().selectedModelId);
+      const selected = await flusk().chat.getSelectedModel().catch(() => null);
+      if (selected?.modelId) {
+        set({ selectedModelId: selected.modelId });
+      }
+      await sendPreparedMessage(content, selected?.modelId ?? null);
     },
 
     cancelStream: async () => {

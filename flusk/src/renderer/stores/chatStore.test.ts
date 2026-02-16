@@ -414,4 +414,58 @@ describe('chatStore stream reliability', () => {
       expect(toolStep?.toolName).toBe('create_task');
     });
   });
+
+  it('uses the main-selected model at send time instead of stale store state', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
+    mockChatApi.send.mockResolvedValue({
+      requestId: 'req-send-live-model',
+      userMessage: {
+        id: 'user-msg-1',
+        role: 'user',
+        content: 'hello',
+        toolCalls: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    useChatStore.setState({ selectedModelId: 'minimax/minimax-m2.5' });
+
+    await useChatStore.getState().sendMessage('hello');
+
+    expect(mockChatApi.getSelectedModel).toHaveBeenCalledTimes(1);
+    expect(mockChatApi.send).toHaveBeenCalledWith({
+      content: 'hello',
+      modelId: 'moonshotai/kimi-k2.5',
+    });
+    expect(useChatStore.getState().selectedModelId).toBe('moonshotai/kimi-k2.5');
+  });
+
+  it('falls back to main default model resolution when selected-model lookup fails', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    mockChatApi.getSelectedModel.mockRejectedValue(new Error('lookup failed'));
+    mockChatApi.send.mockResolvedValue({
+      requestId: 'req-send-fallback-model',
+      userMessage: {
+        id: 'user-msg-2',
+        role: 'user',
+        content: 'fallback',
+        toolCalls: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    await useChatStore.getState().sendMessage('fallback');
+
+    expect(mockChatApi.send).toHaveBeenCalledWith({
+      content: 'fallback',
+      modelId: null,
+    });
+  });
 });

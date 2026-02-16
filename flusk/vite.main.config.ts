@@ -8,7 +8,9 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['better-sqlite3'],
+      // Keep native and heavy server-side deps external for Electron main-process runtime resolution.
+      // This avoids bundling optional transitive modules (e.g. linkedom -> canvas).
+      external: ['better-sqlite3', '@extractus/article-extractor', 'linkedom', 'canvas'],
     },
   },
 });

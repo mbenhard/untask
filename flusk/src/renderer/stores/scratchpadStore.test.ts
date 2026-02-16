@@ -26,20 +26,18 @@ describe('scratchpadStore', () => {
     (globalThis as { window?: unknown }).window = { flusk: { scratchpad } };
 
     useScratchpadStore.setState({
-      isOpen: false,
       content: '',
+      isLegacyMarkdown: false,
       isDirty: false,
       isLoading: false,
       isSaving: false,
+      isSendingToAI: false,
       error: null,
     });
   });
 
   it('clears dirty state after saving when content is unchanged', async () => {
-    useScratchpadStore.setState({
-      content: 'draft note',
-      isDirty: true,
-    });
+    useScratchpadStore.setState({ content: 'draft note', isDirty: true });
 
     await useScratchpadStore.getState().save();
 
@@ -50,9 +48,6 @@ describe('scratchpadStore', () => {
   });
 
   it('does not overwrite newer edits when a save resolves late', async () => {
-    let resolveSave: ((value: { id: string; content: string; updatedAt: string }) => void) | null =
-      null;
-
     const scratchpad = ((globalThis as { window?: unknown }).window as {
       flusk: { scratchpad: MockScratchpadApi };
     }).flusk.scratchpad;
@@ -60,30 +55,58 @@ describe('scratchpadStore', () => {
     scratchpad.save.mockImplementation(
       async (content: string) =>
         await new Promise<{ id: string; content: string; updatedAt: string }>((resolve) => {
-          resolveSave = resolve;
           setTimeout(() => {
-            resolve({
-              id: 'main',
-              content,
-              updatedAt: new Date().toISOString(),
-            });
+            resolve({ id: 'main', content, updatedAt: new Date().toISOString() });
           }, 0);
         }),
     );
 
-    useScratchpadStore.setState({
-      content: 'first draft',
-      isDirty: true,
-    });
+    useScratchpadStore.setState({ content: 'first draft', isDirty: true });
 
     const savePromise = useScratchpadStore.getState().save();
     useScratchpadStore.getState().setContent('first draft plus new text');
     await savePromise;
 
     const state = useScratchpadStore.getState();
-    expect(resolveSave).not.toBeNull();
     expect(state.content).toBe('first draft plus new text');
     expect(state.isDirty).toBe(true);
     expect(state.isSaving).toBe(false);
+  });
+
+  it('detects legacy markdown on load', async () => {
+    const scratchpad = ((globalThis as { window?: unknown }).window as {
+      flusk: { scratchpad: MockScratchpadApi };
+    }).flusk.scratchpad;
+
+    scratchpad.get.mockResolvedValue({
+      id: 'main',
+      content: '# Hello\n\n- item 1\n- item 2',
+      updatedAt: new Date().toISOString(),
+    });
+
+    await useScratchpadStore.getState().load();
+
+    const state = useScratchpadStore.getState();
+    expect(state.isLegacyMarkdown).toBe(true);
+    expect(state.content).toBe('# Hello\n\n- item 1\n- item 2');
+  });
+
+  it('detects blocknote JSON on load', async () => {
+    const scratchpad = ((globalThis as { window?: unknown }).window as {
+      flusk: { scratchpad: MockScratchpadApi };
+    }).flusk.scratchpad;
+
+    const blocks = JSON.stringify([{ type: 'paragraph', content: [{ type: 'text', text: 'hello' }] }]);
+    scratchpad.get.mockResolvedValue({
+      id: 'main',
+      content: blocks,
+      updatedAt: new Date().toISOString(),
+    });
+
+    await useScratchpadStore.getState().load();
+
+    const state = useScratchpadStore.getState();
+    expect(state.isLegacyMarkdown).toBe(false);
+    expect(state.content).toBe(blocks);
   });
 });

@@ -19,7 +19,6 @@ export const ProjectsView = ({
     const activeParents = allTasks.filter(
       (task) =>
         task.parentId === null &&
-        task.status !== 'inbox' &&
         task.status !== 'done',
     );
 
@@ -53,27 +52,25 @@ export const ProjectsView = ({
           totalCount: allSubtasks.length,
         };
       })
-      .filter((group) => group.subtasks.length > 0);
+      .filter((group) => group.totalCount > 0);
   }, [allTasks]);
 
   return (
-    <div className="h-full overflow-y-auto p-4">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div className="h-full overflow-y-auto p-3">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading projects...</p>
         ) : null}
 
         {error ? (
-          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
+          <p className="text-[11px] text-destructive">
             {error}
           </p>
         ) : null}
 
         {!isLoading && projectGroups.length === 0 ? (
-          <div className="grid min-h-44 place-items-center rounded-lg border border-dashed border-border bg-card/40">
-            <p className="text-sm text-muted-foreground">
-              No active project subtasks.
-            </p>
+          <div className="grid min-h-28 place-items-center">
+            <p className="text-[13px] text-muted-foreground">No project tasks yet.</p>
           </div>
         ) : null}
 

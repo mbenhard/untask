@@ -51,7 +51,7 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
           animate={{ opacity: 1, y: 0 }}
           exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
           transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
-          className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2"
+          className="flex items-center gap-2 px-1 py-1"
           aria-live="polite"
         >
           <Sparkles className="size-4 text-muted-foreground" />
@@ -68,7 +68,7 @@ export const LiveThought = ({ refreshKey }: LiveThoughtProps) => {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-[11px] text-muted-foreground"
+            className="h-6 px-1.5 text-[11px] text-muted-foreground"
             disabled={!thought || isLoading}
             onClick={() => {
               if (!thought?.suggestedPrompt) {

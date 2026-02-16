@@ -5,12 +5,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useQuickAddListener } from '../../hooks/useQuickAddListener';
 import {
-  APP_VIEW_ORDER,
-  type AppView,
   selectActiveView,
   selectIsChatMode,
   selectIsMemorySettingsOpen,
-  selectPreviousViewIndex,
   useAppStore,
 } from '../../stores/appStore';
 import {
@@ -21,7 +18,7 @@ import {
 } from '../../stores/taskStore';
 import { useChatStore } from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
-import { Scratchpad } from '../scratchpad/Scratchpad';
+import { ScratchpadView } from '../scratchpad/ScratchpadView';
 import { SearchModal } from '../search/SearchModal';
 import { SettingsMemory } from '../settings/SettingsMemory';
 import { InboxView } from '../views/InboxView';
@@ -30,24 +27,11 @@ import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
 import { TitleBar } from './TitleBar';
 
-const getViewIndex = (view: AppView): number => APP_VIEW_ORDER.indexOf(view);
-
-const getDirection = (activeView: AppView, previousViewIndex: number): number => {
-  const activeViewIndex = getViewIndex(activeView);
-
-  if (activeViewIndex === previousViewIndex) {
-    return 0;
-  }
-
-  return activeViewIndex > previousViewIndex ? 1 : -1;
-};
-
 export const AppShell = () => {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [chatInputValue, setChatInputValue] = useState('');
 
   const activeView = useAppStore(selectActiveView);
-  const previousViewIndex = useAppStore(selectPreviousViewIndex);
   const isChatMode = useAppStore(selectIsChatMode);
   const isMemorySettingsOpen = useAppStore(selectIsMemorySettingsOpen);
   const closeMemorySettings = useAppStore((state) => state.closeMemorySettings);
@@ -103,28 +87,15 @@ export const AppShell = () => {
     void sendMessage(content);
   }, [chatInputValue, sendMessage]);
 
-  const transitionDirection = useMemo(
-    () => getDirection(activeView, previousViewIndex),
-    [activeView, previousViewIndex],
-  );
-
   const prefersReducedMotion = useReducedMotion();
 
-  const transition = prefersReducedMotion
-    ? { duration: 0.12, ease: 'easeOut' as const }
-    : { duration: 0.2, ease: 'easeOut' as const };
+  const transition = { duration: prefersReducedMotion ? 0.05 : 0.1, ease: 'easeOut' as const };
 
-  const viewVariants = prefersReducedMotion
-    ? {
-        enter: { opacity: 0 },
-        center: { opacity: 1 },
-        exit: { opacity: 0 },
-      }
-    : {
-        enter: (direction: number) => ({ x: direction * 200, opacity: 0 }),
-        center: { x: 0, opacity: 1 },
-        exit: (direction: number) => ({ x: direction * -200, opacity: 0 }),
-      };
+  const viewVariants = {
+    enter: { opacity: 0 },
+    center: { opacity: 1 },
+    exit: { opacity: 0 },
+  };
 
   const activeViewComponent = useMemo(() => {
     if (activeView === 'today') {
@@ -135,11 +106,15 @@ export const AppShell = () => {
       return <ProjectsView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
 
+    if (activeView === 'scratchpad') {
+      return <ScratchpadView />;
+    }
+
     return <InboxView allTasks={tasks} isLoading={isLoading} error={error} />;
   }, [activeView, error, isLoading, tasks]);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-window)] border border-border bg-background">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <TitleBar />
 
       <div className="relative flex-1 overflow-hidden pb-14">
@@ -158,7 +133,6 @@ export const AppShell = () => {
           ) : (
             <motion.section
               key={activeView}
-              custom={transitionDirection}
               variants={viewVariants}
               initial="enter"
               animate="center"
@@ -181,7 +155,6 @@ export const AppShell = () => {
       </div>
 
       {isMemorySettingsOpen ? <SettingsMemory onClose={closeMemorySettings} /> : null}
-      <Scratchpad />
       <SearchModal />
     </div>
   );

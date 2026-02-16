@@ -10,13 +10,6 @@ import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
 import { TaskBody } from './TaskBody';
 
-const PRIORITY_INDICATOR_CLASS: Record<'none' | 'low' | 'medium' | 'high', string> = {
-  none: 'bg-transparent',
-  low: 'bg-border',
-  medium: 'bg-muted-foreground/70',
-  high: 'bg-foreground',
-};
-
 export interface TaskItemProps {
   task: Task;
   isExpanded: boolean;
@@ -67,7 +60,6 @@ export const TaskItem = ({
     transition,
   };
 
-  const priority = task.priority ?? 'none';
   const isCompleted = task.status === 'done';
   const isToday = task.today === true;
 
@@ -96,23 +88,15 @@ export const TaskItem = ({
       tabIndex={isFocused ? 0 : -1}
       onFocus={onFocus}
       className={cn(
-        'overflow-hidden rounded-md border border-border/80 bg-card/60 outline-none transition-colors duration-100 hover:bg-accent/40',
-        isFocused && 'ring-1 ring-ring',
-        isDragging && 'z-10 opacity-80 shadow-lg',
+        'overflow-hidden border-b border-border/40 outline-none transition-colors duration-100',
+        isFocused && 'bg-accent/20',
+        isDragging && 'z-10 opacity-80',
       )}
     >
       <div
         onClick={() => onToggleExpand(task.id)}
-        className="group flex min-h-11 items-center gap-2 px-2"
+        className="group flex min-h-10 items-center gap-2 px-1.5"
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            'h-6 w-0.5 rounded-full',
-            PRIORITY_INDICATOR_CLASS[priority],
-          )}
-        />
-
         <button
           type="button"
           onClick={(event) => {
@@ -120,7 +104,7 @@ export const TaskItem = ({
             onComplete(task.id);
           }}
           aria-label={`Mark "${task.title}" complete`}
-          className="inline-flex size-5 items-center justify-center rounded-sm text-foreground/90 outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring"
+          className="inline-flex size-5 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
         >
           <motion.span
             initial={false}
@@ -130,7 +114,7 @@ export const TaskItem = ({
               borderColor: isCompleted ? 'var(--foreground)' : 'var(--border)',
             }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="inline-flex size-4 items-center justify-center rounded-sm border"
+            className="inline-flex size-4 items-center justify-center border"
           >
             <Check
               className={cn(
@@ -162,13 +146,13 @@ export const TaskItem = ({
                 }}
                 onBlur={saveTitleDraft}
                 onClick={(event) => event.stopPropagation()}
-                className="min-w-0 flex-1 truncate rounded-sm bg-transparent text-sm text-foreground outline-none ring-1 ring-ring px-1"
+                className="min-w-0 flex-1 truncate bg-transparent text-[13px] text-foreground outline-none ring-1 ring-ring px-1"
               />
             ) : (
               <>
                 <p
                   className={cn(
-                    'truncate text-sm text-foreground',
+                    'truncate text-[13px] text-foreground',
                     isCompleted && 'text-muted-foreground line-through',
                   )}
                 >
@@ -180,16 +164,11 @@ export const TaskItem = ({
                     event.stopPropagation();
                     onStartTitleEdit(task.id);
                   }}
-                  className="hidden size-5 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover:flex group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:flex focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+                  className="hidden size-5 items-center justify-center text-muted-foreground opacity-0 transition-opacity group-hover:flex group-hover:opacity-100 hover:text-foreground focus-visible:flex focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
                   aria-label={`Edit title for "${task.title}"`}
                 >
                   <Pencil className="size-3" />
                 </button>
-                {task.client ? (
-                  <span className="rounded-sm border border-border/80 bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {task.client}
-                  </span>
-                ) : null}
               </>
             )}
           </div>
@@ -203,14 +182,13 @@ export const TaskItem = ({
           }}
           aria-label={`Toggle today for "${task.title}"`}
           className={cn(
-            'inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
+            'inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
             isToday
-              ? 'bg-accent text-foreground'
-              : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+              ? 'text-foreground'
+              : 'hover:text-foreground',
           )}
         >
-          <Sun className="size-3" />
-          Today
+          <Sun className="size-3.5" />
         </button>
 
         <button
@@ -221,7 +199,7 @@ export const TaskItem = ({
             event.stopPropagation();
           }}
           aria-label={`Reorder "${task.title}"`}
-          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
         >
           <GripVertical className="size-3.5" />
         </button>
