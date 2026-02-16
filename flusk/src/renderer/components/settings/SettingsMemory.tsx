@@ -2,9 +2,11 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
 } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 import type { AiJournal } from '../../../types/models';
 import type { ChatModelCatalogEntry } from '../../../types/chat';
@@ -16,6 +18,7 @@ import type {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 type SettingsMemoryProps = {
   onClose: () => void;
@@ -76,6 +79,10 @@ const flusk = () => {
 };
 
 export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
+  const settingsRef = useRef<HTMLElement>(null);
+  useFocusTrap(settingsRef, true);
+  const prefersReducedMotion = useReducedMotion();
+
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('soul');
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
@@ -593,10 +600,16 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
   // ─── Render ──────────────────────────────────────────────
 
   return (
-    <section className="no-drag absolute inset-0 z-30 flex flex-col bg-background/95 backdrop-blur-sm">
+    <section
+      ref={settingsRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+      className="no-drag absolute inset-0 z-30 flex flex-col bg-background/95 backdrop-blur-sm"
+    >
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Settings</h2>
+          <h2 id="settings-title" className="text-sm font-semibold text-foreground">Settings</h2>
           <p className="text-xs text-muted-foreground">
             General, AI, memory, journal, and chat configuration.
           </p>
@@ -606,11 +619,14 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
         </Button>
       </header>
 
-      <nav className="flex items-center gap-2 border-b border-border px-4 py-2">
+      <nav className="flex items-center gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="Settings sections">
         {TAB_ORDER.map((tab) => (
           <Button
             key={tab}
             type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`settings-panel-${tab}`}
             variant={activeTab === tab ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setActiveTab(tab)}
@@ -632,507 +648,517 @@ export const SettingsMemory = ({ onClose }: SettingsMemoryProps) => {
           </p>
         ) : null}
 
-        {/* ─── General tab ─────────────────────────────── */}
-        {activeTab === 'general' ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Configure desktop startup behavior.
-            </p>
-            <div className="rounded-md border border-border bg-card px-3 py-3">
-              <label className="flex items-center justify-between gap-3 text-sm text-foreground">
-                <span>Launch Flusk at login</span>
-                <input
-                  type="checkbox"
-                  checked={launchAtLoginEnabled}
-                  onChange={(event) => void handleLaunchAtLoginChange(event)}
-                  disabled={isLoadingLaunchAtLogin || isSavingLaunchAtLogin}
-                  className="h-4 w-4 rounded border border-input bg-background accent-foreground"
-                />
-              </label>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
+          >
+            {/* ─── General tab ─────────────────────────────── */}
+            {activeTab === 'general' ? (
+              <div role="tabpanel" id="settings-panel-general" className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Configure desktop startup behavior.
+                </p>
+                <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <label className="flex items-center justify-between gap-3 text-sm text-foreground">
+                    <span>Launch Flusk at login</span>
+                    <input
+                      type="checkbox"
+                      checked={launchAtLoginEnabled}
+                      onChange={(event) => void handleLaunchAtLoginChange(event)}
+                      disabled={isLoadingLaunchAtLogin || isSavingLaunchAtLogin}
+                      className="h-4 w-4 rounded border border-input bg-background accent-foreground"
+                    />
+                  </label>
 
-              <p className="mt-2 text-xs text-muted-foreground">
-                {isLoadingLaunchAtLogin
-                  ? 'Checking availability...'
-                  : launchAtLoginApplied
-                    ? 'Supported in this runtime.'
-                    : 'Not supported in this runtime (preference is still saved).'}
-              </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {isLoadingLaunchAtLogin
+                      ? 'Checking availability...'
+                      : launchAtLoginApplied
+                        ? 'Supported in this runtime.'
+                        : 'Not supported in this runtime (preference is still saved).'}
+                  </p>
 
-              {launchAtLoginError ? (
-                <p className="mt-2 text-xs text-destructive">{launchAtLoginError}</p>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {/* ─── AI tab ──────────────────────────────────── */}
-        {activeTab === 'ai' ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Configure AI model, autonomy mode, and API credentials.
-            </p>
-
-            {/* Model selector */}
-            <div className="rounded-md border border-border bg-card px-3 py-3">
-              <p className="text-sm font-medium text-foreground">Model</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Select the AI model used for chat responses.
-              </p>
-              {isLoadingModels ? (
-                <p className="mt-2 text-xs text-muted-foreground">Loading models...</p>
-              ) : (
-                <select
-                  value={selectedModelId ?? ''}
-                  onChange={(event) => void handleModelChange(event.target.value)}
-                  className="mt-2 h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                  aria-label="AI model"
-                >
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Autonomy mode */}
-            <div className="rounded-md border border-border bg-card px-3 py-3">
-              <p className="text-sm font-medium text-foreground">Autonomy mode</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Controls how much the AI can act on its own.
-              </p>
-              {isLoadingAutonomy ? (
-                <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
-              ) : (
-                <div className="mt-2 flex items-center gap-2">
-                  {(['manual', 'safe', 'autopilot'] as const).map((mode) => (
-                    <Button
-                      key={mode}
-                      type="button"
-                      variant={autonomyMode === mode ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => void handleAutonomyChange(mode)}
-                    >
-                      {mode === 'manual' ? 'Manual' : mode === 'safe' ? 'Safe' : 'Autopilot'}
-                    </Button>
-                  ))}
+                  {launchAtLoginError ? (
+                    <p className="mt-2 text-xs text-destructive">{launchAtLoginError}</p>
+                  ) : null}
                 </div>
-              )}
-            </div>
-
-            {/* API key */}
-            <div className="rounded-md border border-border bg-card px-3 py-3">
-              <p className="text-sm font-medium text-foreground">OpenRouter API key</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Used for AI chat requests when the shell environment variable is not set.
-              </p>
-              <Input
-                type="password"
-                value={openRouterApiKeyInput}
-                onChange={(event) => setOpenRouterApiKeyInput(event.target.value)}
-                placeholder={hasOpenRouterApiKey ? 'Saved key (enter to replace)' : 'sk-or-...'}
-                disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
-                className="mt-3"
-                aria-label="OpenRouter API key"
-              />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {isLoadingOpenRouterApiKey
-                  ? 'Checking key status...'
-                  : hasOpenRouterApiKey
-                    ? 'A key is currently saved.'
-                    : 'No key saved yet.'}
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void saveOpenRouterApiKey()}
-                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
-                >
-                  Save key
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void clearOpenRouterApiKey()}
-                  disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey || !hasOpenRouterApiKey}
-                >
-                  Clear key
-                </Button>
               </div>
-            </div>
-          </div>
-        ) : null}
+            ) : null}
 
-        {/* ─── Memory tab ──────────────────────────────── */}
-        {activeTab === 'memory' ? (
-          <div className="space-y-3">
-            {isLoadingMemory ? (
-              <p className="text-sm text-muted-foreground">Loading memory state...</p>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  {(['soul', 'profile', 'patterns'] as const).map((sub) => (
-                    <Button
-                      key={sub}
-                      type="button"
-                      variant={memorySubTab === sub ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setMemorySubTab(sub)}
-                    >
-                      {MEMORY_FIELD_LABELS[sub]}
-                    </Button>
-                  ))}
-                </div>
+            {/* ─── AI tab ──────────────────────────────────── */}
+            {activeTab === 'ai' ? (
+              <div role="tabpanel" id="settings-panel-ai" className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Configure AI model, autonomy mode, and API credentials.
+                </p>
 
-                {memorySubTab === 'soul' ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Soul is your editable personality overlay on top of base assistant contracts.
-                    </p>
-                    <Textarea
-                      value={draft.soul}
-                      onChange={(event) =>
-                        setDraft((current) => ({ ...current, soul: event.target.value }))
-                      }
-                      className="min-h-52"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button type="button" size="sm" onClick={() => void saveField('soul')} disabled={isSaving}>
-                        Save Soul
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => void resetSoulField()} disabled={isSaving}>
-                        Reset Soul
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {memorySubTab === 'profile' ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Profile stores durable user facts and preferences.
-                    </p>
-                    <Textarea
-                      value={draft.profile}
-                      onChange={(event) =>
-                        setDraft((current) => ({ ...current, profile: event.target.value }))
-                      }
-                      className="min-h-52"
-                    />
-                    <Button type="button" size="sm" onClick={() => void saveField('profile')} disabled={isSaving}>
-                      Save Profile
-                    </Button>
-                  </div>
-                ) : null}
-
-                {memorySubTab === 'patterns' ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Patterns capture repeated workflows and recurring structures.
-                    </p>
-                    <Textarea
-                      value={draft.patterns}
-                      onChange={(event) =>
-                        setDraft((current) => ({ ...current, patterns: event.target.value }))
-                      }
-                      className="min-h-52"
-                    />
-                    <Button type="button" size="sm" onClick={() => void saveField('patterns')} disabled={isSaving}>
-                      Save Patterns
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-        ) : null}
-
-        {/* ─── Journal tab ─────────────────────────────── */}
-        {activeTab === 'journal' ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={50}
-                value={journalFilters.limit ?? 20}
-                onChange={(event) =>
-                  setJournalFilters((current) => ({
-                    ...current,
-                    limit: Number(event.target.value) || 20,
-                  }))
-                }
-                aria-label="Journal limit"
-              />
-              <Input
-                type="number"
-                min={1}
-                max={90}
-                value={journalFilters.days_back ?? 30}
-                onChange={(event) =>
-                  setJournalFilters((current) => ({
-                    ...current,
-                    days_back: Number(event.target.value) || 30,
-                  }))
-                }
-                aria-label="Journal days back"
-              />
-              <select
-                value={journalFilters.category ?? ''}
-                onChange={(event) =>
-                  setJournalFilters((current) => ({
-                    ...current,
-                    category:
-                      event.target.value.length > 0
-                        ? (event.target.value as NonNullable<
-                            SettingsReadJournalRequestPayload['category']
-                          >)
-                        : undefined,
-                  }))
-                }
-                className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                aria-label="Journal category filter"
-              >
-                <option value="">All categories</option>
-                <option value="progress">progress</option>
-                <option value="pattern">pattern</option>
-                <option value="preference">preference</option>
-                <option value="summary">summary</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">{journalSummary}</p>
-              <Button type="button" size="sm" variant="outline" onClick={() => void loadJournal()} disabled={isLoadingJournal}>
-                Refresh
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {isLoadingJournal ? (
-                <p className="text-sm text-muted-foreground">Loading journal...</p>
-              ) : null}
-              {!isLoadingJournal && journalEntries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No entries.</p>
-              ) : null}
-              {journalEntries.map((entry) => (
-                <article
-                  key={entry.id}
-                  className="rounded-md border border-border bg-card px-3 py-2"
-                >
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {entry.category} · {entry.createdAt ?? 'unknown time'}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">
-                    {entry.content}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {/* ─── Chat tab ────────────────────────────────── */}
-        {activeTab === 'chat' ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Configure chat message retention.
-            </p>
-            <div className="rounded-md border border-border bg-card px-3 py-3">
-              <p className="text-sm font-medium text-foreground">Retention period</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                How long chat messages are stored before being cleaned up.
-              </p>
-              {isLoadingRetention ? (
-                <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
-              ) : (
-                <div className="mt-2 flex items-center gap-2">
-                  {([
-                    { mode: 'session' as const, label: 'Session only' },
-                    { mode: '30d' as const, label: '30 days' },
-                    { mode: 'forever' as const, label: 'Forever' },
-                  ]).map(({ mode, label }) => (
-                    <Button
-                      key={mode}
-                      type="button"
-                      variant={retentionMode === mode ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => void handleRetentionChange(mode)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
-
-        {/* ─── Shortcuts tab ────────────────────────────── */}
-        {activeTab === 'shortcuts' ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Configure global keyboard shortcuts. Changes take effect after restart.
-            </p>
-            {isLoadingShortcuts ? (
-              <p className="text-sm text-muted-foreground">Loading shortcuts...</p>
-            ) : (
-              SHORTCUT_ENTRIES.map((entry) => (
-                <div
-                  key={entry.key}
-                  className="rounded-md border border-border bg-card px-3 py-3"
-                >
-                  <p className="text-sm font-medium text-foreground">{entry.label}</p>
+                {/* Model selector */}
+                <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">Model</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Default: {entry.defaultAccelerator}
+                    Select the AI model used for chat responses.
+                  </p>
+                  {isLoadingModels ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Loading models...</p>
+                  ) : (
+                    <select
+                      value={selectedModelId ?? ''}
+                      onChange={(event) => void handleModelChange(event.target.value)}
+                      className="mt-2 h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                      aria-label="AI model"
+                    >
+                      {models.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Autonomy mode */}
+                <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">Autonomy mode</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Controls how much the AI can act on its own.
+                  </p>
+                  {isLoadingAutonomy ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-2">
+                      {(['manual', 'safe', 'autopilot'] as const).map((mode) => (
+                        <Button
+                          key={mode}
+                          type="button"
+                          variant={autonomyMode === mode ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => void handleAutonomyChange(mode)}
+                        >
+                          {mode === 'manual' ? 'Manual' : mode === 'safe' ? 'Safe' : 'Autopilot'}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* API key */}
+                <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">OpenRouter API key</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Used for AI chat requests when the shell environment variable is not set.
                   </p>
                   <Input
-                    type="text"
-                    value={shortcutDrafts[entry.key] ?? entry.defaultAccelerator}
-                    onChange={(event) =>
-                      setShortcutDrafts((current) => ({
-                        ...current,
-                        [entry.key]: event.target.value,
-                      }))
-                    }
-                    className="mt-2"
-                    aria-label={`${entry.label} shortcut`}
+                    type="password"
+                    value={openRouterApiKeyInput}
+                    onChange={(event) => setOpenRouterApiKeyInput(event.target.value)}
+                    placeholder={hasOpenRouterApiKey ? 'Saved key (enter to replace)' : 'sk-or-...'}
+                    disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
+                    className="mt-3"
+                    aria-label="OpenRouter API key"
                   />
-                  <div className="mt-2 flex items-center gap-2">
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {isLoadingOpenRouterApiKey
+                      ? 'Checking key status...'
+                      : hasOpenRouterApiKey
+                        ? 'A key is currently saved.'
+                        : 'No key saved yet.'}
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
                     <Button
                       type="button"
                       size="sm"
-                      onClick={() => void saveShortcut(entry.key, shortcutDrafts[entry.key] ?? entry.defaultAccelerator)}
-                      disabled={isSavingShortcut}
+                      onClick={() => void saveOpenRouterApiKey()}
+                      disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey}
                     >
-                      Save
+                      Save key
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => void resetShortcut(entry.key, entry.defaultAccelerator)}
-                      disabled={isSavingShortcut}
+                      onClick={() => void clearOpenRouterApiKey()}
+                      disabled={isLoadingOpenRouterApiKey || isSavingOpenRouterApiKey || !hasOpenRouterApiKey}
                     >
-                      Reset
+                      Clear key
                     </Button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        ) : null}
-
-        {/* ─── Backup tab ──────────────────────────────── */}
-        {activeTab === 'backup' ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Database backups are created daily and the 30 most recent are kept.
-            </p>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void handleCreateBackup()}
-                disabled={isCreatingBackup}
-              >
-                {isCreatingBackup ? 'Creating...' : 'Create backup now'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void handleExportBackup()}
-                disabled={isExportingBackup}
-              >
-                {isExportingBackup ? 'Exporting...' : 'Export backup'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void handleImportBackupFromFile()}
-                disabled={isImportingBackup || restoringBackupFilename !== null}
-              >
-                {isImportingBackup ? 'Importing...' : 'Import backup'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void loadBackups()}
-                disabled={isLoadingBackups}
-              >
-                Refresh
-              </Button>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-md border border-border bg-card px-3 py-3">
-                <p className="text-sm font-medium text-foreground">Export encryption</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Optional passphrase used for encrypted export files.
-                </p>
-                <Input
-                  type="password"
-                  value={exportPassphrase}
-                  onChange={(event) => setExportPassphrase(event.target.value)}
-                  placeholder="Optional passphrase"
-                  className="mt-2"
-                  aria-label="Backup export passphrase"
-                />
               </div>
-              <div className="rounded-md border border-border bg-card px-3 py-3">
-                <p className="text-sm font-medium text-foreground">Import passphrase</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Required only when importing encrypted backups.
-                </p>
-                <Input
-                  type="password"
-                  value={importPassphrase}
-                  onChange={(event) => setImportPassphrase(event.target.value)}
-                  placeholder="Passphrase for encrypted backup"
-                  className="mt-2"
-                  aria-label="Backup import passphrase"
-                />
-              </div>
-            </div>
+            ) : null}
 
-            <div className="space-y-2">
-              {isLoadingBackups ? (
-                <p className="text-sm text-muted-foreground">Loading backups...</p>
-              ) : null}
-              {!isLoadingBackups && backups.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No backups found.</p>
-              ) : null}
-              {backups.map((backup) => (
-                <div
-                  key={backup.filename}
-                  className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2"
-                >
-                  <div>
-                    <p className="text-sm text-foreground">{backup.filename}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(backup.createdAt).toLocaleString()} &middot;{' '}
-                      {(backup.sizeBytes / 1024).toFixed(1)} KB
-                    </p>
-                  </div>
+            {/* ─── Memory tab ──────────────────────────────── */}
+            {activeTab === 'memory' ? (
+              <div role="tabpanel" id="settings-panel-memory" className="space-y-3">
+                {isLoadingMemory ? (
+                  <p className="text-sm text-muted-foreground">Loading memory state...</p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {(['soul', 'profile', 'patterns'] as const).map((sub) => (
+                        <Button
+                          key={sub}
+                          type="button"
+                          variant={memorySubTab === sub ? 'default' : 'ghost'}
+                          size="sm"
+                          onClick={() => setMemorySubTab(sub)}
+                        >
+                          {MEMORY_FIELD_LABELS[sub]}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {memorySubTab === 'soul' ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Soul is your editable personality overlay on top of base assistant contracts.
+                        </p>
+                        <Textarea
+                          value={draft.soul}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, soul: event.target.value }))
+                          }
+                          className="min-h-52"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button type="button" size="sm" onClick={() => void saveField('soul')} disabled={isSaving}>
+                            Save Soul
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => void resetSoulField()} disabled={isSaving}>
+                            Reset Soul
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {memorySubTab === 'profile' ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Profile stores durable user facts and preferences.
+                        </p>
+                        <Textarea
+                          value={draft.profile}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, profile: event.target.value }))
+                          }
+                          className="min-h-52"
+                        />
+                        <Button type="button" size="sm" onClick={() => void saveField('profile')} disabled={isSaving}>
+                          Save Profile
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    {memorySubTab === 'patterns' ? (
+                      <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Patterns capture repeated workflows and recurring structures.
+                        </p>
+                        <Textarea
+                          value={draft.patterns}
+                          onChange={(event) =>
+                            setDraft((current) => ({ ...current, patterns: event.target.value }))
+                          }
+                          className="min-h-52"
+                        />
+                        <Button type="button" size="sm" onClick={() => void saveField('patterns')} disabled={isSaving}>
+                          Save Patterns
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            {/* ─── Journal tab ─────────────────────────────── */}
+            {activeTab === 'journal' ? (
+              <div role="tabpanel" id="settings-panel-journal" className="space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={journalFilters.limit ?? 20}
+                    onChange={(event) =>
+                      setJournalFilters((current) => ({
+                        ...current,
+                        limit: Number(event.target.value) || 20,
+                      }))
+                    }
+                    aria-label="Journal limit"
+                  />
+                  <Input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={journalFilters.days_back ?? 30}
+                    onChange={(event) =>
+                      setJournalFilters((current) => ({
+                        ...current,
+                        days_back: Number(event.target.value) || 30,
+                      }))
+                    }
+                    aria-label="Journal days back"
+                  />
+                  <select
+                    value={journalFilters.category ?? ''}
+                    onChange={(event) =>
+                      setJournalFilters((current) => ({
+                        ...current,
+                        category:
+                          event.target.value.length > 0
+                            ? (event.target.value as NonNullable<
+                                SettingsReadJournalRequestPayload['category']
+                              >)
+                            : undefined,
+                      }))
+                    }
+                    className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                    aria-label="Journal category filter"
+                  >
+                    <option value="">All categories</option>
+                    <option value="progress">progress</option>
+                    <option value="pattern">pattern</option>
+                    <option value="preference">preference</option>
+                    <option value="summary">summary</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{journalSummary}</p>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void loadJournal()} disabled={isLoadingJournal}>
+                    Refresh
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {isLoadingJournal ? (
+                    <p className="text-sm text-muted-foreground">Loading journal...</p>
+                  ) : null}
+                  {!isLoadingJournal && journalEntries.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No entries.</p>
+                  ) : null}
+                  {journalEntries.map((entry) => (
+                    <article
+                      key={entry.id}
+                      className="rounded-md border border-border bg-card px-3 py-2"
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {entry.category} · {entry.createdAt ?? 'unknown time'}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">
+                        {entry.content}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* ─── Chat tab ────────────────────────────────── */}
+            {activeTab === 'chat' ? (
+              <div role="tabpanel" id="settings-panel-chat" className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Configure chat message retention.
+                </p>
+                <div className="rounded-md border border-border bg-card px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">Retention period</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    How long chat messages are stored before being cleaned up.
+                  </p>
+                  {isLoadingRetention ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-2">
+                      {([
+                        { mode: 'session' as const, label: 'Session only' },
+                        { mode: '30d' as const, label: '30 days' },
+                        { mode: 'forever' as const, label: 'Forever' },
+                      ]).map(({ mode, label }) => (
+                        <Button
+                          key={mode}
+                          type="button"
+                          variant={retentionMode === mode ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => void handleRetentionChange(mode)}
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* ─── Shortcuts tab ────────────────────────────── */}
+            {activeTab === 'shortcuts' ? (
+              <div role="tabpanel" id="settings-panel-shortcuts" className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Configure global keyboard shortcuts. Changes take effect after restart.
+                </p>
+                {isLoadingShortcuts ? (
+                  <p className="text-sm text-muted-foreground">Loading shortcuts...</p>
+                ) : (
+                  SHORTCUT_ENTRIES.map((entry) => (
+                    <div
+                      key={entry.key}
+                      className="rounded-md border border-border bg-card px-3 py-3"
+                    >
+                      <p className="text-sm font-medium text-foreground">{entry.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Default: {entry.defaultAccelerator}
+                      </p>
+                      <Input
+                        type="text"
+                        value={shortcutDrafts[entry.key] ?? entry.defaultAccelerator}
+                        onChange={(event) =>
+                          setShortcutDrafts((current) => ({
+                            ...current,
+                            [entry.key]: event.target.value,
+                          }))
+                        }
+                        className="mt-2"
+                        aria-label={`${entry.label} shortcut`}
+                      />
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void saveShortcut(entry.key, shortcutDrafts[entry.key] ?? entry.defaultAccelerator)}
+                          disabled={isSavingShortcut}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void resetShortcut(entry.key, entry.defaultAccelerator)}
+                          disabled={isSavingShortcut}
+                        >
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : null}
+
+            {/* ─── Backup tab ──────────────────────────────── */}
+            {activeTab === 'backup' ? (
+              <div role="tabpanel" id="settings-panel-backup" className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Database backups are created daily and the 30 most recent are kept.
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleCreateBackup()}
+                    disabled={isCreatingBackup}
+                  >
+                    {isCreatingBackup ? 'Creating...' : 'Create backup now'}
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => void handleRestoreBackup(backup)}
-                    disabled={restoringBackupFilename !== null}
+                    onClick={() => void handleExportBackup()}
+                    disabled={isExportingBackup}
                   >
-                    {restoringBackupFilename === backup.filename ? 'Restoring...' : 'Restore'}
+                    {isExportingBackup ? 'Exporting...' : 'Export backup'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleImportBackupFromFile()}
+                    disabled={isImportingBackup || restoringBackupFilename !== null}
+                  >
+                    {isImportingBackup ? 'Importing...' : 'Import backup'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void loadBackups()}
+                    disabled={isLoadingBackups}
+                  >
+                    Refresh
                   </Button>
                 </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-border bg-card px-3 py-3">
+                    <p className="text-sm font-medium text-foreground">Export encryption</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Optional passphrase used for encrypted export files.
+                    </p>
+                    <Input
+                      type="password"
+                      value={exportPassphrase}
+                      onChange={(event) => setExportPassphrase(event.target.value)}
+                      placeholder="Optional passphrase"
+                      className="mt-2"
+                      aria-label="Backup export passphrase"
+                    />
+                  </div>
+                  <div className="rounded-md border border-border bg-card px-3 py-3">
+                    <p className="text-sm font-medium text-foreground">Import passphrase</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Required only when importing encrypted backups.
+                    </p>
+                    <Input
+                      type="password"
+                      value={importPassphrase}
+                      onChange={(event) => setImportPassphrase(event.target.value)}
+                      placeholder="Passphrase for encrypted backup"
+                      className="mt-2"
+                      aria-label="Backup import passphrase"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {isLoadingBackups ? (
+                    <p className="text-sm text-muted-foreground">Loading backups...</p>
+                  ) : null}
+                  {!isLoadingBackups && backups.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No backups found.</p>
+                  ) : null}
+                  {backups.map((backup) => (
+                    <div
+                      key={backup.filename}
+                      className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm text-foreground">{backup.filename}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {new Date(backup.createdAt).toLocaleString()} &middot;{' '}
+                          {(backup.sizeBytes / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleRestoreBackup(backup)}
+                        disabled={restoringBackupFilename !== null}
+                      >
+                        {restoringBackupFilename === backup.filename ? 'Restoring...' : 'Restore'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </section>
   );
