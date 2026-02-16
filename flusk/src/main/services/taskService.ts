@@ -1,4 +1,4 @@
-import { eq, asc, desc, isNull, and, inArray, type SQL } from 'drizzle-orm';
+import { eq, asc, desc, isNull, and, inArray, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { TASK_STATUS_VALUES, type TaskStatus } from '../../types/models';
@@ -27,6 +27,14 @@ export const updateTaskSchema = createTaskSchema.partial().extend({
   id: z.string(),
 });
 const reorderTaskIdsSchema = z.array(z.string().min(1));
+
+export type DeleteTaskOptions = {
+  cascade?: boolean;
+};
+
+export type CompleteTaskOptions = {
+  completeChildren?: boolean;
+};
 
 // ─── Service functions ──────────────────────────────────────
 function logTaskEvent(
@@ -98,6 +106,19 @@ const assertTopLevelParentExists = (
   return parent;
 };
 
+const listChildTasks = (db: ReturnType<typeof getDb>, parentId: string): Task[] =>
+  db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.parentId, parentId))
+    .all();
+
+const listActiveChildTasks = (
+  db: ReturnType<typeof getDb>,
+  parentId: string,
+): Task[] =>
+  listChildTasks(db, parentId).filter((task) => task.status !== 'done');
+
 export function listTasks(filter?: {
   status?: TaskStatus;
   parentId?: string | null;
@@ -126,33 +147,30 @@ export function listTasks(filter?: {
   if (filter?.priority) {
     conditions.push(eq(tasks.priority, filter.priority));
   }
+  if (filter?.client) {
+    const normalizedClient = filter.client.trim().toLowerCase();
+    if (normalizedClient.length > 0) {
+      conditions.push(sql`lower(${tasks.client}) LIKE ${`%${normalizedClient}%`}`);
+    }
+  }
+  if (filter?.search) {
+    const normalizedSearch = filter.search.trim().toLowerCase();
+    if (normalizedSearch.length > 0) {
+      conditions.push(sql`lower(${tasks.title}) LIKE ${`%${normalizedSearch}%`}`);
+    }
+  }
 
-  let results = db
+  const query = db
     .select()
     .from(tasks)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(tasks.order))
-    .all();
+    .orderBy(asc(tasks.order));
 
-  if (filter?.client) {
-    const clientLower = filter.client.toLowerCase();
-    results = results.filter(
-      (task) => task.client && task.client.toLowerCase().includes(clientLower),
-    );
-  }
+  const limitedQuery = filter?.limit && filter.limit > 0
+    ? query.limit(filter.limit)
+    : query;
 
-  if (filter?.search) {
-    const searchLower = filter.search.toLowerCase();
-    results = results.filter(
-      (task) => task.title.toLowerCase().includes(searchLower),
-    );
-  }
-
-  if (filter?.limit && filter.limit > 0) {
-    results = results.slice(0, filter.limit);
-  }
-
-  return results;
+  return limitedQuery.all();
 }
 
 export function getTaskById(id: string): Task | null {
@@ -396,22 +414,97 @@ export function updateTask(
   return updated;
 }
 
-export function deleteTask(id: string, source: 'user' | 'ai' = 'user'): void {
+const deleteTaskRecursive = (
+  id: string,
+  source: 'user' | 'ai',
+  cascade: boolean,
+  visited: Set<string>,
+): void => {
+  if (visited.has(id)) {
+    throw new Error(`Task hierarchy cycle detected while deleting task ${id}.`);
+  }
+
+  visited.add(id);
   const db = getDb();
 
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
-  if (!before) throw new Error(`Task not found: ${id}`);
+  if (!before) {
+    visited.delete(id);
+    throw new Error(`Task not found: ${id}`);
+  }
+
+  const children = listChildTasks(db, id);
+  const activeChildren = children.filter((task) => task.status !== 'done');
+
+  if (cascade) {
+    for (const child of children) {
+      deleteTaskRecursive(child.id, source, true, visited);
+    }
+  } else {
+    if (activeChildren.length > 0) {
+      visited.delete(id);
+      throw new Error(
+        `Cannot delete parent task with active subtasks. Resolve ${activeChildren.length} active subtask(s) first or retry with cascade.`,
+      );
+    }
+
+    for (const child of children) {
+      const [updatedChild] = db
+        .update(tasks)
+        .set({ parentId: null })
+        .where(eq(tasks.id, child.id))
+        .returning()
+        .all();
+      logTaskEvent(child.id, 'move', source, child, updatedChild);
+    }
+  }
 
   db.delete(tasks).where(eq(tasks.id, id)).run();
 
   logTaskEvent(id, 'delete', source, before, null);
+  visited.delete(id);
 }
 
-export function completeTask(id: string, source: 'user' | 'ai' = 'user'): Task {
+export function deleteTask(
+  id: string,
+  source: 'user' | 'ai' = 'user',
+  options?: DeleteTaskOptions,
+): void {
+  deleteTaskRecursive(id, source, options?.cascade === true, new Set<string>());
+}
+
+const completeTaskRecursive = (
+  id: string,
+  source: 'user' | 'ai',
+  completeChildren: boolean,
+  visited: Set<string>,
+): Task => {
+  if (visited.has(id)) {
+    throw new Error(`Task hierarchy cycle detected while completing task ${id}.`);
+  }
+
+  visited.add(id);
   const db = getDb();
 
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
-  if (!before) throw new Error(`Task not found: ${id}`);
+  if (!before) {
+    visited.delete(id);
+    throw new Error(`Task not found: ${id}`);
+  }
+
+  const activeChildren = listActiveChildTasks(db, id);
+  if (activeChildren.length > 0 && !completeChildren) {
+    visited.delete(id);
+    throw new Error(
+      `Cannot complete parent task with active subtasks. Resolve ${activeChildren.length} active subtask(s) first or retry with completeChildren.`,
+    );
+  }
+
+  if (completeChildren) {
+    for (const child of activeChildren) {
+      completeTaskRecursive(child.id, source, true, visited);
+    }
+  }
 
   const [updated] = db
     .update(tasks)
@@ -421,7 +514,21 @@ export function completeTask(id: string, source: 'user' | 'ai' = 'user'): Task {
     .all();
 
   logTaskEvent(id, 'complete', source, before, updated);
+  visited.delete(id);
   return updated;
+}
+
+export function completeTask(
+  id: string,
+  source: 'user' | 'ai' = 'user',
+  options?: CompleteTaskOptions,
+): Task {
+  return completeTaskRecursive(
+    id,
+    source,
+    options?.completeChildren === true,
+    new Set<string>(),
+  );
 }
 
 export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {

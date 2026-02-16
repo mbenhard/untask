@@ -271,8 +271,14 @@ const successResult = (
 };
 
 const createTaskToolInputSchema = createTaskSchema.strict();
-const completeTaskToolInputSchema = z.object({ id: z.string().min(1) });
-const deleteTaskToolInputSchema = z.object({ id: z.string().min(1) });
+const completeTaskToolInputSchema = z.object({
+  id: z.string().min(1),
+  completeChildren: z.boolean().optional(),
+});
+const deleteTaskToolInputSchema = z.object({
+  id: z.string().min(1),
+  cascade: z.boolean().optional(),
+});
 const moveTaskToolInputSchema = z.object({
   id: z.string().min(1),
   parentId: z.string().nullable(),
@@ -422,10 +428,44 @@ const updateTaskTool = {
 
 const completeTaskTool = {
   name: 'complete_task',
-  description: 'Mark a task as done. Use when the user says a task is finished, completed, or done. Requires the task id. Sets completedAt timestamp and status to done. Undoable via undo_last_action.',
+  description: 'Mark a task as done. Use when the user says a task is finished, completed, or done. Requires the task id. If the task has active subtasks, set completeChildren=true only after explicit confirmation. Undoable via undo_last_action.',
   schema: completeTaskToolInputSchema,
   execute: async (input, context) => {
-    const completed = completeTask(input.id, 'ai');
+    const task = getTaskById(input.id);
+    if (!task) {
+      throw new Error(`Task not found: ${input.id}`);
+    }
+
+    const activeChildren = listTasks({ parentId: input.id })
+      .filter((child) => child.status !== 'done');
+
+    if (activeChildren.length > 0 && input.completeChildren !== true) {
+      return confirmationRequired(
+        context,
+        'complete_task',
+        'Confirmation required',
+        `Task "${task.title}" has ${activeChildren.length} active subtask(s). Confirm and call complete_task with completeChildren=true to complete all descendants.`,
+        { taskId: task.id },
+      );
+    }
+
+    if (
+      input.completeChildren === true &&
+      activeChildren.length > 0 &&
+      !context.skipInternalConfirmation
+    ) {
+      return confirmationRequired(
+        context,
+        'complete_task',
+        'Confirmation required',
+        `Complete "${task.title}" and ${activeChildren.length} active subtask(s) only after explicit confirmation.`,
+        { taskId: task.id },
+      );
+    }
+
+    const completed = completeTask(input.id, 'ai', {
+      completeChildren: input.completeChildren === true,
+    });
     const event = getLastTaskEventForTask(completed.id);
 
     return successResult(
@@ -446,12 +486,39 @@ const completeTaskTool = {
 
 const deleteTaskTool = {
   name: 'delete_task',
-  description: 'Permanently delete a task. Use only when the user explicitly asks to delete or remove a task. Always requires confirmation before execution. This is destructive and not undoable. Requires the task id.',
+  description: 'Permanently delete a task. Use only when the user explicitly asks to delete or remove a task. Always requires confirmation before execution. If deleting a parent with active subtasks, set cascade=true only after explicit confirmation. This is destructive and not undoable. Requires the task id.',
   schema: deleteTaskToolInputSchema,
   execute: async (input, context) => {
     const task = getTaskById(input.id);
     if (!task) {
       throw new Error(`Task not found: ${input.id}`);
+    }
+
+    const activeChildren = listTasks({ parentId: input.id })
+      .filter((child) => child.status !== 'done');
+
+    if (activeChildren.length > 0 && input.cascade !== true) {
+      return confirmationRequired(
+        context,
+        'delete_task',
+        'Confirmation required',
+        `Task "${task.title}" has ${activeChildren.length} active subtask(s). Confirm and call delete_task with cascade=true to delete parent and subtasks together.`,
+        { taskId: task.id },
+      );
+    }
+
+    if (
+      input.cascade === true &&
+      activeChildren.length > 0 &&
+      !context.skipInternalConfirmation
+    ) {
+      return confirmationRequired(
+        context,
+        'delete_task',
+        'Confirmation required',
+        `Delete "${task.title}" and ${activeChildren.length} active subtask(s) only after explicit confirmation.`,
+        { taskId: task.id },
+      );
     }
 
     if (!context.skipInternalConfirmation) {
@@ -464,7 +531,7 @@ const deleteTaskTool = {
       );
     }
 
-    deleteTask(input.id, 'ai');
+    deleteTask(input.id, 'ai', { cascade: input.cascade === true });
 
     return successResult(
       context,
@@ -843,7 +910,7 @@ const updateUserProfileTool = {
   description: 'Save a fact about the user to their profile. Use when the user shares a stable personal detail (name, role, timezone, communication preference) or explicitly asks you to remember something. Only save high-confidence facts. Entry should be a concise, atomic statement.',
   schema: updateUserProfileInputSchema,
   execute: async (input) => {
-    const content = appendProfileEntry(input.entry);
+    const content = appendProfileEntry(input.entry, 'ai');
 
     return {
       status: 'success',
@@ -860,7 +927,7 @@ const updatePatternsTool = {
   description: 'Save a recurring workflow pattern the user follows. Use when you observe a repeated behavior across multiple interactions (e.g., "Reviews invoices every Monday", "Prefers tasks broken into subtasks"). Only save after confirming the pattern is stable, not a one-off.',
   schema: updatePatternsInputSchema,
   execute: async (input) => {
-    const content = appendPatternEntry(input.entry);
+    const content = appendPatternEntry(input.entry, 'ai');
 
     return {
       status: 'success',

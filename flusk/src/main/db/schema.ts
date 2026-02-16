@@ -1,4 +1,11 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import {
+  AnySQLiteColumn,
+  sqliteTable,
+  text,
+  integer,
+  real,
+  index,
+} from 'drizzle-orm/sqlite-core';
 
 // ─── tasks ──────────────────────────────────────────────────
 export const tasks = sqliteTable(
@@ -7,7 +14,10 @@ export const tasks = sqliteTable(
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    parentId: text('parent_id'),
+    parentId: text('parent_id').references(
+      (): AnySQLiteColumn => tasks.id,
+      { onDelete: 'set null', onUpdate: 'cascade' },
+    ),
     title: text('title').notNull(),
     body: text('body'),
     status: text('status', {
@@ -106,6 +116,25 @@ export const settings = sqliteTable('settings', {
   value: text('value').notNull(),
 });
 
+// ─── memory_events ──────────────────────────────────────────
+export const memoryEvents = sqliteTable(
+  'memory_events',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    layer: text('layer', { enum: ['soul', 'profile', 'patterns'] }).notNull(),
+    before: text('before').notNull(),
+    after: text('after').notNull(),
+    source: text('source', { enum: ['user', 'ai', 'system'] }).notNull(),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index('memory_events_layer_idx').on(table.layer),
+    index('memory_events_created_at_idx').on(table.createdAt),
+  ],
+);
+
 // ─── Exported types ─────────────────────────────────────────
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
@@ -122,3 +151,5 @@ export type AiJournal = typeof aiJournal.$inferSelect;
 export type NewAiJournal = typeof aiJournal.$inferInsert;
 
 export type Setting = typeof settings.$inferSelect;
+export type MemoryEvent = typeof memoryEvents.$inferSelect;
+export type NewMemoryEvent = typeof memoryEvents.$inferInsert;

@@ -31,9 +31,15 @@ import {
   type ProactiveTriggerEvaluationResultPayload,
   type SettingsBootstrapState,
   type SettingsMemoryStatePayload,
+  type SettingsMemoryHistoryRequestPayload,
+  type SettingsMemoryHistoryResultPayload,
   type SettingsMemoryUpdateRequestPayload,
+  type SettingsUndoMemoryEventRequestPayload,
+  type SettingsUndoMemoryEventResultPayload,
   type SettingsReadJournalRequestPayload,
   type SettingsReadJournalResultPayload,
+  type TaskDeleteRequestPayload,
+  type TaskCompleteRequestPayload,
   type SearchQueryRequest,
   type SearchQueryResponse,
   type BackupListResponse,
@@ -74,6 +80,7 @@ import {
   setChatRetentionMode,
 } from './services/chatService';
 import { readJournalEntries } from './services/journalService';
+import { listMemoryEvents, undoMemoryEvents } from './services/memoryService';
 import { getScratchpad, saveScratchpad } from './services/scratchpadService';
 import {
   createBackup,
@@ -137,6 +144,32 @@ const resolvePendingActionSchema = z.object({
   decision: z.enum(['approve', 'reject']),
 });
 
+const taskDeleteRequestSchema = z.union([
+  z.string().min(1),
+  z.object({
+    id: z.string().min(1),
+    cascade: z.boolean().optional(),
+  }),
+]);
+
+const taskCompleteRequestSchema = z.union([
+  z.string().min(1),
+  z.object({
+    id: z.string().min(1),
+    completeChildren: z.boolean().optional(),
+  }),
+]);
+
+const memoryHistoryRequestSchema = z.object({
+  layer: z.enum(['soul', 'profile', 'patterns']).optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+});
+
+const undoMemoryEventRequestSchema = z.object({
+  eventId: z.string().min(1).optional(),
+  steps: z.number().int().min(1).max(20).optional(),
+});
+
 const launchAtLoginSchema = z.boolean();
 const backupExportRequestSchema = z.object({
   destination: z.string().min(1),
@@ -157,6 +190,29 @@ const getMemoryState = (): SettingsMemoryStatePayload => ({
 });
 
 const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
+const BACKUP_JOB_TIMEOUT_MS = 120_000;
+
+const withTimeout = async <T>(
+  task: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> => {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([task, timeoutPromise]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+};
 
 const notifyBackupRestored = (): void => {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -175,11 +231,11 @@ const reinitializeDatabase = (): void => {
   refreshTodayBadge();
 };
 
-const restoreBackupAndReloadRuntime = (request: BackupImportRequest): void => {
+const restoreBackupAndReloadRuntime = async (request: BackupImportRequest): Promise<void> => {
   closeDatabase();
 
   try {
-    importBackup(request.source, request.passphrase);
+    await importBackup(request.source, request.passphrase);
   } catch (error) {
     // Keep runtime usable if restore attempt fails.
     reinitializeDatabase();
@@ -330,16 +386,29 @@ export const registerIpcHandlers = (): void => {
     try { const result = updateTask(input); refreshTodayBadge(); return result; }
     catch (e) { console.error('[ipc] TASK_UPDATE:', e); throw e; }
   });
-  ipcMain.handle(IPC_CHANNELS.TASK_DELETE, (_event, id: string) => {
-    try { deleteTask(id); refreshTodayBadge(); }
+  ipcMain.handle(IPC_CHANNELS.TASK_DELETE, (_event, request: TaskDeleteRequestPayload) => {
+    try {
+      const validated = taskDeleteRequestSchema.parse(request);
+      const payload = typeof validated === 'string' ? { id: validated } : validated;
+      deleteTask(payload.id, 'user', { cascade: payload.cascade === true });
+      refreshTodayBadge();
+    }
     catch (e) { console.error('[ipc] TASK_DELETE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_REORDER, (_event, ids: string[]) => {
     try { reorderTasks(ids); }
     catch (e) { console.error('[ipc] TASK_REORDER:', e); throw e; }
   });
-  ipcMain.handle(IPC_CHANNELS.TASK_COMPLETE, (_event, id: string) => {
-    try { const result = completeTask(id); refreshTodayBadge(); return result; }
+  ipcMain.handle(IPC_CHANNELS.TASK_COMPLETE, (_event, request: TaskCompleteRequestPayload) => {
+    try {
+      const validated = taskCompleteRequestSchema.parse(request);
+      const payload = typeof validated === 'string' ? { id: validated } : validated;
+      const result = completeTask(payload.id, 'user', {
+        completeChildren: payload.completeChildren === true,
+      });
+      refreshTodayBadge();
+      return result;
+    }
     catch (e) { console.error('[ipc] TASK_COMPLETE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.TASK_TOGGLE_TODAY, (_event, id: string) => {
@@ -622,38 +691,56 @@ export const registerIpcHandlers = (): void => {
   // ─── Backup handlers ─────────────────────────────────────
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_LIST,
-    (): BackupListResponse => {
+    async (): Promise<BackupListResponse> => {
       try {
-        return { backups: listBackups() };
+        return {
+          backups: await withTimeout(
+            listBackups(),
+            BACKUP_JOB_TIMEOUT_MS,
+            'Backup listing',
+          ),
+        };
       }
       catch (e) { console.error('[ipc] BACKUP_LIST:', e); throw e; }
     },
   );
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_CREATE,
-    (): BackupMetadataPayload => {
+    async (): Promise<BackupMetadataPayload> => {
       try {
-        return createBackup();
+        return await withTimeout(
+          createBackup(),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Backup creation',
+        );
       }
       catch (e) { console.error('[ipc] BACKUP_CREATE:', e); throw e; }
     },
   );
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_EXPORT,
-    (_event, request: BackupExportRequest): void => {
+    async (_event, request: BackupExportRequest): Promise<void> => {
       try {
         const validated = backupExportRequestSchema.parse(request ?? {});
-        exportBackup(validated.destination, validated.passphrase);
+        await withTimeout(
+          exportBackup(validated.destination, validated.passphrase),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Backup export',
+        );
       }
       catch (e) { console.error('[ipc] BACKUP_EXPORT:', e); throw e; }
     },
   );
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_IMPORT,
-    (_event, request: BackupImportRequest): void => {
+    async (_event, request: BackupImportRequest): Promise<void> => {
       try {
         const validated = backupImportRequestSchema.parse(request ?? {});
-        restoreBackupAndReloadRuntime(validated);
+        await withTimeout(
+          restoreBackupAndReloadRuntime(validated),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Backup import',
+        );
       }
       catch (e) { console.error('[ipc] BACKUP_IMPORT:', e); throw e; }
     },
@@ -688,7 +775,11 @@ export const registerIpcHandlers = (): void => {
           return { canceled: true };
         }
 
-        exportBackup(result.filePath, validated.passphrase?.trim() || undefined);
+        await withTimeout(
+          exportBackup(result.filePath, validated.passphrase?.trim() || undefined),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Backup export',
+        );
         return { canceled: false, destination: result.filePath };
       }
       catch (e) { console.error('[ipc] BACKUP_EXPORT_DIALOG:', e); throw e; }
@@ -720,10 +811,14 @@ export const registerIpcHandlers = (): void => {
           return { canceled: true, restored: false };
         }
 
-        restoreBackupAndReloadRuntime({
-          source,
-          passphrase: validated.passphrase?.trim() || undefined,
-        });
+        await withTimeout(
+          restoreBackupAndReloadRuntime({
+            source,
+            passphrase: validated.passphrase?.trim() || undefined,
+          }),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Backup import',
+        );
         return { canceled: false, source, restored: true };
       }
       catch (e) { console.error('[ipc] BACKUP_IMPORT_DIALOG:', e); throw e; }
@@ -793,6 +888,45 @@ export const registerIpcHandlers = (): void => {
         return getMemoryState();
       }
       catch (e) { console.error('[ipc] SETTINGS_RESET_SOUL:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_MEMORY_HISTORY,
+    (
+      _event,
+      payload?: SettingsMemoryHistoryRequestPayload,
+    ): SettingsMemoryHistoryResultPayload => {
+      try {
+        const validated = memoryHistoryRequestSchema.parse(payload ?? {});
+        return {
+          events: listMemoryEvents({
+            layer: validated.layer,
+            limit: validated.limit,
+          }),
+        };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_GET_MEMORY_HISTORY:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_UNDO_MEMORY_EVENT,
+    (
+      _event,
+      payload?: SettingsUndoMemoryEventRequestPayload,
+    ): SettingsUndoMemoryEventResultPayload => {
+      try {
+        const validated = undoMemoryEventRequestSchema.parse(payload ?? {});
+        const result = undoMemoryEvents({
+          eventId: validated.eventId,
+          steps: validated.steps,
+          source: 'user',
+        });
+        return {
+          state: getMemoryState(),
+          revertedEventIds: result.revertedEventIds,
+        };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_UNDO_MEMORY_EVENT:', e); throw e; }
     },
   );
   ipcMain.handle(

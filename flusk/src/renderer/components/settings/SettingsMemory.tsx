@@ -11,11 +11,14 @@ import type { AiJournal } from '../../../types/models';
 import type { ChatModelCatalogEntry } from '../../../types/chat';
 import type {
   BackupMetadataPayload,
+  SettingsMemoryEventPayload,
+  SettingsMemoryHistoryRequestPayload,
   SettingsMemoryStatePayload,
   SettingsReadJournalRequestPayload,
   WindowDismissMode,
 } from '../../../types/ipc';
 import { cn } from '../../lib/utils';
+import { getFlusk } from '../../lib/flusk';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -66,20 +69,13 @@ const OPENROUTER_API_KEY_SETTING_KEY = 'ai_openrouter_key';
 
 type MemorySubTab = 'soul' | 'profile' | 'patterns';
 
-const flusk = () => {
-  if (!window.flusk) {
-    throw new Error('Flusk API not available');
-  }
-
-  return window.flusk;
-};
-
 export const SettingsMemory = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('soul');
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
+  const [memoryHistory, setMemoryHistory] = useState<SettingsMemoryEventPayload[]>([]);
   const [journalEntries, setJournalEntries] = useState<AiJournal[]>([]);
   const [journalFilters, setJournalFilters] = useState<SettingsReadJournalRequestPayload>(
     DEFAULT_JOURNAL_FILTERS,
@@ -87,6 +83,8 @@ export const SettingsMemory = () => {
 
   // Loading / saving states
   const [isLoadingMemory, setIsLoadingMemory] = useState(true);
+  const [isLoadingMemoryHistory, setIsLoadingMemoryHistory] = useState(false);
+  const [isUndoingMemory, setIsUndoingMemory] = useState(false);
   const [isLoadingJournal, setIsLoadingJournal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +136,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingMemory(true);
       setError(null);
-      const next = await flusk().settings.getMemoryState();
+      const next = await getFlusk().settings.getMemoryState();
       setDraft(next);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load memory state.');
@@ -147,11 +145,31 @@ export const SettingsMemory = () => {
     }
   }, []);
 
+  const loadMemoryHistory = useCallback(
+    async (options?: SettingsMemoryHistoryRequestPayload) => {
+      try {
+        setIsLoadingMemoryHistory(true);
+        setError(null);
+        const response = await getFlusk().settings.getMemoryHistory({
+          layer: memorySubTab,
+          limit: 20,
+          ...options,
+        });
+        setMemoryHistory(response.events);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Failed to load memory history.');
+      } finally {
+        setIsLoadingMemoryHistory(false);
+      }
+    },
+    [memorySubTab],
+  );
+
   const loadJournal = useCallback(async () => {
     try {
       setIsLoadingJournal(true);
       setError(null);
-      const response = await flusk().settings.readJournal(journalFilters);
+      const response = await getFlusk().settings.readJournal(journalFilters);
       setJournalEntries(response.entries);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load journal.');
@@ -164,7 +182,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingLaunchAtLogin(true);
       setLaunchAtLoginError(null);
-      const result = await flusk().app.getLaunchAtLogin();
+      const result = await getFlusk().app.getLaunchAtLogin();
       setLaunchAtLoginEnabled(result.enabled);
       setLaunchAtLoginApplied(result.applied);
       if (result.error) {
@@ -185,7 +203,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingOpenRouterApiKey(true);
       setError(null);
-      const stored = await flusk().settings.get(OPENROUTER_API_KEY_SETTING_KEY);
+      const stored = await getFlusk().settings.get(OPENROUTER_API_KEY_SETTING_KEY);
       setHasOpenRouterApiKey(Boolean(stored && stored.trim().length > 0));
       setOpenRouterApiKeyInput('');
     } catch (loadError) {
@@ -199,7 +217,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingWindowDismissMode(true);
       setError(null);
-      const result = await flusk().app.getWindowDismissMode();
+      const result = await getFlusk().app.getWindowDismissMode();
       setWindowDismissModeState(result.mode);
     } catch (loadError) {
       setError(
@@ -215,7 +233,7 @@ export const SettingsMemory = () => {
   const loadModels = useCallback(async () => {
     try {
       setIsLoadingModels(true);
-      const catalog = await flusk().chat.getModels();
+      const catalog = await getFlusk().chat.getModels();
       setModels(catalog);
       const selected = catalog.find((m) => m.selected);
       if (selected) {
@@ -231,7 +249,7 @@ export const SettingsMemory = () => {
   const loadAutonomyMode = useCallback(async () => {
     try {
       setIsLoadingAutonomy(true);
-      const result = await flusk().chat.getAutonomyMode();
+      const result = await getFlusk().chat.getAutonomyMode();
       setAutonomyMode(result.mode);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load autonomy mode.');
@@ -243,7 +261,7 @@ export const SettingsMemory = () => {
   const loadRetentionMode = useCallback(async () => {
     try {
       setIsLoadingRetention(true);
-      const result = await flusk().chat.getRetentionMode();
+      const result = await getFlusk().chat.getRetentionMode();
       setRetentionMode(result.mode);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load retention mode.');
@@ -258,7 +276,7 @@ export const SettingsMemory = () => {
       setError(null);
       const drafts: Record<string, string> = {};
       for (const entry of SHORTCUT_ENTRIES) {
-        const stored = await flusk().settings.get(entry.key);
+        const stored = await getFlusk().settings.get(entry.key);
         drafts[entry.key] = stored && stored.trim().length > 0
           ? stored
           : entry.defaultAccelerator;
@@ -276,7 +294,7 @@ export const SettingsMemory = () => {
       setIsSavingShortcut(true);
       setError(null);
       setNotice(null);
-      await flusk().settings.set(key, value);
+      await getFlusk().settings.set(key, value);
       setNotice('Shortcut saved. Restart app to apply.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to save shortcut.');
@@ -291,7 +309,7 @@ export const SettingsMemory = () => {
       setIsSavingShortcut(true);
       setError(null);
       setNotice(null);
-      await flusk().settings.set(key, defaultValue);
+      await getFlusk().settings.set(key, defaultValue);
       setNotice('Shortcut reset to default. Restart app to apply.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to reset shortcut.');
@@ -304,7 +322,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingBackups(true);
       setError(null);
-      const result = await flusk().backup.list();
+      const result = await getFlusk().backup.list();
       setBackups(result.backups);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load backups.');
@@ -318,7 +336,7 @@ export const SettingsMemory = () => {
       setIsCreatingBackup(true);
       setError(null);
       setNotice(null);
-      await flusk().backup.create();
+      await getFlusk().backup.create();
       setNotice('Backup created successfully.');
       await loadBackups();
     } catch (createError) {
@@ -334,7 +352,7 @@ export const SettingsMemory = () => {
       setError(null);
       setNotice(null);
 
-      const response = await flusk().backup.exportWithDialog({
+      const response = await getFlusk().backup.exportWithDialog({
         passphrase: exportPassphrase.trim() || undefined,
       });
 
@@ -357,7 +375,7 @@ export const SettingsMemory = () => {
       setError(null);
       setNotice(null);
 
-      const response = await flusk().backup.importWithDialog({
+      const response = await getFlusk().backup.importWithDialog({
         passphrase: importPassphrase.trim() || undefined,
       });
 
@@ -388,7 +406,7 @@ export const SettingsMemory = () => {
       setError(null);
       setNotice(null);
 
-      await flusk().backup.import({
+      await getFlusk().backup.import({
         source: backup.path,
         passphrase: importPassphrase.trim() || undefined,
       });
@@ -406,6 +424,12 @@ export const SettingsMemory = () => {
   useEffect(() => {
     void loadMemoryState();
   }, [loadMemoryState]);
+
+  useEffect(() => {
+    if (activeTab === 'memory') {
+      void loadMemoryHistory();
+    }
+  }, [activeTab, loadMemoryHistory]);
 
   useEffect(() => {
     if (activeTab === 'general') {
@@ -454,16 +478,17 @@ export const SettingsMemory = () => {
         setIsSaving(true);
         setNotice(null);
         setError(null);
-        const updated = await flusk().settings.updateMemoryState({ [field]: draft[field] });
+        const updated = await getFlusk().settings.updateMemoryState({ [field]: draft[field] });
         setDraft(updated);
         setNotice(`${MEMORY_FIELD_LABELS[field]} saved.`);
+        await loadMemoryHistory({ layer: field });
       } catch (saveError) {
         setError(saveError instanceof Error ? saveError.message : 'Failed to save memory.');
       } finally {
         setIsSaving(false);
       }
     },
-    [draft],
+    [draft, loadMemoryHistory],
   );
 
   const resetSoulField = useCallback(async () => {
@@ -471,15 +496,41 @@ export const SettingsMemory = () => {
       setIsSaving(true);
       setNotice(null);
       setError(null);
-      const updated = await flusk().settings.resetSoul();
+      const updated = await getFlusk().settings.resetSoul();
       setDraft(updated);
       setNotice('Soul reset to default.');
+      await loadMemoryHistory({ layer: 'soul' });
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : 'Failed to reset soul.');
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [loadMemoryHistory]);
+
+  const undoMemoryChange = useCallback(
+    async (eventId?: string) => {
+      try {
+        setIsUndoingMemory(true);
+        setNotice(null);
+        setError(null);
+        const result = await getFlusk().settings.undoMemoryEvent(
+          eventId ? { eventId } : { steps: 1 },
+        );
+        setDraft(result.state);
+        setNotice(
+          result.revertedEventIds.length > 0
+            ? `Reverted ${result.revertedEventIds.length} memory change(s).`
+            : 'No memory change was reverted.',
+        );
+        await loadMemoryHistory();
+      } catch (undoError) {
+        setError(undoError instanceof Error ? undoError.message : 'Failed to undo memory change.');
+      } finally {
+        setIsUndoingMemory(false);
+      }
+    },
+    [loadMemoryHistory],
+  );
 
   const handleLaunchAtLoginChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -492,7 +543,7 @@ export const SettingsMemory = () => {
 
       try {
         setIsSavingLaunchAtLogin(true);
-        const result = await flusk().app.setLaunchAtLogin(nextEnabled);
+        const result = await getFlusk().app.setLaunchAtLogin(nextEnabled);
         setLaunchAtLoginEnabled(result.enabled);
         setLaunchAtLoginApplied(result.applied);
         if (result.error) {
@@ -527,7 +578,7 @@ export const SettingsMemory = () => {
 
       try {
         setIsSavingWindowDismissMode(true);
-        const result = await flusk().app.setWindowDismissMode(mode);
+        const result = await getFlusk().app.setWindowDismissMode(mode);
         setWindowDismissModeState(result.mode);
         setNotice(
           result.mode === 'persistent'
@@ -559,7 +610,7 @@ export const SettingsMemory = () => {
       setIsSavingOpenRouterApiKey(true);
       setError(null);
       setNotice(null);
-      await flusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, normalized);
+      await getFlusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, normalized);
       setHasOpenRouterApiKey(true);
       setOpenRouterApiKeyInput('');
       setNotice('OpenRouter API key saved.');
@@ -575,7 +626,7 @@ export const SettingsMemory = () => {
       setIsSavingOpenRouterApiKey(true);
       setError(null);
       setNotice(null);
-      await flusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, '');
+      await getFlusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, '');
       setHasOpenRouterApiKey(false);
       setOpenRouterApiKeyInput('');
       setNotice('OpenRouter API key cleared.');
@@ -593,7 +644,7 @@ export const SettingsMemory = () => {
     setError(null);
 
     try {
-      const result = await flusk().chat.setSelectedModel({ modelId });
+      const result = await getFlusk().chat.setSelectedModel({ modelId });
       setSelectedModelId(result.modelId);
       setNotice('Model updated.');
     } catch (saveError) {
@@ -609,7 +660,7 @@ export const SettingsMemory = () => {
     setError(null);
 
     try {
-      const result = await flusk().chat.setAutonomyMode({ mode });
+      const result = await getFlusk().chat.setAutonomyMode({ mode });
       setAutonomyMode(result.mode);
       setNotice(`Autonomy mode set to ${result.mode}.`);
     } catch (saveError) {
@@ -625,7 +676,7 @@ export const SettingsMemory = () => {
     setError(null);
 
     try {
-      const result = await flusk().chat.setRetentionMode({ mode });
+      const result = await getFlusk().chat.setRetentionMode({ mode });
       setRetentionMode(result.mode);
       setNotice(`Chat retention set to ${mode === '30d' ? '30 days' : mode}.`);
     } catch (saveError) {
@@ -940,6 +991,60 @@ export const SettingsMemory = () => {
                         </Button>
                       </div>
                     ) : null}
+
+                    <div className="rounded-md border border-border/60 px-3 py-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          Recent {MEMORY_FIELD_LABELS[memorySubTab]} changes
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void undoMemoryChange()}
+                          disabled={isUndoingMemory || isLoadingMemoryHistory}
+                        >
+                          Undo latest
+                        </Button>
+                      </div>
+
+                      {isLoadingMemoryHistory ? (
+                        <p className="text-xs text-muted-foreground">Loading memory history...</p>
+                      ) : null}
+
+                      {!isLoadingMemoryHistory && memoryHistory.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No history yet.</p>
+                      ) : null}
+
+                      {!isLoadingMemoryHistory && memoryHistory.length > 0 ? (
+                        <div className="space-y-2">
+                          {memoryHistory.map((event) => (
+                            <article
+                              key={event.id}
+                              className="rounded-md border border-border/50 px-2 py-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] text-muted-foreground">
+                                  {event.createdAt ?? 'unknown time'} · {event.source}
+                                </p>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => void undoMemoryChange(event.id)}
+                                  disabled={isUndoingMemory}
+                                >
+                                  Undo
+                                </Button>
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-xs text-foreground/90">
+                                {event.after.trim().length > 0 ? event.after : '(empty)'}
+                              </p>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </>
                 )}
               </div>

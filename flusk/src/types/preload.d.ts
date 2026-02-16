@@ -41,10 +41,16 @@ import type {
   SearchQueryRequest,
   SearchQueryResponse,
   SettingsMemoryStatePayload,
+  SettingsMemoryHistoryRequestPayload,
+  SettingsMemoryHistoryResultPayload,
   SettingsMemoryUpdateRequestPayload,
+  SettingsUndoMemoryEventRequestPayload,
+  SettingsUndoMemoryEventResultPayload,
   SettingsReadJournalRequestPayload,
   SettingsReadJournalResultPayload,
   SettingsBootstrapState,
+  TaskDeleteRequestPayload,
+  TaskCompleteRequestPayload,
 } from './ipc';
 
 import type { Task, ChatMessage, Scratchpad, Setting } from './models';
@@ -83,12 +89,20 @@ export type FluskApi = {
 
   // ─── Database domain APIs ─────────────────────────────────
   tasks: {
-    list: (filter?: { status?: Exclude<Task['status'], null>; parentId?: string | null; today?: boolean }) => Promise<Task[]>;
+    list: (filter?: {
+      status?: Exclude<Task['status'], null>;
+      parentId?: string | null;
+      today?: boolean;
+      priority?: Task['priority'];
+      client?: string;
+      search?: string;
+      limit?: number;
+    }) => Promise<Task[]>;
     create: (input: Record<string, unknown>) => Promise<Task>;
     update: (input: Record<string, unknown>) => Promise<Task>;
-    delete: (id: string) => Promise<void>;
+    delete: (payload: TaskDeleteRequestPayload) => Promise<void>;
     reorder: (ids: string[]) => Promise<void>;
-    complete: (id: string) => Promise<Task>;
+    complete: (payload: TaskCompleteRequestPayload) => Promise<Task>;
     toggleToday: (id: string) => Promise<Task>;
   };
   chat: {
@@ -133,6 +147,8 @@ export type FluskApi = {
     getMemoryState: () => Promise<SettingsMemoryStatePayload>;
     updateMemoryState: (payload: SettingsMemoryUpdateRequestPayload) => Promise<SettingsMemoryStatePayload>;
     resetSoul: () => Promise<SettingsMemoryStatePayload>;
+    getMemoryHistory: (payload?: SettingsMemoryHistoryRequestPayload) => Promise<SettingsMemoryHistoryResultPayload>;
+    undoMemoryEvent: (payload?: SettingsUndoMemoryEventRequestPayload) => Promise<SettingsUndoMemoryEventResultPayload>;
     readJournal: (payload?: SettingsReadJournalRequestPayload) => Promise<SettingsReadJournalResultPayload>;
   };
 };

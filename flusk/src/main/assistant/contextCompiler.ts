@@ -192,6 +192,46 @@ const readContract = async (
   };
 };
 
+type IdentityContractsCacheEntry = {
+  contracts: IdentityContracts;
+  soulPath: string;
+  charterPath: string;
+  soulMtimeMs: number;
+  charterMtimeMs: number;
+};
+
+const identityContractsCache = new Map<string, IdentityContractsCacheEntry>();
+
+const resolveContractsCacheKey = (baseDir?: string): string =>
+  path.resolve(baseDir ?? process.cwd());
+
+const readMtimeMs = async (targetPath: string): Promise<number | null> => {
+  try {
+    const stats = await fs.stat(targetPath);
+    return stats.mtimeMs;
+  } catch {
+    return null;
+  }
+};
+
+const isCacheEntryFresh = async (
+  entry: IdentityContractsCacheEntry,
+): Promise<boolean> => {
+  const [nextSoulMtimeMs, nextCharterMtimeMs] = await Promise.all([
+    readMtimeMs(entry.soulPath),
+    readMtimeMs(entry.charterPath),
+  ]);
+
+  if (nextSoulMtimeMs === null || nextCharterMtimeMs === null) {
+    return false;
+  }
+
+  return (
+    nextSoulMtimeMs === entry.soulMtimeMs &&
+    nextCharterMtimeMs === entry.charterMtimeMs
+  );
+};
+
 export const loadIdentityContractsWithSources = async (
   baseDir?: string,
 ): Promise<IdentityContractsLoadResult> => {
@@ -217,12 +257,41 @@ export const loadIdentityContractsWithSources = async (
 export const loadIdentityContracts = async (
   baseDir?: string,
 ): Promise<IdentityContracts> => {
-  const contracts = await loadIdentityContractsWithSources(baseDir);
+  const cacheKey = resolveContractsCacheKey(baseDir);
+  const cached = identityContractsCache.get(cacheKey);
 
-  return {
-    soul: contracts.soul,
-    charter: contracts.charter,
+  if (cached && await isCacheEntryFresh(cached)) {
+    return cached.contracts;
+  }
+
+  const loaded = await loadIdentityContractsWithSources(baseDir);
+  const contracts: IdentityContracts = {
+    soul: loaded.soul,
+    charter: loaded.charter,
   };
+
+  if (loaded.resolvedPaths.soul && loaded.resolvedPaths.charter) {
+    const [soulMtimeMs, charterMtimeMs] = await Promise.all([
+      readMtimeMs(loaded.resolvedPaths.soul),
+      readMtimeMs(loaded.resolvedPaths.charter),
+    ]);
+
+    if (soulMtimeMs !== null && charterMtimeMs !== null) {
+      identityContractsCache.set(cacheKey, {
+        contracts,
+        soulPath: loaded.resolvedPaths.soul,
+        charterPath: loaded.resolvedPaths.charter,
+        soulMtimeMs,
+        charterMtimeMs,
+      });
+    } else {
+      identityContractsCache.delete(cacheKey);
+    }
+  } else {
+    identityContractsCache.delete(cacheKey);
+  }
+
+  return contracts;
 };
 
 const parseMarkdownSnippets = (

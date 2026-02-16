@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 
 import { stepCountIs, streamText } from 'ai';
 
-import type { AssistantLiveContext, AssistantMemorySnapshot } from '../../types/assistant';
 import type {
   ChatStreamErrorCode,
   ChatSendResultPayload,
@@ -24,7 +23,7 @@ import { createOpenRouterProviderFromEnv } from './openrouter';
 import type { ChatModelId } from './models';
 import { getSelectedModelId, getModelWebSearchConfig, resolveModelId } from './models';
 import { buildSystemPrompt } from './systemPrompt';
-import type { AiToolCall, AiToolExecutionResult, ToolExecutionEnvelope } from './tools';
+import type { AiToolCall, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall } from './tools';
 import { loadPendingActions } from './autonomy';
 
@@ -510,57 +509,12 @@ const maybeWriteMeaningfulInteractionJournal = (input: {
   }
 };
 
-export type PrepareChatTurnInput = {
-  userMessage: string;
-  modelId?: string | null;
-  tokenBudget?: number;
-  memory?: Partial<AssistantMemorySnapshot>;
-  liveContext?: Partial<AssistantLiveContext>;
-};
-
-export type PreparedChatTurn = {
-  modelId: ChatModelId;
-  userMessage: string;
-  systemPrompt: string;
-};
-
 export type StartChatTurnInput = {
   content: string;
   modelId?: string | null;
   tokenBudget?: number;
   requestId?: string;
   emit: (event: ChatStreamEvent) => void;
-};
-
-export const prepareChatTurn = async (
-  input: PrepareChatTurnInput,
-): Promise<PreparedChatTurn> => {
-  const trimmedMessage = input.userMessage.trim();
-
-  if (trimmedMessage.length === 0) {
-    throw new Error('Chat message cannot be empty.');
-  }
-
-  const modelId = input.modelId ? resolveModelId(input.modelId) : getSelectedModelId();
-  const { memory, liveContext } = buildCanonicalRuntimeContext({
-    memory: input.memory,
-    liveContext: input.liveContext,
-    journalLimit: 24,
-  });
-
-  const built = await buildSystemPrompt({
-    userMessage: trimmedMessage,
-    tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
-    memory,
-    liveContext,
-    modelId,
-  });
-
-  return {
-    modelId,
-    userMessage: trimmedMessage,
-    systemPrompt: built.modelInputPrompt,
-  };
 };
 
 const runAssistantStream = async (
@@ -584,6 +538,7 @@ const runAssistantStream = async (
   let reasoningText = '';
   const stepDescriptions: string[] = [];
   let finalizedTextFromModel = '';
+  let cachedPrompt: Awaited<ReturnType<typeof buildSystemPrompt>> | null = null;
 
   try {
     let streamCompleted = false;
@@ -593,16 +548,24 @@ const runAssistantStream = async (
       let attemptHadToolExecution = false;
 
       try {
-        const { memory, liveContext } = buildCanonicalRuntimeContext({
-          journalLimit: 24,
-        });
-        const builtPrompt = await buildSystemPrompt({
-          userMessage: input.userMessage,
-          tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
-          memory,
-          liveContext,
-          modelId: input.modelId,
-        });
+        let builtPrompt: Awaited<ReturnType<typeof buildSystemPrompt>> | null = cachedPrompt;
+        if (!builtPrompt) {
+          const { memory, liveContext } = buildCanonicalRuntimeContext({
+            journalLimit: 24,
+          });
+          builtPrompt = await buildSystemPrompt({
+            userMessage: input.userMessage,
+            tokenBudget: input.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
+            memory,
+            liveContext,
+            modelId: input.modelId,
+          });
+          cachedPrompt = builtPrompt;
+        }
+
+        if (!builtPrompt) {
+          throw new Error('Failed to build chat system prompt.');
+        }
 
         const provider = createOpenRouterProviderFromEnv();
         const model = provider.chat(input.modelId);
@@ -902,6 +865,9 @@ const runAssistantStream = async (
         });
 
         if (shouldRetry) {
+          if (attemptHadToolExecution || toolExecutions.length > 0) {
+            cachedPrompt = null;
+          }
           await sleep(computeRetryDelayMs());
           continue;
         }
@@ -1049,7 +1015,3 @@ export const cancelActiveChatTurns = (): void => {
     canceledChatRequestIds.add(requestId);
   });
 };
-
-export const dispatchToolCall = async (
-  call: AiToolCall,
-): Promise<AiToolExecutionResult> => executeToolCall(call);

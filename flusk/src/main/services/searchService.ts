@@ -70,8 +70,17 @@ export function initSearchFts(): void {
     END;
   `);
 
-  // Rebuild index from current tasks data
-  rebuildSearchIndex();
+  const taskCountRow = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as {
+    count: number;
+  };
+  const ftsCountRow = db.prepare('SELECT COUNT(*) as count FROM tasks_fts').get() as {
+    count: number;
+  };
+
+  // Rebuild only when FTS appears out-of-sync (new table, schema drift, or manual edits).
+  if (taskCountRow.count > 0 && ftsCountRow.count !== taskCountRow.count) {
+    rebuildSearchIndex();
+  }
 }
 
 /**

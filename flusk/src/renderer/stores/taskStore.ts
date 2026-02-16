@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { Task } from '../../types/models';
+import { getFlusk } from '../lib/flusk';
 
 export type TaskCreateInput = {
   title: string;
@@ -65,11 +66,6 @@ type TaskStore = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────
-const flusk = () => {
-  if (!window.flusk) throw new Error('Flusk API not available');
-  return window.flusk;
-};
-
 const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unknown task operation error.';
 
@@ -107,7 +103,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   fetchTasks: async () => {
     set({ isLoading: true, error: null });
     try {
-      const tasks = await flusk().tasks.list();
+      const tasks = await getFlusk().tasks.list();
       set({ tasks: [...tasks].sort(byOrderThenCreatedAt), isLoading: false });
     } catch (e) {
       set({ isLoading: false, error: toErrorMessage(e) });
@@ -141,7 +137,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set((s) => ({ tasks: [...s.tasks, tempTask].sort(byOrderThenCreatedAt), error: null }));
 
     try {
-      const created = await flusk().tasks.create(input as Record<string, unknown>);
+      const created = await getFlusk().tasks.create(input as Record<string, unknown>);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === tempId ? created : t))
@@ -171,7 +167,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const updated = await flusk().tasks.update(input as Record<string, unknown>);
+      const updated = await getFlusk().tasks.update(input as Record<string, unknown>);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? updated : t))
@@ -203,7 +199,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      await flusk().tasks.delete(id);
+      await getFlusk().tasks.delete(id);
       return true;
     } catch (e) {
       // Rollback: restore task
@@ -252,7 +248,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ tasks: reordered, error: null });
 
     try {
-      await flusk().tasks.reorder(ids);
+      await getFlusk().tasks.reorder(ids);
       return true;
     } catch (e) {
       // Rollback to previous order
@@ -276,7 +272,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const completed = await flusk().tasks.complete(id);
+      const completed = await getFlusk().tasks.complete(id);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? completed : t))
@@ -305,7 +301,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const toggled = await flusk().tasks.toggleToday(id);
+      const toggled = await getFlusk().tasks.toggleToday(id);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? toggled : t))

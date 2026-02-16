@@ -13,9 +13,7 @@ import type { Task, TaskStatus } from '../../../types/models';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
-import { InlineTaskInput } from './InlineTaskInput';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
-import { TaskList } from './TaskList';
 
 // ─── Metadata Field Sub-Components ──────────────────────────
 
@@ -258,16 +256,17 @@ const TaskFieldProject = ({
 export type TaskBodyProps = {
   task: Task;
   isExpanded: boolean;
+  hasChildren: boolean;
   onBodyEditModeChange?: (editing: boolean) => void;
 };
 
 export const TaskBody = ({
   task,
   isExpanded,
+  hasChildren,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
-  const allTasks = useTaskStore((state) => state.tasks);
   const prefersReducedMotion = useReducedMotion();
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -325,16 +324,6 @@ export const TaskBody = ({
     onBodyEditModeChange?.(false);
   }, [onBodyEditModeChange]);
 
-  const canOwnSubtasks = task.parentId === null;
-  const subtasks = useMemo(
-    () =>
-      canOwnSubtasks
-        ? allTasks.filter((candidate) => candidate.parentId === task.id)
-        : [],
-    [allTasks, canOwnSubtasks, task.id],
-  );
-  const hasChildren = subtasks.length > 0;
-
   return (
     <AnimatePresence initial={false}>
       {isExpanded ? (
@@ -355,29 +344,6 @@ export const TaskBody = ({
               getSlashMenuItems={task.parentId !== null ? getTextOnlySlashMenuItems : undefined}
             />
           </div>
-
-          {canOwnSubtasks ? (
-            <div className="border-t border-border/80 px-3 py-2">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Subtasks
-                </p>
-                <InlineTaskInput
-                  parentId={task.id}
-                  label="Add subtask"
-                  placeholder="Add subtask..."
-                />
-              </div>
-              <TaskList
-                tasks={subtasks}
-                allTasks={allTasks}
-                emptyMessage="No subtasks yet."
-                ariaLabel={`Subtasks for ${task.title}`}
-                scopeId={`subtasks:${task.id}`}
-                indentPx={8}
-              />
-            </div>
-          ) : null}
 
           {/* Metadata fields */}
           <div className="border-t border-border/80 px-3 py-2">

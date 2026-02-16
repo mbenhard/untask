@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -10,7 +10,6 @@ import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
 import { formatDueDateDisplay } from './dueDate';
 import { getNextPriority } from './taskInteraction';
-import { TaskBody } from './TaskBody';
 
 export interface TaskItemProps {
   task: Task;
@@ -22,8 +21,8 @@ export interface TaskItemProps {
   onToggleExpand: (id: string) => void;
   onComplete: (id: string) => void;
   onToggleToday: (id: string) => void;
-  onBodyEditModeChange?: (editing: boolean) => void;
   onFocus?: () => void;
+  children?: ReactNode;
 }
 
 const PRIORITY_CLASSNAME: Record<NonNullable<Task['priority']>, string> = {
@@ -48,8 +47,8 @@ export const TaskItem = ({
   onToggleExpand,
   onComplete,
   onToggleToday,
-  onBodyEditModeChange,
   onFocus,
+  children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
   const [titleDraft, setTitleDraft] = useState(task.title);
@@ -286,11 +285,7 @@ export const TaskItem = ({
         </div>
       </div>
 
-      <TaskBody
-        task={task}
-        isExpanded={isExpanded}
-        onBodyEditModeChange={onBodyEditModeChange}
-      />
+      {children}
     </div>
   );
 };

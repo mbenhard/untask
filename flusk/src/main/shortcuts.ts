@@ -50,12 +50,3 @@ export const registerGlobalShortcuts = (_mainWindow: BrowserWindow): void => {
 export const unregisterGlobalShortcuts = (): void => {
   globalShortcut.unregisterAll();
 };
-
-/**
- * Re-register shortcuts after settings change.
- * Unregisters all first, then re-registers with current settings.
- */
-export const refreshGlobalShortcuts = (mainWindow: BrowserWindow): void => {
-  globalShortcut.unregisterAll();
-  registerGlobalShortcuts(mainWindow);
-};

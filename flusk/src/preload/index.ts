@@ -43,15 +43,22 @@ import {
   type QuickAddPayload,
   type SearchQueryRequest,
   type SearchQueryResponse,
+  type TaskDeleteRequestPayload,
+  type TaskCompleteRequestPayload,
   type SettingsMemoryStatePayload,
+  type SettingsMemoryHistoryRequestPayload,
+  type SettingsMemoryHistoryResultPayload,
   type SettingsMemoryUpdateRequestPayload,
+  type SettingsUndoMemoryEventRequestPayload,
+  type SettingsUndoMemoryEventResultPayload,
   type SettingsReadJournalRequestPayload,
   type SettingsReadJournalResultPayload,
   type SettingsBootstrapState,
 } from '../types/ipc';
 import type { Task } from '../types/models';
+import type { FluskApi } from '../types/preload';
 
-const fluskApi = {
+const fluskApi: FluskApi = {
   // ─── App/window lifecycle APIs ──────────────────────────
   app: {
     requestHide: (): Promise<void> =>
@@ -123,18 +130,26 @@ const fluskApi = {
     ipcRenderer.invoke(IPC_CHANNELS.CHAT_ORCHESTRATE_WITH_KERNEL, request),
   // ─── Database domain APIs ─────────────────────────────────
   tasks: {
-    list: (filter?: { status?: Exclude<Task['status'], null>; parentId?: string | null; today?: boolean }) =>
+    list: (filter?: {
+      status?: Exclude<Task['status'], null>;
+      parentId?: string | null;
+      today?: boolean;
+      priority?: Task['priority'];
+      client?: string;
+      search?: string;
+      limit?: number;
+    }) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_LIST, filter),
     create: (input: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_CREATE, input),
     update: (input: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_UPDATE, input),
-    delete: (id: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TASK_DELETE, id),
+    delete: (payload: TaskDeleteRequestPayload) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_DELETE, payload),
     reorder: (ids: string[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_REORDER, ids),
-    complete: (id: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.TASK_COMPLETE, id),
+    complete: (payload: TaskCompleteRequestPayload) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_COMPLETE, payload),
     toggleToday: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_TOGGLE_TODAY, id),
   },
@@ -225,6 +240,14 @@ const fluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE_MEMORY_STATE, payload),
     resetSoul: (): Promise<SettingsMemoryStatePayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_RESET_SOUL),
+    getMemoryHistory: (
+      payload?: SettingsMemoryHistoryRequestPayload,
+    ): Promise<SettingsMemoryHistoryResultPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_MEMORY_HISTORY, payload),
+    undoMemoryEvent: (
+      payload?: SettingsUndoMemoryEventRequestPayload,
+    ): Promise<SettingsUndoMemoryEventResultPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UNDO_MEMORY_EVENT, payload),
     readJournal: (
       payload?: SettingsReadJournalRequestPayload,
     ): Promise<SettingsReadJournalResultPayload> =>

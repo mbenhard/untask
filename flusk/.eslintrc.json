@@ -13,5 +13,23 @@
     "plugin:import/typescript"
   ],
   "parser": "@typescript-eslint/parser",
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx", ".d.ts", ".css"]
+      }
+    }
+  },
+  "rules": {
+    "import/no-unresolved": [
+      "error",
+      {
+        "ignore": [
+          "^@blocknote/core/extensions$",
+          "^@blocknote/.+\\.css$"
+        ]
+      }
+    ]
+  },
   "ignorePatterns": ["vitest.config.ts"]
 }

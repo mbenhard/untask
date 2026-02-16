@@ -1,12 +1,14 @@
 import type { AssistantMemorySnapshot } from '../../types/assistant';
 import { readJournalEntries } from '../services/journalService';
-import { getSetting, setSetting } from '../services/settingsService';
+import {
+  MEMORY_LAYER_SETTINGS_KEYS,
+  writeMemoryLayerValue,
+  type MemoryEventSource,
+  type MemoryLayer,
+} from '../services/memoryService';
+import { getSetting } from '../services/settingsService';
 
-export const CANONICAL_MEMORY_KEYS = {
-  soul: 'ai_soul',
-  profile: 'ai_user_profile',
-  patterns: 'ai_patterns',
-} as const;
+export const CANONICAL_MEMORY_KEYS = MEMORY_LAYER_SETTINGS_KEYS;
 
 const LEGACY_MEMORY_KEYS = {
   soul: ['assistant.memory.soul'],
@@ -17,13 +19,10 @@ const LEGACY_MEMORY_KEYS = {
 export const DEFAULT_SOUL_MEMORY =
   "You are a direct, helpful productivity assistant for a solo freelancer. Push me to be productive but don't be annoying. Be concise. No corporate fluff.";
 
-type MemoryLayer = keyof typeof CANONICAL_MEMORY_KEYS;
-
 const hasContent = (value: string | null): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
 const migrateLegacyLayer = (layer: MemoryLayer): string | null => {
-  const canonicalKey = CANONICAL_MEMORY_KEYS[layer];
   const legacyKeys = LEGACY_MEMORY_KEYS[layer];
 
   for (const legacyKey of legacyKeys) {
@@ -32,7 +31,7 @@ const migrateLegacyLayer = (layer: MemoryLayer): string | null => {
       continue;
     }
 
-    setSetting(canonicalKey, legacyValue);
+    writeMemoryLayerValue(layer, legacyValue, 'system');
     return legacyValue;
   }
 
@@ -60,7 +59,7 @@ const getLayerValue = (
   }
 
   if (typeof options?.fallback === 'string') {
-    setSetting(canonicalKey, options.fallback);
+    writeMemoryLayerValue(layer, options.fallback, 'system');
     return options.fallback;
   }
 
@@ -71,15 +70,17 @@ const getLayerValue = (
   return '';
 };
 
-const setLayerValue = (layer: MemoryLayer, value: string): string => {
-  setSetting(CANONICAL_MEMORY_KEYS[layer], value);
-  return value;
-};
+const setLayerValue = (
+  layer: MemoryLayer,
+  value: string,
+  source: MemoryEventSource = 'user',
+): string => writeMemoryLayerValue(layer, value, source).value;
 
 const appendMemoryEntry = (
   read: () => string,
-  write: (value: string) => string,
+  write: (value: string, source?: MemoryEventSource) => string,
   entry: string,
+  source: MemoryEventSource = 'user',
 ): string => {
   const normalized = entry.trim();
   if (normalized.length === 0) {
@@ -99,7 +100,7 @@ const appendMemoryEntry = (
   }
 
   const next = existing.trim().length === 0 ? bullet : `${existing.trimEnd()}\n${bullet}`;
-  write(next);
+  write(next, source);
   return next;
 };
 
@@ -109,26 +110,42 @@ export const getSoul = (): string =>
     requireContent: true,
   });
 
-export const setSoul = (value: string): string => {
+export const setSoul = (
+  value: string,
+  source: MemoryEventSource = 'user',
+): string => {
   const next = value.trim().length > 0 ? value : DEFAULT_SOUL_MEMORY;
-  return setLayerValue('soul', next);
+  return setLayerValue('soul', next, source);
 };
 
-export const resetSoul = (): string => setLayerValue('soul', DEFAULT_SOUL_MEMORY);
+export const resetSoul = (source: MemoryEventSource = 'user'): string =>
+  setLayerValue('soul', DEFAULT_SOUL_MEMORY, source);
 
 export const getProfile = (): string => getLayerValue('profile');
 
-export const setProfile = (value: string): string => setLayerValue('profile', value);
+export const setProfile = (
+  value: string,
+  source: MemoryEventSource = 'user',
+): string => setLayerValue('profile', value, source);
 
-export const appendProfileEntry = (entry: string): string =>
-  appendMemoryEntry(getProfile, setProfile, entry);
+export const appendProfileEntry = (
+  entry: string,
+  source: MemoryEventSource = 'user',
+): string =>
+  appendMemoryEntry(getProfile, setProfile, entry, source);
 
 export const getPatterns = (): string => getLayerValue('patterns');
 
-export const setPatterns = (value: string): string => setLayerValue('patterns', value);
+export const setPatterns = (
+  value: string,
+  source: MemoryEventSource = 'user',
+): string => setLayerValue('patterns', value, source);
 
-export const appendPatternEntry = (entry: string): string =>
-  appendMemoryEntry(getPatterns, setPatterns, entry);
+export const appendPatternEntry = (
+  entry: string,
+  source: MemoryEventSource = 'user',
+): string =>
+  appendMemoryEntry(getPatterns, setPatterns, entry, source);
 
 export const migrateLegacyMemoryKeys = (): void => {
   void getSoul();

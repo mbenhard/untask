@@ -99,6 +99,7 @@ vi.mock('./memory', () => ({
 
 import * as taskService from '../services/taskService';
 import * as scratchpadService from '../services/scratchpadService';
+import * as autonomy from './autonomy';
 import { lookup } from 'node:dns/promises';
 import { extractFromHtml } from '@extractus/article-extractor';
 import { executeToolCall } from './tools';
@@ -106,12 +107,15 @@ import { executeToolCall } from './tools';
 const createTaskMock = vi.mocked(taskService.createTask);
 const updateTaskMock = vi.mocked(taskService.updateTask);
 const completeTaskMock = vi.mocked(taskService.completeTask);
+const deleteTaskMock = vi.mocked(taskService.deleteTask);
 const toggleTodayMock = vi.mocked(taskService.toggleToday);
 const getLastTaskEventForTaskMock = vi.mocked(taskService.getLastTaskEventForTask);
 const getTaskByIdMock = vi.mocked(taskService.getTaskById);
 const listTasksMock = vi.mocked(taskService.listTasks);
 const getScratchpadMock = vi.mocked(scratchpadService.getScratchpad);
 const saveScratchpadMock = vi.mocked(scratchpadService.saveScratchpad);
+const evaluateGateMock = vi.mocked(autonomy.evaluateGate);
+const isMutationToolMock = vi.mocked(autonomy.isMutationTool);
 const lookupMock = vi.mocked(lookup);
 const extractFromHtmlMock = vi.mocked(extractFromHtml);
 const originalFetch = globalThis.fetch;
@@ -125,12 +129,15 @@ beforeEach(() => {
   createTaskMock.mockReset();
   updateTaskMock.mockReset();
   completeTaskMock.mockReset();
+  deleteTaskMock.mockReset();
   toggleTodayMock.mockReset();
   getLastTaskEventForTaskMock.mockReset();
   getTaskByIdMock.mockReset();
   listTasksMock.mockReset();
   getScratchpadMock.mockReset();
   saveScratchpadMock.mockReset();
+  evaluateGateMock.mockReset();
+  isMutationToolMock.mockReset();
   lookupMock.mockReset();
   extractFromHtmlMock.mockReset();
   getScratchpadMock.mockReturnValue({
@@ -148,6 +155,8 @@ beforeEach(() => {
     title: 'Extracted title',
     content: '<p>Extracted content</p>',
   } as never);
+  evaluateGateMock.mockReturnValue({ action: 'execute', reason: 'allowed' } as never);
+  isMutationToolMock.mockReturnValue(false);
   globalThis.fetch = vi.fn() as typeof fetch;
 });
 
@@ -218,6 +227,17 @@ describe('view intent mapping', () => {
   });
 
   it('maps complete_task to tasks view when item is not Today or Inbox', async () => {
+    getTaskByIdMock.mockReturnValue({
+      id: 'task-done-1',
+      title: 'Write summary',
+      status: 'active',
+      today: false,
+      priority: 'none',
+      dueDate: null,
+      client: null,
+      invoiceStatus: 'none',
+    } as never);
+    listTasksMock.mockReturnValue([] as never);
     completeTaskMock.mockReturnValue({
       id: 'task-done-1',
       title: 'Write summary',
@@ -273,6 +293,58 @@ describe('view intent mapping', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.output.actionCard?.viewIntent).toBe('today');
+    }
+  });
+});
+
+describe('delete_task safety', () => {
+  it('auto-executes delete_task after autonomy gate approval', async () => {
+    isMutationToolMock.mockReturnValue(true);
+    getTaskByIdMock.mockReturnValue({
+      id: 'task-del-1',
+      title: 'Archive old invoices',
+      status: 'active',
+      today: false,
+    } as never);
+    listTasksMock.mockReturnValue([] as never);
+
+    const result = await executeToolCall({
+      name: 'delete_task',
+      input: { id: 'task-del-1' },
+    });
+
+    expect(deleteTaskMock).toHaveBeenCalledWith('task-del-1', 'ai', {
+      cascade: false,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+    }
+  });
+
+  it('executes delete_task only when explicitly replayed with autonomyBypass', async () => {
+    getTaskByIdMock.mockReturnValue({
+      id: 'task-del-2',
+      title: 'Remove stale draft',
+      status: 'active',
+      today: false,
+    } as never);
+    listTasksMock.mockReturnValue([] as never);
+
+    const result = await executeToolCall(
+      {
+        name: 'delete_task',
+        input: { id: 'task-del-2' },
+      },
+      { autonomyBypass: true },
+    );
+
+    expect(deleteTaskMock).toHaveBeenCalledWith('task-del-2', 'ai', {
+      cascade: false,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
     }
   });
 });

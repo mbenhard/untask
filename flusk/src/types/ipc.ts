@@ -90,6 +90,8 @@ export const IPC_CHANNELS = {
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
   SETTINGS_RESET_SOUL: 'settings:reset-soul',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
+  SETTINGS_GET_MEMORY_HISTORY: 'settings:get-memory-history',
+  SETTINGS_UNDO_MEMORY_EVENT: 'settings:undo-memory-event',
 } as const;
 
 export type SettingsBootstrapState = {
@@ -148,6 +150,44 @@ export type SettingsReadJournalRequestPayload = {
 
 export type SettingsReadJournalResultPayload = {
   entries: AiJournal[];
+};
+
+export type SettingsMemoryEventPayload = {
+  id: string;
+  layer: 'soul' | 'profile' | 'patterns';
+  before: string;
+  after: string;
+  source: 'user' | 'ai' | 'system';
+  createdAt: string | null;
+};
+
+export type SettingsMemoryHistoryRequestPayload = {
+  layer?: 'soul' | 'profile' | 'patterns';
+  limit?: number;
+};
+
+export type SettingsMemoryHistoryResultPayload = {
+  events: SettingsMemoryEventPayload[];
+};
+
+export type SettingsUndoMemoryEventRequestPayload = {
+  eventId?: string;
+  steps?: number;
+};
+
+export type SettingsUndoMemoryEventResultPayload = {
+  state: SettingsMemoryStatePayload;
+  revertedEventIds: string[];
+};
+
+export type TaskDeleteRequestPayload = string | {
+  id: string;
+  cascade?: boolean;
+};
+
+export type TaskCompleteRequestPayload = string | {
+  id: string;
+  completeChildren?: boolean;
 };
 
 // ─── App/window lifecycle payloads ────────────────────────

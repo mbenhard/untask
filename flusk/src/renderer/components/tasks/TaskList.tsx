@@ -27,7 +27,9 @@ import {
   getNextStatusInCycle,
   getStatusAfterToggleComplete,
 } from './taskInteraction';
+import { InlineTaskInput } from './InlineTaskInput';
 import { reconcileScopedReorder } from './statusLaneDrag';
+import { TaskBody } from './TaskBody';
 import { TaskItem } from './TaskItem';
 
 export interface TaskListProps {
@@ -316,22 +318,57 @@ export const TaskList = ({
           In Tasks view, drag tasks between status groups or drop onto tasks for exact placement.
           Press E to edit title.
         </p>
-        {tasks.map((task, index) => (
-          <TaskItem
-            key={task.id}
-            task={task}
-            isExpanded={expandedTaskId === task.id}
-            isFocused={focusedIndex === index}
-            isEditingTitle={editingTitleTaskId === task.id}
-            onStartTitleEdit={setEditingTitleTaskId}
-            onEndTitleEdit={() => setEditingTitleTaskId(null)}
-            onToggleExpand={handleToggleExpand}
-            onComplete={handleComplete}
-            onToggleToday={handleToggleToday}
-            onBodyEditModeChange={setIsAnyBodyEditing}
-            onFocus={() => setFocusedIndex(index)}
-          />
-        ))}
+        {tasks.map((task, index) => {
+          const isExpanded = expandedTaskId === task.id;
+          const canOwnSubtasks = task.parentId === null;
+          const subtasks = canOwnSubtasks
+            ? allTasks.filter((candidate) => candidate.parentId === task.id)
+            : [];
+
+          return (
+            <TaskItem
+              key={task.id}
+              task={task}
+              isExpanded={isExpanded}
+              isFocused={focusedIndex === index}
+              isEditingTitle={editingTitleTaskId === task.id}
+              onStartTitleEdit={setEditingTitleTaskId}
+              onEndTitleEdit={() => setEditingTitleTaskId(null)}
+              onToggleExpand={handleToggleExpand}
+              onComplete={handleComplete}
+              onToggleToday={handleToggleToday}
+              onFocus={() => setFocusedIndex(index)}
+            >
+              <TaskBody
+                task={task}
+                isExpanded={isExpanded}
+                hasChildren={subtasks.length > 0}
+                onBodyEditModeChange={setIsAnyBodyEditing}
+              />
+
+              {isExpanded && canOwnSubtasks ? (
+                <div className="border-t border-border/80 px-3 py-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Subtasks</p>
+                    <InlineTaskInput
+                      parentId={task.id}
+                      label="Add subtask"
+                      placeholder="Add subtask..."
+                    />
+                  </div>
+                  <TaskList
+                    tasks={subtasks}
+                    allTasks={allTasks}
+                    emptyMessage="No subtasks yet."
+                    ariaLabel={`Subtasks for ${task.title}`}
+                    scopeId={`subtasks:${task.id}`}
+                    indentPx={8}
+                  />
+                </div>
+              ) : null}
+            </TaskItem>
+          );
+        })}
       </div>
     </SortableContext>
   );

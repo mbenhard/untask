@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { isBlockNoteJson } from '../components/editor/editorUtils';
+import { getFlusk } from '../lib/flusk';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
 
@@ -17,14 +18,6 @@ type ScratchpadStore = {
   save: () => Promise<void>;
   sendToAI: (markdownOverride?: string) => Promise<void>;
   clearError: () => void;
-};
-
-const flusk = () => {
-  if (!window.flusk) {
-    throw new Error('Flusk API not available');
-  }
-
-  return window.flusk;
 };
 
 const toErrorMessage = (error: unknown): string =>
@@ -47,7 +40,7 @@ export const useScratchpadStore = create<ScratchpadStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const document = await flusk().scratchpad.get();
+      const document = await getFlusk().scratchpad.get();
       const raw = document.content;
       const legacy = raw.length > 0 && !isBlockNoteJson(raw);
 
@@ -81,7 +74,7 @@ export const useScratchpadStore = create<ScratchpadStore>((set, get) => ({
     set({ isSaving: true, error: null });
 
     try {
-      const saved = await flusk().scratchpad.save(content);
+      const saved = await getFlusk().scratchpad.save(content);
       set((state) => {
         if (state.content !== content) {
           return { isSaving: false, error: null };

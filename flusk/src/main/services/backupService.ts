@@ -1,16 +1,17 @@
 import { app } from 'electron';
 import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  statSync,
-  unlinkSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+  access,
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { promisify } from 'node:util';
 
 import { getDbPath, getRawDb } from '../db';
 
@@ -22,6 +23,9 @@ const KEY_LENGTH = 32; // AES-256
 const IV_LENGTH = 12; // GCM recommended
 const SALT_LENGTH = 16;
 const SQLITE_MAGIC = Buffer.from('SQLite format 3\0');
+const DAILY_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+const pbkdf2Async = promisify(crypto.pbkdf2);
 
 export type BackupMetadata = {
   filename: string;
@@ -30,11 +34,18 @@ export type BackupMetadata = {
   sizeBytes: number;
 };
 
-function getBackupDir(): string {
-  const dir = path.join(app.getPath('userData'), BACKUP_DIR_NAME);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+const pathExists = async (targetPath: string): Promise<boolean> => {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
   }
+};
+
+async function getBackupDir(): Promise<string> {
+  const dir = path.join(app.getPath('userData'), BACKUP_DIR_NAME);
+  await mkdir(dir, { recursive: true });
   return dir;
 }
 
@@ -60,53 +71,57 @@ function assertValidSqliteDatabase(data: Buffer): void {
   }
 }
 
-export function createBackup(): BackupMetadata {
+export async function createBackup(): Promise<BackupMetadata> {
   const dbPath = getDbPath();
-  if (!existsSync(dbPath)) {
+  if (!(await pathExists(dbPath))) {
     throw new Error('Database file not found.');
   }
 
   checkpointDatabaseWal();
 
-  const backupDir = getBackupDir();
+  const backupDir = await getBackupDir();
   const filename = `flusk-backup-${formatTimestamp()}.db`;
   const backupPath = path.join(backupDir, filename);
 
-  copyFileSync(dbPath, backupPath);
+  await copyFile(dbPath, backupPath);
 
-  const stat = statSync(backupPath);
-  pruneOldBackups(MAX_BACKUPS);
+  const fileStat = await stat(backupPath);
+  await pruneOldBackups(MAX_BACKUPS);
 
   return {
     filename,
     path: backupPath,
     createdAt: new Date().toISOString(),
-    sizeBytes: stat.size,
+    sizeBytes: fileStat.size,
   };
 }
 
-export function listBackups(): BackupMetadata[] {
-  const backupDir = getBackupDir();
+export async function listBackups(): Promise<BackupMetadata[]> {
+  const backupDir = await getBackupDir();
 
-  const files = readdirSync(backupDir)
+  const files = (await readdir(backupDir))
     .filter((f) => f.startsWith('flusk-backup-') && f.endsWith('.db'))
     .sort()
     .reverse();
 
-  return files.map((filename) => {
-    const fullPath = path.join(backupDir, filename);
-    const stat = statSync(fullPath);
-    return {
-      filename,
-      path: fullPath,
-      createdAt: stat.mtime.toISOString(),
-      sizeBytes: stat.size,
-    };
-  });
+  const stats = await Promise.all(
+    files.map(async (filename) => {
+      const fullPath = path.join(backupDir, filename);
+      const fileStat = await stat(fullPath);
+      return {
+        filename,
+        path: fullPath,
+        createdAt: fileStat.mtime.toISOString(),
+        sizeBytes: fileStat.size,
+      };
+    }),
+  );
+
+  return stats;
 }
 
-export function pruneOldBackups(keep: number = MAX_BACKUPS): number {
-  const backups = listBackups();
+export async function pruneOldBackups(keep: number = MAX_BACKUPS): Promise<number> {
+  const backups = await listBackups();
 
   if (backups.length <= keep) {
     return 0;
@@ -117,8 +132,8 @@ export function pruneOldBackups(keep: number = MAX_BACKUPS): number {
 
   for (const backup of toDelete) {
     try {
-      unlinkSync(backup.path);
-      deleted++;
+      await unlink(backup.path);
+      deleted += 1;
     } catch {
       // Best-effort deletion
     }
@@ -127,38 +142,38 @@ export function pruneOldBackups(keep: number = MAX_BACKUPS): number {
   return deleted;
 }
 
-function deriveKey(passphrase: string, salt: Buffer): Buffer {
-  return crypto.pbkdf2Sync(passphrase, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
+async function deriveKey(passphrase: string, salt: Buffer): Promise<Buffer> {
+  return pbkdf2Async(passphrase, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
 }
 
-export function exportBackup(
+export async function exportBackup(
   destination: string,
   passphrase?: string,
-): void {
+): Promise<void> {
   const dbPath = getDbPath();
-  if (!existsSync(dbPath)) {
+  if (!(await pathExists(dbPath))) {
     throw new Error('Database file not found.');
   }
 
   checkpointDatabaseWal();
 
   if (!passphrase || passphrase.length === 0) {
-    copyFileSync(dbPath, destination);
+    await copyFile(dbPath, destination);
     return;
   }
 
   // Encrypted export: magic + salt + iv + authTag + ciphertext
-  const plaintext = readFileSync(dbPath);
+  const plaintext = await readFile(dbPath);
   const salt = crypto.randomBytes(SALT_LENGTH);
   const iv = crypto.randomBytes(IV_LENGTH);
-  const key = deriveKey(passphrase, salt);
+  const key = await deriveKey(passphrase, salt);
 
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   const output = Buffer.concat([ENCRYPTED_MAGIC, salt, iv, authTag, encrypted]);
-  writeFileSync(destination, output);
+  await writeFile(destination, output);
 }
 
 function isEncryptedBackup(data: Buffer): boolean {
@@ -166,26 +181,26 @@ function isEncryptedBackup(data: Buffer): boolean {
   return data.subarray(0, ENCRYPTED_MAGIC.length).equals(ENCRYPTED_MAGIC);
 }
 
-export function importBackup(
+export async function importBackup(
   source: string,
   passphrase?: string,
-): void {
-  if (!existsSync(source)) {
+): Promise<void> {
+  if (!(await pathExists(source))) {
     throw new Error('Backup file not found.');
   }
 
   const dbPath = getDbPath();
 
   // Create safety backup of current DB
-  const backupDir = getBackupDir();
+  const backupDir = await getBackupDir();
   const safetyFilename = `flusk-safety-${formatTimestamp()}.db`;
   const safetyPath = path.join(backupDir, safetyFilename);
 
-  if (existsSync(dbPath)) {
-    copyFileSync(dbPath, safetyPath);
+  if (await pathExists(dbPath)) {
+    await copyFile(dbPath, safetyPath);
   }
 
-  const data = readFileSync(source);
+  const data = await readFile(source);
 
   if (isEncryptedBackup(data)) {
     if (!passphrase || passphrase.length === 0) {
@@ -201,20 +216,20 @@ export function importBackup(
     );
     const ciphertext = data.subarray(offset + SALT_LENGTH + IV_LENGTH + 16);
 
-    const key = deriveKey(passphrase, salt);
+    const key = await deriveKey(passphrase, salt);
 
     try {
       const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
       decipher.setAuthTag(authTag);
       const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
       assertValidSqliteDatabase(decrypted);
-      writeFileSync(dbPath, decrypted);
+      await writeFile(dbPath, decrypted);
     } catch {
       throw new Error('Decryption failed. Wrong passphrase or corrupted file.');
     }
   } else {
     assertValidSqliteDatabase(data);
-    writeFileSync(dbPath, data);
+    await writeFile(dbPath, data);
   }
 }
 
@@ -227,34 +242,35 @@ export function startDailyBackupScheduler(): void {
     return;
   }
 
-  const runBackup = (): void => {
+  const runBackup = async (): Promise<void> => {
     try {
-      createBackup();
-      pruneOldBackups(MAX_BACKUPS);
+      await createBackup();
+      await pruneOldBackups(MAX_BACKUPS);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('[backup] daily backup failed:', error);
     }
   };
 
-  // Run initial backup if no recent backup exists
-  const backups = listBackups();
-  const hasRecentBackup =
-    backups.length > 0 &&
-    Date.now() - new Date(backups[0].createdAt).getTime() < 24 * 60 * 60 * 1000;
-
-  if (!hasRecentBackup) {
-    runBackup();
-  }
-
-  // Schedule next backup in 24 hours, repeat
   const scheduleNext = (): void => {
     backupTimerId = setTimeout(() => {
-      runBackup();
+      void runBackup();
       scheduleNext();
-    }, 24 * 60 * 60 * 1000);
+    }, DAILY_BACKUP_INTERVAL_MS);
   };
 
-  scheduleNext();
+  void (async () => {
+    const backups = await listBackups();
+    const hasRecentBackup =
+      backups.length > 0 &&
+      Date.now() - new Date(backups[0].createdAt).getTime() < DAILY_BACKUP_INTERVAL_MS;
+
+    if (!hasRecentBackup) {
+      await runBackup();
+    }
+
+    scheduleNext();
+  })();
 }
 
 export function stopDailyBackupScheduler(): void {

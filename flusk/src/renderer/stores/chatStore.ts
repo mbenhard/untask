@@ -14,6 +14,7 @@ import type {
   TurnStep,
 } from '../../types/chat';
 import type { ChatMessage } from '../../types/models';
+import { getFlusk } from '../lib/flusk';
 import { useAppStore } from './appStore';
 import { useTaskStore } from './taskStore';
 
@@ -85,14 +86,6 @@ type ChatStore = {
     lifecycle: ActionLifecycle,
     updates?: Partial<ChatActionCard>,
   ) => void;
-};
-
-const flusk = () => {
-  if (!window.flusk) {
-    throw new Error('Flusk API not available');
-  }
-
-  return window.flusk;
 };
 
 const toErrorMessage = (error: unknown): string =>
@@ -237,7 +230,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     try {
       set({ isSending: true, error: null });
 
-      const response = await flusk().chat.send({
+      const response = await getFlusk().chat.send({
         content: trimmed,
         modelId,
       });
@@ -324,18 +317,18 @@ export const useChatStore = create<ChatStore>((set, get) => {
         try {
           const [history, models, selectedModel, retention, autonomy, pending] =
             await Promise.all([
-              flusk().chat.history(),
-              flusk().chat.getModels(),
-              flusk().chat.getSelectedModel(),
-              flusk().chat.getRetentionMode(),
-              flusk().chat.getAutonomyMode(),
-              flusk().chat.listPendingActions(),
+              getFlusk().chat.history(),
+              getFlusk().chat.getModels(),
+              getFlusk().chat.getSelectedModel(),
+              getFlusk().chat.getRetentionMode(),
+              getFlusk().chat.getAutonomyMode(),
+              getFlusk().chat.listPendingActions(),
             ]);
 
           const existingUnsubscribe = get().unsubscribeStream;
           existingUnsubscribe?.();
 
-          const unsubscribeStream = flusk().chat.onStreamEvent((event) => {
+          const unsubscribeStream = getFlusk().chat.onStreamEvent((event) => {
             get().applyStreamEvent(event);
           });
 
@@ -364,7 +357,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     sendMessage: async (content) => {
-      const selected = await flusk().chat.getSelectedModel().catch(() => null);
+      const selected = await getFlusk().chat.getSelectedModel().catch(() => null);
       if (selected?.modelId) {
         set({ selectedModelId: selected.modelId });
       }
@@ -372,7 +365,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     cancelStream: async () => {
-      await flusk().chat.cancel();
+      await getFlusk().chat.cancel();
       const { messages } = get();
       const updatedMessages = messages.map((msg) => {
         if (msg.isStreaming) {
@@ -423,7 +416,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     clearHistory: async () => {
       try {
-        await flusk().chat.clear();
+        await getFlusk().chat.clear();
         set({
           messages: [],
           inFlightByRequestId: {},
@@ -440,7 +433,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     undoAction: async (taskEventId) => {
       try {
-        const result = await flusk().chat.undoLastAction(
+        const result = await getFlusk().chat.undoLastAction(
           taskEventId ? { taskEventId } : undefined,
         );
 
@@ -473,8 +466,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
     setSelectedModel: async (modelId) => {
       try {
         const [selected, models] = await Promise.all([
-          flusk().chat.setSelectedModel({ modelId }),
-          flusk().chat.getModels(),
+          getFlusk().chat.setSelectedModel({ modelId }),
+          getFlusk().chat.getModels(),
         ]);
 
         set({
@@ -489,7 +482,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     setRetentionMode: async (mode) => {
       try {
-        const updated = await flusk().chat.setRetentionMode({ mode });
+        const updated = await getFlusk().chat.setRetentionMode({ mode });
         set({ retentionMode: updated.mode, error: null });
       } catch (error) {
         set({ error: toErrorMessage(error) });
@@ -790,7 +783,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     setAutonomyMode: async (mode) => {
       try {
-        const result = await flusk().chat.setAutonomyMode({ mode });
+        const result = await getFlusk().chat.setAutonomyMode({ mode });
         set({ autonomyMode: result.mode, error: null });
       } catch (error) {
         set({ error: toErrorMessage(error) });
@@ -799,7 +792,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     approvePendingAction: async (actionId) => {
       try {
-        const result = await flusk().chat.resolvePendingAction({
+        const result = await getFlusk().chat.resolvePendingAction({
           actionId,
           decision: 'approve',
         });
@@ -831,7 +824,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     rejectPendingAction: async (actionId) => {
       try {
-        const result = await flusk().chat.resolvePendingAction({
+        const result = await getFlusk().chat.resolvePendingAction({
           actionId,
           decision: 'reject',
         });
@@ -852,7 +845,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     refreshPendingActions: async () => {
       try {
-        const result = await flusk().chat.listPendingActions();
+        const result = await getFlusk().chat.listPendingActions();
         set({ pendingActions: result.actions });
       } catch (error) {
         set({ error: toErrorMessage(error) });

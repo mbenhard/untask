@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { SearchResultItem } from '../../types/ipc';
+import { getFlusk } from '../lib/flusk';
 
 type SearchStore = {
   isOpen: boolean;
@@ -18,14 +19,6 @@ type SearchStore = {
   selectNext: () => void;
   selectPrevious: () => void;
   getSelectedResult: () => SearchResultItem | null;
-};
-
-const flusk = () => {
-  if (!window.flusk) {
-    throw new Error('Flusk API not available');
-  }
-
-  return window.flusk;
 };
 
 export const useSearchStore = create<SearchStore>((set, get) => ({
@@ -71,7 +64,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     set({ isSearching: true, error: null });
 
     try {
-      const result = await flusk().search.query({
+      const result = await getFlusk().search.query({
         query: trimmed,
         limit: 50,
       });
