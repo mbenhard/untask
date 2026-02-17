@@ -9,6 +9,7 @@ import {
 
 import type { Task, TaskStatus } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { useAppStore } from '../../stores/appStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
@@ -444,6 +445,12 @@ export const TaskBody = ({
   onBodyEditModeChange,
 }: TaskBodyProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
+  const allTasks = useTaskStore((state) => state.tasks);
+  const selectTask = useTaskStore((state) => state.selectTask);
+  const setView = useAppStore((state) => state.setView);
+  const parentTask = task.parentId
+    ? allTasks.find((t) => t.id === task.parentId) ?? null
+    : null;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBodyRef = useRef<string | null>(null);
 
@@ -504,8 +511,32 @@ export const TaskBody = ({
 
   return (
     <div className="overflow-hidden">
+      {/* Part-of reference — subtask context */}
+      {parentTask && (
+        <div className="border-t border-border/30 px-3 pt-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const view = parentTask.today ? 'today'
+                : parentTask.status === 'inbox' ? 'inbox'
+                : 'tasks';
+              setView(view);
+              selectTask(parentTask.id);
+            }}
+            className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-150 hover:text-muted-foreground"
+          >
+            <span aria-hidden="true">↳</span>
+            {parentTask.title}
+          </button>
+        </div>
+      )}
+
       {/* Zone 1 — Body Editor (hero) */}
-      <div className="border-t border-border/30 px-3 py-3">
+      <div className={cn(
+        'px-3 py-3',
+        !parentTask && 'border-t border-border/30',
+      )}>
         <BlockEditor
           content={task.body ?? ''}
           onChange={handleBodyChange}

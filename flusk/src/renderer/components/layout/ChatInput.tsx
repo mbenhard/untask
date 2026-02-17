@@ -268,12 +268,6 @@ export const ChatInput = ({
         <p className="px-3 pt-1 text-[11px] text-destructive">{errorMessage}</p>
       )}
 
-      {isSending && (
-        <p className="animate-pulse px-3 pt-1 text-[11px] text-muted-foreground">
-          Thinking...
-        </p>
-      )}
-
       <div className="flex min-h-11 items-end gap-2 px-3 py-1.5">
         <Button
           type="button"

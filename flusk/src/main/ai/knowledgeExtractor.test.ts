@@ -88,7 +88,7 @@ describe('knowledge extractor scheduling', () => {
     expect(emit).not.toHaveBeenCalled();
   });
 
-  it('applies extracted facts and emits memory_updated', async () => {
+  it('applies extracted facts silently (no memory_updated event)', async () => {
     const emit = vi.fn();
     generateTextMock.mockResolvedValue({
       text: JSON.stringify({
@@ -118,10 +118,8 @@ describe('knowledge extractor scheduling', () => {
       'merge',
       'ai',
     );
-    expect(emit).toHaveBeenCalledWith({
-      type: 'memory_updated',
-      requestId: 'req-update',
-    });
+    // Background extraction is silent — no memory_updated event emitted
+    expect(emit).not.toHaveBeenCalled();
   });
 
   it('skips extraction for short turns', async () => {

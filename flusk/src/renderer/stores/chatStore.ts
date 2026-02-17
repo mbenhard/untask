@@ -278,16 +278,21 @@ const parseChips = (raw: string | null): ChipAction[] | undefined => {
   }
 };
 
-const collapseDuplicateTextSteps = (steps: TurnStep[]): TurnStep[] => {
+const collapseConsecutiveTextSteps = (steps: TurnStep[]): TurnStep[] => {
   const collapsed: TurnStep[] = [];
 
   steps.forEach((step) => {
     const previous = collapsed[collapsed.length - 1];
-    if (
-      step.kind === 'text' &&
-      previous?.kind === 'text' &&
-      previous.content.trim() === step.content.trim()
-    ) {
+    if (step.kind === 'text' && previous?.kind === 'text') {
+      // Skip exact duplicates
+      if (previous.content.trim() === step.content.trim()) {
+        return;
+      }
+      // Merge different consecutive text steps into one — prevents double-bubble rendering
+      collapsed[collapsed.length - 1] = {
+        ...previous,
+        content: previous.content.trimEnd() + '\n\n' + step.content.trimStart(),
+      };
       return;
     }
 
@@ -310,7 +315,7 @@ const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
     createdAt: message.createdAt,
     actionCards: dedupeActionCards(metadata?.actionCards ?? []),
     steps: message.role === 'assistant'
-      ? collapseDuplicateTextSteps(reconstructStepsFromMetadata(metadata, message.content))
+      ? collapseConsecutiveTextSteps(reconstructStepsFromMetadata(metadata, message.content))
       : [],
     ...(imageCount ? { imageCount } : {}),
     ...(chips ? { chips } : {}),
@@ -1177,7 +1182,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           const baseMessages = state.messages.filter(
             (message) => message.id !== inFlight?.placeholderId,
           );
-          const finalizedSteps = collapseDuplicateTextSteps(inFlight?.steps ?? mapped.steps);
+          const finalizedSteps = collapseConsecutiveTextSteps(inFlight?.steps ?? mapped.steps);
           const finalizedChips = event.chips ?? inFlight?.chips ?? mapped.chips;
           const finalizedAssistantMessage: ChatUiMessage = {
             ...mapped,
@@ -1397,18 +1402,23 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     updateCardLifecycle: (actionId, lifecycle, updates) => {
+      const applyCardUpdate = (card: ChatActionCard): ChatActionCard => ({
+        ...card,
+        ...updates,
+        lifecycle,
+        status: lifecycle === 'executed' ? ('success' as const) : card.status,
+      });
+
       set((state) => ({
         messages: state.messages.map((message) => ({
           ...message,
           actionCards: message.actionCards.map((card) =>
-            card.actionId === actionId
-              ? {
-                  ...card,
-                  ...updates,
-                  lifecycle,
-                  status: lifecycle === 'executed' ? ('success' as const) : card.status,
-                }
-              : card,
+            card.actionId === actionId ? applyCardUpdate(card) : card,
+          ),
+          steps: message.steps.map((step) =>
+            step.kind === 'tool' && step.actionCard?.actionId === actionId
+              ? { ...step, actionCard: applyCardUpdate(step.actionCard) }
+              : step,
           ),
         })),
       }));

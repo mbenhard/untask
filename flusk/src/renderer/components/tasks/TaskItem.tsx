@@ -93,9 +93,6 @@ export const TaskItem = ({
 
   const isCompleted = task.status === 'done';
   const isToday = task.today === true;
-  const parentTitle = task.parentId
-    ? allTasks.find((t) => t.id === task.parentId)?.title ?? null
-    : null;
   const priority = task.priority ?? 'none';
   const dueDateLabel = useMemo(
     () => (task.dueDate ? formatDueDateDisplay(task.dueDate) : null),
@@ -313,15 +310,6 @@ export const TaskItem = ({
               {childrenDoneCount}/{childrenCount}
             </span>
           )}
-
-          {parentTitle ? (
-            <span className={cn(
-              'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
-              !isExpanded && 'max-w-[120px] truncate',
-            )}>
-              {parentTitle}
-            </span>
-          ) : null}
 
           {isCompleted && completedAtLabel ? (
             <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">

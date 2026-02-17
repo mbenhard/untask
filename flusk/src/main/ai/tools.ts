@@ -123,22 +123,7 @@ const extractTaskTitlesFromNotes = (raw: string): string[] => {
   return deduped;
 };
 
-const summarizeTask = (task: {
-  title: string;
-  priority: string | null;
-  dueDate: string | null;
-  client: string | null;
-  recurrence?: string | null;
-}): string => {
-  const tags = [
-    task.priority ? `priority:${task.priority}` : null,
-    task.client ? `client:${task.client}` : null,
-    task.dueDate ? `due:${task.dueDate}` : null,
-    task.recurrence ? `repeats:${task.recurrence}` : null,
-  ].filter(Boolean);
-
-  return `${task.title}${tags.length > 0 ? ` (${tags.join(', ')})` : ''}`;
-};
+const summarizeTask = (task: { title: string }): string => task.title;
 
 const normalizeForSummary = (value: string, maxLength: number): string => {
   const normalized = value.replace(/\s+/g, ' ').trim();
@@ -950,7 +935,7 @@ const undoLastActionTool = {
       context,
       'undo_last_action',
       'Last action undone',
-      `Reverted event ${undoResult.originalEventId}.`,
+      'Undone',
       undoResult,
       {
         taskId: undoResult.targetTaskId,
@@ -1574,22 +1559,26 @@ const buildRiskHint = (
   return { toolName, input: hint };
 };
 
+const resolveTaskTitle = (id: unknown): string => {
+  if (typeof id !== 'string') return 'unknown task';
+  const task = getTaskById(id);
+  return task ? `"${task.title}"` : 'unknown task';
+};
+
 const buildPendingRationale = (toolName: string, input: Record<string, unknown>): string => {
   switch (toolName) {
-    case 'delete_task': {
-      const task = typeof input.id === 'string' ? getTaskById(input.id) : null;
-      return task ? `Delete task "${task.title}".` : `Delete task ${String(input.id)}.`;
-    }
+    case 'delete_task':
+      return `Delete task ${resolveTaskTitle(input.id)}.`;
     case 'update_task':
-      return `Update task ${String(input.id)}.`;
+      return `Update task ${resolveTaskTitle(input.id)}.`;
     case 'complete_task':
-      return `Mark task ${String(input.id)} as done.`;
+      return `Mark task ${resolveTaskTitle(input.id)} as done.`;
     case 'move_task':
-      return `Move task ${String(input.id)}.`;
+      return `Move task ${resolveTaskTitle(input.id)}.`;
     case 'create_task':
       return `Create task "${String(input.title ?? '')}".`;
     case 'set_today':
-      return `Toggle Today for task ${String(input.id)}.`;
+      return `Toggle Today for task ${resolveTaskTitle(input.id)}.`;
     case 'parse_notes':
       return `Create tasks from notes.`;
     case 'edit_note': {
@@ -1687,11 +1676,11 @@ export const executeToolCall = async (
         rawToolName,
         'confirmation_required',
         'Approval required',
-        gate.reason,
+        rationale,
         {
           actionId: pending.actionId,
           riskLevel: risk,
-          rationale,
+          rationale: gate.reason,
           lifecycle: 'pending',
         },
       );
@@ -1705,7 +1694,7 @@ export const executeToolCall = async (
         toolName: rawToolName,
         output: {
           status: 'confirmation_required',
-          message: gate.reason,
+          message: rationale,
           actionCard,
         },
       };

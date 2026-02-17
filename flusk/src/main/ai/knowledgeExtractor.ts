@@ -1,9 +1,9 @@
 import { generateText } from 'ai';
 
+import type { ChatStreamEvent } from '../../types/chat';
 import { getMemory, updateMemorySection } from './memory';
 import { getSelectedModelId } from './models';
 import { createOpenRouterProviderFromEnv } from './openrouter';
-import type { ChatStreamEvent } from '../../types/chat';
 
 const EXTRACTION_DEBOUNCE_MS = 60_000; // 60s after last message
 let extractionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -94,8 +94,6 @@ const applyExtractions = (extractions: ExtractionResult[]): boolean => {
 const runExtraction = async (
   userMessage: string,
   assistantResponse: string,
-  emit: (event: ChatStreamEvent) => void,
-  requestId: string,
 ): Promise<void> => {
   try {
     const knowledge = getMemory();
@@ -116,14 +114,11 @@ const runExtraction = async (
     // Optimistic concurrency: re-read knowledge before applying
     // If it changed since we started, the section-level operations still work
     // because updateMemorySection reads fresh state each time
-    const changed = applyExtractions(output.extractions);
+    applyExtractions(output.extractions);
 
-    if (changed) {
-      emit({
-        type: 'memory_updated',
-        requestId,
-      });
-    }
+    // No memory_updated event — background extraction is silent.
+    // The "Memory updated" badge only appears when the AI explicitly
+    // calls update_memory during a turn.
   } catch {
     // Never block chat on extraction failures — silently skip
   }
@@ -132,8 +127,8 @@ const runExtraction = async (
 export const scheduleKnowledgeExtraction = (input: {
   userMessage: string;
   assistantResponse: string;
-  requestId: string;
-  emit: (event: ChatStreamEvent) => void;
+  requestId?: string;
+  emit?: (event: ChatStreamEvent) => void;
 }): void => {
   // Cancel any pending extraction
   if (extractionTimer !== null) {
@@ -151,8 +146,6 @@ export const scheduleKnowledgeExtraction = (input: {
     void runExtraction(
       input.userMessage,
       input.assistantResponse,
-      input.emit,
-      input.requestId,
     );
   }, EXTRACTION_DEBOUNCE_MS);
 };

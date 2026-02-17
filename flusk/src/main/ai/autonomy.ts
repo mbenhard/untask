@@ -89,7 +89,7 @@ const noteEditAction = (
 
 export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return 'critical';
-  if (isCompletedRewrite(hint)) return 'critical';
+  if (isCompletedRewrite(hint)) return 'medium';
   if (isBulkWrite(hint)) return 'high';
 
   const noteAction = noteEditAction(hint);
@@ -121,10 +121,8 @@ export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
 };
 
 export const requiresHardConfirmation = (hint: ToolRiskHint): boolean => {
-  if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return true;
-  if (isCompletedRewrite(hint)) return true;
-  if (isBulkWrite(hint)) return true;
-  return false;
+  // Only delete_task requires hard confirmation regardless of autonomy mode
+  return HARD_OVERRIDE_TOOLS.has(hint.toolName);
 };
 
 // ─── Mode gating decision ────────────────────────────────────
@@ -141,19 +139,19 @@ export const evaluateGate = (
   if (hardOverride) {
     return {
       action: 'pending',
-      reason: 'Hard safety override requires confirmation regardless of autonomy mode.',
+      reason: 'This action requires confirmation.',
     };
   }
 
   switch (mode) {
     case 'manual':
-      return { action: 'pending', reason: 'Manual mode: all AI writes require approval.' };
+      return { action: 'pending', reason: 'Approval needed in manual mode.' };
 
     case 'safe':
       if (risk === 'low') return { action: 'execute' };
       return {
         action: 'pending',
-        reason: `Safe mode: ${risk}-risk actions require approval.`,
+        reason: 'Approval needed.',
       };
 
     case 'autopilot':

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, Check, ChevronRight, Image as ImageIcon, Loader2, Undo2, X, Zap } from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, Image as ImageIcon, Loader2, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 
@@ -51,27 +51,26 @@ const toolStatusIcon = (status: string) => {
 
 type ThinkingStepProps = {
   content: string;
-  isStreaming: boolean;
 };
 
-const ThinkingStep = ({ content, isStreaming }: ThinkingStepProps) => {
-  const [expanded, setExpanded] = useState(isStreaming);
+const ThinkingStep = ({ content }: ThinkingStepProps) => {
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 text-muted-foreground/40 hover:text-muted-foreground/60 transition-colors"
+        className="flex items-center gap-1 text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors"
       >
         <ChevronRight
           className={cn(
-            'size-3 transition-transform duration-150',
+            'size-2.5 transition-transform duration-150',
             expanded && 'rotate-90',
           )}
         />
         <span className="font-mono text-[10px] uppercase tracking-[0.08em]">
-          {isStreaming ? 'Thinking\u2026' : 'Reasoning'}
+          Reasoning
         </span>
       </button>
       <AnimatePresence initial={false}>
@@ -93,6 +92,32 @@ const ThinkingStep = ({ content, isStreaming }: ThinkingStepProps) => {
   );
 };
 
+// Only show tool steps for mutation tools — read-only tools (list_tasks, get_task, etc.) are hidden
+const VISIBLE_TOOL_NAMES = new Set([
+  'create_task',
+  'update_task',
+  'complete_task',
+  'delete_task',
+  'move_task',
+  'set_today',
+  'edit_note',
+  'parse_notes',
+  'update_identity',
+  'update_memory',
+  'write_journal',
+  'undo_last_action',
+]);
+
+const isVisibleToolStep = (step: Extract<TurnStep, { kind: 'tool' }>): boolean => {
+  // Always show steps that need user action
+  if (step.status === 'confirmation_required') return true;
+  if (step.actionCard?.lifecycle === 'pending') return true;
+  // Always show errors
+  if (step.status === 'error') return true;
+  // Show mutation tools, hide read-only
+  return VISIBLE_TOOL_NAMES.has(step.toolName);
+};
+
 type ToolStepProps = {
   step: Extract<TurnStep, { kind: 'tool' }>;
   onUndo: (taskEventId?: string) => void;
@@ -110,7 +135,7 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
     <div className={cn(
       'flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs',
       step.status === 'error' ? 'border-destructive/30 bg-destructive/5' :
-      step.status === 'confirmation_required' ? 'border-amber-500/30 bg-amber-500/5' :
+      step.status === 'confirmation_required' ? 'border-border/60 bg-card/40' :
       isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
       'border-border/60 bg-card/40',
     )}>
@@ -118,12 +143,12 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
         {toolStatusIcon(isUndone ? 'success' : step.status)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-mono font-medium text-foreground/90">
+        <p className="text-sm text-foreground/90">
           {step.summary && step.status !== 'running' ? step.summary : step.description}
         </p>
-        {card?.riskLevel && (card.riskLevel === 'high' || card.riskLevel === 'critical') ? (
-          <p className="mt-0.5 font-mono text-amber-400/80 text-[10px] uppercase tracking-wide">
-            {card.riskLevel} risk{card.rationale ? ` — ${card.rationale}` : ''}
+        {isPending && card?.riskLevel && card.riskLevel !== 'low' ? (
+          <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+            Requires confirmation
           </p>
         ) : null}
         {isUndone ? (
@@ -149,9 +174,21 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
               onClick={() => { if (card.actionId) onReject(card.actionId); }}
             >
               <X className="size-3" />
-              Reject
             </Button>
           </>
+        ) : null}
+
+        {isExecuted && card?.actionId ? (
+          <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
+            <Check className="size-2.5" />
+            Approved
+          </span>
+        ) : null}
+
+        {card?.lifecycle === 'rejected' ? (
+          <span className="text-[10px] text-muted-foreground/50">
+            Rejected
+          </span>
         ) : null}
 
         {isExecuted && card?.undoable && card?.taskEventId ? (
@@ -359,9 +396,13 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         .find((c) => c.actionId === actionId);
 
       if (card?.riskLevel === 'high' || card?.riskLevel === 'critical') {
+        // Use task title and action detail for human-readable rationale
+        const readableRationale = card.title
+          ? card.title
+          : card.detail ?? 'This action requires confirmation.';
         setConfirmationTarget({
           actionId,
-          rationale: card.rationale ?? card.detail,
+          rationale: readableRationale,
           riskLevel: card.riskLevel,
         });
         return;
@@ -423,12 +464,6 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
           lastAnimatedIdRef.current = message.id;
         }
 
-        // Tool-call indicator: check if next message is assistant with tool steps
-        const nextMessage = messages[messageIndex + 1];
-        const triggeredTools = !isAssistant
-          && nextMessage?.role === 'assistant'
-          && nextMessage.steps.some((s) => s.kind === 'tool');
-
         return (
           <motion.article
             key={message.id}
@@ -448,11 +483,12 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
               <div className="flex w-full max-w-[88%] flex-col gap-1.5">
                 {message.steps.map((step, index) => {
                   if (step.kind === 'thinking') {
+                    // Only show reasoning disclosure after streaming is done
+                    if (message.isStreaming) return null;
                     return (
                       <ThinkingStep
                         key={`thinking-${index}`}
                         content={step.content}
-                        isStreaming={Boolean(message.isStreaming)}
                       />
                     );
                   }
@@ -471,8 +507,9 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                   }
 
                   if (step.kind === 'tool') {
-                    // Hide emit_chips tool steps — chips are rendered separately
+                    // Hide emit_chips and read-only tool steps
                     if (step.toolName === 'emit_chips') return null;
+                    if (!isVisibleToolStep(step)) return null;
 
                     return (
                       <ToolStep
@@ -491,6 +528,10 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
 
                   return null;
                 })}
+
+                {Boolean(message.isStreaming) && (
+                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+                )}
 
                 {message.chips && message.chips.length > 0 ? (
                   <ChipBar
@@ -533,12 +574,8 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                 ) : null}
               </div>
             ) : (
-              <div className="relative max-w-[88%] rounded-xl border border-border/70 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
+              <div className="max-w-[88%] rounded-xl border border-border/70 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
                 <p className="whitespace-pre-wrap">{message.content}</p>
-
-                {triggeredTools && (
-                  <Zap className="absolute bottom-1.5 right-2 size-3 text-muted-foreground/40" />
-                )}
               </div>
             )}
 
@@ -653,26 +690,24 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             aria-describedby="confirm-dialog-desc"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              exit={{ opacity: 0, scale: 0.97 }}
               transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
-              className="w-full max-w-sm rounded-xl border border-border bg-card p-4 shadow-lg"
+              className="w-full max-w-xs rounded-xl border border-border bg-card p-4 shadow-lg"
             >
-              <div className="flex items-center gap-2 text-amber-300">
-                <AlertTriangle className="size-4" />
-                <h3 id="confirm-dialog-title" className="text-sm font-semibold">Confirm {confirmationTarget.riskLevel}-risk action</h3>
-              </div>
-              <p id="confirm-dialog-desc" className="mt-3 text-sm text-muted-foreground">{confirmationTarget.rationale}</p>
-              <p className="mt-2 text-xs text-muted-foreground/70">
-                This action has elevated risk and requires explicit confirmation.
+              <h3 id="confirm-dialog-title" className="text-sm font-medium text-foreground">
+                Confirm action
+              </h3>
+              <p id="confirm-dialog-desc" className="mt-2 text-sm text-muted-foreground">
+                {confirmationTarget.rationale}
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmationTarget(null)}>
                   Cancel
                 </Button>
                 <Button type="button" variant="default" size="sm" onClick={handleConfirmApprove}>
-                  Confirm &amp; Execute
+                  Do it
                 </Button>
               </div>
             </motion.div>

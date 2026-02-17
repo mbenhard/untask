@@ -387,28 +387,9 @@ export const shouldRequireToolChoice = (input: {
     return false;
   }
 
+  // Only force tool use for very explicit, unambiguous commands
   const explicitCommand = parseExplicitFallbackToolCall(normalizedMessage);
   if (explicitCommand) {
-    return true;
-  }
-
-  const mutationIntent =
-    TASK_MUTATION_VERB_PATTERN.test(normalizedMessage) &&
-    TASK_ENTITY_PATTERN.test(normalizedMessage);
-  if (mutationIntent && !looksLikeQuestion(normalizedMessage)) {
-    return true;
-  }
-
-  // Pronoun + strong verb pattern (e.g., "complete it", "mark that as done")
-  if (PRONOUN_WITH_VERB_PATTERN.test(normalizedMessage)) {
-    return true;
-  }
-
-  // Web search intent detection
-  if (
-    input.allowWebSearchToolChoice === true &&
-    WEB_SEARCH_INTENT_PATTERN.test(normalizedMessage)
-  ) {
     return true;
   }
 
@@ -420,19 +401,7 @@ export const shouldRequireToolChoice = (input: {
     }
   }
 
-  const lastAssistantMessage = [...input.history]
-    .reverse()
-    .find((entry) => entry.role === 'assistant');
-  if (!lastAssistantMessage) {
-    return false;
-  }
-
-  const isClarificationFollowup =
-    TASK_CLARIFICATION_PATTERN.test(lastAssistantMessage.content.toLowerCase()) &&
-    !looksLikeQuestion(normalizedMessage) &&
-    normalizedMessage.split(/\s+/).length >= 2;
-
-  return isClarificationFollowup;
+  return false;
 };
 
 export const parseExplicitFallbackToolCall = (
