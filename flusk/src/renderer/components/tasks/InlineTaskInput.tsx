@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Bookmark } from 'lucide-react';
 
-import type { Task } from '../../../types/models';
+import type { Task, TaskStatus } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
 import { formatDueDateDisplay } from './dueDate';
@@ -30,7 +30,7 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
 
 type InlineTaskInputProps = {
   parentId?: string | null;
-  defaultStatus?: 'inbox' | 'active';
+  defaultStatus?: Exclude<TaskStatus, 'done'>;
   defaultToday?: boolean;
   placeholder?: string;
   label?: string;

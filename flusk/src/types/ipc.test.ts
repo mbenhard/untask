@@ -13,6 +13,13 @@ describe('IPC_CHANNELS', () => {
     expect(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE).toBe('app:set-window-dismiss-mode');
   });
 
+  it('contains chat thread channels', () => {
+    expect(IPC_CHANNELS.CHAT_CREATE_THREAD).toBe('chat:create-thread');
+    expect(IPC_CHANNELS.CHAT_LIST_THREADS).toBe('chat:list-threads');
+    expect(IPC_CHANNELS.CHAT_ARCHIVE_THREAD).toBe('chat:archive-thread');
+    expect(IPC_CHANNELS.CHAT_DELETE_THREAD).toBe('chat:delete-thread');
+  });
+
   it('contains all expected domain prefixes', () => {
     const channels = Object.values(IPC_CHANNELS);
     const prefixes = new Set(channels.map((c) => c.split(':')[0]));

@@ -302,7 +302,7 @@ export const TasksView = ({
               {GROUP_CONFIG.map((group) => {
                 const tasks = groupedTasks[group.key];
                 const isCollapsed = collapsedGroups[group.key];
-                const isBacklog = group.key === 'active';
+                const canAdd = group.key !== 'done';
 
                 return (
                   <StatusGroupSection
@@ -313,12 +313,12 @@ export const TasksView = ({
                     allTasks={allTasks}
                     activeDragId={activeDragId}
                     addTaskConfig={
-                      isBacklog
-                        ? { defaultStatus: 'active', showMetadata: true, placeholder: 'Add task...' }
+                      canAdd
+                        ? { defaultStatus: group.key, showMetadata: true, placeholder: 'Add task...' }
                         : undefined
                     }
                     triggerAdd={
-                      isBacklog && activeView === 'tasks' ? newTaskTrigger : undefined
+                      group.key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
                     }
                     onToggle={() => {
                       setCollapsedGroups((current) => ({

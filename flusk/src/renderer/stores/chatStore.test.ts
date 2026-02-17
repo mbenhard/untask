@@ -15,6 +15,33 @@ const createMockChatApi = () => {
     onFocusMessage: vi.fn(() => unsubscribe),
     history: vi.fn(async (): Promise<ChatMessage[]> => []),
     clear: vi.fn(async () => undefined),
+    listThreads: vi.fn(async () => ({
+      conversations: [
+        {
+          id: 'thread-1',
+          title: 'New Thread',
+          isAutoTitle: true,
+          createdAt: '2026-02-17T00:00:00.000Z',
+          updatedAt: '2026-02-17T00:00:00.000Z',
+          archivedAt: null,
+          messageCount: 0,
+        },
+      ],
+      total: 1,
+    })),
+    createThread: vi.fn(async () => ({
+      conversation: {
+        id: 'thread-new',
+        title: 'New Thread',
+        isAutoTitle: true,
+        createdAt: '2026-02-17T00:00:00.000Z',
+        updatedAt: '2026-02-17T00:00:00.000Z',
+        archivedAt: null,
+        messageCount: 0,
+      },
+    })),
+    archiveThread: vi.fn(async () => undefined),
+    deleteThread: vi.fn(async () => undefined),
     getModels: vi.fn(async () => []),
     getSelectedModel: vi.fn(async () => ({ modelId: 'minimax/minimax-m2.5' })),
     setSelectedModel: vi.fn(async ({ modelId }: { modelId: string }) => ({ modelId })),
@@ -48,6 +75,10 @@ describe('chatStore stream reliability', () => {
 
     useChatStore.setState({
       messages: [],
+      conversations: [],
+      conversationsTotal: 0,
+      activeConversationId: 'thread-1',
+      isLoadingConversations: false,
       isInitialized: false,
       isSending: false,
       error: null,
@@ -57,6 +88,8 @@ describe('chatStore stream reliability', () => {
       inFlightByRequestId: {},
       pendingViewSwitchByRequestId: {},
       requestPayloadByRequestId: {},
+      conversationIdByRequestId: {},
+      assistantMessageIdByRequestId: {},
       lastStreamError: null,
       unsubscribeStream: undefined,
       unsubscribeFocusMessage: undefined,
@@ -131,6 +164,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-1',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -175,6 +209,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-peek-1',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -208,6 +243,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-peek-2',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -238,6 +274,7 @@ describe('chatStore stream reliability', () => {
     const now = new Date().toISOString();
     const assistantMessage: ChatMessage = {
       id: 'assistant-auto-switch-1',
+      conversationId: 'thread-1',
       role: 'assistant',
       content: 'Done.',
       toolCalls: null,
@@ -257,6 +294,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-auto-1',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: now,
@@ -337,6 +375,7 @@ describe('chatStore stream reliability', () => {
     const now = new Date().toISOString();
     const assistantMessage: ChatMessage = {
       id: 'assistant-auto-switch-2',
+      conversationId: 'thread-1',
       role: 'assistant',
       content: 'Done.',
       toolCalls: null,
@@ -348,6 +387,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-auto-2',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: now,
@@ -405,6 +445,7 @@ describe('chatStore stream reliability', () => {
   it('upserts assistant_done by persisted message id', () => {
     const assistantMessage: ChatMessage = {
       id: 'assistant-1',
+      conversationId: 'thread-1',
       role: 'assistant',
       content: 'Done.',
       toolCalls: null,
@@ -416,6 +457,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-2',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: 'Partial',
           createdAt: new Date().toISOString(),
@@ -470,11 +512,99 @@ describe('chatStore stream reliability', () => {
     expect(assistantMessages[0]?.actionCards).toHaveLength(1);
   });
 
+  it('collapses adjacent duplicate text steps on assistant_done', () => {
+    const now = new Date().toISOString();
+    const assistantMessage: ChatMessage = {
+      id: 'assistant-dedupe-1',
+      conversationId: 'thread-1',
+      role: 'assistant',
+      content: 'Repeated summary.',
+      toolCalls: null,
+      chips: null,
+      createdAt: now,
+    };
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-dedupe-1',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: 'Repeated summary.',
+          createdAt: now,
+          isStreaming: true,
+          actionCards: [],
+          steps: [
+            { kind: 'text', content: 'Repeated summary.' },
+            { kind: 'text', content: 'Repeated summary.' },
+          ],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-dedupe-1': {
+          placeholderId: 'assistant-stream-dedupe-1',
+          actionCards: [],
+          steps: [
+            { kind: 'text', content: 'Repeated summary.' },
+            { kind: 'text', content: 'Repeated summary.' },
+          ],
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'req-dedupe-1',
+      assistantMessage,
+      actionCards: [],
+    });
+
+    const stored = useChatStore
+      .getState()
+      .messages.find((message) => message.id === 'assistant-dedupe-1');
+    const textSteps = stored?.steps.filter((step) => step.kind === 'text') ?? [];
+
+    expect(textSteps).toHaveLength(1);
+    expect((textSteps[0] as Extract<TurnStep, { kind: 'text' }>)?.content).toBe('Repeated summary.');
+  });
+
+  it('marks the related assistant message when memory_updated arrives', () => {
+    const now = new Date().toISOString();
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-memory-1',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: 'Done.',
+          createdAt: now,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      assistantMessageIdByRequestId: {
+        'req-memory-1': 'assistant-memory-1',
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'memory_updated',
+      requestId: 'req-memory-1',
+    });
+
+    const updatedMessage = useChatStore
+      .getState()
+      .messages.find((message) => message.id === 'assistant-memory-1');
+
+    expect(updatedMessage?.memoryUpdated).toBe(true);
+  });
+
   it('accumulates reasoning events into a thinking step', () => {
     useChatStore.setState({
       messages: [
         {
           id: 'assistant-stream-req-3',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -517,6 +647,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-4',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -587,6 +718,7 @@ describe('chatStore stream reliability', () => {
       messages: [
         {
           id: 'assistant-stream-req-5',
+          conversationId: 'thread-1',
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -652,6 +784,7 @@ describe('chatStore stream reliability', () => {
 
     const historicalMessage: ChatMessage = {
       id: 'msg-hist',
+      conversationId: 'thread-1',
       role: 'assistant',
       content: 'Done. Task created.',
       toolCalls: JSON.stringify(metadata),
@@ -691,6 +824,7 @@ describe('chatStore stream reliability', () => {
   it('hydrates chips from the dedicated chat column', async () => {
     const historicalMessage: ChatMessage = {
       id: 'msg-chip-hist',
+      conversationId: 'thread-1',
       role: 'assistant',
       content: 'Choose one.',
       toolCalls: JSON.stringify({
@@ -721,6 +855,7 @@ describe('chatStore stream reliability', () => {
   it('hydrates legacy response chips by defaulting responseText to label', async () => {
     const historicalMessage: ChatMessage = {
       id: 'msg-chip-legacy',
+      conversationId: 'thread-1',
       role: 'assistant',
       content: 'Choose one.',
       toolCalls: JSON.stringify({
@@ -760,8 +895,10 @@ describe('chatStore stream reliability', () => {
     mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
     mockChatApi.send.mockResolvedValue({
       requestId: 'req-send-live-model',
+      conversationId: 'thread-1',
       userMessage: {
         id: 'user-msg-1',
+        conversationId: 'thread-1',
         role: 'user',
         content: 'hello',
         toolCalls: null,
@@ -778,8 +915,22 @@ describe('chatStore stream reliability', () => {
     expect(mockChatApi.send).toHaveBeenCalledWith({
       content: 'hello',
       modelId: 'moonshotai/kimi-k2.5',
+      conversationId: 'thread-1',
     });
     expect(useChatStore.getState().selectedModelId).toBe('moonshotai/kimi-k2.5');
+  });
+
+  it('does not dispatch a second send while a turn is already in flight', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    useChatStore.setState({ isSending: true });
+
+    await useChatStore.getState().sendMessage('duplicate?');
+
+    expect(mockChatApi.getSelectedModel).not.toHaveBeenCalled();
+    expect(mockChatApi.send).not.toHaveBeenCalled();
   });
 
   it('attaches staged note context on the next outgoing message', async () => {
@@ -790,8 +941,10 @@ describe('chatStore stream reliability', () => {
     mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
     mockChatApi.send.mockResolvedValue({
       requestId: 'req-send-note-context',
+      conversationId: 'thread-1',
       userMessage: {
         id: 'user-msg-note-context',
+        conversationId: 'thread-1',
         role: 'user',
         content: 'extract tasks',
         toolCalls: null,
@@ -811,6 +964,7 @@ describe('chatStore stream reliability', () => {
     expect(mockChatApi.send).toHaveBeenCalledWith({
       content: 'extract tasks',
       modelId: 'moonshotai/kimi-k2.5',
+      conversationId: 'thread-1',
       noteContext: {
         noteId: 'note-42',
         title: 'Client call',
@@ -832,8 +986,10 @@ describe('chatStore stream reliability', () => {
     mockChatApi.getSelectedModel.mockRejectedValue(new Error('lookup failed'));
     mockChatApi.send.mockResolvedValue({
       requestId: 'req-send-fallback-model',
+      conversationId: 'thread-1',
       userMessage: {
         id: 'user-msg-2',
+        conversationId: 'thread-1',
         role: 'user',
         content: 'fallback',
         toolCalls: null,
@@ -847,6 +1003,7 @@ describe('chatStore stream reliability', () => {
     expect(mockChatApi.send).toHaveBeenCalledWith({
       content: 'fallback',
       modelId: null,
+      conversationId: 'thread-1',
     });
   });
 

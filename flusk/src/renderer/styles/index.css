@@ -153,10 +153,10 @@
 
 @keyframes theme-circle-reveal {
   from {
-    clip-path: circle(0% at 5% 95%);
+    clip-path: circle(0% at 9% 97%);
   }
   to {
-    clip-path: circle(150% at 5% 95%);
+    clip-path: circle(150% at 9% 97%);
   }
 }
 

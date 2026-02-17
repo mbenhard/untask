@@ -1,4 +1,4 @@
-import type { ChatMessage } from './models';
+import type { ChatMessage, Conversation } from './models';
 
 export type ChatToolStatus = 'success' | 'error' | 'confirmation_required';
 export type ChatStreamErrorCode =
@@ -139,13 +139,47 @@ export type ChatStreamEvent =
 export type ChatSendRequestPayload = {
   content: string;
   modelId?: string | null;
+  conversationId?: string;
   images?: string[];
   noteContext?: ChatNoteContext;
 };
 
 export type ChatSendResultPayload = {
   requestId: string;
+  conversationId: string;
   userMessage: ChatMessage;
+};
+
+export type ChatConversationSummary = Conversation & {
+  messageCount: number;
+};
+
+export type ChatListConversationsRequestPayload = {
+  includeArchived?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type ChatListConversationsResultPayload = {
+  conversations: ChatConversationSummary[];
+  total: number;
+};
+
+export type ChatCreateConversationRequestPayload = {
+  title?: string;
+};
+
+export type ChatCreateConversationResultPayload = {
+  conversation: ChatConversationSummary;
+};
+
+export type ChatArchiveConversationRequestPayload = {
+  conversationId: string;
+};
+
+export type ChatDeleteConversationRequestPayload = {
+  conversationId: string;
 };
 
 export type ChatModelCatalogEntry = {

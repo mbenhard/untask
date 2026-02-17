@@ -1,90 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  resolveDateSelection,
-  resolvePrecisionChange,
-} from './TaskDueDatePicker';
+import { formatDueDateDisplay, parseDueDate, parseDueTime, toISODateTime } from './dueDate';
 
-const DATE = new Date(2026, 1, 20);
-
-describe('TaskDueDatePicker logic', () => {
-  it('closes and clears when date selection is removed', () => {
-    expect(
-      resolveDateSelection({
-        date: undefined,
-        precision: 'date',
-        currentTime: null,
-      }),
-    ).toEqual({
-      nextDueDate: null,
-      closePopover: true,
-      focusTimeInput: false,
-    });
+describe('TaskDueDatePicker helpers', () => {
+  it('parseDueDate returns a Date for valid ISO date', () => {
+    const date = parseDueDate('2026-02-20');
+    expect(date).toBeInstanceOf(Date);
+    expect(date?.getFullYear()).toBe(2026);
+    expect(date?.getMonth()).toBe(1); // 0-indexed
+    expect(date?.getDate()).toBe(20);
   });
 
-  it('uses date-only precision and closes popover after selection', () => {
-    expect(
-      resolveDateSelection({
-        date: DATE,
-        precision: 'date',
-        currentTime: '13:45',
-      }),
-    ).toEqual({
-      nextDueDate: '2026-02-20',
-      closePopover: true,
-      focusTimeInput: false,
-    });
+  it('parseDueDate returns undefined for null/invalid', () => {
+    expect(parseDueDate(null)).toBeUndefined();
+    expect(parseDueDate('')).toBeUndefined();
+    expect(parseDueDate('not-a-date')).toBeUndefined();
   });
 
-  it('keeps popover open in date-time precision and focuses time input', () => {
-    expect(
-      resolveDateSelection({
-        date: DATE,
-        precision: 'date-time',
-        currentTime: null,
-      }),
-    ).toEqual({
-      nextDueDate: '2026-02-20',
-      closePopover: false,
-      focusTimeInput: true,
-    });
-
-    expect(
-      resolveDateSelection({
-        date: DATE,
-        precision: 'date-time',
-        currentTime: '13:45',
-      }),
-    ).toEqual({
-      nextDueDate: '2026-02-20T13:45',
-      closePopover: false,
-      focusTimeInput: true,
-    });
+  it('parseDueTime extracts HH:MM from ISO datetime', () => {
+    expect(parseDueTime('2026-02-20T13:45')).toBe('13:45');
+    expect(parseDueTime('2026-02-20')).toBeNull();
+    expect(parseDueTime(null)).toBeNull();
   });
 
-  it('drops existing time when switching to date-only precision', () => {
-    expect(
-      resolvePrecisionChange({
-        precision: 'date',
-        selectedDate: DATE,
-        currentTime: '08:30',
-      }),
-    ).toEqual({
-      nextDueDate: '2026-02-20',
-      focusTimeInput: false,
-    });
+  it('toISODateTime combines date and optional time', () => {
+    const date = new Date(2026, 1, 20);
+    expect(toISODateTime(date, null)).toBe('2026-02-20');
+    expect(toISODateTime(date, '13:45')).toBe('2026-02-20T13:45');
   });
 
-  it('focuses time input when switching to date-time precision', () => {
-    expect(
-      resolvePrecisionChange({
-        precision: 'date-time',
-        selectedDate: DATE,
-        currentTime: null,
-      }),
-    ).toEqual({
-      nextDueDate: null,
-      focusTimeInput: true,
-    });
+  it('formatDueDateDisplay formats correctly', () => {
+    expect(formatDueDateDisplay('2026-02-20')).toBe('20.02.26');
+    expect(formatDueDateDisplay('2026-02-20T13:45')).toBe('20.02.26 13:45');
   });
 });

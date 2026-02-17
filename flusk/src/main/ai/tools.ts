@@ -455,7 +455,7 @@ const editNoteToolInputSchema = z.intersection(
 
 const createTaskTool = {
   name: 'create_task',
-  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Optional: priority, dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), client, parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks"). To create subtasks, first create the parent task, then use its returned ID as parentId. Never use placeholder IDs.',
+  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Always set priority — don\'t leave it as none. High: due today/tomorrow, money/client commitments, user said urgent/ASAP. Medium: due this week, meaningful but not time-critical. Low: no deadline, nice-to-have. If unsure, default to medium. Optional: dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), client, parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks"). To create subtasks, first create the parent task, then use its returned ID as parentId. Never use placeholder IDs.',
   schema: createTaskToolInputSchema,
   execute: async (input, context) => {
     const createdTask = createTask(input, 'ai');

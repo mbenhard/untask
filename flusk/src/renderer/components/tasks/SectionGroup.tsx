@@ -2,11 +2,12 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChevronRight, Plus } from 'lucide-react';
 
+import type { TaskStatus } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { InlineTaskInput } from './InlineTaskInput';
 
 export type AddTaskConfig = {
-  defaultStatus: 'inbox' | 'active';
+  defaultStatus: Exclude<TaskStatus, 'done'>;
   defaultToday?: boolean;
   showMetadata?: boolean;
   placeholder?: string;

@@ -23,89 +23,16 @@ const SEGMENT_TRIGGER_BASE =
 const clampHours = (v: number) => Math.max(0, Math.min(23, v));
 const clampMinutes = (v: number) => Math.max(0, Math.min(59, v));
 
-type DueDatePrecision = 'date' | 'date-time';
-
-type DateSelectionResolution = {
-  nextDueDate: string | null;
-  closePopover: boolean;
-  focusTimeInput: boolean;
-};
-
-const getInitialPrecision = (dueDate: string | null): DueDatePrecision =>
-  parseDueTime(dueDate) ? 'date-time' : 'date';
-
-export const resolveDateSelection = ({
-  date,
-  precision,
-  currentTime,
-}: {
-  date: Date | undefined;
-  precision: DueDatePrecision;
-  currentTime: string | null;
-}): DateSelectionResolution => {
-  if (!date) {
-    return {
-      nextDueDate: null,
-      closePopover: true,
-      focusTimeInput: false,
-    };
-  }
-
-  if (precision === 'date') {
-    return {
-      nextDueDate: toISODateTime(date, null),
-      closePopover: true,
-      focusTimeInput: false,
-    };
-  }
-
-  return {
-    nextDueDate: toISODateTime(date, currentTime),
-    closePopover: false,
-    focusTimeInput: true,
-  };
-};
-
-export const resolvePrecisionChange = ({
-  precision,
-  selectedDate,
-  currentTime,
-}: {
-  precision: DueDatePrecision;
-  selectedDate: Date | undefined;
-  currentTime: string | null;
-}): {
-  nextDueDate: string | null;
-  focusTimeInput: boolean;
-} => {
-  if (!selectedDate) {
-    return {
-      nextDueDate: null,
-      focusTimeInput: false,
-    };
-  }
-
-  if (precision === 'date') {
-    return {
-      nextDueDate: currentTime ? toISODateTime(selectedDate, null) : null,
-      focusTimeInput: false,
-    };
-  }
-
-  return {
-    nextDueDate: null,
-    focusTimeInput: true,
-  };
-};
-
 const TimeInput = ({
   value,
   onChange,
+  onDone,
   inputRef,
   autoFocus = false,
 }: {
   value: string | null;
   onChange: (time: string | null) => void;
+  onDone?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   autoFocus?: boolean;
 }) => {
@@ -146,11 +73,13 @@ const TimeInput = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       commit(draft);
+      onDone?.();
       return;
     }
     if (e.key === 'Escape') {
       e.preventDefault();
       setDraft(value ?? '');
+      onDone?.();
       return;
     }
 
@@ -203,7 +132,7 @@ const TimeInput = ({
   };
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center justify-center gap-1.5">
       <span className="font-mono text-[10px] text-muted-foreground">Time</span>
       <input
         ref={resolvedInputRef}
@@ -244,14 +173,8 @@ export const TaskDueDatePicker = ({
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
   const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
-  const [precision, setPrecision] = useState<DueDatePrecision>(() => getInitialPrecision(dueDate));
   const timeInputRef = useRef<HTMLInputElement>(null);
   const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
-
-  useEffect(() => {
-    if (open) return;
-    setPrecision(getInitialPrecision(dueDate));
-  }, [dueDate, open]);
 
   const triggerClassName = cn(
     variant === 'row'
@@ -269,24 +192,11 @@ export const TaskDueDatePicker = ({
 
   const handleDateSelect = useCallback(
     (date: Date | undefined) => {
-      const result = resolveDateSelection({
-        date,
-        precision,
-        currentTime,
-      });
-      void onChange(result.nextDueDate);
-      if (result.closePopover) {
-        setOpen(false);
-        return;
-      }
-
-      if (result.focusTimeInput) {
-        requestAnimationFrame(() => {
-          timeInputRef.current?.focus();
-        });
-      }
+      if (!date) return; // Prevent accidental clear on re-click
+      const nextValue = toISODateTime(date, currentTime);
+      void onChange(nextValue);
     },
-    [currentTime, onChange, precision],
+    [currentTime, onChange],
   );
 
   const handleTimeChange = useCallback(
@@ -298,27 +208,9 @@ export const TaskDueDatePicker = ({
     [onChange, selected],
   );
 
-  const handlePrecisionChange = useCallback(
-    (nextPrecision: DueDatePrecision) => {
-      setPrecision(nextPrecision);
-      const result = resolvePrecisionChange({
-        precision: nextPrecision,
-        selectedDate: selected,
-        currentTime,
-      });
-
-      if (result.nextDueDate !== null) {
-        void onChange(result.nextDueDate);
-      }
-
-      if (result.focusTimeInput) {
-        requestAnimationFrame(() => {
-          timeInputRef.current?.focus();
-        });
-      }
-    },
-    [currentTime, onChange, selected],
-  );
+  const handleTimeDone = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -342,60 +234,20 @@ export const TaskDueDatePicker = ({
       >
         <Calendar
           mode="single"
+          required={!!selected}
           selected={selected}
           defaultMonth={selected}
           className="p-2 [--cell-size:1.5rem]"
           onSelect={handleDateSelect}
         />
 
-        <div className="border-t border-border px-3 py-2">
-          <div
-            role="group"
-            aria-label="Due date precision"
-            className="inline-flex rounded-sm border border-border/70 bg-muted/30 p-0.5"
-          >
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handlePrecisionChange('date');
-              }}
-              className={cn(
-                'rounded-[2px] px-2 py-1 text-[10px] font-mono transition-colors',
-                precision === 'date'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              aria-pressed={precision === 'date'}
-            >
-              Date only
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handlePrecisionChange('date-time');
-              }}
-              className={cn(
-                'rounded-[2px] px-2 py-1 text-[10px] font-mono transition-colors',
-                precision === 'date-time'
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              aria-pressed={precision === 'date-time'}
-            >
-              Date + time
-            </button>
-          </div>
-        </div>
-
-        {selected && precision === 'date-time' ? (
+        {selected ? (
           <div className="border-t border-border px-3 py-2">
             <TimeInput
               value={currentTime}
               onChange={handleTimeChange}
+              onDone={handleTimeDone}
               inputRef={timeInputRef}
-              autoFocus
             />
           </div>
         ) : null}

@@ -15,7 +15,7 @@ const TAB_ORDER: SettingsTab[] = ['general', 'ai', 'memory', 'journal', 'shortcu
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: 'General',
   ai: 'AI',
-  memory: 'Memory',
+  memory: 'Knowledge',
   journal: 'Journal',
   shortcuts: 'Shortcuts',
   backup: 'Backup',

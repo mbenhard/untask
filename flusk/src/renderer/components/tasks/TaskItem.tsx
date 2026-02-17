@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { ArrowRightLeft, Bookmark, Check, Copy, FolderInput, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
@@ -93,6 +93,9 @@ export const TaskItem = ({
 
   const isCompleted = task.status === 'done';
   const isToday = task.today === true;
+  const parentTitle = task.parentId
+    ? allTasks.find((t) => t.id === task.parentId)?.title ?? null
+    : null;
   const priority = task.priority ?? 'none';
   const dueDateLabel = useMemo(
     () => (task.dueDate ? formatDueDateDisplay(task.dueDate) : null),
@@ -162,8 +165,10 @@ export const TaskItem = ({
     setMenuOpen(false);
   };
 
-  const handleDelete = () => {
-    void deleteTask(task.id);
+  const activeChildrenCount = childrenCount - childrenDoneCount;
+
+  const handleDelete = (cascade?: boolean) => {
+    void deleteTask(task.id, cascade);
     setMenuOpen(false);
     setMenuView('main');
   };
@@ -268,16 +273,21 @@ export const TaskItem = ({
                 className="min-w-0 flex-1 truncate bg-transparent text-[13px] text-foreground outline-none"
               />
             ) : (
-              <>
-                <p
-                  className={cn(
-                    'truncate text-[13px] text-foreground',
-                    isCompleted && 'text-muted-foreground line-through',
-                  )}
-                >
-                  {task.title}
-                </p>
-              </>
+              <p
+                onClick={(event) => {
+                  if (isExpanded) {
+                    event.stopPropagation();
+                    onStartTitleEdit(task.id);
+                  }
+                }}
+                className={cn(
+                  'cursor-default text-[13px] text-foreground',
+                  !isExpanded && 'truncate',
+                  isCompleted && 'text-muted-foreground line-through',
+                )}
+              >
+                {task.title}
+              </p>
             )}
           </div>
         </div>
@@ -304,23 +314,20 @@ export const TaskItem = ({
             </span>
           )}
 
+          {parentTitle ? (
+            <span className={cn(
+              'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
+              !isExpanded && 'max-w-[120px] truncate',
+            )}>
+              {parentTitle}
+            </span>
+          ) : null}
+
           {isCompleted && completedAtLabel ? (
             <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">
               {completedAtLabel}
             </span>
           ) : null}
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onStartTitleEdit(task.id);
-            }}
-            className="inline-flex size-5 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-            aria-label={`Edit title for "${task.title}"`}
-          >
-            <Pencil className="size-3" />
-          </button>
 
           <button
             type="button"
@@ -353,7 +360,7 @@ export const TaskItem = ({
                 aria-label={`More actions for "${task.title}"`}
                 className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <MoreHorizontal className="size-3.5" />
+                <ChevronDown className="size-3.5" />
               </button>
             </Popover.Trigger>
             <PopoverContent
@@ -450,7 +457,11 @@ export const TaskItem = ({
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5 px-1 py-1.5">
-                  <p className="text-xs text-muted-foreground">Delete this task?</p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeChildrenCount > 0
+                      ? `Delete this task and ${activeChildrenCount} active subtask${activeChildrenCount > 1 ? 's' : ''}?`
+                      : 'Delete this task?'}
+                  </p>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -461,7 +472,7 @@ export const TaskItem = ({
                     </button>
                     <button
                       type="button"
-                      onClick={handleDelete}
+                      onClick={() => handleDelete(activeChildrenCount > 0)}
                       className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
                     >
                       Delete

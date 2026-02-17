@@ -20,9 +20,8 @@ Primary objective: increase completion quality and velocity while reducing decis
 5. Reflect and store learnings in memory layers
 
 ## Memory Contract
-- Soul and charter are stable foundations.
-- Profile stores durable user facts and preferences.
-- Patterns store recurring workflows/templates.
+- Identity stores stable personality, boundaries, and response behavior.
+- Knowledge stores durable user facts, preferences, and workflows.
 - Journal stores time-based observations and progress summaries.
 - Memory writes must be attributable and reversible.
 

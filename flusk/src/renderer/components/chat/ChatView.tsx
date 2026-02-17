@@ -392,20 +392,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         }));
       };
 
-      if (chip.type === 'response') {
-        const responseText = chip.responseText?.trim().length
-          ? chip.responseText.trim()
-          : chip.label.trim();
-
-        if (responseText.length === 0) {
-          return;
-        }
-
-        setChipUsed(true);
-        void sendMessage(responseText);
-        return;
-      }
-
+      // Action chip with a valid tool call — execute directly
       if (chip.type === 'action' && chip.toolCall) {
         setChipUsed(true);
         const toolCall = chip.toolCall;
@@ -431,7 +418,24 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             setChipUsed(false);
           }
         })();
+        return;
       }
+
+      // Response chip or action chip without toolCall — send label as message
+      const responseText = chip.responseText?.trim().length
+        ? chip.responseText.trim()
+        : chip.label.trim();
+
+      if (responseText.length === 0) {
+        return;
+      }
+
+      if (useChatStore.getState().isSending) {
+        return;
+      }
+
+      setChipUsed(true);
+      void sendMessage(responseText);
     },
     [sendMessage],
   );
@@ -534,6 +538,11 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     onChipClick={(chip) => handleChipClick(message.id, chip)}
                   />
                 ) : null}
+                {message.memoryUpdated ? (
+                  <span className="px-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Memory updated
+                  </span>
+                ) : null}
               </div>
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] flex-col gap-1.5">
@@ -558,6 +567,11 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     stale={!isLatest}
                     onChipClick={(chip) => handleChipClick(message.id, chip)}
                   />
+                ) : null}
+                {message.memoryUpdated ? (
+                  <span className="px-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Memory updated
+                  </span>
                 ) : null}
               </div>
             ) : (

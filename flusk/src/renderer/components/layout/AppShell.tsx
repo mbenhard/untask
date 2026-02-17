@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { LampDesk, Settings } from 'lucide-react';
+import { ChevronDown, LampDesk, Settings } from 'lucide-react';
 
 import { useTheme } from '../providers/ThemeProvider';
 
@@ -21,8 +21,14 @@ import {
   selectTasks,
   useTaskStore,
 } from '../../stores/taskStore';
-import { useChatStore } from '../../stores/chatStore';
+import {
+  selectChatActiveConversationId,
+  selectChatConversations,
+  selectChatIsLoadingConversations,
+  useChatStore,
+} from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
+import { ThreadDropdown } from '../chat/ThreadDropdown';
 import { NotesView } from '../notes/NotesView';
 import { SearchModal } from '../search/SearchModal';
 import { SettingsView } from '../settings/SettingsView';
@@ -37,6 +43,7 @@ export const AppShell = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openPanelRef = useRef<HTMLElement>(null);
   const [chatInputValue, setChatInputValue] = useState('');
+  const [threadDropdownOpen, setThreadDropdownOpen] = useState(false);
 
   const { resolvedTheme, setTheme } = useTheme();
   const prefersReducedMotion = useReducedMotion();
@@ -74,9 +81,14 @@ export const AppShell = () => {
   const error = useTaskStore(selectError);
   const initializeChat = useChatStore((state) => state.initialize);
   const sendMessage = useChatStore((state) => state.sendMessage);
-  const clearHistory = useChatStore((state) => state.clearHistory);
+  const conversations = useChatStore(selectChatConversations);
+  const activeConversationId = useChatStore(selectChatActiveConversationId);
+  const isLoadingConversations = useChatStore(selectChatIsLoadingConversations);
+  const createConversation = useChatStore((state) => state.createConversation);
+  const setActiveConversation = useChatStore((state) => state.setActiveConversation);
+  const archiveConversation = useChatStore((state) => state.archiveConversation);
+  const deleteConversation = useChatStore((state) => state.deleteConversation);
   const clearPendingNoteContext = useChatStore((state) => state.clearPendingNoteContext);
-  const messageCount = useChatStore((state) => state.messages.length);
 
   useEffect(() => {
     void fetchTasks();
@@ -164,14 +176,22 @@ export const AppShell = () => {
   }, [openChatOverlay]);
 
   const collapseChatOverlay = useCallback(() => {
+    setThreadDropdownOpen(false);
     peekChatOverlay();
     clearPendingNoteContext();
     inputRef.current?.blur();
   }, [clearPendingNoteContext, peekChatOverlay]);
 
-  const clearChat = useCallback(() => {
-    void clearHistory();
-  }, [clearHistory]);
+  const activeConversationTitle = useMemo(() => {
+    if (!activeConversationId) {
+      return 'New Thread';
+    }
+
+    return (
+      conversations.find((conversation) => conversation.id === activeConversationId)?.title ??
+      'New Thread'
+    );
+  }, [activeConversationId, conversations]);
 
   useEffect(() => {
     if (chatOverlayState !== 'open') {
@@ -217,6 +237,12 @@ export const AppShell = () => {
       window.removeEventListener('pointerdown', onPointerDown, true);
     };
   }, [chatOverlayState, collapseChatOverlay]);
+
+  useEffect(() => {
+    if (chatOverlayState !== 'open') {
+      setThreadDropdownOpen(false);
+    }
+  }, [chatOverlayState]);
 
   const isSettingsActive = activeView === 'settings';
 
@@ -282,19 +308,23 @@ export const AppShell = () => {
                   }}
                   className="pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm"
                 >
-                  <header className="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
-                    <span className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Chat
-                    </span>
+                  <header className="relative flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
+                    <button
+                      type="button"
+                      className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={() => setThreadDropdownOpen((open) => !open)}
+                    >
+                      <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
+                        {activeConversationTitle}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          'size-3 transition-transform',
+                          threadDropdownOpen ? 'rotate-180' : '',
+                        )}
+                      />
+                    </button>
                     <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={clearChat}
-                        disabled={messageCount === 0}
-                        className="rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                      >
-                        Clear
-                      </button>
                       <button
                         type="button"
                         onClick={collapseChatOverlay}
@@ -303,6 +333,25 @@ export const AppShell = () => {
                         Collapse
                       </button>
                     </div>
+                    <ThreadDropdown
+                      open={threadDropdownOpen}
+                      conversations={conversations}
+                      activeConversationId={activeConversationId}
+                      isLoading={isLoadingConversations}
+                      onClose={() => setThreadDropdownOpen(false)}
+                      onSelect={(conversationId) => {
+                        void setActiveConversation(conversationId);
+                      }}
+                      onCreate={() => {
+                        void createConversation();
+                      }}
+                      onArchive={(conversationId) => {
+                        void archiveConversation(conversationId);
+                      }}
+                      onDelete={(conversationId) => {
+                        void deleteConversation(conversationId);
+                      }}
+                    />
                   </header>
 
                   <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">

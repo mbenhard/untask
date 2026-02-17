@@ -49,7 +49,7 @@ type TaskStore = {
   fetchTasks: () => Promise<void>;
   createTask: (input: TaskCreateInput) => Promise<Task | null>;
   updateTask: (input: TaskUpdateInput) => Promise<Task | null>;
-  deleteTask: (id: string) => Promise<boolean>;
+  deleteTask: (id: string, cascade?: boolean) => Promise<boolean>;
   reorderTasks: (ids: string[]) => Promise<boolean>;
   completeTask: (id: string) => Promise<Task | null>;
   toggleToday: (id: string) => Promise<Task | null>;
@@ -178,30 +178,33 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   // ── Delete (optimistic) ─────────────────────────────────
-  deleteTask: async (id) => {
+  deleteTask: async (id, cascade) => {
     const previousTasks = get().tasks;
     const deletedIndex = previousTasks.findIndex((task) => task.id === id);
     if (deletedIndex === -1) return false;
-    const prev = previousTasks[deletedIndex];
+
+    // Collect IDs to remove (parent + children when cascading)
+    const idsToRemove = new Set([id]);
+    if (cascade) {
+      for (const t of previousTasks) {
+        if (t.parentId === id) idsToRemove.add(t.id);
+      }
+    }
 
     // Optimistic remove
     set((s) => ({
-      tasks: s.tasks.filter((t) => t.id !== id),
-      selectedTaskId: s.selectedTaskId === id ? null : s.selectedTaskId,
+      tasks: s.tasks.filter((t) => !idsToRemove.has(t.id)),
+      selectedTaskId: s.selectedTaskId && idsToRemove.has(s.selectedTaskId) ? null : s.selectedTaskId,
       error: null,
     }));
 
     try {
-      await getFlusk().tasks.delete(id);
+      await getFlusk().tasks.delete(cascade ? { id, cascade: true } : id);
       return true;
     } catch (e) {
-      // Rollback: restore task
-      set((s) => ({
-        tasks: [
-          ...s.tasks.slice(0, deletedIndex),
-          prev,
-          ...s.tasks.slice(deletedIndex),
-        ],
+      // Rollback: restore all removed tasks
+      set(() => ({
+        tasks: previousTasks,
         error: toErrorMessage(e),
       }));
       return false;
