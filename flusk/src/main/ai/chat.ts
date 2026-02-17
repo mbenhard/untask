@@ -4,6 +4,7 @@ import { stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
   ChipAction,
+  ChatNoteContext,
   ChatStreamErrorCode,
   ChatSendResultPayload,
   ChatStreamEvent,
@@ -21,6 +22,7 @@ import { writeJournalEntry } from '../services/journalService';
 import { getSetting, setSetting } from '../services/settingsService';
 
 import { buildCanonicalRuntimeContext } from './contextBuilder';
+import { scheduleKnowledgeExtraction } from './knowledgeExtractor';
 import { createOpenRouterProviderFromEnv } from './openrouter';
 import type { ChatModelId } from './models';
 import { getSelectedModelId, getModelWebSearchConfig, modelSupportsVision, resolveModelId } from './models';
@@ -44,7 +46,7 @@ const TOOL_MUTATION_NAMES = new Set([
   'move_task',
   'set_today',
   'parse_notes',
-  'edit_scratchpad',
+  'edit_note',
   'undo_last_action',
   'update_identity',
   'update_memory',
@@ -389,14 +391,14 @@ export const generateToolCallDescription = (
       return 'Generating daily plan';
     case 'parse_notes':
       return 'Extracting tasks from notes';
-    case 'read_scratchpad':
-      return 'Reading scratchpad';
-    case 'edit_scratchpad':
+    case 'read_note':
+      return 'Reading note';
+    case 'edit_note':
       return input.action === 'rewrite'
-        ? 'Rewriting scratchpad'
+        ? 'Rewriting note'
         : input.action === 'replace'
-          ? 'Replacing scratchpad section'
-          : 'Appending to scratchpad';
+          ? 'Replacing note section'
+          : 'Appending to note';
     case 'undo_last_action':
       return 'Undoing last action…';
     case 'write_journal':
@@ -405,12 +407,8 @@ export const generateToolCallDescription = (
       return 'Reading journal entries';
     case 'update_identity':
       return 'Updating identity document';
-    case 'read_memory':
-      return 'Reading memory';
     case 'update_memory':
       return input.section ? `Updating memory section "${truncate(String(input.section), 30)}"` : 'Updating memory';
-    case 'search_memory':
-      return input.query ? `Searching memory for "${truncate(String(input.query), 30)}"` : 'Searching memory';
     case 'search_journal':
       return input.query ? `Searching journal for "${truncate(String(input.query), 30)}"` : 'Searching journal';
     case 'emit_chips':
@@ -520,6 +518,7 @@ export type StartChatTurnInput = {
   content: string;
   modelId?: string | null;
   images?: string[];
+  noteContext?: ChatNoteContext;
   tokenBudget?: number;
   requestId?: string;
   emit: (event: ChatStreamEvent) => void;
@@ -531,6 +530,7 @@ const runAssistantStream = async (
     userMessage: string;
     modelId: ChatModelId;
     images?: string[];
+    noteContext?: ChatNoteContext;
     tokenBudget?: number;
     emit: (event: ChatStreamEvent) => void;
   },
@@ -576,6 +576,17 @@ const runAssistantStream = async (
         const provider = createOpenRouterProviderFromEnv();
         const model = provider.chat(input.modelId);
         const webSearchConfig = getModelWebSearchConfig(input.modelId);
+        const noteContextPrompt =
+          input.noteContext &&
+          input.noteContext.noteId.trim().length > 0 &&
+          input.noteContext.markdown.trim().length > 0
+            ? [
+                'Attached note context:',
+                `- note_id: ${input.noteContext.noteId}`,
+                `- title: ${input.noteContext.title}`,
+                input.noteContext.markdown,
+              ].join('\n')
+            : null;
         const recentHistory = getRecentChatMessages(HISTORY_WINDOW_LIMIT).filter(
           (message) => message.role === 'user' || message.role === 'assistant',
         );
@@ -625,7 +636,9 @@ const runAssistantStream = async (
 
         const result = streamText({
           model,
-          system: builtPrompt.modelInputPrompt,
+          system: noteContextPrompt
+            ? `${builtPrompt.modelInputPrompt}\n\n${noteContextPrompt}`
+            : builtPrompt.modelInputPrompt,
           messages: sdkMessages,
           toolChoice: requireToolChoice ? 'required' : 'auto',
           stopWhen: stepCountIs(STREAM_TOOL_LOOP_MAX_STEPS),
@@ -675,6 +688,7 @@ const runAssistantStream = async (
               onActionCard: (card) => {
                 actionCards.push(card);
               },
+              activeNoteId: input.noteContext?.noteId,
             });
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
@@ -842,6 +856,7 @@ const runAssistantStream = async (
               onActionCard: (card) => {
                 actionCards.push(card);
               },
+              activeNoteId: input.noteContext?.noteId,
             });
 
             if (isChatRequestCanceled(input.requestId)) {
@@ -991,6 +1006,13 @@ const runAssistantStream = async (
       toolExecutions,
     });
 
+    scheduleKnowledgeExtraction({
+      userMessage: input.userMessage,
+      assistantResponse: finalizedText,
+      requestId: input.requestId,
+      emit,
+    });
+
     if (isChatRequestCanceled(input.requestId)) {
       return;
     }
@@ -1037,6 +1059,16 @@ export const startChatTurn = async (
   canceledChatRequestIds.delete(requestId);
 
   const images = input.images?.length ? input.images : undefined;
+  const noteContext =
+    input.noteContext &&
+    input.noteContext.noteId.trim().length > 0 &&
+    input.noteContext.markdown.trim().length > 0
+      ? {
+          noteId: input.noteContext.noteId.trim(),
+          title: input.noteContext.title.trim(),
+          markdown: input.noteContext.markdown.trim(),
+        }
+      : undefined;
 
   try {
     const userMessageMeta: Record<string, unknown> = {
@@ -1045,6 +1077,12 @@ export const startChatTurn = async (
     };
     if (images) {
       userMessageMeta.imageCount = images.length;
+    }
+    if (noteContext) {
+      userMessageMeta.noteContext = {
+        noteId: noteContext.noteId,
+        title: noteContext.title,
+      };
     }
 
     const userMessage = saveChatMessage({
@@ -1059,6 +1097,7 @@ export const startChatTurn = async (
       userMessage: content,
       modelId,
       images,
+      noteContext,
       tokenBudget: input.tokenBudget,
       emit: input.emit,
     });

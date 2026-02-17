@@ -9,7 +9,7 @@ import {
   UI_FONT_MONO_SETTING_KEY,
   UI_FONT_SANS_SETTING_KEY,
 } from '../../lib/typography';
-import { SettingsMemory } from './SettingsMemory';
+import { SettingsView } from './SettingsView';
 
 vi.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: { children: ReactNode }) => createElement('div', null, children),
@@ -103,7 +103,7 @@ describe('SettingsMemory typography controls', () => {
 
     flushSync(() => {
       root.render(
-        createElement(TypographyProvider, null, createElement(SettingsMemory)),
+        createElement(TypographyProvider, null, createElement(SettingsView)),
       );
     });
 
@@ -157,7 +157,7 @@ describe('SettingsMemory typography controls', () => {
 
     flushSync(() => {
       root.render(
-        createElement(TypographyProvider, null, createElement(SettingsMemory)),
+        createElement(TypographyProvider, null, createElement(SettingsView)),
       );
     });
 

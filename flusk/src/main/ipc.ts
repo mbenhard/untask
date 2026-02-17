@@ -8,6 +8,7 @@ import {
   type ChatKernelStatusResultPayload,
 
   type ChatRetentionResult,
+  type ChatSendRequest,
   type ChatSendResult,
   type ChatSelectedModelResult,
   type ChatSetModelRequest,
@@ -53,11 +54,12 @@ import {
   type BackupImportDialogResponse,
   type WindowDismissModeResult,
 } from '../types/ipc';
+import type { MemoryLayer } from '../types/assistant';
 import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
 import { buildSystemPrompt } from './ai/systemPrompt';
 import { closeDatabase, initDatabase } from './db';
 import { runMigrations } from './db/migrate';
-import { getPatterns, getProfile, getSoul, resetSoul, setPatterns, setProfile, setSoul, getIdentity, getMemory, setIdentity, setMemory } from './ai/memory';
+import { getIdentity, getMemory, setIdentity, setMemory } from './ai/memory';
 import { evaluateProactiveTriggerPolicy } from './assistant/proactivePolicy';
 import {
   listTasks,
@@ -78,7 +80,14 @@ import {
 } from './services/chatService';
 import { readJournalEntries } from './services/journalService';
 import { listMemoryEvents, undoMemoryEvents } from './services/memoryService';
-import { getScratchpad, saveScratchpad } from './services/scratchpadService';
+import {
+  createNote,
+  getNote,
+  saveNote,
+  archiveNote,
+  deleteNote,
+  listNotes,
+} from './services/notesService';
 import {
   createBackup,
   exportBackup,
@@ -108,25 +117,13 @@ import {
 } from './window/summonController';
 import { windowDismissModeSchema } from './window/dismissMode';
 
-type ChatSendInput = {
-  content: string;
-  modelId?: string | null;
-  images?: string[];
-};
-
 const settingsMemoryUpdateSchema = z
   .object({
-    soul: z.string().optional(),
-    profile: z.string().optional(),
-    patterns: z.string().optional(),
     identity: z.string().optional(),
     memory: z.string().optional(),
   })
   .refine(
     (value) =>
-      value.soul !== undefined ||
-      value.profile !== undefined ||
-      value.patterns !== undefined ||
       value.identity !== undefined ||
       value.memory !== undefined,
     {
@@ -162,6 +159,27 @@ const taskCompleteRequestSchema = z.union([
   }),
 ]);
 
+const chatSendSchema = z.object({
+  content: z.string(),
+  modelId: z.string().nullable().optional(),
+  images: z.array(z.string().min(1)).optional(),
+  noteContext: z
+    .object({
+      noteId: z.string().min(1),
+      title: z.string().min(1),
+      markdown: z.string().min(1),
+    })
+    .optional(),
+});
+
+const noteIdSchema = z.string().min(1);
+const noteTitleSchema = z.string().max(200).optional();
+const noteSaveSchema = z.object({
+  id: z.string().min(1),
+  content: z.string(),
+  title: z.string().max(200).optional(),
+});
+
 const memoryHistoryRequestSchema = z.object({
   layer: z.enum(['soul', 'profile', 'patterns', 'identity', 'memory']).optional(),
   limit: z.number().int().min(1).max(200).optional(),
@@ -186,9 +204,6 @@ const backupDialogRequestSchema = z.object({
 });
 
 const getMemoryState = (): SettingsMemoryStatePayload => ({
-  soul: getSoul(),
-  profile: getProfile(),
-  patterns: getPatterns(),
   identity: getIdentity(),
   memory: getMemory(),
 });
@@ -345,7 +360,7 @@ export const registerIpcHandlers = (): void => {
       _request: MemoryPromotionEvaluationRequestPayload,
     ): MemoryPromotionEvaluationResultPayload => ({
       action: 'journal_only',
-      proposedLayer: 'journal',
+      proposedLayer: 'identity',
       proposedEntry: '',
       confidence: 0,
       requiresConfirmation: false,
@@ -363,7 +378,7 @@ export const registerIpcHandlers = (): void => {
       resolved: false,
       decision: {
         action: 'journal_only',
-        proposedLayer: 'journal',
+        proposedLayer: 'identity',
         proposedEntry: '',
         confidence: 0,
         requiresConfirmation: false,
@@ -465,25 +480,23 @@ export const registerIpcHandlers = (): void => {
   // ─── Chat handlers ───────────────────────────────────────
   ipcMain.handle(
     IPC_CHANNELS.CHAT_SEND,
-    async (event, message: ChatSendInput): Promise<ChatSendResult> => {
+    async (event, message: ChatSendRequest): Promise<ChatSendResult> => {
     try {
-      if (!message || typeof message.content !== 'string') {
-        throw new Error('Invalid chat payload: expected { content, modelId? }.');
-      }
-
-      const content = message.content.trim();
+      const parsedMessage = chatSendSchema.parse(message ?? {});
+      const content = parsedMessage.content.trim();
       if (content.length === 0) {
         throw new Error('Chat content cannot be empty.');
       }
 
-      const images = Array.isArray(message.images) ? message.images.filter(
+      const images = Array.isArray(parsedMessage.images) ? parsedMessage.images.filter(
         (img): img is string => typeof img === 'string' && img.length > 0,
       ) : undefined;
 
       return startChatTurn({
         content,
-        modelId: message.modelId,
+        modelId: parsedMessage.modelId,
         images: images?.length ? images : undefined,
+        noteContext: parsedMessage.noteContext,
         emit: (streamEvent): void => {
           if (event.sender.isDestroyed()) {
             return;
@@ -747,14 +760,49 @@ export const registerIpcHandlers = (): void => {
     },
   );
 
-  // ─── Scratchpad handlers ─────────────────────────────────
-  ipcMain.handle(IPC_CHANNELS.SCRATCHPAD_GET, () => {
-    try { return getScratchpad(); }
-    catch (e) { console.error('[ipc] SCRATCHPAD_GET:', e); throw e; }
+  // ─── Notes handlers ─────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.NOTES_LIST, () => {
+    try { return listNotes(); }
+    catch (e) { console.error('[ipc] NOTES_LIST:', e); throw e; }
   });
-  ipcMain.handle(IPC_CHANNELS.SCRATCHPAD_SAVE, (_event, content: string) => {
-    try { return saveScratchpad(content); }
-    catch (e) { console.error('[ipc] SCRATCHPAD_SAVE:', e); throw e; }
+  ipcMain.handle(IPC_CHANNELS.NOTES_GET, (_event, idInput: string) => {
+    try {
+      const id = noteIdSchema.parse(idInput);
+      return getNote(id);
+    }
+    catch (e) { console.error('[ipc] NOTES_GET:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.NOTES_CREATE, (_event, titleInput?: string) => {
+    try {
+      const title = noteTitleSchema.parse(titleInput);
+      return createNote(title);
+    }
+    catch (e) { console.error('[ipc] NOTES_CREATE:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.NOTES_SAVE, (_event, idInput: string, contentInput: string, titleInput?: string) => {
+    try {
+      const validated = noteSaveSchema.parse({
+        id: idInput,
+        content: contentInput,
+        title: titleInput,
+      });
+      return saveNote(validated.id, validated.content, validated.title);
+    }
+    catch (e) { console.error('[ipc] NOTES_SAVE:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.NOTES_ARCHIVE, (_event, idInput: string) => {
+    try {
+      const id = noteIdSchema.parse(idInput);
+      return archiveNote(id);
+    }
+    catch (e) { console.error('[ipc] NOTES_ARCHIVE:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.NOTES_DELETE, (_event, idInput: string) => {
+    try {
+      const id = noteIdSchema.parse(idInput);
+      return deleteNote(id);
+    }
+    catch (e) { console.error('[ipc] NOTES_DELETE:', e); throw e; }
   });
 
   // ─── Backup handlers ─────────────────────────────────────
@@ -934,15 +982,6 @@ export const registerIpcHandlers = (): void => {
       try {
         const validated = settingsMemoryUpdateSchema.parse(payload ?? {});
 
-        if (validated.soul !== undefined) {
-          setSoul(validated.soul);
-        }
-        if (validated.profile !== undefined) {
-          setProfile(validated.profile);
-        }
-        if (validated.patterns !== undefined) {
-          setPatterns(validated.patterns);
-        }
         if (validated.identity !== undefined) {
           setIdentity(validated.identity);
         }
@@ -956,16 +995,6 @@ export const registerIpcHandlers = (): void => {
     },
   );
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_RESET_SOUL,
-    (): SettingsMemoryStatePayload => {
-      try {
-        resetSoul();
-        return getMemoryState();
-      }
-      catch (e) { console.error('[ipc] SETTINGS_RESET_SOUL:', e); throw e; }
-    },
-  );
-  ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_MEMORY_HISTORY,
     (
       _event,
@@ -975,7 +1004,7 @@ export const registerIpcHandlers = (): void => {
         const validated = memoryHistoryRequestSchema.parse(payload ?? {});
         return {
           events: listMemoryEvents({
-            layer: validated.layer,
+            layer: validated.layer as MemoryLayer | undefined,
             limit: validated.limit,
           }),
         };

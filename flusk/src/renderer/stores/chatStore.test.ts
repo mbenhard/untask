@@ -65,6 +65,7 @@ describe('chatStore stream reliability', () => {
       pendingImages: [],
       processingImageCount: 0,
       focusMessageId: null,
+      pendingNoteContext: null,
     });
 
     useAppStore.setState({
@@ -282,19 +283,19 @@ describe('chatStore stream reliability', () => {
     useChatStore.getState().applyStreamEvent({
       type: 'tool_call_completed',
       requestId: 'req-auto-1',
-      toolName: 'edit_scratchpad',
+      toolName: 'edit_note',
       toolCallId: 'tc-1',
       status: 'success',
-      message: 'Edited scratchpad',
+      message: 'Edited note',
       actionCard: {
         id: 'card-auto-1',
-        toolName: 'edit_scratchpad',
+        toolName: 'edit_note',
         status: 'success',
-        title: 'Scratchpad updated',
+        title: 'Note updated',
         detail: 'Edited notes',
         undoable: false,
         createdAt: now,
-        viewIntent: 'scratchpad',
+        viewIntent: 'notes',
       },
     });
 
@@ -781,6 +782,48 @@ describe('chatStore stream reliability', () => {
     expect(useChatStore.getState().selectedModelId).toBe('moonshotai/kimi-k2.5');
   });
 
+  it('attaches staged note context on the next outgoing message', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      flusk: { chat: ReturnType<typeof createMockChatApi> };
+    }).flusk.chat;
+
+    mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
+    mockChatApi.send.mockResolvedValue({
+      requestId: 'req-send-note-context',
+      userMessage: {
+        id: 'user-msg-note-context',
+        role: 'user',
+        content: 'extract tasks',
+        toolCalls: null,
+        chips: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    useChatStore.getState().stageNoteContext({
+      noteId: 'note-42',
+      title: 'Client call',
+      markdown: '- send proposal',
+    });
+
+    await useChatStore.getState().sendMessage('extract tasks');
+
+    expect(mockChatApi.send).toHaveBeenCalledWith({
+      content: 'extract tasks',
+      modelId: 'moonshotai/kimi-k2.5',
+      noteContext: {
+        noteId: 'note-42',
+        title: 'Client call',
+        markdown: '- send proposal',
+      },
+    });
+    expect(useChatStore.getState().pendingNoteContext).toEqual({
+      noteId: 'note-42',
+      title: 'Client call',
+      markdown: '- send proposal',
+    });
+  });
+
   it('falls back to main default model resolution when selected-model lookup fails', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
       flusk: { chat: ReturnType<typeof createMockChatApi> };
@@ -805,5 +848,34 @@ describe('chatStore stream reliability', () => {
       content: 'fallback',
       modelId: null,
     });
+  });
+
+  it('detaches staged note context on demand', () => {
+    useChatStore.getState().stageNoteContext({
+      noteId: 'note-9',
+      title: 'Planning',
+      markdown: '- clarify scope',
+    });
+
+    useChatStore.getState().detachPendingNoteContext();
+
+    expect(useChatStore.getState().pendingNoteContext).toBeNull();
+  });
+
+  it('consumes staged note context and clears it', () => {
+    useChatStore.getState().stageNoteContext({
+      noteId: 'note-11',
+      title: 'Retro',
+      markdown: '- improve handoff',
+    });
+
+    const consumed = useChatStore.getState().consumePendingNoteContext();
+
+    expect(consumed).toEqual({
+      noteId: 'note-11',
+      title: 'Retro',
+      markdown: '- improve handoff',
+    });
+    expect(useChatStore.getState().pendingNoteContext).toBeNull();
   });
 });

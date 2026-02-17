@@ -82,10 +82,10 @@ const isBulkWrite = (hint: ToolRiskHint): boolean => {
   return typeof count === 'number' && count > 5;
 };
 
-const scratchpadEditAction = (
+const noteEditAction = (
   hint: ToolRiskHint,
 ): 'append' | 'replace' | 'rewrite' | null => {
-  if (hint.toolName !== 'edit_scratchpad') return null;
+  if (hint.toolName !== 'edit_note') return null;
   const action = hint.input.action;
   if (action === 'append' || action === 'replace' || action === 'rewrite') {
     return action;
@@ -99,10 +99,10 @@ export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   if (isCompletedRewrite(hint)) return 'critical';
   if (isBulkWrite(hint)) return 'high';
 
-  const scratchpadAction = scratchpadEditAction(hint);
-  if (scratchpadAction === 'rewrite') return 'high';
-  if (scratchpadAction === 'replace') return 'medium';
-  if (scratchpadAction === 'append') return 'low';
+  const noteAction = noteEditAction(hint);
+  if (noteAction === 'rewrite') return 'high';
+  if (noteAction === 'replace') return 'medium';
+  if (noteAction === 'append') return 'low';
 
   switch (hint.toolName) {
     case 'create_task':
@@ -268,7 +268,7 @@ export const getPendingAction = (actionId: string): PendingAction | null => {
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'suggest_daily_plan',
   'read_journal',
-  'read_scratchpad',
+  'read_note',
   'read_memory',
   'search_memory',
   'search_journal',

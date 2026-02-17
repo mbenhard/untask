@@ -163,13 +163,13 @@ describe('generateToolCallDescription', () => {
 
   it('generates description for complete_task', () => {
     expect(generateToolCallDescription('complete_task', { id: 'task-123' })).toBe(
-      'Completing task task-123',
+      'Completing task…',
     );
   });
 
   it('generates description for delete_task', () => {
     expect(generateToolCallDescription('delete_task', { id: 'task-456' })).toBe(
-      'Deleting task task-456',
+      'Deleting task…',
     );
   });
 
@@ -179,27 +179,27 @@ describe('generateToolCallDescription', () => {
 
   it('generates description for set_today', () => {
     expect(generateToolCallDescription('set_today', { id: 'task-789' })).toBe(
-      'Updating Today list for task task-789',
+      'Updating Today list…',
     );
   });
 
-  it('generates description for read_scratchpad', () => {
-    expect(generateToolCallDescription('read_scratchpad', {})).toBe('Reading scratchpad');
+  it('generates description for read_note', () => {
+    expect(generateToolCallDescription('read_note', {})).toBe('Reading note');
   });
 
-  it('generates description for edit_scratchpad rewrite', () => {
-    expect(generateToolCallDescription('edit_scratchpad', { action: 'rewrite' })).toBe(
-      'Rewriting scratchpad',
+  it('generates description for edit_note rewrite', () => {
+    expect(generateToolCallDescription('edit_note', { action: 'rewrite' })).toBe(
+      'Rewriting note',
     );
   });
 
   it('generates description for undo_last_action without event id', () => {
-    expect(generateToolCallDescription('undo_last_action', {})).toBe('Undoing last action');
+    expect(generateToolCallDescription('undo_last_action', {})).toBe('Undoing last action…');
   });
 
   it('generates description for undo_last_action with event id', () => {
     expect(generateToolCallDescription('undo_last_action', { taskEventId: 'evt-1' })).toBe(
-      'Undoing event evt-1',
+      'Undoing last action…',
     );
   });
 
@@ -213,7 +213,7 @@ describe('generateToolCallDescription', () => {
 
   it('generates description for improve_task', () => {
     expect(generateToolCallDescription('improve_task', { id: 'task-abc' })).toBe(
-      'Analyzing task task-abc',
+      'Analyzing task…',
     );
   });
 

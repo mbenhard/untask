@@ -13,6 +13,7 @@ import {
   selectChatLastStreamError,
   selectChatMessages,
   selectFocusMessageId,
+  selectPendingNoteContext,
   useChatStore,
 } from '../../stores/chatStore';
 import { useTaskStore } from '../../stores/taskStore';
@@ -266,12 +267,14 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const error = useChatStore(selectChatError);
   const lastStreamError = useChatStore(selectChatLastStreamError);
   const focusMessageId = useChatStore(selectFocusMessageId);
+  const pendingNoteContext = useChatStore(selectPendingNoteContext);
 
   const undoAction = useChatStore((state) => state.undoAction);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
   const clearFocusMessageId = useChatStore((state) => state.clearFocusMessageId);
+  const detachPendingNoteContext = useChatStore((state) => state.detachPendingNoteContext);
 
   const prefersReducedMotion = useReducedMotion();
   const lastAnimatedIdRef = useRef<string | null>(null);
@@ -367,6 +370,17 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   }, [confirmationTarget, approvePendingAction]);
 
   const sendMessage = useChatStore((state) => state.sendMessage);
+  const triggerNotePrompt = useCallback(
+    (prompt: string) => {
+      if (onSuggestionClick) {
+        onSuggestionClick(prompt);
+        return;
+      }
+
+      void sendMessage(prompt);
+    },
+    [onSuggestionClick, sendMessage],
+  );
 
   const handleChipClick = useCallback(
     (messageId: string, chip: ChipAction) => {
@@ -601,6 +615,44 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
               Retry last message
             </Button>
           ) : null}
+        </div>
+      ) : null}
+
+      {pendingNoteContext ? (
+        <div className="rounded-lg border border-border/60 bg-card/60 px-3 py-2">
+          <p className="truncate text-[11px] text-muted-foreground">
+            Note attached: <span className="text-foreground">{pendingNoteContext.title}</span>
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+              onClick={() => triggerNotePrompt('Extract the action items from this note and add or update tasks as needed.')}
+            >
+              Extract tasks
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+              onClick={() => triggerNotePrompt('Summarize the key decisions from this note.')}
+            >
+              Summarize decisions
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+              onClick={() => triggerNotePrompt('Clean up this note for clarity and brevity without losing important details.')}
+            >
+              Clean up note
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+              onClick={detachPendingNoteContext}
+            >
+              Detach
+            </button>
+          </div>
         </div>
       ) : null}
 

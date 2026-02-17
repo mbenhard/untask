@@ -52,12 +52,26 @@ export const tasks = sqliteTable(
   ],
 );
 
-// ─── scratchpad ─────────────────────────────────────────────
-export const scratchpad = sqliteTable('scratchpad', {
-  id: text('id').primaryKey(),
-  content: text('content').notNull().default(''),
-  updatedAt: text('updated_at'),
-});
+// ─── notes ──────────────────────────────────────────────────
+export const notes = sqliteTable(
+  'notes',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    title: text('title').notNull(),
+    content: text('content').notNull().default(''),
+    status: text('status', { enum: ['active', 'archived'] })
+      .notNull()
+      .default('active'),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at'),
+  },
+  (table) => [
+    index('notes_status_idx').on(table.status),
+    index('notes_created_at_idx').on(table.createdAt),
+  ],
+);
 
 // ─── chat_messages ──────────────────────────────────────────
 export const chatMessages = sqliteTable(
@@ -160,7 +174,8 @@ export const memoryEvents = sqliteTable(
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
 
-export type Scratchpad = typeof scratchpad.$inferSelect;
+export type Note = typeof notes.$inferSelect;
+export type NewNote = typeof notes.$inferInsert;
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;

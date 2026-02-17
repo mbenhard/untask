@@ -9,14 +9,14 @@ const TAB_LABELS: Record<string, string> = {
   today: 'Today',
   tasks: 'Tasks',
   inbox: 'Inbox',
-  scratchpad: 'Notes',
+  notes: 'Notes',
 };
 
 const PRIMARY_VIEWS: AppView[] = [
   'today',
   'tasks',
   'inbox',
-  'scratchpad',
+  'notes',
 ];
 
 export const TitleBar = () => {

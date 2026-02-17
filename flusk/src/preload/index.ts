@@ -241,9 +241,14 @@ const fluskApi: FluskApi = {
     query: (request: SearchQueryRequest): Promise<SearchQueryResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.SEARCH_QUERY, request),
   },
-  scratchpad: {
-    get: () => ipcRenderer.invoke(IPC_CHANNELS.SCRATCHPAD_GET),
-    save: (content: string) => ipcRenderer.invoke(IPC_CHANNELS.SCRATCHPAD_SAVE, content),
+  notes: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES_LIST),
+    get: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_GET, id),
+    create: (title?: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE, title),
+    save: (id: string, content: string, title?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content, title),
+    archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
   },
   settings: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
@@ -255,8 +260,6 @@ const fluskApi: FluskApi = {
       payload: SettingsMemoryUpdateRequestPayload,
     ): Promise<SettingsMemoryStatePayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE_MEMORY_STATE, payload),
-    resetSoul: (): Promise<SettingsMemoryStatePayload> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_RESET_SOUL),
     getMemoryHistory: (
       payload?: SettingsMemoryHistoryRequestPayload,
     ): Promise<SettingsMemoryHistoryResultPayload> =>

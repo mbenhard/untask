@@ -4,6 +4,7 @@ import type {
   ActionLifecycle,
   AutonomyMode,
   ChatActionCard,
+  ChatNoteContext,
   ChipAction,
   ChatModelCatalogEntry,
   ChatPendingActionEntry,
@@ -47,6 +48,7 @@ type PendingViewSwitch = {
 type ChatRequestPayload = {
   content: string;
   modelId: string | null;
+  noteContext?: ChatNoteContext;
 };
 
 type ChatLastStreamError = {
@@ -75,9 +77,14 @@ type ChatStore = {
   pendingImages: string[];
   processingImageCount: number;
   focusMessageId: string | null;
+  pendingNoteContext: ChatNoteContext | null;
 
   initialize: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
+  stageNoteContext: (context: ChatNoteContext) => void;
+  consumePendingNoteContext: () => ChatNoteContext | null;
+  detachPendingNoteContext: () => void;
+  clearPendingNoteContext: () => void;
   clearHistory: () => Promise<void>;
   undoAction: (taskEventId?: string) => Promise<void>;
   setSelectedModel: (modelId: string) => Promise<void>;
@@ -342,6 +349,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     content: string,
     modelId: string | null,
     images?: string[],
+    noteContext?: ChatNoteContext,
   ): Promise<void> => {
     const trimmed = content.trim();
     if (trimmed.length === 0) {
@@ -355,6 +363,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         content: trimmed,
         modelId,
         images: images?.length ? images : undefined,
+        noteContext,
       });
 
       const userMessage = mapMessageToUi(response.userMessage);
@@ -387,6 +396,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           [response.requestId]: {
             content: trimmed,
             modelId,
+            ...(noteContext ? { noteContext } : {}),
           },
         },
         pendingViewSwitchByRequestId: {
@@ -427,6 +437,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     pendingImages: [],
     processingImageCount: 0,
     focusMessageId: null,
+    pendingNoteContext: null,
 
     initialize: async () => {
       if (get().isInitialized) {
@@ -506,8 +517,29 @@ export const useChatStore = create<ChatStore>((set, get) => {
         set({ selectedModelId: selected.modelId });
       }
       const images = get().pendingImages;
+      const noteContext = get().pendingNoteContext ?? undefined;
       set({ pendingImages: [] });
-      await sendPreparedMessage(content, selected?.modelId ?? null, images);
+      await sendPreparedMessage(content, selected?.modelId ?? null, images, noteContext);
+    },
+
+    stageNoteContext: (context) => {
+      set({ pendingNoteContext: context });
+    },
+
+    consumePendingNoteContext: () => {
+      const context = get().pendingNoteContext;
+      if (context) {
+        set({ pendingNoteContext: null });
+      }
+      return context;
+    },
+
+    detachPendingNoteContext: () => {
+      set({ pendingNoteContext: null });
+    },
+
+    clearPendingNoteContext: () => {
+      set({ pendingNoteContext: null });
     },
 
     cancelStream: async () => {
@@ -557,7 +589,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         };
       });
 
-      await sendPreparedMessage(payload.content, payload.modelId);
+      await sendPreparedMessage(payload.content, payload.modelId, undefined, payload.noteContext);
     },
 
     clearHistory: async () => {
@@ -571,6 +603,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           lastStreamError: null,
           isSending: false,
           focusMessageId: null,
+          pendingNoteContext: null,
           error: null,
         });
       } catch (error) {
@@ -1114,3 +1147,4 @@ export const selectPendingActions = (state: ChatStore) => state.pendingActions;
 export const selectPendingImages = (state: ChatStore) => state.pendingImages;
 export const selectProcessingImageCount = (state: ChatStore) => state.processingImageCount;
 export const selectFocusMessageId = (state: ChatStore) => state.focusMessageId;
+export const selectPendingNoteContext = (state: ChatStore) => state.pendingNoteContext;

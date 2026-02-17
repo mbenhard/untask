@@ -23,9 +23,9 @@ import {
 } from '../../stores/taskStore';
 import { useChatStore } from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
-import { ScratchpadView } from '../scratchpad/ScratchpadView';
+import { NotesView } from '../notes/NotesView';
 import { SearchModal } from '../search/SearchModal';
-import { SettingsMemory } from '../settings/SettingsMemory';
+import { SettingsView } from '../settings/SettingsView';
 import { InboxView } from '../views/InboxView';
 import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
@@ -75,6 +75,7 @@ export const AppShell = () => {
   const initializeChat = useChatStore((state) => state.initialize);
   const sendMessage = useChatStore((state) => state.sendMessage);
   const clearHistory = useChatStore((state) => state.clearHistory);
+  const clearPendingNoteContext = useChatStore((state) => state.clearPendingNoteContext);
   const messageCount = useChatStore((state) => state.messages.length);
 
   useEffect(() => {
@@ -147,12 +148,12 @@ export const AppShell = () => {
       return <TasksView allTasks={tasks} isLoading={isLoading} error={error} />;
     }
 
-    if (activeView === 'scratchpad') {
-      return <ScratchpadView />;
+    if (activeView === 'notes') {
+      return <NotesView />;
     }
 
     if (activeView === 'settings') {
-      return <SettingsMemory />;
+      return <SettingsView />;
     }
 
     return <InboxView allTasks={tasks} isLoading={isLoading} error={error} />;
@@ -164,8 +165,9 @@ export const AppShell = () => {
 
   const collapseChatOverlay = useCallback(() => {
     peekChatOverlay();
+    clearPendingNoteContext();
     inputRef.current?.blur();
-  }, [peekChatOverlay]);
+  }, [clearPendingNoteContext, peekChatOverlay]);
 
   const clearChat = useCallback(() => {
     void clearHistory();

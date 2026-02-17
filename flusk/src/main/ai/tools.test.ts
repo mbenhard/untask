@@ -70,17 +70,28 @@ vi.mock('../services/journalService', () => ({
   }),
 }));
 
-vi.mock('../services/scratchpadService', () => ({
-  getScratchpad: vi.fn(() => ({
-    id: 'main',
+vi.mock('../services/notesService', () => ({
+  getNote: vi.fn((id: string) => ({
+    id,
+    title: 'Test note',
     content: '',
+    status: 'active',
+    createdAt: '2026-02-16T00:00:00.000Z',
     updatedAt: '2026-02-16T00:00:00.000Z',
   })),
-  saveScratchpad: vi.fn((content: string) => ({
-    id: 'main',
+  saveNote: vi.fn((id: string, content: string) => ({
+    id,
+    title: 'Test note',
     content,
+    status: 'active',
+    createdAt: '2026-02-16T00:00:00.000Z',
     updatedAt: '2026-02-16T00:01:00.000Z',
   })),
+  listNotes: vi.fn(() => ({
+    active: [{ id: 'note-1', title: 'Test note', content: '', status: 'active', createdAt: '2026-02-16T00:00:00.000Z', updatedAt: '2026-02-16T00:00:00.000Z' }],
+    archived: [],
+  })),
+  blockNoteToMarkdown: vi.fn((raw: string) => raw),
 }));
 
 vi.mock('./memory', () => ({
@@ -95,7 +106,7 @@ vi.mock('./memory', () => ({
 }));
 
 import * as taskService from '../services/taskService';
-import * as scratchpadService from '../services/scratchpadService';
+import * as notesService from '../services/notesService';
 import * as autonomy from './autonomy';
 import { lookup } from 'node:dns/promises';
 import { extractFromHtml } from '@extractus/article-extractor';
@@ -109,8 +120,9 @@ const toggleTodayMock = vi.mocked(taskService.toggleToday);
 const getLastTaskEventForTaskMock = vi.mocked(taskService.getLastTaskEventForTask);
 const getTaskByIdMock = vi.mocked(taskService.getTaskById);
 const listTasksMock = vi.mocked(taskService.listTasks);
-const getScratchpadMock = vi.mocked(scratchpadService.getScratchpad);
-const saveScratchpadMock = vi.mocked(scratchpadService.saveScratchpad);
+const getNoteMock = vi.mocked(notesService.getNote);
+const saveNoteMock = vi.mocked(notesService.saveNote);
+const listNotesMock = vi.mocked(notesService.listNotes);
 const evaluateGateMock = vi.mocked(autonomy.evaluateGate);
 const isMutationToolMock = vi.mocked(autonomy.isMutationTool);
 const lookupMock = vi.mocked(lookup);
@@ -131,22 +143,33 @@ beforeEach(() => {
   getLastTaskEventForTaskMock.mockReset();
   getTaskByIdMock.mockReset();
   listTasksMock.mockReset();
-  getScratchpadMock.mockReset();
-  saveScratchpadMock.mockReset();
+  getNoteMock.mockReset();
+  saveNoteMock.mockReset();
+  listNotesMock.mockReset();
   evaluateGateMock.mockReset();
   isMutationToolMock.mockReset();
   lookupMock.mockReset();
   extractFromHtmlMock.mockReset();
-  getScratchpadMock.mockReturnValue({
-    id: 'main',
+  getNoteMock.mockReturnValue({
+    id: 'note-1',
+    title: 'Test note',
     content: '',
+    status: 'active',
+    createdAt: '2026-02-16T00:00:00.000Z',
     updatedAt: '2026-02-16T00:00:00.000Z',
   } as never);
-  saveScratchpadMock.mockImplementation((content: string) => ({
-    id: 'main',
+  saveNoteMock.mockImplementation((id: string, content: string) => ({
+    id,
+    title: 'Test note',
     content,
+    status: 'active',
+    createdAt: '2026-02-16T00:00:00.000Z',
     updatedAt: '2026-02-16T00:01:00.000Z',
   }) as never);
+  listNotesMock.mockReturnValue({
+    active: [{ id: 'note-1', title: 'Test note', content: '', status: 'active', createdAt: '2026-02-16T00:00:00.000Z', updatedAt: '2026-02-16T00:00:00.000Z' }],
+    archived: [],
+  } as never);
   lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
   extractFromHtmlMock.mockResolvedValue({
     title: 'Extracted title',
@@ -486,50 +509,61 @@ describe('get_task tool', () => {
   });
 });
 
-describe('scratchpad tools', () => {
-  it('reads the current scratchpad content', async () => {
-    getScratchpadMock.mockReturnValue({
-      id: 'main',
+describe('note tools', () => {
+  it('reads a note by ID', async () => {
+    getNoteMock.mockReturnValue({
+      id: 'note-1',
+      title: 'Test note',
       content: 'Draft notes for Tuesday.',
+      status: 'active',
+      createdAt: '2026-02-16T12:00:00.000Z',
       updatedAt: '2026-02-16T12:00:00.000Z',
     } as never);
 
     const result = await executeToolCall({
-      name: 'read_scratchpad',
-      input: {},
+      name: 'read_note',
+      input: { noteId: 'note-1' },
     });
 
-    expect(getScratchpadMock).toHaveBeenCalledTimes(1);
+    expect(getNoteMock).toHaveBeenCalledWith('note-1');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.output.status).toBe('success');
       expect(result.output.data).toEqual({
-        scratchpad: {
-          id: 'main',
+        note: {
+          id: 'note-1',
+          title: 'Test note',
           content: 'Draft notes for Tuesday.',
+          status: 'active',
+          createdAt: '2026-02-16T12:00:00.000Z',
           updatedAt: '2026-02-16T12:00:00.000Z',
         },
       });
     }
   });
 
-  it('returns replace diff summary when editing scratchpad', async () => {
-    getScratchpadMock.mockReturnValue({
-      id: 'main',
+  it('returns replace diff summary when editing a note', async () => {
+    getNoteMock.mockReturnValue({
+      id: 'note-1',
+      title: 'Test note',
       content: 'One old sentence.\nAnother line.',
+      status: 'active',
+      createdAt: '2026-02-16T12:00:00.000Z',
       updatedAt: '2026-02-16T12:00:00.000Z',
     } as never);
 
     const result = await executeToolCall({
-      name: 'edit_scratchpad',
+      name: 'edit_note',
       input: {
+        noteId: 'note-1',
         action: 'replace',
         target: 'One old sentence.',
         replacement: 'One improved sentence.',
       },
     });
 
-    expect(saveScratchpadMock).toHaveBeenCalledWith(
+    expect(saveNoteMock).toHaveBeenCalledWith(
+      'note-1',
       'One improved sentence.\nAnother line.',
     );
     expect(result.ok).toBe(true);
@@ -537,7 +571,7 @@ describe('scratchpad tools', () => {
       expect(result.output.status).toBe('success');
       expect(result.output.message).toContain('Before: "One old sentence."');
       expect(result.output.message).toContain('After: "One improved sentence."');
-      expect(result.output.actionCard?.viewIntent).toBe('scratchpad');
+      expect(result.output.actionCard?.viewIntent).toBe('notes');
     }
   });
 });

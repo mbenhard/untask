@@ -56,7 +56,7 @@ import type {
   TaskCompleteRequestPayload,
 } from './ipc';
 
-import type { Task, ChatMessage, Scratchpad, Setting } from './models';
+import type { Task, ChatMessage, Note, Setting } from './models';
 
 export type FluskApi = {
   // ─── App/window lifecycle APIs ──────────────────────────
@@ -143,9 +143,13 @@ export type FluskApi = {
   search: {
     query: (request: SearchQueryRequest) => Promise<SearchQueryResponse>;
   };
-  scratchpad: {
-    get: () => Promise<Scratchpad>;
-    save: (content: string) => Promise<Scratchpad>;
+  notes: {
+    list: () => Promise<{ active: Note[]; archived: Note[] }>;
+    get: (id: string) => Promise<Note | undefined>;
+    create: (title?: string) => Promise<Note>;
+    save: (id: string, content: string, title?: string) => Promise<Note | undefined>;
+    archive: (id: string) => Promise<Note | undefined>;
+    delete: (id: string) => Promise<void>;
   };
   settings: {
     get: (key: string) => Promise<string | null>;
@@ -153,7 +157,6 @@ export type FluskApi = {
     getAll: () => Promise<Setting[]>;
     getMemoryState: () => Promise<SettingsMemoryStatePayload>;
     updateMemoryState: (payload: SettingsMemoryUpdateRequestPayload) => Promise<SettingsMemoryStatePayload>;
-    resetSoul: () => Promise<SettingsMemoryStatePayload>;
     getMemoryHistory: (payload?: SettingsMemoryHistoryRequestPayload) => Promise<SettingsMemoryHistoryResultPayload>;
     undoMemoryEvent: (payload?: SettingsUndoMemoryEventRequestPayload) => Promise<SettingsUndoMemoryEventResultPayload>;
     readJournal: (payload?: SettingsReadJournalRequestPayload) => Promise<SettingsReadJournalResultPayload>;

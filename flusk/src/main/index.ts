@@ -17,6 +17,7 @@ import {
 import { initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting } from './services/settingsService';
+import { migrateLegacyMemoryLayers } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
 import { initSummonController, summonWindow } from './window/summonController';
 
@@ -79,6 +80,7 @@ const createMainWindow = (): BrowserWindow => {
 const bootstrap = (): void => {
   initDatabase();
   runMigrations();
+  migrateLegacyMemoryLayers();
   initSearchFts();
   registerIpcHandlers();
 

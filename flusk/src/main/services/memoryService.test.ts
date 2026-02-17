@@ -63,12 +63,12 @@ describeIfNativeSqlite('memoryService audit log', () => {
   });
 
   it('writes layer values and records memory events', () => {
-    writeMemoryLayerValue('profile', '- prefers concise updates', 'user');
+    writeMemoryLayerValue('memory', '- prefers concise updates', 'user');
 
     const state = getMemoryState();
-    const events = listMemoryEvents({ layer: 'profile', limit: 5 });
+    const events = listMemoryEvents({ layer: 'memory', limit: 5 });
 
-    expect(state.profile).toContain('prefers concise updates');
+    expect(state.memory).toContain('prefers concise updates');
     expect(events).toHaveLength(1);
     expect(events[0]?.before).toBe('');
     expect(events[0]?.after).toContain('prefers concise updates');
@@ -76,24 +76,24 @@ describeIfNativeSqlite('memoryService audit log', () => {
   });
 
   it('undoes the latest memory event by steps', () => {
-    writeMemoryLayerValue('patterns', '- plans week on Monday', 'ai');
-    writeMemoryLayerValue('patterns', '- plans week on Monday\n- blocks deep work', 'ai');
+    writeMemoryLayerValue('identity', '- plans week on Monday', 'ai');
+    writeMemoryLayerValue('identity', '- plans week on Monday\n- blocks deep work', 'ai');
 
     const undoResult = undoMemoryEvents({ steps: 1 });
 
     expect(undoResult.revertedEventIds).toHaveLength(1);
-    expect(getMemoryState().patterns).toBe('- plans week on Monday');
+    expect(getMemoryState().identity).toBe('- plans week on Monday');
   });
 
   it('undoes a targeted memory event by id', () => {
-    const first = writeMemoryLayerValue('soul', 'Direct and concise', 'user');
-    writeMemoryLayerValue('soul', 'Direct, concise, and proactive', 'user');
+    const first = writeMemoryLayerValue('memory', 'Direct and concise', 'user');
+    writeMemoryLayerValue('memory', 'Direct, concise, and proactive', 'user');
 
     const initialEventId = first.event?.id;
     expect(initialEventId).toBeTruthy();
 
     undoMemoryEvents({ eventId: initialEventId });
 
-    expect(getMemoryState().soul).toBe('');
+    expect(getMemoryState().memory).toBe('');
   });
 });

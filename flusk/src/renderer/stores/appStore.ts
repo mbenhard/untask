@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export const APP_VIEW_ORDER = ['today', 'tasks', 'inbox', 'scratchpad'] as const;
+export const APP_VIEW_ORDER = ['today', 'tasks', 'inbox', 'notes'] as const;
 
 export type AppView = (typeof APP_VIEW_ORDER)[number] | 'settings';
 export type ChatOverlayState = 'peek' | 'open';

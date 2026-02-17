@@ -49,9 +49,12 @@ export type ChatMessage = {
   createdAt: string | null;
 };
 
-export type Scratchpad = {
+export type Note = {
   id: string;
+  title: string;
   content: string;
+  status: 'active' | 'archived';
+  createdAt: string | null;
   updatedAt: string | null;
 };
 

@@ -85,14 +85,17 @@ export const IPC_CHANNELS = {
   BACKUP_EXPORT_DIALOG: 'backup:export-dialog',
   BACKUP_IMPORT_DIALOG: 'backup:import-dialog',
   SEARCH_QUERY: 'search:query',
-  SCRATCHPAD_GET: 'scratchpad:get',
-  SCRATCHPAD_SAVE: 'scratchpad:save',
+  NOTES_LIST: 'notes:list',
+  NOTES_GET: 'notes:get',
+  NOTES_CREATE: 'notes:create',
+  NOTES_SAVE: 'notes:save',
+  NOTES_ARCHIVE: 'notes:archive',
+  NOTES_DELETE: 'notes:delete',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_GET_ALL: 'settings:get-all',
   SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
-  SETTINGS_RESET_SOUL: 'settings:reset-soul',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
   SETTINGS_GET_MEMORY_HISTORY: 'settings:get-memory-history',
   SETTINGS_UNDO_MEMORY_EVENT: 'settings:undo-memory-event',
@@ -141,9 +144,6 @@ export type ChatFocusMessagePayload = {
 };
 
 export type SettingsMemoryStatePayload = {
-  soul: string;
-  profile: string;
-  patterns: string;
   identity: string;
   memory: string;
 };

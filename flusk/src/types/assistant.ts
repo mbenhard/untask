@@ -1,12 +1,5 @@
 export type { Task, AiJournal } from './models';
-import type { Task, AiJournal } from './models';
-
-export type AssistantMemorySnapshot = {
-  soul: string;
-  profile: string;
-  patterns: string;
-  journalEntries: AiJournal[];
-};
+import type { Task } from './models';
 
 export type AssistantLiveContext = {
   tasks: Task[];
@@ -15,10 +8,15 @@ export type AssistantLiveContext = {
   timezone?: string;
 };
 
+export type AssistantMemoryInput = {
+  identity?: string;
+  memory?: string;
+};
+
 export type IdentityContextCompileRequest = {
   request?: string;
   tokenBudget?: number;
-  memory?: Partial<AssistantMemorySnapshot>;
+  memory?: AssistantMemoryInput;
   liveContext?: Partial<AssistantLiveContext>;
 };
 
@@ -41,7 +39,7 @@ export type IdentityContextDebugSnapshot = {
   compiledPrompt: string;
 };
 
-export type MemoryLayer = 'profile' | 'patterns' | 'journal';
+export type MemoryLayer = 'identity' | 'memory';
 
 export type MemoryImpactSignal =
   | 'financial'
@@ -50,8 +48,6 @@ export type MemoryImpactSignal =
   | 'identity_preference';
 
 export type MemoryPromotionAction =
-  | 'promote_profile'
-  | 'promote_patterns'
   | 'journal_only'
   | 'needs_confirmation';
 
@@ -66,7 +62,7 @@ export type MemoryPromotionReason =
 
 export type MemoryPromotionEvaluationRequest = {
   observation: string;
-  candidateLayer?: Exclude<MemoryLayer, 'journal'>;
+  candidateLayer?: MemoryLayer;
   confidence?: number;
   impactSignals?: MemoryImpactSignal[];
   sourceMessage?: string;
@@ -145,7 +141,7 @@ export type IdentityKernelStatus = {
 export type ChatKernelOrchestrationRequest = {
   userMessage: string;
   tokenBudget?: number;
-  memory?: Partial<AssistantMemorySnapshot>;
+  memory?: AssistantMemoryInput;
   liveContext?: Partial<AssistantLiveContext>;
   memoryObservation?: MemoryPromotionEvaluationRequest;
 };

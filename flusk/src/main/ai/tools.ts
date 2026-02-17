@@ -44,7 +44,7 @@ import {
   writeJournalEntry,
   writeJournalEntrySchema,
 } from '../services/journalService';
-import { getScratchpad, saveScratchpad } from '../services/scratchpadService';
+import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../services/notesService';
 import {
   estimateTokens,
   getIdentity,
@@ -54,7 +54,6 @@ import {
   setMemory,
   readMemorySection,
   updateMemorySection,
-  searchMemory,
 } from './memory';
 
 const priorityScore: Record<'none' | 'low' | 'medium' | 'high', number> = {
@@ -244,6 +243,7 @@ type ToolExecutionContext = {
   onActionCard?: (card: ChatActionCard) => void;
   autonomyBypass?: boolean;
   skipInternalConfirmation?: boolean;
+  activeNoteId?: string;
 };
 
 type ToolInputSchema = z.ZodTypeAny;
@@ -334,6 +334,7 @@ const parseNotesToolInputSchema = z.object({
   text: z.string().trim().min(1),
   status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
+  parentId: z.string().optional().describe('Parent task ID to create subtasks under'),
 });
 const suggestDailyPlanInputSchema = z.object({
   maxTasks: z.number().int().min(1).max(8).default(5),
@@ -344,16 +345,10 @@ const undoLastActionInputSchema = z.object({
 const updateIdentityInputSchema = z.object({
   content: z.string().min(100).max(12000),
 });
-const readMemoryInputSchema = z.object({
-  section: z.string().optional(),
-});
 const updateMemoryInputSchema = z.object({
   section: z.string().min(1),
   content: z.string().min(1),
   mode: z.enum(['merge', 'replace']).default('merge'),
-});
-const searchMemoryInputSchema = z.object({
-  query: z.string().min(1),
 });
 const searchJournalInputSchema = z.object({
   query: z.string().min(1),
@@ -409,26 +404,33 @@ const fetchUrlToolInputSchema = z.object({
   url: z.string().url(),
   maxLength: z.number().int().min(100).max(10000).default(3000),
 });
-const readScratchpadToolInputSchema = z.object({});
-const editScratchpadToolInputSchema = z.discriminatedUnion('action', [
+const readNoteToolInputSchema = z.object({
+  noteId: z.string().optional().describe('ID of the note to read. If omitted, reads the most recent active note.'),
+});
+const editNoteToolInputSchema = z.intersection(
   z.object({
-    action: z.literal('append'),
-    content: z.string().trim().min(1),
+    noteId: z.string().optional().describe('ID of the note to edit. If omitted, edits the most recent active note.'),
   }),
-  z.object({
-    action: z.literal('replace'),
-    target: z.string().trim().min(1),
-    replacement: z.string(),
-  }),
-  z.object({
-    action: z.literal('rewrite'),
-    content: z.string().trim().min(1),
-  }),
-]);
+  z.discriminatedUnion('action', [
+    z.object({
+      action: z.literal('append'),
+      content: z.string().trim().min(1),
+    }),
+    z.object({
+      action: z.literal('replace'),
+      target: z.string().trim().min(1),
+      replacement: z.string(),
+    }),
+    z.object({
+      action: z.literal('rewrite'),
+      content: z.string().trim().min(1),
+    }),
+  ]),
+);
 
 const createTaskTool = {
   name: 'create_task',
-  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Optional: priority, dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), client, parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks").',
+  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Optional: priority, dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), client, parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks"). To create subtasks, first create the parent task, then use its returned ID as parentId. Never use placeholder IDs.',
   schema: createTaskToolInputSchema,
   execute: async (input, context) => {
     const createdTask = createTask(input, 'ai');
@@ -765,6 +767,7 @@ const parseNotesTool = {
           title,
           status: input.status ?? 'inbox',
           priority: input.priority ?? 'none',
+          ...(input.parentId ? { parentId: input.parentId } : {}),
         },
         'ai',
       );
@@ -801,69 +804,82 @@ const parseNotesTool = {
   },
 } satisfies ToolRegistryEntry<'parse_notes', typeof parseNotesToolInputSchema>;
 
-const readScratchpadTool = {
-  name: 'read_scratchpad',
-  description: 'Read the current scratchpad content. Use before editing notes to understand current context and avoid overwriting important text.',
-  schema: readScratchpadToolInputSchema,
-  execute: async () => {
-    const scratchpad = getScratchpad();
-    const hasContent = scratchpad.content.trim().length > 0;
+const resolveNoteId = (noteId?: string, activeNoteId?: string): string => {
+  if (noteId) return noteId;
+  if (activeNoteId) return activeNoteId;
+  const { active } = listNotes();
+  if (active.length === 0) throw new Error('No active notes found.');
+  return active[0].id;
+};
+
+const readNoteTool = {
+  name: 'read_note',
+  description: 'Read a specific note by ID. If noteId is omitted, reads the most recent active note. Use before editing to understand current context. If note content is attached in the system prompt, use it directly — do not call read_note.',
+  schema: readNoteToolInputSchema,
+  execute: async (input, context) => {
+    const id = resolveNoteId(input.noteId, context.activeNoteId);
+    const note = getNote(id);
+    if (!note) throw new Error(`Note ${id} not found.`);
+    const markdown = blockNoteToMarkdown(note.content);
+    const hasContent = markdown.trim().length > 0;
 
     return {
       status: 'success',
       message: hasContent
-        ? `Loaded scratchpad (${scratchpad.content.length} chars).`
-        : 'Scratchpad is currently empty.',
-      data: { scratchpad },
+        ? `Loaded note "${note.title}" (${markdown.length} chars).`
+        : `Note "${note.title}" is currently empty.`,
+      data: { note: { ...note, content: markdown } },
     };
   },
-} satisfies ToolRegistryEntry<'read_scratchpad', typeof readScratchpadToolInputSchema>;
+} satisfies ToolRegistryEntry<'read_note', typeof readNoteToolInputSchema>;
 
-const editScratchpadTool = {
-  name: 'edit_scratchpad',
-  description: 'Edit scratchpad content. Use action=append to add text, action=replace to update one specific section, and action=rewrite to replace the full document.',
-  schema: editScratchpadToolInputSchema,
+const editNoteTool = {
+  name: 'edit_note',
+  description: 'Edit a note. If noteId is omitted, edits the most recent active note. Use action=append to add text, action=replace to update one specific section, and action=rewrite to replace the full document.',
+  schema: editNoteToolInputSchema,
   execute: async (input, context) => {
-    const current = getScratchpad();
+    const id = resolveNoteId(input.noteId, context.activeNoteId);
+    const current = getNote(id);
+    if (!current) throw new Error(`Note ${id} not found.`);
     const beforeContent = current.content;
 
     if (input.action === 'append') {
       const separator =
         beforeContent.length === 0 || beforeContent.endsWith('\n') ? '' : '\n\n';
       const nextContent = `${beforeContent}${separator}${input.content}`;
-      const saved = saveScratchpad(nextContent);
+      const saved = saveNote(id, nextContent);
 
       return successResult(
         context,
-        'edit_scratchpad',
-        'Scratchpad appended',
-        `Added ${input.content.length} characters.`,
+        'edit_note',
+        'Note appended',
+        `Added ${input.content.length} characters to "${current.title}".`,
         {
           before: beforeContent,
           after: nextContent,
-          scratchpad: saved,
+          note: saved,
         },
-        { viewIntent: 'scratchpad' },
+        { viewIntent: 'notes' },
       );
     }
 
     if (input.action === 'replace') {
       const startIndex = beforeContent.indexOf(input.target);
       if (startIndex === -1) {
-        throw new Error('Scratchpad replace target was not found.');
+        throw new Error('Note replace target was not found.');
       }
 
       const nextContent = `${beforeContent.slice(0, startIndex)}${input.replacement}${beforeContent.slice(
         startIndex + input.target.length,
       )}`;
-      const saved = saveScratchpad(nextContent);
+      const saved = saveNote(id, nextContent);
 
       return successResult(
         context,
-        'edit_scratchpad',
-        'Scratchpad section replaced',
+        'edit_note',
+        'Note section replaced',
         [
-          'Updated one section.',
+          `Updated one section in "${current.title}".`,
           `Before: "${normalizeForSummary(input.target, 72)}"`,
           `After: "${normalizeForSummary(input.replacement, 72)}"`,
         ].join(' '),
@@ -875,29 +891,29 @@ const editScratchpadTool = {
             after: input.replacement,
             startIndex,
           },
-          scratchpad: saved,
+          note: saved,
         },
-        { viewIntent: 'scratchpad' },
+        { viewIntent: 'notes' },
       );
     }
 
     const nextContent = input.content;
-    const saved = saveScratchpad(nextContent);
+    const saved = saveNote(id, nextContent);
 
     return successResult(
       context,
-      'edit_scratchpad',
-      'Scratchpad rewritten',
-      `Replaced full scratchpad (${beforeContent.length} -> ${nextContent.length} chars).`,
+      'edit_note',
+      'Note rewritten',
+      `Replaced full note "${current.title}" (${beforeContent.length} -> ${nextContent.length} chars).`,
       {
         before: beforeContent,
         after: nextContent,
-        scratchpad: saved,
+        note: saved,
       },
-      { viewIntent: 'scratchpad' },
+      { viewIntent: 'notes' },
     );
   },
-} satisfies ToolRegistryEntry<'edit_scratchpad', typeof editScratchpadToolInputSchema>;
+} satisfies ToolRegistryEntry<'edit_note', typeof editNoteToolInputSchema>;
 
 const undoLastActionTool = {
   name: 'undo_last_action',
@@ -1019,35 +1035,6 @@ const updateIdentityTool = {
   },
 } satisfies ToolRegistryEntry<'update_identity', typeof updateIdentityInputSchema>;
 
-const readMemoryTool = {
-  name: 'read_memory',
-  description: "Read your Memory — everything you know about Marcus: clients, preferences, workflows, project context. Returns the full document or a specific section. Call this when a client is mentioned, when planning, or when you need to recall a preference. Don't call on every message — only when context demands it.",
-  schema: readMemoryInputSchema,
-  execute: async (input) => {
-    const content = input.section
-      ? readMemorySection(input.section)
-      : getMemory();
-
-    if (!content.trim()) {
-      return {
-        status: 'success',
-        message: input.section
-          ? `No Memory section found for "${input.section}".`
-          : 'Memory is empty.',
-        data: { content: '' },
-      };
-    }
-
-    return {
-      status: 'success',
-      message: input.section
-        ? `Loaded Memory section "${input.section}".`
-        : `Loaded full Memory (~${estimateTokens(content)} tokens).`,
-      data: { content },
-    };
-  },
-} satisfies ToolRegistryEntry<'read_memory', typeof readMemoryInputSchema>;
-
 const updateMemoryTool = {
   name: 'update_memory',
   description: "Update a section of your Memory. Adds new knowledge or replaces existing entries in the specified section. Keep entries atomic (one fact per line). If the section doesn't exist, it's created. Announce what you're saving to Marcus. If Memory exceeds 8000 tokens, you'll get a warning to consolidate.",
@@ -1104,29 +1091,6 @@ const updateMemoryTool = {
   },
 } satisfies ToolRegistryEntry<'update_memory', typeof updateMemoryInputSchema>;
 
-const searchMemoryTool = {
-  name: 'search_memory',
-  description: "Search your Memory for keywords. Returns matching lines with their section headings. Use for quick lookups when you don't need the full document.",
-  schema: searchMemoryInputSchema,
-  execute: async (input) => {
-    const results = searchMemory(input.query);
-
-    if (results.length === 0) {
-      return {
-        status: 'success',
-        message: `No Memory matches for "${input.query}".`,
-        data: { results: [] },
-      };
-    }
-
-    return {
-      status: 'success',
-      message: `Found ${results.length} matching lines in Memory.`,
-      data: { results },
-    };
-  },
-} satisfies ToolRegistryEntry<'search_memory', typeof searchMemoryInputSchema>;
-
 const searchJournalTool = {
   name: 'search_journal',
   description: 'Search your Journal by keyword with optional date range. Use to recall past reasoning, find self-corrections, or verify patterns before updating Identity.',
@@ -1149,7 +1113,7 @@ const searchJournalTool = {
 
 const emitChipsTool = {
   name: 'emit_chips',
-  description: 'Attach interactive chips to your current message. Response chips let Marcus answer with a tap instead of typing. Action chips execute a tool call on tap. Call AFTER writing your text, not instead of it. Always 2-4 chips.',
+  description: 'Attach interactive chips to your current message. Response chips let Marcus answer with a tap instead of typing. Action chips execute a tool call on tap. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
   schema: emitChipsInputSchema,
   execute: async (input) => {
     const normalizedChips = normalizeChipActions(input.chips as ChipAction[]);
@@ -1510,15 +1474,13 @@ export const AI_TOOL_REGISTRY = {
   set_today: setTodayTool,
   suggest_daily_plan: suggestDailyPlanTool,
   parse_notes: parseNotesTool,
-  read_scratchpad: readScratchpadTool,
-  edit_scratchpad: editScratchpadTool,
+  read_note: readNoteTool,
+  edit_note: editNoteTool,
   undo_last_action: undoLastActionTool,
   write_journal: writeJournalTool,
   read_journal: readJournalTool,
   update_identity: updateIdentityTool,
-  read_memory: readMemoryTool,
   update_memory: updateMemoryTool,
-  search_memory: searchMemoryTool,
   search_journal: searchJournalTool,
   emit_chips: emitChipsTool,
   improve_task: improveTaskTool,
@@ -1603,17 +1565,17 @@ const buildPendingRationale = (toolName: string, input: Record<string, unknown>)
       return `Toggle Today for task ${String(input.id)}.`;
     case 'parse_notes':
       return `Create tasks from notes.`;
-    case 'edit_scratchpad': {
+    case 'edit_note': {
       const action = String(input.action ?? '');
       if (action === 'rewrite') {
-        return 'Rewrite the full scratchpad content.';
+        return 'Rewrite the full note content.';
       }
       if (action === 'replace') {
         const before = normalizeForSummary(String(input.target ?? ''), 48);
         const after = normalizeForSummary(String(input.replacement ?? ''), 48);
-        return `Replace scratchpad section "${before}" with "${after}".`;
+        return `Replace note section "${before}" with "${after}".`;
       }
-      return 'Append content to scratchpad.';
+      return 'Append content to note.';
     }
     default:
       return `Execute ${toolName}.`;

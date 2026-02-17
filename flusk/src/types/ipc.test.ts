@@ -21,7 +21,7 @@ describe('IPC_CHANNELS', () => {
     expect(prefixes).toContain('settings');
     expect(prefixes).toContain('task');
     expect(prefixes).toContain('chat');
-    expect(prefixes).toContain('scratchpad');
+    expect(prefixes).toContain('notes');
     expect(prefixes).toContain('search');
     expect(prefixes).toContain('backup');
   });

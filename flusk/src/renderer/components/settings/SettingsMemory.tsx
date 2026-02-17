@@ -78,7 +78,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
   {
     key: 'shortcut.quickAdd',
     label: 'Quick add',
-    defaultAccelerator: 'CommandOrControl+Shift+A',
+    defaultAccelerator: 'CommandOrControl+Shift+Q',
     action: 'Open quick add and prefill from clipboard when available.',
   },
 ];
@@ -90,7 +90,8 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
     entries: [
       { keys: 'Cmd/Ctrl + K', action: 'Toggle chat overlay and focus chat input.' },
       { keys: 'Cmd/Ctrl + F', action: 'Open or close Search.' },
-      { keys: 'Cmd/Ctrl + N', action: 'Jump to Scratchpad view.' },
+      { keys: 'Cmd/Ctrl + N', action: 'Jump to Notes view.' },
+      { keys: 'Cmd/Ctrl + Shift + N', action: 'Create a new note and open it.' },
       {
         keys: 'Cmd/Ctrl + Z',
         action: 'Undo the last assistant action.',
@@ -105,10 +106,47 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
       { keys: '3', action: 'Go to Inbox view.' },
       { keys: '4', action: 'Toggle chat overlay (peek/open).' },
       { keys: ',', action: 'Open Settings view.' },
+      { keys: 'Cmd/Ctrl + Shift + L', action: 'Toggle light/dark theme.' },
       {
         keys: 'N',
         action: 'Open new-task input.',
         context: 'Only in Today, Tasks, or Inbox while chat is in peek mode and Search is closed.',
+      },
+    ],
+  },
+  {
+    title: 'Notes',
+    description: 'These work while Notes view is active.',
+    entries: [
+      {
+        keys: 'Cmd/Ctrl + Enter',
+        action: 'Process active note with AI.',
+        context: 'Only in Notes editor.',
+      },
+      {
+        keys: 'Cmd/Ctrl + Shift + A',
+        action: 'Archive active note.',
+        context: 'Only in Notes editor.',
+      },
+      {
+        keys: 'Alt + Arrow Up / Arrow Down',
+        action: 'Open previous or next active note.',
+        context: 'Only in Notes editor.',
+      },
+      {
+        keys: 'Escape',
+        action: 'Return from note editor to notes list.',
+        context: 'Only in Notes editor while chat overlay is peeked.',
+      },
+      {
+        keys: 'J / K',
+        action: 'Move selected note up or down in the list.',
+        context: 'Notes view only, while not typing and chat overlay is peeked.',
+      },
+      {
+        keys: 'Enter',
+        action: 'Open the currently selected note in the list.',
+        context: 'Notes view only while chat overlay is peeked.',
       },
     ],
   },
@@ -156,23 +194,14 @@ const formatAccelerator = (value: string): string =>
     .replace(/Control/g, 'Ctrl')
     .replace(/\+/g, ' + ');
 
-const MEMORY_FIELD_LABELS: Record<
-  'identity' | 'memory' | 'soul' | 'profile' | 'patterns',
-  string
-> = {
+const MEMORY_FIELD_LABELS: Record<'identity' | 'memory', string> = {
   identity: 'Identity',
-  memory: 'Memory',
-  soul: 'Soul',
-  profile: 'Profile',
-  patterns: 'Patterns',
+  memory: 'Knowledge',
 };
 
-const MEMORY_SUB_TABS = ['identity', 'memory', 'soul', 'profile', 'patterns'] as const;
+const MEMORY_SUB_TABS = ['identity', 'memory'] as const;
 
 const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
-  soul: '',
-  profile: '',
-  patterns: '',
   identity: '',
   memory: '',
 };
@@ -579,22 +608,6 @@ export const SettingsMemory = () => {
     },
     [draft, loadMemoryHistory],
   );
-
-  const resetSoulField = useCallback(async () => {
-    try {
-      setIsSaving(true);
-      setNotice(null);
-      setError(null);
-      const updated = await getFlusk().settings.resetSoul();
-      setDraft(updated);
-      setNotice('Soul reset to default.');
-      await loadMemoryHistory({ layer: 'soul' });
-    } catch (resetError) {
-      setError(resetError instanceof Error ? resetError.message : 'Failed to reset soul.');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [loadMemoryHistory]);
 
   const undoMemoryChange = useCallback(
     async (eventId?: string) => {
@@ -1193,7 +1206,7 @@ export const SettingsMemory = () => {
                     {memorySubTab === 'memory' ? (
                       <div className="space-y-3">
                         <p className="text-xs text-muted-foreground">
-                          Memory is loaded on-demand for client context, preferences, and workflows.
+                          What your assistant knows about you. Auto-maintained.
                         </p>
                         <Textarea
                           value={draft.memory}
@@ -1203,66 +1216,7 @@ export const SettingsMemory = () => {
                           className="min-h-64"
                         />
                         <Button type="button" size="sm" onClick={() => void saveField('memory')} disabled={isSaving}>
-                          Save Memory
-                        </Button>
-                      </div>
-                    ) : null}
-
-                    {memorySubTab === 'soul' ? (
-                      <div className="space-y-3">
-                        <p className="text-xs text-muted-foreground">
-                          Soul is your editable personality overlay on top of base assistant contracts.
-                        </p>
-                        <Textarea
-                          value={draft.soul}
-                          onChange={(event) =>
-                            setDraft((current) => ({ ...current, soul: event.target.value }))
-                          }
-                          className="min-h-52"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button type="button" size="sm" onClick={() => void saveField('soul')} disabled={isSaving}>
-                            Save Soul
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => void resetSoulField()} disabled={isSaving}>
-                            Reset Soul
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {memorySubTab === 'profile' ? (
-                      <div className="space-y-3">
-                        <p className="text-xs text-muted-foreground">
-                          Profile stores durable user facts and preferences.
-                        </p>
-                        <Textarea
-                          value={draft.profile}
-                          onChange={(event) =>
-                            setDraft((current) => ({ ...current, profile: event.target.value }))
-                          }
-                          className="min-h-52"
-                        />
-                        <Button type="button" size="sm" onClick={() => void saveField('profile')} disabled={isSaving}>
-                          Save Profile
-                        </Button>
-                      </div>
-                    ) : null}
-
-                    {memorySubTab === 'patterns' ? (
-                      <div className="space-y-3">
-                        <p className="text-xs text-muted-foreground">
-                          Patterns capture repeated workflows and recurring structures.
-                        </p>
-                        <Textarea
-                          value={draft.patterns}
-                          onChange={(event) =>
-                            setDraft((current) => ({ ...current, patterns: event.target.value }))
-                          }
-                          className="min-h-52"
-                        />
-                        <Button type="button" size="sm" onClick={() => void saveField('patterns')} disabled={isSaving}>
-                          Save Patterns
+                          Save Knowledge
                         </Button>
                       </div>
                     ) : null}

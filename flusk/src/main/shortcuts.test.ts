@@ -37,7 +37,7 @@ describe('shortcuts', () => {
 
     expect(mockRegister).toHaveBeenCalledTimes(2);
     expect(mockRegister.mock.calls[0]?.[0]).toBe('CommandOrControl+Shift+Space');
-    expect(mockRegister.mock.calls[1]?.[0]).toBe('CommandOrControl+Shift+A');
+    expect(mockRegister.mock.calls[1]?.[0]).toBe('CommandOrControl+Shift+Q');
   });
 
   it('uses settings-backed accelerators when stored', () => {
@@ -70,6 +70,6 @@ describe('shortcuts', () => {
 
   it('exports default shortcuts map', () => {
     expect(DEFAULT_SHORTCUTS['shortcut.toggleWindow']).toBe('CommandOrControl+Shift+Space');
-    expect(DEFAULT_SHORTCUTS['shortcut.quickAdd']).toBe('CommandOrControl+Shift+A');
+    expect(DEFAULT_SHORTCUTS['shortcut.quickAdd']).toBe('CommandOrControl+Shift+Q');
   });
 });

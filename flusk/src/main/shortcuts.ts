@@ -5,7 +5,7 @@ import { toggleWindow, showQuickAdd } from './window/summonController';
 
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
   'shortcut.toggleWindow': 'CommandOrControl+Shift+Space',
-  'shortcut.quickAdd': 'CommandOrControl+Shift+A',
+  'shortcut.quickAdd': 'CommandOrControl+Shift+Q',
 };
 
 function resolveAccelerator(settingKey: string): string {

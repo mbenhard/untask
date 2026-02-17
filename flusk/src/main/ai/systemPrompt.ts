@@ -3,7 +3,7 @@ import type {
   AssistantLiveContext,
   IdentityContextDebugSnapshot,
 } from '../../types/assistant';
-import { getIdentity, estimateTokens } from './memory';
+import { getIdentity, getMemory, estimateTokens } from './memory';
 import { getToolDefinitions } from './tools';
 import type { ChatModelId } from './models';
 import { getModelWebSearchConfig } from './models';
@@ -237,9 +237,7 @@ const buildProtocolSection = (
     '### 4. Memory & Self-Management',
     '',
     '**Reading Memory:**',
-    '- Call read_memory when a client, project, or preference is relevant to the current request',
-    '- Call read_memory during planning or scheduling to check for known workflows',
-    "- Don't read Memory on every message — only when the context demands it",
+    '- Your Knowledge document is always present above. You do not need to fetch it. Use the update_memory tool to save new facts.',
     '',
     '**Writing Memory:**',
     '- Save when Marcus explicitly states a preference ("I always...", "My client...", "I prefer...")',
@@ -316,10 +314,16 @@ export const buildSystemPrompt = (
   // 2. Identity (full, untruncated from DB)
   const identity = getIdentity();
 
-  // 3. Live State
+  // 3. Knowledge (full document, always present)
+  const knowledge = getMemory();
+  const knowledgeSection = knowledge.trim()
+    ? `## Knowledge\n\n${knowledge.trim()}`
+    : '';
+
+  // 4. Live State
   const liveStateSection = buildLiveStateSection(input.liveContext, now);
 
-  // 4. Operating Protocol
+  // 5. Operating Protocol
   const toolNames = getToolDefinitions()
     .map((t) => t.name)
     .join(', ');
@@ -332,12 +336,19 @@ export const buildSystemPrompt = (
   );
 
   // Assemble
-  const compiledPrompt = [
+  const compiledSections = [
     metaSection,
     '',
     '---',
     '',
     identity,
+  ];
+
+  if (knowledgeSection) {
+    compiledSections.push('', '---', '', knowledgeSection);
+  }
+
+  compiledSections.push(
     '',
     '---',
     '',
@@ -346,7 +357,9 @@ export const buildSystemPrompt = (
     '---',
     '',
     protocolSection,
-  ].join('\n');
+  );
+
+  const compiledPrompt = compiledSections.join('\n');
 
   const estimatedTotalTokens = estimateTokens(compiledPrompt);
 
@@ -356,7 +369,7 @@ export const buildSystemPrompt = (
     timezone,
     tokenBudget: estimatedTotalTokens, // No budget system — report actual size
     estimatedTotalTokens,
-    sectionOrder: ['meta', 'identity', 'live-state', 'protocol'],
+    sectionOrder: ['meta', 'identity', 'knowledge', 'live-state', 'protocol'],
     sections: [
       {
         id: 'meta',
@@ -371,6 +384,14 @@ export const buildSystemPrompt = (
         title: 'Identity',
         estimatedTokens: estimateTokens(identity),
         included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+      {
+        id: 'knowledge',
+        title: 'Knowledge',
+        estimatedTokens: estimateTokens(knowledgeSection),
+        included: Boolean(knowledgeSection),
         truncated: false,
         snippetIds: [],
       },

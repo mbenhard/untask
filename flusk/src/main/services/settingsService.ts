@@ -23,6 +23,11 @@ export function setSetting(key: string, value: string): Setting {
   return result;
 }
 
+export function deleteSetting(key: string): void {
+  const db = getDb();
+  db.delete(settings).where(eq(settings.key, key)).run();
+}
+
 export function getAllSettings(): Setting[] {
   const db = getDb();
   return db.select().from(settings).all();

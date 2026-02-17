@@ -7,13 +7,10 @@ import {
 } from '../db/schema';
 import { getSetting, setSetting } from './settingsService';
 
-export type MemoryLayer = 'soul' | 'profile' | 'patterns' | 'identity' | 'memory';
+export type MemoryLayer = 'identity' | 'memory';
 export type MemoryEventSource = 'user' | 'ai' | 'system';
 
 export const MEMORY_LAYER_SETTINGS_KEYS: Record<MemoryLayer, string> = {
-  soul: 'ai_soul',
-  profile: 'ai_user_profile',
-  patterns: 'ai_patterns',
   identity: 'ai_identity',
   memory: 'ai_memory',
 };
@@ -21,9 +18,6 @@ export const MEMORY_LAYER_SETTINGS_KEYS: Record<MemoryLayer, string> = {
 export type MemoryState = Record<MemoryLayer, string>;
 
 export const getMemoryState = (): MemoryState => ({
-  soul: getSetting(MEMORY_LAYER_SETTINGS_KEYS.soul) ?? '',
-  profile: getSetting(MEMORY_LAYER_SETTINGS_KEYS.profile) ?? '',
-  patterns: getSetting(MEMORY_LAYER_SETTINGS_KEYS.patterns) ?? '',
   identity: getSetting(MEMORY_LAYER_SETTINGS_KEYS.identity) ?? '',
   memory: getSetting(MEMORY_LAYER_SETTINGS_KEYS.memory) ?? '',
 });
@@ -121,7 +115,12 @@ export const undoMemoryEvents = (options?: {
 
   const revertedEventIds: string[] = [];
   for (const event of targetEvents) {
-    const key = MEMORY_LAYER_SETTINGS_KEYS[event.layer];
+    const key = MEMORY_LAYER_SETTINGS_KEYS[event.layer as MemoryLayer];
+    if (!key) {
+      // Legacy layer (e.g. 'soul', 'profile', 'patterns') — skip silently
+      revertedEventIds.push(event.id);
+      continue;
+    }
     const current = getSetting(key) ?? '';
 
     if (current === event.before) {
@@ -130,7 +129,7 @@ export const undoMemoryEvents = (options?: {
     }
 
     setSetting(key, event.before);
-    createMemoryEvent(event.layer, current, event.before, source);
+    createMemoryEvent(event.layer as MemoryLayer, current, event.before, source);
     revertedEventIds.push(event.id);
   }
 

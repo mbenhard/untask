@@ -12,7 +12,12 @@ import {
 import { ArrowUp, Loader2, Paperclip, Square } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
-import { useChatStore, selectPendingImages, selectProcessingImageCount } from '../../stores/chatStore';
+import {
+  useChatStore,
+  selectPendingImages,
+  selectPendingNoteContext,
+  selectProcessingImageCount,
+} from '../../stores/chatStore';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 
@@ -81,6 +86,7 @@ export const ChatInput = ({
   const isSending = useChatStore((state) => state.isSending);
   const cancelStream = useChatStore((state) => state.cancelStream);
   const pendingImages = useChatStore(selectPendingImages);
+  const pendingNoteContext = useChatStore(selectPendingNoteContext);
   const processingImageCount = useChatStore(selectProcessingImageCount);
   const addPendingImage = useChatStore((state) => state.addPendingImage);
   const clearPendingImages = useChatStore((state) => state.clearPendingImages);
@@ -288,7 +294,11 @@ export const ChatInput = ({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="Ask Flusk..."
+            placeholder={
+              pendingNoteContext
+                ? `Ask Flusk about "${pendingNoteContext.title}"...`
+                : 'Ask Flusk...'
+            }
             aria-label="Chat input"
             className="h-7 max-h-32 !min-h-0 resize-none overflow-y-auto !border-0 !bg-transparent !px-0 py-1 text-[13px] leading-5 !shadow-none focus-visible:!border-0 focus-visible:!ring-0"
           />

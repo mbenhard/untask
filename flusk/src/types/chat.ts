@@ -8,12 +8,18 @@ export type ChatStreamErrorCode =
   | 'tool_error'
   | 'unknown_error';
 
+export type ChatNoteContext = {
+  noteId: string;
+  title: string;
+  markdown: string;
+};
+
 export type AutonomyMode = 'manual' | 'safe' | 'autopilot';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 export type ActionLifecycle = 'pending' | 'executed' | 'rejected' | 'undone';
-export type ChatViewIntent = 'today' | 'tasks' | 'inbox' | 'scratchpad';
+export type ChatViewIntent = 'today' | 'tasks' | 'inbox' | 'notes';
 
 export type ChipAction = {
   label: string;
@@ -119,6 +125,10 @@ export type ChatStreamEvent =
       chips?: ChipAction[];
     }
   | {
+      type: 'memory_updated';
+      requestId: string;
+    }
+  | {
       type: 'error';
       requestId: string;
       message: string;
@@ -130,6 +140,7 @@ export type ChatSendRequestPayload = {
   content: string;
   modelId?: string | null;
   images?: string[];
+  noteContext?: ChatNoteContext;
 };
 
 export type ChatSendResultPayload = {

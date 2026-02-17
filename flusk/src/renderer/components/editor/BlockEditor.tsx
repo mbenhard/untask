@@ -6,9 +6,13 @@ import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
 import {
   type DefaultReactSuggestionItem,
+  FormattingToolbarController,
   SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react';
+
+import { FluskFormattingToolbar } from './FluskFormattingToolbar';
+import { FluskSlashMenu } from './FluskSlashMenu';
 
 import { useTheme } from '../providers/ThemeProvider';
 import { isBlockNoteJson, parseStoredBlocks } from './editorUtils';
@@ -124,16 +128,22 @@ export const BlockEditor = ({
         theme={resolvedTheme}
         onChange={handleChange}
         editable={editable}
-        slashMenu={!hasCustomSlashMenu}
+        slashMenu={false}
+        formattingToolbar={false}
       >
-        {hasCustomSlashMenu ? (
-          <SuggestionMenuController
-            triggerCharacter="/"
-            getItems={async (query) =>
-              filterSuggestionItems(getSlashMenuItems(editor), query)
-            }
-          />
-        ) : null}
+        <SuggestionMenuController
+          triggerCharacter="/"
+          suggestionMenuComponent={FluskSlashMenu}
+          getItems={
+            hasCustomSlashMenu
+              ? async (query) =>
+                  filterSuggestionItems(getSlashMenuItems(editor), query)
+              : undefined
+          }
+        />
+        <FormattingToolbarController
+          formattingToolbar={FluskFormattingToolbar}
+        />
       </BlockNoteView>
     </div>
   );

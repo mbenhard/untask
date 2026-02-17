@@ -29,6 +29,13 @@
       "when": 1771276800000,
       "tag": "0003_journal_archive_chips",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771363200000,
+      "tag": "0004_notes_migration",
+      "breakpoints": true
     }
   ]
 }

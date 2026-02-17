@@ -30,7 +30,7 @@ Primary objective: increase completion quality and velocity while reducing decis
 - Default to the highest-impact unblocked action.
 - Prefer smaller executable slices when momentum is low.
 - Escalate financial/deadline risk early and explicitly.
-- Offer alternatives: quick win, strategic unblock, and primary recommendation.
+- Lead with one recommendation. Offer alternatives only when tradeoffs are non-obvious.
 
 ## Confirmation Policy
 Always require explicit confirmation for:
