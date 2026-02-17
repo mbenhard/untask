@@ -3,10 +3,12 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { ArrowRightLeft, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
+import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { Popover, PopoverContent } from '../ui';
 import { formatDueDateDisplay, isDueDateOverdue } from './dueDate';
@@ -60,7 +62,9 @@ export const TaskItem = ({
   const updateTask = useTaskStore((state) => state.updateTask);
   const createTask = useTaskStore((state) => state.createTask);
   const deleteTask = useTaskStore((state) => state.deleteTask);
+  const cancelTask = useTaskStore((state) => state.cancelTask);
   const allTasks = useTaskStore((state) => state.tasks);
+  const enabledStatuses = useTaskStatusConfigStore((s) => s.config.enabled);
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<'main' | 'projects' | 'delete-confirm'>('main');
@@ -92,6 +96,8 @@ export const TaskItem = ({
   };
 
   const isCompleted = task.status === 'done';
+  const isTerminal = TERMINAL_STATUSES.includes(task.status as PredefinedStatusId);
+  const cancelledEnabled = enabledStatuses.includes('cancelled');
   const isToday = task.today === true;
   const priority = task.priority ?? 'none';
   const dueDateLabel = useMemo(
@@ -139,7 +145,9 @@ export const TaskItem = ({
       canMoveToProject
         ? allTasks.filter(
             (t) =>
-              t.parentId === null && t.id !== task.id && t.status !== 'done',
+              t.parentId === null &&
+              t.id !== task.id &&
+              !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
           )
         : [],
     [allTasks, canMoveToProject, task.id],
@@ -152,7 +160,7 @@ export const TaskItem = ({
       title: task.title,
       parentId: task.parentId,
       body: task.body,
-      status: task.status === 'done' ? 'active' : task.status,
+      status: isTerminal ? 'active' : task.status,
       priority: task.priority,
       today: task.today ?? undefined,
       client: task.client,
@@ -372,7 +380,7 @@ export const TaskItem = ({
                       Move to Tasks
                     </button>
                   )}
-                  {task.status !== 'inbox' && task.status !== 'done' && (
+                  {task.status !== 'inbox' && !isTerminal && (
                     <button
                       type="button"
                       onClick={() => {
@@ -383,6 +391,19 @@ export const TaskItem = ({
                     >
                       <ArrowRightLeft className="size-3" />
                       Move to Inbox
+                    </button>
+                  )}
+                  {cancelledEnabled && !isTerminal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void cancelTask(task.id);
+                        setMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <Ban className="size-3" />
+                      Cancel task
                     </button>
                   )}
                   {showMoveToProject && (

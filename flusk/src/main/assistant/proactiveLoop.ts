@@ -143,7 +143,7 @@ export class ProactiveLoop {
     const nowMs = Date.now();
 
     for (const task of tasks) {
-      if (task.status === 'done') continue;
+      if (task.status === 'done' || task.status === 'cancelled') continue;
 
       const parsed = parseDueDate(task.dueDate);
       if (!parsed) continue;

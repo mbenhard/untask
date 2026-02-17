@@ -114,7 +114,7 @@ describe('shouldRequireToolChoice', () => {
     ).toBe(true);
   });
 
-  it('requires tool choice for clarification follow-up detail messages', () => {
+  it('does not require tool choice for follow-up detail messages without explicit command', () => {
     expect(
       shouldRequireToolChoice({
         userMessage: 'do laundry tomorrow at 1pm medium priority',
@@ -126,7 +126,7 @@ describe('shouldRequireToolChoice', () => {
           },
         ],
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('does not require tool choice for non-task conversational prompts', () => {
@@ -152,14 +152,14 @@ describe('shouldRequireToolChoice', () => {
     ).toBe(false);
   });
 
-  it('can require tool choice for explicit web-search phrasing when enabled', () => {
+  it('does not require tool choice for web-search phrasing', () => {
     expect(
       shouldRequireToolChoice({
         userMessage: 'look up latest news about openrouter',
         history: [],
         allowWebSearchToolChoice: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

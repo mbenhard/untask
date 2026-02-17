@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 
-import type { Task, PredefinedStatusId } from '../../types/models';
-import { TERMINAL_STATUSES } from '../../types/models';
+import type { Task } from '../../types/models';
 import { getFlusk } from '../lib/flusk';
 
 export type TaskCreateInput = {
@@ -385,23 +384,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 }));
 
 // ─── Selectors ──────────────────────────────────────────────
+// IMPORTANT: Zustand v5 uses useSyncExternalStore directly — selectors that
+// create new references (e.g. .filter(), .map()) will cause infinite re-renders
+// unless consumed via useShallow from 'zustand/react/shallow'.
 export const selectTasks = (s: TaskStore) => s.tasks;
-export const selectSelectedTask = (s: TaskStore) =>
-  s.tasks.find((t) => t.id === s.selectedTaskId) ?? null;
-export const selectTodayTasks = (s: TaskStore) =>
-  s.tasks.filter(
-    (t) => t.today === true && !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
-  );
-export const selectProjectTasks = (s: TaskStore) =>
-  s.tasks.filter(
-    (t) =>
-      t.parentId === null &&
-      t.status !== 'inbox' &&
-      !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
-  );
-export const selectInboxTasks = (s: TaskStore) =>
-  s.tasks.filter(
-    (t) => t.status === 'inbox' && t.parentId === null && t.today !== true,
-  );
 export const selectIsLoading = (s: TaskStore) => s.isLoading;
 export const selectError = (s: TaskStore) => s.error;

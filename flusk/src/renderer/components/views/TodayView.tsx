@@ -47,9 +47,9 @@ export const TodayView = ({
       return;
     }
 
-    if (selectedTask.today === true && selectedTask.status === 'done') {
+    if (selectedTask.today === true && TERMINAL_STATUSES.includes(selectedTask.status as PredefinedStatusId)) {
       setIsDoneCollapsed(false);
-    } else if (selectedTask.today === true && selectedTask.status !== 'done') {
+    } else if (selectedTask.today === true && !TERMINAL_STATUSES.includes(selectedTask.status as PredefinedStatusId)) {
       setIsTodayCollapsed(false);
     }
   }, [allTasks, selectedTaskId]);

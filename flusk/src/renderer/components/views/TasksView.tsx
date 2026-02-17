@@ -17,6 +17,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { Task, PredefinedStatusId } from '../../../types/models';
 import { isTerminalStatus, getStatusLabel } from '../../../types/models';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
 import {
@@ -118,7 +119,7 @@ export const TasksView = ({
   const completeTask = useTaskStore((state) => state.completeTask);
   const cancelTask = useTaskStore((state) => state.cancelTask);
   const reopenTask = useTaskStore((state) => state.reopenTask);
-  const laneOrder = useTaskStatusConfigStore(selectLaneOrder);
+  const laneOrder = useTaskStatusConfigStore(useShallow(selectLaneOrder));
 
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [activeDragId, setActiveDragId] = useState<string | null>(null);

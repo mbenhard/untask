@@ -5,7 +5,7 @@ import started from 'electron-squirrel-startup';
 
 import { buildSystemPrompt } from './ai/systemPrompt';
 import { startProactiveTurn } from './ai/chat';
-import { checkAndGenerateWeeklyDigest } from './ai/weeklyDigest';
+
 import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
@@ -17,6 +17,7 @@ import {
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting } from './services/settingsService';
+import { ensureDefaultTaskStatusConfig } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
 import { initSummonController, summonWindow } from './window/summonController';
@@ -80,6 +81,7 @@ const createMainWindow = (): BrowserWindow => {
 const bootstrap = (): void => {
   initDatabase();
   runMigrations();
+  ensureDefaultTaskStatusConfig();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
   initSearchFts();
@@ -108,20 +110,7 @@ const emitIdentityContextDebugSnapshot = (): void => {
   );
 };
 
-const runWeeklyDigestStartupCheck = (): void => {
-  setTimeout(() => {
-    try {
-      const result = checkAndGenerateWeeklyDigest();
-      if (result.status === 'generated') {
-        // eslint-disable-next-line no-console
-        console.info('[weekly-digest] generated startup digest entry');
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('[weekly-digest] startup check failed', error);
-    }
-  }, 0);
-};
+
 
 app.on('second-instance', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -178,7 +167,7 @@ app.whenReady().then(() => {
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
-  runWeeklyDigestStartupCheck();
+
 
   // Initialize the proactive loop with chat pipeline dependency
   initProactiveLoop({

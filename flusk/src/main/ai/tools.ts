@@ -32,6 +32,7 @@ import {
   updateTask,
   updateTaskSchema,
 } from '../services/taskService';
+import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
 import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../services/notesService';
 import {
   getMemory,
@@ -272,6 +273,7 @@ const normalizeChipActions = (chips: Array<{ label: string; responseText?: strin
     };
   });
 const listTasksToolInputSchema = z.object({
+  id: z.string().optional().describe('Return a single task by ID (ignores other filters when set).'),
   status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   client: z.string().optional(),
@@ -340,7 +342,7 @@ const updateTaskTool = {
     }
 
     if (!context.skipInternalConfirmation) {
-      if (before.status === 'done') {
+      if (before.status === 'done' || before.status === 'cancelled') {
         return confirmationRequired(
           context,
           'update_task',
@@ -381,7 +383,7 @@ const completeTaskTool = {
     }
 
     const activeChildren = listTasks({ parentId: input.id })
-      .filter((child) => child.status !== 'done');
+      .filter((child) => !TERMINAL_STATUSES.includes(child.status as PredefinedStatusId));
 
     if (activeChildren.length > 0 && input.completeChildren !== true) {
       return confirmationRequired(
@@ -443,7 +445,7 @@ const deleteTaskTool = {
     }
 
     const activeChildren = listTasks({ parentId: input.id })
-      .filter((child) => child.status !== 'done');
+      .filter((child) => !TERMINAL_STATUSES.includes(child.status as PredefinedStatusId));
 
     if (activeChildren.length > 0 && input.cascade !== true) {
       return confirmationRequired(
@@ -691,9 +693,40 @@ const emitChipsTool = {
 
 const listTasksTool = {
   name: 'list_tasks',
-  description: 'Search and filter the full task list. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Accepts optional filters: status, priority, client (case-insensitive partial match), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
+  description: 'Search and filter the full task list, or retrieve a single task by ID. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Pass id to look up one task. Accepts optional filters: status, priority, client (case-insensitive partial match), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
   schema: listTasksToolInputSchema,
   execute: async (input) => {
+    // Single-task lookup by ID (absorbs get_task)
+    if (input.id) {
+      const task = getTaskById(input.id);
+      if (!task) {
+        throw new Error(`Task not found: ${input.id}`);
+      }
+
+      const children = listTasks({ parentId: task.id });
+
+      return {
+        status: 'success',
+        message: `Found task "${task.title}".`,
+        data: {
+          tasks: [{
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            client: task.client,
+            dueDate: task.dueDate,
+            today: task.today,
+            parentId: task.parentId,
+            body: task.body,
+            effort: task.effort,
+            recurrence: task.recurrence,
+            childCount: children.length,
+          }],
+        },
+      };
+    }
+
     const results = listTasks({
       status: input.status,
       priority: input.priority,

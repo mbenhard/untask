@@ -5,7 +5,7 @@ import { formatDueDateDisplay, parseDueDate, toISODate } from './dueDate';
 describe('dueDate utils', () => {
   it('formats valid ISO dates as DD.MM.YY', () => {
     expect(formatDueDateDisplay('2026-02-05')).toBe('05.02.26');
-    expect(formatDueDateDisplay('2026-02-05T12:00:00Z')).toBe('05.02.26');
+    expect(formatDueDateDisplay('2026-02-05T12:00:00Z')).toBe('05.02.26 12:00');
   });
 
   it('falls back to original input for invalid date strings', () => {

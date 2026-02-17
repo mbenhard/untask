@@ -301,10 +301,10 @@ export function undoTaskEvent(
     const restored = existing
       ? updateTaskFromSnapshot(targetEvent.taskId, before)
       : db
-          .insert(tasks)
-          .values(before as NewTask)
-          .returning()
-          .all()[0];
+        .insert(tasks)
+        .values(before as NewTask)
+        .returning()
+        .all()[0];
 
     const undoEvent = logTaskEvent(
       targetEvent.taskId,
@@ -332,10 +332,10 @@ export function undoTaskEvent(
   const restored = existing
     ? updateTaskFromSnapshot(targetEvent.taskId, before)
     : db
-        .insert(tasks)
-        .values(before as NewTask)
-        .returning()
-        .all()[0];
+      .insert(tasks)
+      .values(before as NewTask)
+      .returning()
+      .all()[0];
 
   const undoEvent = logTaskEvent(
     targetEvent.taskId,
@@ -472,7 +472,9 @@ const deleteTaskRecursive = (
   }
 
   const children = listChildTasks(db, id);
-  const activeChildren = children.filter((task) => task.status !== 'done');
+  const activeChildren = children.filter(
+    (task) => !TERMINAL_STATUSES.includes(task.status as PredefinedStatusId),
+  );
 
   if (cascade) {
     for (const child of children) {
@@ -691,6 +693,14 @@ export function getTaskStatusConfig(): TaskStatusConfig {
 export function setTaskStatusConfig(config: TaskStatusConfig): TaskStatusConfig {
   setSetting(TASK_STATUSES_KEY, JSON.stringify(config));
   return config;
+}
+
+/** Seed default config on first run (no-op if already set). */
+export function ensureDefaultTaskStatusConfig(): void {
+  const raw = getSetting(TASK_STATUSES_KEY);
+  if (!raw) {
+    setSetting(TASK_STATUSES_KEY, JSON.stringify(getDefaultStatusConfig()));
+  }
 }
 
 export function reorderTasks(

@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-
 import type { BlockNoteEditor } from '@blocknote/core';
 import {
   type DefaultReactSuggestionItem,
   getDefaultReactSlashMenuItems,
 } from '@blocknote/react';
 
-import type { Task, TaskStatus, PredefinedStatusId } from '../../../types/models';
-import { PREDEFINED_STATUSES, isTerminalStatus, TERMINAL_STATUSES } from '../../../types/models';
+import type { Task, PredefinedStatusId } from '../../../types/models';
+import { PREDEFINED_STATUSES } from '../../../types/models';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../stores/appStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import {
   useTaskStatusConfigStore,
-  selectLaneOrder,
   selectEnabledNonTerminal,
   selectEnabledTerminal,
 } from '../../stores/taskStatusConfigStore';
@@ -206,8 +205,8 @@ const StatusSegment = ({
   const [open, setOpen] = useState(false);
   const status = task.status ?? 'active';
   const label = statusLabelMap.get(status as PredefinedStatusId) ?? status;
-  const enabledNonTerminal = useTaskStatusConfigStore(selectEnabledNonTerminal);
-  const enabledTerminal = useTaskStatusConfigStore(selectEnabledTerminal);
+  const enabledNonTerminal = useTaskStatusConfigStore(useShallow(selectEnabledNonTerminal));
+  const enabledTerminal = useTaskStatusConfigStore(useShallow(selectEnabledTerminal));
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>

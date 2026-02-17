@@ -144,7 +144,7 @@ export const SearchModal = () => {
             ) : (
               results.map((result, i) => {
                 const isSelected = i === selectedIndex;
-                const isDone = result.status === 'done';
+                const isDone = result.status === 'done' || result.status === 'cancelled';
                 const priority = result.priority ?? 'none';
 
                 return (
@@ -152,9 +152,8 @@ export const SearchModal = () => {
                     key={result.id}
                     type="button"
                     data-selected={isSelected}
-                    className={`flex w-full items-center gap-2 px-2.5 py-1 text-left ${
-                      isSelected ? 'bg-accent' : ''
-                    } ${isDone ? 'opacity-40' : ''}`}
+                    className={`flex w-full items-center gap-2 px-2.5 py-1 text-left ${isSelected ? 'bg-accent' : ''
+                      } ${isDone ? 'opacity-40' : ''}`}
                     onClick={() => navigateToResult(result)}
                     onMouseEnter={() => useSearchStore.setState({ selectedIndex: i })}
                   >

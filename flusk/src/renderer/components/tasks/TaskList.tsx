@@ -20,6 +20,7 @@ import {
 
 import type { Task } from '../../../types/models';
 import { isTerminalStatus } from '../../../types/models';
+import { useShallow } from 'zustand/react/shallow';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
@@ -69,7 +70,7 @@ export const TaskList = ({
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
   const selectTask = useTaskStore((state) => state.selectTask);
-  const enabledNonTerminal = useTaskStatusConfigStore(selectEnabledNonTerminal);
+  const enabledNonTerminal = useTaskStatusConfigStore(useShallow(selectEnabledNonTerminal));
   const firstEnabledNonTerminal = useTaskStatusConfigStore(selectFirstEnabledNonTerminal);
 
   const containerRef = useRef<HTMLDivElement>(null);

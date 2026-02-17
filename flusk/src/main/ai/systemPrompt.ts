@@ -1,4 +1,5 @@
 import type { Task } from '../db/schema';
+import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
 import type {
   AssistantLiveContext,
   IdentityContextDebugSnapshot,
@@ -82,7 +83,9 @@ const buildTodaySection = (
   now: Date,
 ): string => {
   const activeTasks = sortTasks(
-    liveContext.tasks.filter((task) => task.status !== 'done'),
+    liveContext.tasks.filter(
+      (task) => !TERMINAL_STATUSES.includes(task.status as PredefinedStatusId),
+    ),
   );
   const todayTasks = activeTasks.filter((task) => task.today);
   const overdueTasks = activeTasks.filter((task) => {
