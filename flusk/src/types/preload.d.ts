@@ -59,7 +59,7 @@ import type {
   TaskCompleteRequestPayload,
 } from './ipc';
 
-import type { Task, ChatMessage, Note, Setting } from './models';
+import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
 
 export type FluskApi = {
   // ─── App/window lifecycle APIs ──────────────────────────
@@ -106,7 +106,11 @@ export type FluskApi = {
     delete: (payload: TaskDeleteRequestPayload) => Promise<void>;
     reorder: (ids: string[]) => Promise<void>;
     complete: (payload: TaskCompleteRequestPayload) => Promise<Task>;
+    cancel: (id: string) => Promise<Task>;
+    reopen: (id: string) => Promise<Task>;
     toggleToday: (id: string) => Promise<Task>;
+    getStatuses: () => Promise<TaskStatusConfig>;
+    setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
   };
   chat: {
     send: (message: ChatSendRequest) => Promise<ChatSendResult>;

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
-import type { Task } from '../../types/models';
+import type { Task, PredefinedStatusId } from '../../types/models';
+import { TERMINAL_STATUSES } from '../../types/models';
 import { getFlusk } from '../lib/flusk';
 
 export type TaskCreateInput = {
@@ -52,6 +53,8 @@ type TaskStore = {
   deleteTask: (id: string, cascade?: boolean) => Promise<boolean>;
   reorderTasks: (ids: string[]) => Promise<boolean>;
   completeTask: (id: string) => Promise<Task | null>;
+  cancelTask: (id: string) => Promise<Task | null>;
+  reopenTask: (id: string) => Promise<Task | null>;
   toggleToday: (id: string) => Promise<Task | null>;
 
   // ── UI actions ──────────────────────────────────────────
@@ -125,6 +128,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       order: nextOrder,
       createdAt: new Date().toISOString(),
       completedAt: null,
+      cancelledAt: null,
     };
 
     set((s) => ({ tasks: [...s.tasks, tempTask].sort(byOrderThenCreatedAt), error: null }));
@@ -284,6 +288,68 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
 
+  // ── Cancel (optimistic) ────────────────────────────────
+  cancelTask: async (id) => {
+    const prev = get().tasks.find((t) => t.id === id);
+    if (!prev) return null;
+
+    set((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === id
+          ? { ...t, status: 'cancelled' as const, cancelledAt: new Date().toISOString() }
+          : t,
+      ),
+      error: null,
+    }));
+
+    try {
+      const cancelled = await getFlusk().tasks.cancel(id);
+      set((s) => ({
+        tasks: s.tasks
+          .map((t) => (t.id === id ? cancelled : t))
+          .sort(byOrderThenCreatedAt),
+      }));
+      return cancelled;
+    } catch (e) {
+      set((s) => ({
+        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+        error: toErrorMessage(e),
+      }));
+      return null;
+    }
+  },
+
+  // ── Reopen (optimistic) ───────────────────────────────
+  reopenTask: async (id) => {
+    const prev = get().tasks.find((t) => t.id === id);
+    if (!prev) return null;
+
+    set((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === id
+          ? { ...t, status: 'active' as const, completedAt: null, cancelledAt: null }
+          : t,
+      ),
+      error: null,
+    }));
+
+    try {
+      const reopened = await getFlusk().tasks.reopen(id);
+      set((s) => ({
+        tasks: s.tasks
+          .map((t) => (t.id === id ? reopened : t))
+          .sort(byOrderThenCreatedAt),
+      }));
+      return reopened;
+    } catch (e) {
+      set((s) => ({
+        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+        error: toErrorMessage(e),
+      }));
+      return null;
+    }
+  },
+
   // ── Toggle today (optimistic) ───────────────────────────
   toggleToday: async (id) => {
     const prev = get().tasks.find((t) => t.id === id);
@@ -323,10 +389,15 @@ export const selectTasks = (s: TaskStore) => s.tasks;
 export const selectSelectedTask = (s: TaskStore) =>
   s.tasks.find((t) => t.id === s.selectedTaskId) ?? null;
 export const selectTodayTasks = (s: TaskStore) =>
-  s.tasks.filter((t) => t.today === true && t.status !== 'done');
+  s.tasks.filter(
+    (t) => t.today === true && !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
+  );
 export const selectProjectTasks = (s: TaskStore) =>
   s.tasks.filter(
-    (t) => t.parentId === null && t.status !== 'inbox' && t.status !== 'done',
+    (t) =>
+      t.parentId === null &&
+      t.status !== 'inbox' &&
+      !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
   );
 export const selectInboxTasks = (s: TaskStore) =>
   s.tasks.filter(

@@ -6,8 +6,16 @@ import {
   getTopLevelStatusScopedIds,
   moveTaskAcrossStatusLanes,
   reconcileScopedReorder,
+  type StatusLaneKey,
   type StatusLaneTaskIds,
 } from './statusLaneDrag';
+
+const DEFAULT_LANE_KEYS: StatusLaneKey[] = [
+  'in_progress',
+  'active',
+  'waiting',
+  'done',
+];
 
 const createGroups = (
   overrides: Partial<StatusLaneTaskIds> = {},
@@ -29,6 +37,7 @@ describe('statusLaneDrag', () => {
       groups,
       activeId: 'c',
       overId: 'b',
+      laneKeys: DEFAULT_LANE_KEYS,
     });
 
     expect(result).not.toBeNull();
@@ -48,6 +57,7 @@ describe('statusLaneDrag', () => {
       groups,
       activeId: 'a2',
       overId: 'w2',
+      laneKeys: DEFAULT_LANE_KEYS,
     });
 
     expect(result).not.toBeNull();
@@ -68,6 +78,7 @@ describe('statusLaneDrag', () => {
       groups,
       activeId: 'a1',
       overId: getStatusLaneId('waiting'),
+      laneKeys: DEFAULT_LANE_KEYS,
     });
 
     expect(result).not.toBeNull();
@@ -84,6 +95,7 @@ describe('statusLaneDrag', () => {
       groups,
       activeId: 'a1',
       overId: 'a1',
+      laneKeys: DEFAULT_LANE_KEYS,
     });
     expect(sameSpot).toBeNull();
 
@@ -91,6 +103,7 @@ describe('statusLaneDrag', () => {
       groups,
       activeId: 'a1',
       overId: 'unknown-id',
+      laneKeys: DEFAULT_LANE_KEYS,
     });
     expect(unknownTarget).toBeNull();
   });
@@ -129,6 +142,7 @@ describe('statusLaneDrag', () => {
         waiting: ['w1'],
         done: ['d1'],
       }),
+      DEFAULT_LANE_KEYS,
     );
 
     expect(flattened).toEqual(['i1', 'a1', 'w1', 'd1']);

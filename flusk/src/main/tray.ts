@@ -1,5 +1,6 @@
 import { Tray, Menu, nativeImage } from 'electron';
 
+import { TERMINAL_STATUSES, type PredefinedStatusId } from '../types/models';
 import { listTasks } from './services/taskService';
 import { toggleWindow } from './window/summonController';
 import { getTrayIconPath } from './window/trayIcon';
@@ -42,7 +43,9 @@ export function refreshTodayBadge(): void {
 
   try {
     const todayTasks = listTasks({ today: true });
-    const remaining = todayTasks.filter((t) => t.status !== 'done').length;
+    const remaining = todayTasks.filter(
+      (t) => !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
+    ).length;
     tray.setTitle(remaining > 0 ? String(remaining) : '');
   } catch {
     // Badge refresh failure should not disrupt task mutations

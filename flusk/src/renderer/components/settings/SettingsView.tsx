@@ -2,21 +2,21 @@ import { useState } from 'react';
 
 import { cn } from '../../lib/utils';
 import { SettingsGeneral } from './SettingsGeneral';
+import { SettingsTasks } from './SettingsTasks';
 import { SettingsAI } from './SettingsAI';
 import { SettingsMemoryTab } from './SettingsMemoryTab';
-import { SettingsJournal } from './SettingsJournal';
 import { SettingsShortcuts } from './SettingsShortcuts';
 import { SettingsBackup } from './SettingsBackup';
 
-type SettingsTab = 'general' | 'ai' | 'memory' | 'journal' | 'shortcuts' | 'backup';
+type SettingsTab = 'general' | 'tasks' | 'ai' | 'memory' | 'shortcuts' | 'backup';
 
-const TAB_ORDER: SettingsTab[] = ['general', 'ai', 'memory', 'journal', 'shortcuts', 'backup'];
+const TAB_ORDER: SettingsTab[] = ['general', 'tasks', 'ai', 'memory', 'shortcuts', 'backup'];
 
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: 'General',
+  tasks: 'Tasks',
   ai: 'AI',
   memory: 'Knowledge',
-  journal: 'Journal',
   shortcuts: 'Shortcuts',
   backup: 'Backup',
 };
@@ -30,12 +30,12 @@ export const SettingsView = () => {
     switch (activeTab) {
       case 'general':
         return <SettingsGeneral setError={setError} setNotice={setNotice} />;
+      case 'tasks':
+        return <SettingsTasks setError={setError} setNotice={setNotice} />;
       case 'ai':
         return <SettingsAI setError={setError} setNotice={setNotice} />;
       case 'memory':
         return <SettingsMemoryTab setError={setError} setNotice={setNotice} />;
-      case 'journal':
-        return <SettingsJournal setError={setError} />;
       case 'shortcuts':
         return <SettingsShortcuts setError={setError} />;
       case 'backup':

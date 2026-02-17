@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import type { Task } from '../../../types/models';
+import type { Task, PredefinedStatusId } from '../../../types/models';
+import { TERMINAL_STATUSES } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
@@ -25,11 +26,15 @@ export const TodayView = ({
   const [isDoneCollapsed, setIsDoneCollapsed] = useState(true);
 
   const activeTodayTasks = useMemo(
-    () => allTasks.filter((task) => task.today === true && task.status !== 'done'),
+    () => allTasks.filter(
+      (task) => task.today === true && !TERMINAL_STATUSES.includes(task.status as PredefinedStatusId),
+    ),
     [allTasks],
   );
   const doneTodayTasks = useMemo(
-    () => allTasks.filter((task) => task.today === true && task.status === 'done'),
+    () => allTasks.filter(
+      (task) => task.today === true && TERMINAL_STATUSES.includes(task.status as PredefinedStatusId),
+    ),
     [allTasks],
   );
   useEffect(() => {

@@ -15,9 +15,14 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { Task } from '../../../types/models';
+import type { Task, PredefinedStatusId } from '../../../types/models';
+import { isTerminalStatus, getStatusLabel } from '../../../types/models';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
+import {
+  useTaskStatusConfigStore,
+  selectLaneOrder,
+} from '../../stores/taskStatusConfigStore';
 import { type AddTaskConfig, SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 import {
@@ -36,39 +41,6 @@ type TasksViewProps = {
   error: string | null;
 };
 
-type GroupKey = StatusLaneKey;
-
-const GROUP_CONFIG: Array<{
-  key: GroupKey;
-  label: string;
-  emptyMessage: string;
-}> = [
-  { key: 'in_progress', label: 'In Progress', emptyMessage: 'No tasks in progress.' },
-  { key: 'active', label: 'Backlog', emptyMessage: 'No tasks in backlog.' },
-  { key: 'waiting', label: 'On Hold', emptyMessage: 'No tasks on hold.' },
-  { key: 'done', label: 'Done', emptyMessage: 'No completed tasks.' },
-];
-
-const toGroupKey = (status: Task['status']): GroupKey => {
-  if (
-    status === 'in_progress' ||
-    status === 'active' ||
-    status === 'waiting' ||
-    status === 'done'
-  ) {
-    return status;
-  }
-
-  return 'active';
-};
-
-const toTaskIdsByGroup = (groups: Record<GroupKey, Task[]>): StatusLaneTaskIds => ({
-  in_progress: groups.in_progress.map((task) => task.id),
-  active: groups.active.map((task) => task.id),
-  waiting: groups.waiting.map((task) => task.id),
-  done: groups.done.map((task) => task.id),
-});
-
 const SHARED_DROP_ANIMATION: DropAnimation = {
   duration: 220,
   easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
@@ -82,7 +54,8 @@ const SHARED_DROP_ANIMATION: DropAnimation = {
 };
 
 type StatusGroupSectionProps = {
-  group: (typeof GROUP_CONFIG)[number];
+  laneKey: StatusLaneKey;
+  label: string;
   tasks: Task[];
   isCollapsed: boolean;
   onToggle: () => void;
@@ -93,7 +66,8 @@ type StatusGroupSectionProps = {
 };
 
 const StatusGroupSection = ({
-  group,
+  laneKey,
+  label,
   tasks,
   isCollapsed,
   onToggle,
@@ -103,13 +77,13 @@ const StatusGroupSection = ({
   triggerAdd,
 }: StatusGroupSectionProps) => {
   const { setNodeRef, isOver } = useDroppable({
-    id: getStatusLaneId(group.key),
+    id: getStatusLaneId(laneKey),
   });
 
   return (
     <SectionGroup
-      sectionId={`tasks-${group.key}`}
-      label={group.label}
+      sectionId={`tasks-${laneKey}`}
+      label={label}
       count={tasks.length}
       isCollapsed={isCollapsed}
       onToggle={onToggle}
@@ -121,9 +95,9 @@ const StatusGroupSection = ({
       <TaskList
         tasks={tasks}
         allTasks={allTasks}
-        emptyMessage={group.emptyMessage}
-        ariaLabel={`${group.label} tasks`}
-        scopeId={`tasks-${group.key}`}
+        emptyMessage={`No ${label.toLowerCase()} tasks.`}
+        ariaLabel={`${label} tasks`}
+        scopeId={`tasks-${laneKey}`}
         dndMode="shared"
         sharedActiveDragId={activeDragId}
       />
@@ -142,40 +116,61 @@ export const TasksView = ({
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const updateTask = useTaskStore((state) => state.updateTask);
   const completeTask = useTaskStore((state) => state.completeTask);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<GroupKey, boolean>>({
-    in_progress: false,
-    active: false,
-    waiting: false,
-    done: true,
-  });
+  const cancelTask = useTaskStore((state) => state.cancelTask);
+  const reopenTask = useTaskStore((state) => state.reopenTask);
+  const laneOrder = useTaskStatusConfigStore(selectLaneOrder);
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
+  // Initialize collapsed state for new lanes (terminal = collapsed, non-terminal = open)
+  useEffect(() => {
+    setCollapsedGroups((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const key of laneOrder) {
+        if (next[key] === undefined) {
+          next[key] = isTerminalStatus(key);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [laneOrder]);
+
   const groupedTasks = useMemo(() => {
-    const groups: Record<GroupKey, Task[]> = {
-      in_progress: [],
-      active: [],
-      waiting: [],
-      done: [],
-    };
+    const groups: Record<string, Task[]> = {};
+    for (const key of laneOrder) {
+      groups[key] = [];
+    }
+
+    const laneSet = new Set<string>(laneOrder);
 
     for (const task of allTasks) {
-      if (task.parentId !== null) {
-        continue;
+      if (task.parentId !== null || task.status === 'inbox') continue;
+      const status = task.status ?? 'active';
+      if (laneSet.has(status)) {
+        groups[status].push(task);
+      } else {
+        // Orphaned task with disabled status — put in first non-terminal lane
+        const fallback = laneOrder.find((k) => !isTerminalStatus(k));
+        if (fallback && groups[fallback]) {
+          groups[fallback].push(task);
+        }
       }
-
-      if (task.status === 'inbox') {
-        continue;
-      }
-
-      groups[toGroupKey(task.status)].push(task);
     }
 
     return groups;
-  }, [allTasks]);
-  const groupedTaskIds = useMemo(
-    () => toTaskIdsByGroup(groupedTasks),
-    [groupedTasks],
-  );
+  }, [allTasks, laneOrder]);
+
+  const groupedTaskIds = useMemo((): StatusLaneTaskIds => {
+    const ids: StatusLaneTaskIds = {};
+    for (const key of laneOrder) {
+      ids[key] = (groupedTasks[key] ?? []).map((t) => t.id);
+    }
+    return ids;
+  }, [groupedTasks, laneOrder]);
+
   const topLevelStatusScopedIds = useMemo(
     () => getTopLevelStatusScopedIds(allTasks),
     [allTasks],
@@ -195,22 +190,15 @@ export const TasksView = ({
   );
 
   useEffect(() => {
-    if (!selectedTaskId) {
-      return;
-    }
+    if (!selectedTaskId) return;
 
     const selectedTask = allTasks.find((task) => task.id === selectedTaskId);
-    if (!selectedTask || selectedTask.parentId !== null || selectedTask.status === 'inbox') {
-      return;
-    }
+    if (!selectedTask || selectedTask.parentId !== null || selectedTask.status === 'inbox') return;
 
-    const groupKey = toGroupKey(selectedTask.status);
+    const groupKey = selectedTask.status as string;
     setCollapsedGroups((current) =>
       current[groupKey]
-        ? {
-            ...current,
-            [groupKey]: false,
-          }
+        ? { ...current, [groupKey]: false }
         : current,
     );
   }, [allTasks, selectedTaskId]);
@@ -223,27 +211,25 @@ export const TasksView = ({
     (event: DragEndEvent): void => {
       setActiveDragId(null);
 
-      if (!event.over) {
-        return;
-      }
+      if (!event.over) return;
 
       const activeId = String(event.active.id);
       const overId = String(event.over.id);
 
-      if (activeId === overId) {
-        return;
-      }
+      if (activeId === overId) return;
 
       const moveResult = moveTaskAcrossStatusLanes({
         groups: groupedTaskIds,
         activeId,
         overId,
+        laneKeys: laneOrder,
       });
-      if (!moveResult) {
-        return;
-      }
+      if (!moveResult) return;
 
-      const reorderedScopedIds = flattenStatusLaneTaskIds(moveResult.nextGroups);
+      const reorderedScopedIds = flattenStatusLaneTaskIds(
+        moveResult.nextGroups,
+        laneOrder,
+      );
       const currentGlobalIds = allTasks.map((task) => task.id);
       const fullOrderedIds = reconcileScopedReorder(
         currentGlobalIds,
@@ -260,17 +246,31 @@ export const TasksView = ({
       }
 
       if (moveResult.didChangeLane) {
-        if (moveResult.targetLane === 'done') {
+        const targetLane = moveResult.targetLane as PredefinedStatusId;
+        const sourceLane = moveResult.sourceLane as PredefinedStatusId;
+
+        if (targetLane === 'done') {
           void completeTask(activeId);
+        } else if (targetLane === 'cancelled') {
+          void cancelTask(activeId);
+        } else if (isTerminalStatus(sourceLane)) {
+          // Dragging out of a terminal lane → reopen
+          void reopenTask(activeId);
+          // Then move to the target status if different from default reopen target
+          // (reopenTask sets to first enabled non-terminal; updateTask corrects if needed)
+          void updateTask({ id: activeId, status: targetLane });
         } else {
-          void updateTask({ id: activeId, status: moveResult.targetLane });
+          void updateTask({ id: activeId, status: targetLane });
         }
       }
     },
     [
       allTasks,
+      cancelTask,
       completeTask,
       groupedTaskIds,
+      laneOrder,
+      reopenTask,
       reorderTasks,
       topLevelStatusScopedIds,
       updateTask,
@@ -299,31 +299,33 @@ export const TasksView = ({
             onDragCancel={() => setActiveDragId(null)}
           >
             <div className="space-y-2">
-              {GROUP_CONFIG.map((group) => {
-                const tasks = groupedTasks[group.key];
-                const isCollapsed = collapsedGroups[group.key];
-                const canAdd = group.key !== 'done';
+              {laneOrder.map((key) => {
+                const tasks = groupedTasks[key] ?? [];
+                const isCollapsed = collapsedGroups[key] ?? false;
+                const isTerminal = isTerminalStatus(key);
+                const label = getStatusLabel(key);
 
                 return (
                   <StatusGroupSection
-                    key={group.key}
-                    group={group}
+                    key={key}
+                    laneKey={key}
+                    label={label}
                     tasks={tasks}
                     isCollapsed={isCollapsed}
                     allTasks={allTasks}
                     activeDragId={activeDragId}
                     addTaskConfig={
-                      canAdd
-                        ? { defaultStatus: group.key, showMetadata: true, placeholder: 'Add task...' }
+                      !isTerminal
+                        ? { defaultStatus: key, showMetadata: true, placeholder: 'Add task...' }
                         : undefined
                     }
                     triggerAdd={
-                      group.key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
+                      key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
                     }
                     onToggle={() => {
                       setCollapsedGroups((current) => ({
                         ...current,
-                        [group.key]: !current[group.key],
+                        [key]: !current[key],
                       }));
                     }}
                   />

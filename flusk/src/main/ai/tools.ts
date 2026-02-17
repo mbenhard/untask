@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
-import { URL } from 'node:url';
 
 import { tool } from 'ai';
-import { extractFromHtml } from '@extractus/article-extractor';
 import { z } from 'zod';
 
 import type {
@@ -31,97 +27,20 @@ import {
   getLastTaskEventForTask,
   getTaskById,
   listTasks,
-  toggleToday,
   undoLastAiTaskEvent,
   undoTaskEvent,
   updateTask,
   updateTaskSchema,
 } from '../services/taskService';
-import {
-  readJournalEntries,
-  readJournalEntriesSchema,
-  searchJournalEntries,
-  writeJournalEntry,
-  writeJournalEntrySchema,
-} from '../services/journalService';
 import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../services/notesService';
-import { searchChatMessages } from '../services/searchService';
 import {
-  estimateTokens,
-  getIdentity,
-  setIdentity,
-  IDENTITY_TOKEN_HARD_LIMIT,
   getMemory,
   setMemory,
   readMemorySection,
   updateMemorySection,
 } from './memory';
 
-const priorityScore: Record<'none' | 'low' | 'medium' | 'high', number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-  none: 3,
-};
-
 const todayIso = (): string => new Date().toISOString();
-
-const parseIso = (value: string | null | undefined): number => {
-  if (!value) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
-};
-
-const sortPlanningTasks = (
-  left: ReturnType<typeof listTasks>[number],
-  right: ReturnType<typeof listTasks>[number],
-): number => {
-  if (Boolean(left.today) !== Boolean(right.today)) {
-    return left.today ? -1 : 1;
-  }
-
-  const dueDiff = parseIso(left.dueDate) - parseIso(right.dueDate);
-  if (dueDiff !== 0) {
-    return dueDiff;
-  }
-
-  const priorityDiff =
-    priorityScore[left.priority ?? 'none'] - priorityScore[right.priority ?? 'none'];
-  if (priorityDiff !== 0) {
-    return priorityDiff;
-  }
-
-  return left.title.localeCompare(right.title);
-};
-
-const noteLinePattern = /^\s*(?:[-*•]|\d+[.)]|\[ ?\])\s+/;
-
-const extractTaskTitlesFromNotes = (raw: string): string[] => {
-  const normalizedLines = raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => line.replace(noteLinePattern, '').trim())
-    .filter((line) => line.length > 0);
-
-  const deduped: string[] = [];
-  const seen = new Set<string>();
-
-  normalizedLines.forEach((line) => {
-    const key = line.toLowerCase();
-    if (seen.has(key)) {
-      return;
-    }
-
-    seen.add(key);
-    deduped.push(line);
-  });
-
-  return deduped;
-};
 
 const summarizeTask = (task: { title: string }): string => task.title;
 
@@ -325,46 +244,13 @@ const deleteTaskToolInputSchema = z.object({
   id: z.string().min(1),
   cascade: z.boolean().optional(),
 });
-const moveTaskToolInputSchema = z.object({
-  id: z.string().min(1),
-  parentId: z.string().nullable(),
-  order: z.number().int().optional(),
-});
-const setTodayToolInputSchema = z.object({
-  id: z.string().min(1),
-  today: z.boolean().optional(),
-});
-const parseNotesToolInputSchema = z.object({
-  text: z.string().trim().min(1),
-  status: z.enum(TASK_STATUS_VALUES).optional(),
-  priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
-  parentId: z.string().optional().describe('Parent task ID to create subtasks under'),
-});
-const suggestDailyPlanInputSchema = z.object({
-  maxTasks: z.number().int().min(1).max(8).default(5),
-});
 const undoLastActionInputSchema = z.object({
   taskEventId: z.string().min(1).optional(),
-});
-const updateIdentityInputSchema = z.object({
-  content: z.string().min(100).max(12000),
 });
 const updateMemoryInputSchema = z.object({
   section: z.string().min(1),
   content: z.string().min(1),
   mode: z.enum(['merge', 'replace']).default('merge'),
-});
-const searchJournalInputSchema = z.object({
-  query: z.string().min(1),
-  fromDate: z.string().optional(),
-  toDate: z.string().optional(),
-  limit: z.number().int().min(1).max(50).default(20),
-});
-const searchChatHistoryInputSchema = z.object({
-  query: z.string().min(1),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
-  limit: z.number().int().min(1).max(50).default(10),
 });
 const emitChipsInputSchema = z.object({
   chips: z.array(z.object({
@@ -385,10 +271,6 @@ const normalizeChipActions = (chips: Array<{ label: string; responseText?: strin
       responseText: responseText.length > 0 ? responseText : chip.label,
     };
   });
-const improveTaskInputSchema = z.object({
-  id: z.string().min(1),
-});
-
 const listTasksToolInputSchema = z.object({
   status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
@@ -398,14 +280,6 @@ const listTasksToolInputSchema = z.object({
   limit: z.number().int().min(1).max(50).default(20),
 });
 
-const getTaskToolInputSchema = z.object({
-  id: z.string().min(1),
-});
-
-const fetchUrlToolInputSchema = z.object({
-  url: z.string().url(),
-  maxLength: z.number().int().min(100).max(10000).default(3000),
-});
 const readNoteToolInputSchema = z.object({
   noteId: z.string().optional().describe('ID of the note to read. If omitted, reads the most recent active note.'),
 });
@@ -618,182 +492,6 @@ const deleteTaskTool = {
   },
 } satisfies ToolRegistryEntry<'delete_task', typeof deleteTaskToolInputSchema>;
 
-const moveTaskTool = {
-  name: 'move_task',
-  description: 'Move a task to a different parent (re-parent as subtask or promote to top-level). Use when the user wants to reorganize tasks, nest a task under a project, or extract a subtask. Requires task id and target parentId (null for top-level).',
-  schema: moveTaskToolInputSchema,
-  execute: async (input, context) => {
-    const before = getTaskById(input.id);
-    if (!before) {
-      throw new Error(`Task not found: ${input.id}`);
-    }
-
-    const moved = updateTask(
-      {
-        id: input.id,
-        parentId: input.parentId,
-        ...(typeof input.order === 'number' ? { order: input.order } : {}),
-      },
-      'ai',
-    );
-
-    const event = getLastTaskEventForTask(moved.id);
-
-    return successResult(
-      context,
-      'move_task',
-      'Task moved',
-      summarizeTask(moved),
-      { task: moved },
-      {
-        taskId: moved.id,
-        taskEventId: event?.id,
-        undoable: Boolean(event?.id),
-      },
-    );
-  },
-} satisfies ToolRegistryEntry<'move_task', typeof moveTaskToolInputSchema>;
-
-const setTodayTool = {
-  name: 'set_today',
-  description: 'Add or remove a task from the Today focus list. Use when the user wants to focus on a task today, or remove it from today. Requires task id. Pass today=true to add, today=false to remove, or omit to toggle.',
-  schema: setTodayToolInputSchema,
-  execute: async (input, context) => {
-    const task = getTaskById(input.id);
-    if (!task) {
-      throw new Error(`Task not found: ${input.id}`);
-    }
-
-    const updated =
-      typeof input.today === 'boolean'
-        ? updateTask({ id: input.id, today: input.today }, 'ai')
-        : toggleToday(input.id, 'ai');
-
-    const event = getLastTaskEventForTask(updated.id);
-
-    return successResult(
-      context,
-      'set_today',
-      updated.today ? 'Task added to Today' : 'Task removed from Today',
-      summarizeTask(updated),
-      { task: updated },
-      {
-        taskId: updated.id,
-        taskEventId: event?.id,
-        undoable: Boolean(event?.id),
-        viewIntent: 'today',
-      },
-    );
-  },
-} satisfies ToolRegistryEntry<'set_today', typeof setTodayToolInputSchema>;
-
-const suggestDailyPlanTool = {
-  name: 'suggest_daily_plan',
-  description:
-    'Generate a focused daily plan. Use when the user asks to plan their day, prioritize work, or figure out what to focus on. Ranks tasks by Today list membership, due date proximity, and priority level. Returns up to maxTasks suggestions (default 5, max 8).',
-  schema: suggestDailyPlanInputSchema,
-  execute: async (input, context) => {
-    const activeTasks = listTasks().filter((task) => task.status !== 'done');
-    const planned = [...activeTasks].sort(sortPlanningTasks).slice(0, input.maxTasks);
-
-    const suggestions = planned.map((task, index) => ({
-      rank: index + 1,
-      taskId: task.id,
-      title: task.title,
-      reason: [
-        task.today ? 'already on today list' : null,
-        task.dueDate ? `due ${task.dueDate}` : null,
-        task.priority ? `priority ${task.priority}` : null,
-      ]
-        .filter(Boolean)
-        .join(', '),
-    }));
-
-    const detail =
-      suggestions.length > 0
-        ? `Suggested ${suggestions.length} focus tasks for today.`
-        : 'No active tasks available for planning.';
-
-    return successResult(
-      context,
-      'suggest_daily_plan',
-      'Daily plan suggested',
-      detail,
-      { suggestions },
-      {
-        undoable: false,
-        viewIntent: 'today',
-      },
-    );
-  },
-} satisfies ToolRegistryEntry<'suggest_daily_plan', typeof suggestDailyPlanInputSchema>;
-
-const parseNotesTool = {
-  name: 'parse_notes',
-  description: 'Parse raw text into individual tasks. Use when the user pastes notes, a list, or bullet points and wants them converted to tasks. Extracts one task per line, deduplicates, and creates them. Bulk writes above 5 tasks require confirmation. Optional: default status and priority for all created tasks.',
-  schema: parseNotesToolInputSchema,
-  execute: async (input, context) => {
-    const titles = extractTaskTitlesFromNotes(input.text);
-
-    if (titles.length === 0) {
-      return {
-        status: 'success',
-        message: 'No task lines detected in the provided notes.',
-        data: { created: [] },
-      };
-    }
-
-    if (titles.length > 5 && !context.skipInternalConfirmation) {
-      return confirmationRequired(
-        context,
-        'parse_notes',
-        'Confirmation required',
-        `Parsed ${titles.length} tasks. Bulk writes above 5 tasks require confirmation.`,
-      );
-    }
-
-    const created = titles.map((title) => {
-      const task = createTask(
-        {
-          title,
-          status: input.status ?? 'inbox',
-          priority: input.priority ?? 'none',
-          ...(input.parentId ? { parentId: input.parentId } : {}),
-        },
-        'ai',
-      );
-
-      const event = getLastTaskEventForTask(task.id);
-      return {
-        task,
-        taskEventId: event?.id,
-      };
-    });
-
-    const summary = created.map(({ task }) => task.title).join(', ');
-    const actionCard = createActionCard(
-      'parse_notes',
-      'success',
-      'Tasks extracted from notes',
-      `${created.length} tasks created: ${summary}`,
-      {
-        undoable: false,
-        viewIntent:
-          (input.status ?? 'inbox') === 'inbox' ? 'inbox' : 'today',
-      },
-    );
-    emitActionCard(context, actionCard);
-
-    return {
-      status: 'success',
-      message: `${created.length} tasks created from notes.`,
-      data: {
-        created,
-      },
-      actionCard,
-    };
-  },
-} satisfies ToolRegistryEntry<'parse_notes', typeof parseNotesToolInputSchema>;
 
 const resolveNoteId = (noteId?: string, activeNoteId?: string): string => {
   if (noteId) return noteId;
@@ -946,125 +644,18 @@ const undoLastActionTool = {
   },
 } satisfies ToolRegistryEntry<'undo_last_action', typeof undoLastActionInputSchema>;
 
-const writeJournalTool = {
-  name: 'write_journal',
-  description: 'Write a journal entry to record observations about the user. Use to log patterns (recurring workflows), progress (task completion milestones), preferences (stated likes/dislikes), or summaries (session recaps). Entries persist across sessions and inform future context. Keep entries atomic and factual.',
-  schema: writeJournalEntrySchema,
-  execute: async (input) => {
-    const entry = writeJournalEntry(input);
-
-    return {
-      status: 'success',
-      message: 'Journal entry saved.',
-      data: { entry },
-    };
-  },
-} satisfies ToolRegistryEntry<'write_journal', typeof writeJournalEntrySchema>;
-
-const readJournalTool = {
-  name: 'read_journal',
-  description: 'Read recent journal entries to recall past observations. Use when you need context about previous sessions, user patterns, or past decisions before responding. Supports filtering by category and limiting result count. Read before writing to avoid duplicate entries.',
-  schema: readJournalEntriesSchema,
-  execute: async (input) => {
-    const entries = readJournalEntries(input);
-
-    return {
-      status: 'success',
-      message: `Loaded ${entries.length} journal entries.`,
-      data: { entries },
-    };
-  },
-} satisfies ToolRegistryEntry<'read_journal', typeof readJournalEntriesSchema>;
-
-// ─── New Proactive Assistant OS tools ──────────────────────
-
-const updateIdentityTool = {
-  name: 'update_identity',
-  description: 'Rewrite your Identity document — your personality, voice, decision rules, and operating principles. This is who you are. Only update when a behavioral shift is confirmed across multiple interactions. You must write_journal with the diff and reasoning BEFORE calling this tool. Content must be under 3000 tokens. Submit the full document, not a patch.',
-  schema: updateIdentityInputSchema,
-  execute: async (input) => {
-    const tokens = estimateTokens(input.content);
-    if (tokens > IDENTITY_TOKEN_HARD_LIMIT) {
-      return {
-        status: 'error' as const,
-        message: `Identity document is ~${tokens} tokens (limit: ${IDENTITY_TOKEN_HARD_LIMIT}). Compress it — remove redundancy, tighten language, keep the meaning. Don't truncate.`,
-      };
-    }
-
-    const previousIdentity = getIdentity();
-    const diff = summarizeLineDiff(previousIdentity, input.content);
-
-    try {
-      writeJournalEntry({
-        category: 'summary',
-        content: [
-          'Identity update applied.',
-          'Reason: autonomous refinement based on observed behavior effectiveness.',
-          `Estimated tokens: ${tokens}.`,
-          'Added lines:',
-          formatDiffItems(diff.added),
-          'Removed lines:',
-          formatDiffItems(diff.removed),
-        ].join('\n'),
-      });
-    } catch (error) {
-      return {
-        status: 'error' as const,
-        message: error instanceof Error
-          ? `Identity update aborted: journal logging failed (${error.message}).`
-          : 'Identity update aborted: journal logging failed.',
-      };
-    }
-
-    setIdentity(input.content, 'ai');
-
-    return {
-      status: 'success',
-      message: `Identity updated (~${tokens} tokens). Change logged to Journal and memory events.`,
-      data: { estimatedTokens: tokens, journalLogged: true },
-    };
-  },
-} satisfies ToolRegistryEntry<'update_identity', typeof updateIdentityInputSchema>;
-
 const updateMemoryTool = {
   name: 'update_memory',
   description: "Update a section of your Memory. Adds new knowledge or replaces existing entries in the specified section. Keep entries atomic (one fact per line). If the section doesn't exist, it's created. Announce what you're saving to Marcus. If Memory exceeds 8000 tokens, you'll get a warning to consolidate.",
   schema: updateMemoryInputSchema,
   execute: async (input) => {
     try {
-      const beforeMemory = getMemory();
-      const beforeSection = readMemorySection(input.section);
       const result = updateMemorySection(input.section, input.content, input.mode, 'ai');
-      const afterSection = readMemorySection(input.section);
-      const diff = summarizeLineDiff(beforeSection, afterSection);
-      let journalLogged = false;
-
-      try {
-        writeJournalEntry({
-          category: 'summary',
-          content: [
-            `Memory update applied.`,
-            `Section: ${input.section}. Mode: ${input.mode}.`,
-            'Reason: persistent preference/fact/workflow update.',
-            'Added lines:',
-            formatDiffItems(diff.added),
-            'Removed lines:',
-            formatDiffItems(diff.removed),
-          ].join('\n'),
-        });
-        journalLogged = true;
-      } catch {
-        setMemory(beforeMemory, 'system');
-        return {
-          status: 'error' as const,
-          message: `Memory update for section "${input.section}" was rolled back because journal logging failed.`,
-        };
-      }
 
       const response: { status: 'success'; message: string; data: Record<string, unknown> } = {
         status: 'success',
         message: `Memory section "${input.section}" updated (mode: ${input.mode}).`,
-        data: { section: input.section, mode: input.mode, journalLogged },
+        data: { section: input.section, mode: input.mode },
       };
 
       if (result.tokenWarning) {
@@ -1082,46 +673,6 @@ const updateMemoryTool = {
   },
 } satisfies ToolRegistryEntry<'update_memory', typeof updateMemoryInputSchema>;
 
-const searchJournalTool = {
-  name: 'search_journal',
-  description: 'Search your Journal by keyword with optional date range. Use to recall past reasoning, find self-corrections, or verify patterns before updating Identity.',
-  schema: searchJournalInputSchema,
-  execute: async (input) => {
-    const entries = searchJournalEntries({
-      query: input.query,
-      fromDate: input.fromDate,
-      toDate: input.toDate,
-      limit: input.limit,
-    });
-
-    return {
-      status: 'success',
-      message: `Found ${entries.length} journal entries matching "${input.query}".`,
-      data: { entries },
-    };
-  },
-} satisfies ToolRegistryEntry<'search_journal', typeof searchJournalInputSchema>;
-
-const searchChatHistoryTool = {
-  name: 'search_chat_history',
-  description: 'Search full chat history across all threads using keywords with optional date range. Returns matching messages with thread title, role, timestamp, and context snippet. Use when recalling prior decisions or locating past details.',
-  schema: searchChatHistoryInputSchema,
-  execute: async (input) => {
-    const result = searchChatMessages({
-      query: input.query,
-      dateFrom: input.dateFrom,
-      dateTo: input.dateTo,
-      limit: input.limit,
-    });
-
-    return {
-      status: 'success',
-      message: `Found ${result.results.length} chat message${result.results.length === 1 ? '' : 's'} matching "${input.query}".`,
-      data: result,
-    };
-  },
-} satisfies ToolRegistryEntry<'search_chat_history', typeof searchChatHistoryInputSchema>;
-
 const emitChipsTool = {
   name: 'emit_chips',
   description: 'Attach interactive response chips to your current message. This is the ONLY way to present tappable options — never write options as text bullets or numbered lists. Chips let Marcus answer with a tap instead of typing. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
@@ -1137,49 +688,6 @@ const emitChipsTool = {
     };
   },
 } satisfies ToolRegistryEntry<'emit_chips', typeof emitChipsInputSchema>;
-
-const improveTaskTool = {
-  name: 'improve_task',
-  description: 'Analyze a task and suggest improvements. Use when the user asks to refine, improve, or review a specific task. Checks for missing body, due date, client, and priority. Returns actionable suggestions to make the task more concrete and execution-ready. Requires task id.',
-  schema: improveTaskInputSchema,
-  execute: async (input) => {
-    const task = getTaskById(input.id);
-    if (!task) {
-      throw new Error(`Task not found: ${input.id}`);
-    }
-
-    const suggestions: string[] = [];
-
-    if (!task.body || task.body.trim().length < 30) {
-      suggestions.push('Add brief acceptance criteria and context in the task body.');
-    }
-
-    if (!task.dueDate) {
-      suggestions.push('Set a due date (hard or soft) to reduce drift risk.');
-    }
-
-    if (!task.client) {
-      suggestions.push('Attach a client tag to improve planning and reporting.');
-    }
-
-    if ((task.priority ?? 'none') === 'none') {
-      suggestions.push('Set priority to reflect urgency and impact.');
-    }
-
-    if (suggestions.length === 0) {
-      suggestions.push('Task already looks actionable. Next step: execute first sub-step now.');
-    }
-
-    return {
-      status: 'success',
-      message: `Generated ${suggestions.length} improvements for "${task.title}".`,
-      data: {
-        task,
-        suggestions,
-      },
-    };
-  },
-} satisfies ToolRegistryEntry<'improve_task', typeof improveTaskInputSchema>;
 
 const listTasksTool = {
   name: 'list_tasks',
@@ -1214,291 +722,17 @@ const listTasksTool = {
   },
 } satisfies ToolRegistryEntry<'list_tasks', typeof listTasksToolInputSchema>;
 
-const getTaskTool = {
-  name: 'get_task',
-  description: 'Fetch full details of a single task by ID. Returns all task fields (body, notes, timestamps) plus child subtasks. Use when you need complete context before acting on a task.',
-  schema: getTaskToolInputSchema,
-  execute: async (input) => {
-    const task = getTaskById(input.id);
-    if (!task) {
-      throw new Error(`Task not found: ${input.id}`);
-    }
-
-    const subtasks = listTasks({ parentId: input.id }).map((child) => ({
-      id: child.id,
-      title: child.title,
-      status: child.status,
-      priority: child.priority,
-      today: child.today,
-    }));
-
-    return {
-      status: 'success',
-      message: `Loaded task "${task.title}"${subtasks.length > 0 ? ` with ${subtasks.length} subtask${subtasks.length === 1 ? '' : 's'}` : ''}.`,
-      data: { task, subtasks },
-    };
-  },
-} satisfies ToolRegistryEntry<'get_task', typeof getTaskToolInputSchema>;
-
-const PRIVATE_IP_PATTERNS = [
-  /^10\./,
-  /^127\./,
-];
-
-const isPrivateIpAddress = (address: string): boolean => {
-  const normalized = address.toLowerCase();
-
-  if (normalized === '::1') {
-    return true;
-  }
-
-  if (normalized.startsWith('::ffff:')) {
-    const mapped = normalized.replace('::ffff:', '');
-    return isPrivateIpAddress(mapped);
-  }
-
-  if (normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80')) {
-    return true;
-  }
-
-  if (isIP(address) !== 4) {
-    return false;
-  }
-
-  const octets = address.split('.').map((part) => Number.parseInt(part, 10));
-  if (octets.length !== 4 || octets.some((value) => Number.isNaN(value))) {
-    return true;
-  }
-
-  const [a, b] = octets;
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
-  );
-};
-
-const resolveHostAddresses = async (hostname: string): Promise<string[]> => {
-  try {
-    const records = await lookup(hostname, { all: true, verbatim: true });
-    return records.map((record) => record.address);
-  } catch {
-    return [];
-  }
-};
-
-const isPrivateUrl = async (urlString: string): Promise<boolean> => {
-  try {
-    const parsed = new URL(urlString);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return true;
-    }
-
-    const hostname = parsed.hostname.toLowerCase();
-    if (
-      hostname === 'localhost' ||
-      hostname === '[::1]' ||
-      hostname.endsWith('.local') ||
-      hostname.endsWith('.internal')
-    ) {
-      return true;
-    }
-
-    if (PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname))) {
-      return true;
-    }
-
-    if (isIP(hostname) > 0) {
-      return isPrivateIpAddress(hostname);
-    }
-
-    const addresses = await resolveHostAddresses(hostname);
-    if (addresses.length === 0) {
-      return true;
-    }
-
-    return addresses.some((address) => isPrivateIpAddress(address));
-  } catch {
-    return true;
-  }
-};
-
-const FETCH_TIMEOUT_MS = 10_000;
-const FETCH_MAX_BODY_BYTES = 500_000;
-const FETCH_MAX_REDIRECTS = 5;
-
-const isRedirectStatus = (status: number): boolean =>
-  status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
-
-const readResponseBodyWithLimit = async (
-  response: Response,
-  maxBytes: number,
-): Promise<string> => {
-  const contentLength = response.headers.get('content-length');
-  if (contentLength) {
-    const declaredBytes = Number.parseInt(contentLength, 10);
-    if (!Number.isNaN(declaredBytes) && declaredBytes > maxBytes) {
-      throw new Error(`Response body exceeds ${maxBytes} byte limit.`);
-    }
-  }
-
-  if (!response.body) {
-    const fallback = await response.arrayBuffer();
-    if (fallback.byteLength > maxBytes) {
-      throw new Error(`Response body exceeds ${maxBytes} byte limit.`);
-    }
-    return new TextDecoder().decode(fallback);
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-
-  let streamDone = false;
-  while (!streamDone) {
-    const { done, value } = await reader.read();
-    if (done) {
-      streamDone = true;
-      continue;
-    }
-    if (!value) {
-      continue;
-    }
-
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new Error(`Response body exceeds ${maxBytes} byte limit.`);
-    }
-    chunks.push(value);
-  }
-
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  chunks.forEach((chunk) => {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  });
-
-  return new TextDecoder().decode(merged);
-};
-
-const fetchReadableHtml = async (
-  inputUrl: string,
-  signal: AbortSignal,
-): Promise<{ html: string; finalUrl: string }> => {
-  let currentUrl = inputUrl;
-
-  for (let redirectCount = 0; redirectCount <= FETCH_MAX_REDIRECTS; redirectCount += 1) {
-    if (await isPrivateUrl(currentUrl)) {
-      throw new Error('Cannot fetch private or internal URLs.');
-    }
-
-    const response = await fetch(currentUrl, {
-      signal,
-      redirect: 'manual',
-      headers: {
-        'User-Agent': 'Flusk/1.0 (Article Extractor)',
-        Accept: 'text/html, application/xhtml+xml, text/plain',
-      },
-    });
-
-    if (isRedirectStatus(response.status)) {
-      if (redirectCount === FETCH_MAX_REDIRECTS) {
-        throw new Error('Too many redirects while fetching URL.');
-      }
-
-      const location = response.headers.get('location');
-      if (!location) {
-        throw new Error('Redirect response missing Location header.');
-      }
-
-      currentUrl = new URL(location, currentUrl).toString();
-      continue;
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const contentType = response.headers.get('content-type') ?? '';
-    if (
-      !contentType.includes('text/') &&
-      !contentType.includes('html') &&
-      !contentType.includes('application/xhtml')
-    ) {
-      throw new Error(`Unsupported content type: ${contentType}. Only text/HTML is supported.`);
-    }
-
-    const html = await readResponseBodyWithLimit(response, FETCH_MAX_BODY_BYTES);
-    return { html, finalUrl: currentUrl };
-  }
-
-  throw new Error('Too many redirects while fetching URL.');
-};
-
-const fetchUrlTool = {
-  name: 'fetch_url',
-  description: 'Fetch a URL and return its readable content. Use when the user pastes a link and asks you to summarize or read it. Only processes text/HTML content. Returns extracted article title and content, truncated to maxLength.',
-  schema: fetchUrlToolInputSchema,
-  execute: async (input) => {
-    if (await isPrivateUrl(input.url)) {
-      throw new Error('Cannot fetch private or internal URLs.');
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    try {
-      const { html, finalUrl } = await fetchReadableHtml(input.url, controller.signal);
-      const article = await extractFromHtml(html, finalUrl);
-      const title = article?.title ?? 'Untitled';
-      let content = article?.content ?? html;
-
-      // Strip HTML tags for plain text output
-      content = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-
-      if (content.length > input.maxLength) {
-        content = content.slice(0, input.maxLength).trimEnd() + '...';
-      }
-
-      return {
-        status: 'success',
-        message: `Fetched "${title}" (${content.length} chars).`,
-        data: { title, content, url: finalUrl },
-      };
-    } finally {
-      clearTimeout(timeout);
-    }
-  },
-} satisfies ToolRegistryEntry<'fetch_url', typeof fetchUrlToolInputSchema>;
-
 export const AI_TOOL_REGISTRY = {
   create_task: createTaskTool,
   update_task: updateTaskTool,
   complete_task: completeTaskTool,
   delete_task: deleteTaskTool,
-  move_task: moveTaskTool,
-  set_today: setTodayTool,
-  suggest_daily_plan: suggestDailyPlanTool,
-  parse_notes: parseNotesTool,
   read_note: readNoteTool,
   edit_note: editNoteTool,
   undo_last_action: undoLastActionTool,
-  write_journal: writeJournalTool,
-  read_journal: readJournalTool,
-  update_identity: updateIdentityTool,
   update_memory: updateMemoryTool,
-  search_journal: searchJournalTool,
-  search_chat_history: searchChatHistoryTool,
   emit_chips: emitChipsTool,
-  improve_task: improveTaskTool,
   list_tasks: listTasksTool,
-  get_task: getTaskTool,
-  fetch_url: fetchUrlTool,
 } as const;
 
 export type AiToolName = keyof typeof AI_TOOL_REGISTRY;
@@ -1552,10 +786,6 @@ const buildRiskHint = (
     }
   }
 
-  if (toolName === 'parse_notes' && typeof input.text === 'string') {
-    hint._parsedCount = extractTaskTitlesFromNotes(input.text).length;
-  }
-
   return { toolName, input: hint };
 };
 
@@ -1573,14 +803,8 @@ const buildPendingRationale = (toolName: string, input: Record<string, unknown>)
       return `Update task ${resolveTaskTitle(input.id)}.`;
     case 'complete_task':
       return `Mark task ${resolveTaskTitle(input.id)} as done.`;
-    case 'move_task':
-      return `Move task ${resolveTaskTitle(input.id)}.`;
     case 'create_task':
       return `Create task "${String(input.title ?? '')}".`;
-    case 'set_today':
-      return `Toggle Today for task ${resolveTaskTitle(input.id)}.`;
-    case 'parse_notes':
-      return `Create tasks from notes.`;
     case 'edit_note': {
       const action = String(input.action ?? '');
       if (action === 'rewrite') {
@@ -1738,10 +962,7 @@ export const PROACTIVE_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
   'create_task',
   'update_task',
   'complete_task',
-  'move_task',
-  'set_today',
   'list_tasks',
-  'get_task',
   'emit_chips',
 ]);
 

@@ -24,7 +24,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   const [models, setModels] = useState<ChatModelCatalogEntry[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [autonomyMode, setAutonomyMode] = useState<'manual' | 'safe' | 'autopilot'>('safe');
+  const [autonomyMode, setAutonomyMode] = useState<'auto' | 'confirm'>('auto');
   const [isLoadingAutonomy, setIsLoadingAutonomy] = useState(false);
   const [retentionMode, setRetentionMode] = useState<'session' | '30d' | 'forever'>('session');
   const [isLoadingRetention, setIsLoadingRetention] = useState(false);
@@ -110,7 +110,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   );
 
   const handleAutonomyChange = useCallback(
-    async (mode: 'manual' | 'safe' | 'autopilot') => {
+    async (mode: 'auto' | 'confirm') => {
       const previousMode = autonomyMode;
       setAutonomyMode(mode);
       setNotice(null);
@@ -202,12 +202,11 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
         <SettingsRow label="Autonomy" loading={isLoadingAutonomy}>
           <SegmentedControl
             options={[
-              { value: 'manual' as const, label: 'Manual' },
-              { value: 'safe' as const, label: 'Safe' },
-              { value: 'autopilot' as const, label: 'Autopilot' },
+              { value: 'auto' as const, label: 'Auto' },
+              { value: 'confirm' as const, label: 'Confirm' },
             ]}
             value={autonomyMode}
-            onChange={(v) => void handleAutonomyChange(v as 'manual' | 'safe' | 'autopilot')}
+            onChange={(v) => void handleAutonomyChange(v as 'auto' | 'confirm')}
           />
         </SettingsRow>
         <SettingsRow label="Chat retention" loading={isLoadingRetention}>

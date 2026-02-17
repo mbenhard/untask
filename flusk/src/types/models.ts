@@ -1,12 +1,57 @@
+// ─── Predefined status palette ──────────────────────────────
+// Curated set of statuses users can toggle on/off and reorder.
+
+export const PREDEFINED_STATUSES = [
+  { id: 'inbox',       label: 'Inbox',       defaultEnabled: true,  locked: true,  terminal: false },
+  { id: 'active',      label: 'Backlog',     defaultEnabled: true,  locked: false, terminal: false },
+  { id: 'in_progress', label: 'In Progress', defaultEnabled: true,  locked: false, terminal: false },
+  { id: 'waiting',     label: 'On Hold',     defaultEnabled: true,  locked: false, terminal: false },
+  { id: 'review',      label: 'Review',      defaultEnabled: false, locked: false, terminal: false },
+  { id: 'someday',     label: 'Someday',     defaultEnabled: false, locked: false, terminal: false },
+  { id: 'cancelled',   label: 'Cancelled',   defaultEnabled: false, locked: false, terminal: true  },
+  { id: 'done',        label: 'Done',        defaultEnabled: true,  locked: true,  terminal: true  },
+] as const;
+
+export type PredefinedStatusId = (typeof PREDEFINED_STATUSES)[number]['id'];
+
 export const TASK_STATUS_VALUES = [
-  'inbox',
-  'active',
-  'in_progress',
-  'waiting',
-  'done',
+  'inbox', 'active', 'in_progress', 'waiting', 'review', 'someday', 'cancelled', 'done',
 ] as const;
 
 export type TaskStatus = (typeof TASK_STATUS_VALUES)[number];
+
+// ─── Task status config (stored in settings table) ──────────
+export type TaskStatusConfig = {
+  enabled: PredefinedStatusId[];
+  order: PredefinedStatusId[];  // view order, excludes inbox (always separate)
+};
+
+// ─── Status helpers ─────────────────────────────────────────
+
+const statusMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s]));
+
+export function getStatusDef(id: PredefinedStatusId) {
+  return statusMap.get(id)!;
+}
+
+export function getStatusLabel(id: PredefinedStatusId): string {
+  return statusMap.get(id)?.label ?? id;
+}
+
+export function isTerminalStatus(id: PredefinedStatusId): boolean {
+  return statusMap.get(id)?.terminal ?? false;
+}
+
+export const TERMINAL_STATUSES: PredefinedStatusId[] =
+  PREDEFINED_STATUSES.filter((s) => s.terminal).map((s) => s.id);
+
+export function getDefaultStatusConfig(): TaskStatusConfig {
+  const enabled = PREDEFINED_STATUSES.filter((s) => s.defaultEnabled).map((s) => s.id);
+  const order = PREDEFINED_STATUSES
+    .filter((s) => s.defaultEnabled && s.id !== 'inbox')
+    .map((s) => s.id);
+  return { enabled, order };
+}
 
 // ─── Shared model types ─────────────────────────────────────
 // Standalone type declarations matching the Drizzle schema.
@@ -32,6 +77,7 @@ export type Task = {
   order: number | null;
   createdAt: string | null;
   completedAt: string | null;
+  cancelledAt: string | null;
 };
 
 export type ChatMessage = {

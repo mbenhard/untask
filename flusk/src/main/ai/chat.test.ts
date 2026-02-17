@@ -186,16 +186,6 @@ describe('generateToolCallDescription', () => {
     );
   });
 
-  it('generates description for suggest_daily_plan', () => {
-    expect(generateToolCallDescription('suggest_daily_plan', {})).toBe('Generating daily plan');
-  });
-
-  it('generates description for set_today', () => {
-    expect(generateToolCallDescription('set_today', { id: 'task-789' })).toBe(
-      'Updating Today list…',
-    );
-  });
-
   it('generates description for read_note', () => {
     expect(generateToolCallDescription('read_note', {})).toBe('Reading note');
   });
@@ -213,26 +203,6 @@ describe('generateToolCallDescription', () => {
   it('generates description for undo_last_action with event id', () => {
     expect(generateToolCallDescription('undo_last_action', { taskEventId: 'evt-1' })).toBe(
       'Undoing last action…',
-    );
-  });
-
-  it('generates description for write_journal', () => {
-    expect(generateToolCallDescription('write_journal', {})).toBe('Writing journal entry');
-  });
-
-  it('generates description for read_journal', () => {
-    expect(generateToolCallDescription('read_journal', {})).toBe('Reading journal entries');
-  });
-
-  it('generates description for search_chat_history', () => {
-    expect(generateToolCallDescription('search_chat_history', { query: 'invoice' })).toBe(
-      'Searching chat history for "invoice"',
-    );
-  });
-
-  it('generates description for improve_task', () => {
-    expect(generateToolCallDescription('improve_task', { id: 'task-abc' })).toBe(
-      'Analyzing task…',
     );
   });
 

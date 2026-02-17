@@ -2,26 +2,20 @@ import { describe, expect, it } from 'vitest';
 
 import { classifyRisk, evaluateGate, isMutationTool } from './autonomy';
 
-describe('autonomy note risk mapping', () => {
-  it('classifies rewrite as high risk', () => {
+describe('autonomy risk classification', () => {
+  it('classifies edit_note as low risk regardless of action', () => {
     expect(
       classifyRisk({
         toolName: 'edit_note',
         input: { action: 'rewrite' },
       }),
-    ).toBe('high');
-  });
-
-  it('classifies replace as medium risk', () => {
+    ).toBe('low');
     expect(
       classifyRisk({
         toolName: 'edit_note',
         input: { action: 'replace' },
       }),
-    ).toBe('medium');
-  });
-
-  it('classifies append as low risk', () => {
+    ).toBe('low');
     expect(
       classifyRisk({
         toolName: 'edit_note',
@@ -30,42 +24,31 @@ describe('autonomy note risk mapping', () => {
     ).toBe('low');
   });
 
-  it('auto-executes rewrite in autopilot mode', () => {
-    const risk = classifyRisk({
-      toolName: 'edit_note',
-      input: { action: 'rewrite' },
-    });
-    expect(evaluateGate('autopilot', risk, false).action).toBe('execute');
+  it('classifies delete_task as critical via hard override', () => {
+    expect(
+      classifyRisk({
+        toolName: 'delete_task',
+        input: { id: 'task-1' },
+      }),
+    ).toBe('critical');
   });
 });
 
-describe('evaluateGate autopilot full trust', () => {
-  it('auto-executes critical risk in autopilot', () => {
-    expect(evaluateGate('autopilot', 'critical', false).action).toBe('execute');
+describe('evaluateGate', () => {
+  it('auto-executes in auto mode', () => {
+    expect(evaluateGate('auto', 'low', false).action).toBe('execute');
   });
 
-  it('auto-executes high risk in autopilot', () => {
-    expect(evaluateGate('autopilot', 'high', false).action).toBe('execute');
+  it('blocks in confirm mode', () => {
+    expect(evaluateGate('confirm', 'low', false).action).toBe('pending');
   });
 
-  it('still blocks hard override in autopilot', () => {
-    expect(evaluateGate('autopilot', 'critical', true).action).toBe('pending');
+  it('blocks hard override in auto mode', () => {
+    expect(evaluateGate('auto', 'critical', true).action).toBe('pending');
   });
 
-  it('still blocks hard override in safe mode', () => {
-    expect(evaluateGate('safe', 'critical', true).action).toBe('pending');
-  });
-
-  it('still blocks hard override in manual mode', () => {
-    expect(evaluateGate('manual', 'low', true).action).toBe('pending');
-  });
-
-  it('still blocks medium risk in safe mode', () => {
-    expect(evaluateGate('safe', 'medium', false).action).toBe('pending');
-  });
-
-  it('still blocks all writes in manual mode', () => {
-    expect(evaluateGate('manual', 'low', false).action).toBe('pending');
+  it('blocks hard override in confirm mode', () => {
+    expect(evaluateGate('confirm', 'critical', true).action).toBe('pending');
   });
 });
 

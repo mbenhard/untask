@@ -1,20 +1,17 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
   type ChangeEvent,
 } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
-import type { AiJournal } from '../../../types/models';
 import type { ChatModelCatalogEntry } from '../../../types/chat';
 import type {
   BackupMetadataPayload,
   SettingsMemoryEventPayload,
   SettingsMemoryHistoryRequestPayload,
   SettingsMemoryStatePayload,
-  SettingsReadJournalRequestPayload,
   WindowDismissMode,
 } from '../../../types/ipc';
 import { cn } from '../../lib/utils';
@@ -35,15 +32,14 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 
-type SettingsTab = 'general' | 'ai' | 'memory' | 'journal' | 'chat' | 'shortcuts' | 'backup';
+type SettingsTab = 'general' | 'ai' | 'memory' | 'chat' | 'shortcuts' | 'backup';
 
-const TAB_ORDER: SettingsTab[] = ['general', 'ai', 'memory', 'journal', 'chat', 'shortcuts', 'backup'];
+const TAB_ORDER: SettingsTab[] = ['general', 'ai', 'memory', 'chat', 'shortcuts', 'backup'];
 
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: 'General',
   ai: 'AI',
   memory: 'Knowledge',
-  journal: 'Journal',
   chat: 'Chat',
   shortcuts: 'Shortcuts',
   backup: 'Backup',
@@ -206,11 +202,6 @@ const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
   memory: '',
 };
 
-const DEFAULT_JOURNAL_FILTERS: SettingsReadJournalRequestPayload = {
-  limit: 20,
-  days_back: 30,
-};
-
 const OPENROUTER_API_KEY_SETTING_KEY = 'ai_openrouter_key';
 
 type MemorySubTab = (typeof MEMORY_SUB_TABS)[number];
@@ -223,16 +214,11 @@ export const SettingsMemory = () => {
   const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('identity');
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
   const [memoryHistory, setMemoryHistory] = useState<SettingsMemoryEventPayload[]>([]);
-  const [journalEntries, setJournalEntries] = useState<AiJournal[]>([]);
-  const [journalFilters, setJournalFilters] = useState<SettingsReadJournalRequestPayload>(
-    DEFAULT_JOURNAL_FILTERS,
-  );
 
   // Loading / saving states
   const [isLoadingMemory, setIsLoadingMemory] = useState(true);
   const [isLoadingMemoryHistory, setIsLoadingMemoryHistory] = useState(false);
   const [isUndoingMemory, setIsUndoingMemory] = useState(false);
-  const [isLoadingJournal, setIsLoadingJournal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -256,7 +242,7 @@ export const SettingsMemory = () => {
   const [models, setModels] = useState<ChatModelCatalogEntry[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [autonomyMode, setAutonomyMode] = useState<'manual' | 'safe' | 'autopilot'>('safe');
+  const [autonomyMode, setAutonomyMode] = useState<'auto' | 'confirm'>('auto');
   const [isLoadingAutonomy, setIsLoadingAutonomy] = useState(false);
 
   // Chat tab state
@@ -311,19 +297,6 @@ export const SettingsMemory = () => {
     },
     [memorySubTab],
   );
-
-  const loadJournal = useCallback(async () => {
-    try {
-      setIsLoadingJournal(true);
-      setError(null);
-      const response = await getFlusk().settings.readJournal(journalFilters);
-      setJournalEntries(response.entries);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load journal.');
-    } finally {
-      setIsLoadingJournal(false);
-    }
-  }, [journalFilters]);
 
   const loadLaunchAtLogin = useCallback(async () => {
     try {
@@ -563,12 +536,6 @@ export const SettingsMemory = () => {
       void loadAutonomyMode();
     }
   }, [activeTab, loadOpenRouterApiKey, loadModels, loadAutonomyMode]);
-
-  useEffect(() => {
-    if (activeTab === 'journal') {
-      void loadJournal();
-    }
-  }, [activeTab, loadJournal]);
 
   useEffect(() => {
     if (activeTab === 'chat') {
@@ -821,7 +788,7 @@ export const SettingsMemory = () => {
     }
   }, [selectedModelId]);
 
-  const handleAutonomyChange = useCallback(async (mode: 'manual' | 'safe' | 'autopilot') => {
+  const handleAutonomyChange = useCallback(async (mode: 'auto' | 'confirm') => {
     const previousMode = autonomyMode;
     setAutonomyMode(mode);
     setNotice(null);
@@ -852,14 +819,6 @@ export const SettingsMemory = () => {
       setError(saveError instanceof Error ? saveError.message : 'Failed to update retention mode.');
     }
   }, [retentionMode]);
-
-  const journalSummary = useMemo(() => {
-    if (journalEntries.length === 0) {
-      return 'No journal entries found for current filters.';
-    }
-
-    return `${journalEntries.length} entries loaded`;
-  }, [journalEntries.length]);
 
   // ─── Render ──────────────────────────────────────────────
 
@@ -1104,7 +1063,7 @@ export const SettingsMemory = () => {
                     <p className="mt-2 text-xs text-muted-foreground">Loading...</p>
                   ) : (
                     <div className="mt-2 flex items-center gap-2">
-                      {(['manual', 'safe', 'autopilot'] as const).map((mode) => (
+                      {(['auto', 'confirm'] as const).map((mode) => (
                         <Button
                           key={mode}
                           type="button"
@@ -1112,7 +1071,7 @@ export const SettingsMemory = () => {
                           size="sm"
                           onClick={() => void handleAutonomyChange(mode)}
                         >
-                          {mode === 'manual' ? 'Manual' : mode === 'safe' ? 'Safe' : 'Autopilot'}
+                          {mode === 'auto' ? 'Auto' : 'Confirm'}
                         </Button>
                       ))}
                     </div>
@@ -1276,89 +1235,6 @@ export const SettingsMemory = () => {
                     </div>
                   </>
                 )}
-              </div>
-            ) : null}
-
-            {/* ─── Journal tab ─────────────────────────────── */}
-            {activeTab === 'journal' ? (
-              <div role="tabpanel" id="settings-panel-journal" className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={journalFilters.limit ?? 20}
-                    onChange={(event) =>
-                      setJournalFilters((current) => ({
-                        ...current,
-                        limit: Number(event.target.value) || 20,
-                      }))
-                    }
-                    aria-label="Journal limit"
-                  />
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={journalFilters.days_back ?? 30}
-                    onChange={(event) =>
-                      setJournalFilters((current) => ({
-                        ...current,
-                        days_back: Number(event.target.value) || 30,
-                      }))
-                    }
-                    aria-label="Journal days back"
-                  />
-                  <select
-                    value={journalFilters.category ?? ''}
-                    onChange={(event) =>
-                      setJournalFilters((current) => ({
-                        ...current,
-                        category:
-                          event.target.value.length > 0
-                            ? (event.target.value as NonNullable<
-                                SettingsReadJournalRequestPayload['category']
-                              >)
-                            : undefined,
-                      }))
-                    }
-                    className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                    aria-label="Journal category filter"
-                  >
-                    <option value="">All categories</option>
-                    <option value="progress">progress</option>
-                    <option value="pattern">pattern</option>
-                    <option value="preference">preference</option>
-                    <option value="summary">summary</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{journalSummary}</p>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void loadJournal()} disabled={isLoadingJournal}>
-                    Refresh
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {isLoadingJournal ? (
-                    <p className="text-sm text-muted-foreground">Loading journal...</p>
-                  ) : null}
-                  {!isLoadingJournal && journalEntries.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No entries.</p>
-                  ) : null}
-                  {journalEntries.map((entry) => (
-                    <article
-                      key={entry.id}
-                      className="rounded-md border border-border/60 px-3 py-2"
-                    >
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                        {entry.category} · {entry.createdAt ?? 'unknown time'}
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">
-                        {entry.content}
-                      </p>
-                    </article>
-                  ))}
-                </div>
               </div>
             ) : null}
 

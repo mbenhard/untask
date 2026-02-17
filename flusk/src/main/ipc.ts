@@ -69,10 +69,14 @@ import {
   updateTask,
   deleteTask,
   completeTask,
+  cancelTask,
+  reopenTask,
   toggleToday,
   reorderTasks,
   undoLastAiTaskEvent,
   undoTaskEvent,
+  getTaskStatusConfig,
+  setTaskStatusConfig,
 } from './services/taskService';
 import {
   archiveConversation,
@@ -485,6 +489,22 @@ export const registerIpcHandlers = (): void => {
     try { const result = toggleToday(id); refreshTodayBadge(); return result; }
     catch (e) { console.error('[ipc] TASK_TOGGLE_TODAY:', e); throw e; }
   });
+  ipcMain.handle(IPC_CHANNELS.TASK_CANCEL, (_event, id: string) => {
+    try { const result = cancelTask(id, 'user'); refreshTodayBadge(); return result; }
+    catch (e) { console.error('[ipc] TASK_CANCEL:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.TASK_REOPEN, (_event, id: string) => {
+    try { const result = reopenTask(id, 'user'); refreshTodayBadge(); return result; }
+    catch (e) { console.error('[ipc] TASK_REOPEN:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.TASK_GET_STATUSES, () => {
+    try { return getTaskStatusConfig(); }
+    catch (e) { console.error('[ipc] TASK_GET_STATUSES:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.TASK_SET_STATUSES, (_event, config) => {
+    try { return setTaskStatusConfig(config); }
+    catch (e) { console.error('[ipc] TASK_SET_STATUSES:', e); throw e; }
+  });
 
   ipcMain.handle(IPC_CHANNELS.CHAT_CANCEL, () => {
     try { cancelActiveChatTurns(); }
@@ -712,9 +732,8 @@ export const registerIpcHandlers = (): void => {
       try {
         if (
           !request ||
-          (request.mode !== 'manual' &&
-            request.mode !== 'safe' &&
-            request.mode !== 'autopilot')
+          (request.mode !== 'auto' &&
+            request.mode !== 'confirm')
         ) {
           throw new Error('Invalid autonomy mode payload.');
         }

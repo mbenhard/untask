@@ -98,13 +98,8 @@ const VISIBLE_TOOL_NAMES = new Set([
   'update_task',
   'complete_task',
   'delete_task',
-  'move_task',
-  'set_today',
   'edit_note',
-  'parse_notes',
-  'update_identity',
   'update_memory',
-  'write_journal',
   'undo_last_action',
 ]);
 
@@ -127,20 +122,30 @@ type ToolStepProps = {
 
 const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
   const card = step.actionCard;
-  const isPending = card?.lifecycle === 'pending';
-  const isExecuted = card?.lifecycle === 'executed' || (!card?.lifecycle && step.status === 'success');
+  const [resolving, setResolving] = useState<'approved' | 'rejected' | null>(null);
+
+  // Optimistic lifecycle: local click state takes priority over store
+  const isPending = card?.lifecycle === 'pending' && !resolving;
+  const isExecuted =
+    resolving === 'approved' ||
+    card?.lifecycle === 'executed' ||
+    (!card?.lifecycle && step.status === 'success');
   const isUndone = card?.lifecycle === 'undone';
+
+  // Show approval/rejection badge for cards that were user-resolved
+  const showApprovedBadge = resolving === 'approved' || (card?.lifecycle === 'executed' && Boolean(card?.actionId));
+  const showRejectedBadge = resolving === 'rejected' || card?.lifecycle === 'rejected';
 
   return (
     <div className={cn(
       'flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs',
       step.status === 'error' ? 'border-destructive/30 bg-destructive/5' :
-      step.status === 'confirmation_required' ? 'border-border/60 bg-card/40' :
+      (step.status === 'confirmation_required' && !resolving) ? 'border-border/60 bg-card/40' :
       isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
       'border-border/60 bg-card/40',
     )}>
       <div className="mt-0.5 shrink-0">
-        {toolStatusIcon(isUndone ? 'success' : step.status)}
+        {toolStatusIcon(isUndone ? 'success' : resolving ? 'success' : step.status)}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm text-foreground/90">
@@ -162,7 +167,12 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
               type="button"
               variant="outline"
               size="xs"
-              onClick={() => { if (card.actionId) onApprove(card.actionId); }}
+              onClick={() => {
+                if (card.actionId) {
+                  setResolving('approved');
+                  onApprove(card.actionId);
+                }
+              }}
             >
               <Check className="size-3" />
               Approve
@@ -171,21 +181,26 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
               type="button"
               variant="ghost"
               size="xs"
-              onClick={() => { if (card.actionId) onReject(card.actionId); }}
+              onClick={() => {
+                if (card.actionId) {
+                  setResolving('rejected');
+                  onReject(card.actionId);
+                }
+              }}
             >
               <X className="size-3" />
             </Button>
           </>
         ) : null}
 
-        {isExecuted && card?.actionId ? (
+        {showApprovedBadge ? (
           <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
             <Check className="size-2.5" />
             Approved
           </span>
         ) : null}
 
-        {card?.lifecycle === 'rejected' ? (
+        {showRejectedBadge ? (
           <span className="text-[10px] text-muted-foreground/50">
             Rejected
           </span>
@@ -540,11 +555,6 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     onChipClick={(chip) => handleChipClick(message.id, chip)}
                   />
                 ) : null}
-                {message.memoryUpdated ? (
-                  <span className="px-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Memory updated
-                  </span>
-                ) : null}
               </div>
             ) : isAssistant && isPendingAssistantPlaceholder ? (
               <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
@@ -566,11 +576,6 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     disabled={message.id !== lastAssistantMessageId || isSending}
                     onChipClick={(chip) => handleChipClick(message.id, chip)}
                   />
-                ) : null}
-                {message.memoryUpdated ? (
-                  <span className="px-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Memory updated
-                  </span>
                 ) : null}
               </div>
             ) : (

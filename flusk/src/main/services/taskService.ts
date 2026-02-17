@@ -1,10 +1,18 @@
 import { eq, asc, desc, isNull, and, inArray, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { TASK_STATUS_VALUES, type TaskStatus } from '../../types/models';
+import {
+  TASK_STATUS_VALUES,
+  TERMINAL_STATUSES,
+  type TaskStatus,
+  type TaskStatusConfig,
+  type PredefinedStatusId,
+  getDefaultStatusConfig,
+} from '../../types/models';
 import { getDb } from '../db';
 import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
 import { calculateNextOccurrence } from './recurrenceEngine';
+import { getSetting, setSetting } from './settingsService';
 
 // ─── Validation schemas ─────────────────────────────────────
 export const createTaskSchema = z.object({
@@ -62,7 +70,7 @@ export const subscribeTaskChanges = (
 // ─── Service functions ──────────────────────────────────────
 function logTaskEvent(
   taskId: string,
-  action: 'create' | 'update' | 'move' | 'complete' | 'delete',
+  action: 'create' | 'update' | 'move' | 'complete' | 'cancel' | 'delete',
   source: 'user' | 'ai',
   before: Task | null,
   after: Task | null,
@@ -140,7 +148,9 @@ const listActiveChildTasks = (
   db: ReturnType<typeof getDb>,
   parentId: string,
 ): Task[] =>
-  listChildTasks(db, parentId).filter((task) => task.status !== 'done');
+  listChildTasks(db, parentId).filter(
+    (task) => !TERMINAL_STATUSES.includes(task.status as PredefinedStatusId),
+  );
 
 export function listTasks(filter?: {
   status?: TaskStatus;
@@ -615,6 +625,72 @@ export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
   logTaskEvent(id, 'update', source, before, updated);
   emitTaskChange();
   return updated;
+}
+
+// ─── Cancel / Reopen ────────────────────────────────────────
+
+export function cancelTask(
+  id: string,
+  source: 'user' | 'ai' = 'user',
+): Task {
+  const db = getDb();
+  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  if (!before) throw new Error(`Task not found: ${id}`);
+
+  const [updated] = db
+    .update(tasks)
+    .set({ status: 'cancelled', cancelledAt: new Date().toISOString() })
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+
+  logTaskEvent(id, 'cancel', source, before, updated);
+  emitTaskChange();
+  return updated;
+}
+
+export function reopenTask(
+  id: string,
+  source: 'user' | 'ai' = 'user',
+): Task {
+  const db = getDb();
+  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  if (!before) throw new Error(`Task not found: ${id}`);
+
+  const config = getTaskStatusConfig();
+  const targetStatus = config.enabled.find(
+    (s) => !TERMINAL_STATUSES.includes(s) && s !== 'inbox',
+  ) ?? 'active';
+
+  const [updated] = db
+    .update(tasks)
+    .set({ status: targetStatus, completedAt: null, cancelledAt: null })
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+
+  logTaskEvent(id, 'update', source, before, updated);
+  emitTaskChange();
+  return updated;
+}
+
+// ─── Task status config ─────────────────────────────────────
+
+const TASK_STATUSES_KEY = 'task_statuses';
+
+export function getTaskStatusConfig(): TaskStatusConfig {
+  const raw = getSetting(TASK_STATUSES_KEY);
+  if (!raw) return getDefaultStatusConfig();
+  try {
+    return JSON.parse(raw) as TaskStatusConfig;
+  } catch {
+    return getDefaultStatusConfig();
+  }
+}
+
+export function setTaskStatusConfig(config: TaskStatusConfig): TaskStatusConfig {
+  setSetting(TASK_STATUSES_KEY, JSON.stringify(config));
+  return config;
 }
 
 export function reorderTasks(

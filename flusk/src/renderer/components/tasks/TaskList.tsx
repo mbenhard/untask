@@ -19,9 +19,15 @@ import {
 } from '@dnd-kit/sortable';
 
 import type { Task } from '../../../types/models';
+import { isTerminalStatus } from '../../../types/models';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
+import {
+  useTaskStatusConfigStore,
+  selectEnabledNonTerminal,
+  selectFirstEnabledNonTerminal,
+} from '../../stores/taskStatusConfigStore';
 import {
   getNextPriority,
   getNextStatusInCycle,
@@ -55,12 +61,16 @@ export const TaskList = ({
   sharedActiveDragId = null,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
+  const cancelTask = useTaskStore((state) => state.cancelTask);
+  const reopenTask = useTaskStore((state) => state.reopenTask);
   const createTask = useTaskStore((state) => state.createTask);
   const updateTask = useTaskStore((state) => state.updateTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
   const selectTask = useTaskStore((state) => state.selectTask);
+  const enabledNonTerminal = useTaskStatusConfigStore(selectEnabledNonTerminal);
+  const firstEnabledNonTerminal = useTaskStatusConfigStore(selectFirstEnabledNonTerminal);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -183,18 +193,23 @@ export const TaskList = ({
         return;
       }
 
-      const nextStatus = getStatusAfterToggleComplete(currentTask.status);
-      if (nextStatus === 'active') {
-        void updateTask({ id: taskId, status: 'active' });
-      } else {
+      const nextStatus = getStatusAfterToggleComplete(
+        currentTask.status,
+        firstEnabledNonTerminal,
+      );
+      if (nextStatus === 'done') {
         void completeTask(taskId);
+      } else if (isTerminalStatus(currentTask.status as never)) {
+        void reopenTask(taskId);
+      } else {
+        void updateTask({ id: taskId, status: nextStatus });
       }
 
       if (expandedTaskId === taskId) {
         setExpandedTaskId(null);
       }
     },
-    [completeTask, expandedTaskId, tasks, updateTask],
+    [completeTask, expandedTaskId, firstEnabledNonTerminal, reopenTask, tasks, updateTask],
   );
 
   const handleToggleToday = useCallback(
@@ -225,16 +240,14 @@ export const TaskList = ({
         return;
       }
 
-      const nextStatus = getNextStatusInCycle(currentTask.status);
-
-      if (nextStatus === 'done') {
-        void completeTask(taskId);
-        return;
-      }
+      const nextStatus = getNextStatusInCycle(
+        currentTask.status,
+        enabledNonTerminal,
+      );
 
       void updateTask({ id: taskId, status: nextStatus });
     },
-    [completeTask, tasks, updateTask],
+    [enabledNonTerminal, tasks, updateTask],
   );
 
   const handleDragStart = useCallback((event: DragStartEvent): void => {

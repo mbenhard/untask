@@ -32,7 +32,6 @@ type ChatUiMessage = {
   steps: TurnStep[];
   imageCount?: number;
   chips?: ChipAction[];
-  memoryUpdated?: boolean;
 };
 
 type InFlightStream = {
@@ -497,7 +496,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     conversationIdByRequestId: {},
     assistantMessageIdByRequestId: {},
     lastStreamError: null,
-    autonomyMode: 'safe',
+    autonomyMode: 'auto',
     pendingActions: [],
     pendingImages: [],
     processingImageCount: 0,
@@ -1250,23 +1249,6 @@ export const useChatStore = create<ChatStore>((set, get) => {
         return;
       }
 
-      if (event.type === 'memory_updated') {
-        const assistantMessageId = get().assistantMessageIdByRequestId[event.requestId];
-        if (!assistantMessageId) {
-          return;
-        }
-
-        set((state) => ({
-          messages: state.messages.map((message) =>
-            message.id === assistantMessageId
-              ? { ...message, memoryUpdated: true }
-              : message,
-          ),
-        }));
-
-        return;
-      }
-
       if (event.type === 'error') {
         set((state) => {
           const placeholderId = state.inFlightByRequestId[event.requestId]?.placeholderId;
@@ -1409,18 +1391,34 @@ export const useChatStore = create<ChatStore>((set, get) => {
         status: lifecycle === 'executed' ? ('success' as const) : card.status,
       });
 
+      const updateSteps = (steps: TurnStep[]): TurnStep[] =>
+        steps.map((step) =>
+          step.kind === 'tool' && step.actionCard?.actionId === actionId
+            ? { ...step, actionCard: applyCardUpdate(step.actionCard) }
+            : step,
+        );
+
       set((state) => ({
         messages: state.messages.map((message) => ({
           ...message,
           actionCards: message.actionCards.map((card) =>
             card.actionId === actionId ? applyCardUpdate(card) : card,
           ),
-          steps: message.steps.map((step) =>
-            step.kind === 'tool' && step.actionCard?.actionId === actionId
-              ? { ...step, actionCard: applyCardUpdate(step.actionCard) }
-              : step,
-          ),
+          steps: updateSteps(message.steps),
         })),
+        // Also update inFlight state so assistant_done doesn't overwrite with stale lifecycle
+        inFlightByRequestId: Object.fromEntries(
+          Object.entries(state.inFlightByRequestId).map(([requestId, inFlight]) => [
+            requestId,
+            {
+              ...inFlight,
+              actionCards: inFlight.actionCards.map((card) =>
+                card.actionId === actionId ? applyCardUpdate(card) : card,
+              ),
+              steps: updateSteps(inFlight.steps),
+            },
+          ]),
+        ),
       }));
     },
 

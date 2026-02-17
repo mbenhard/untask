@@ -1,48 +1,49 @@
-import type { Task, TaskStatus } from '../../../types/models';
+import type { Task } from '../../../types/models';
+import type { PredefinedStatusId } from '../../../types/models';
 
-export type StatusLaneKey = Exclude<TaskStatus, 'inbox'>;
-
-export const STATUS_LANE_KEYS: StatusLaneKey[] = [
-  'in_progress',
-  'active',
-  'waiting',
-  'done',
-];
+export type StatusLaneKey = PredefinedStatusId;
 
 export const STATUS_LANE_ID_PREFIX = 'status-group:';
 
 export const getStatusLaneId = (lane: StatusLaneKey): string =>
   `${STATUS_LANE_ID_PREFIX}${lane}`;
 
-export const parseStatusLaneId = (id: string): StatusLaneKey | null => {
+export const parseStatusLaneId = (
+  id: string,
+  laneKeys: StatusLaneKey[],
+): StatusLaneKey | null => {
   if (!id.startsWith(STATUS_LANE_ID_PREFIX)) {
     return null;
   }
 
   const lane = id.slice(STATUS_LANE_ID_PREFIX.length) as StatusLaneKey;
-  return STATUS_LANE_KEYS.includes(lane) ? lane : null;
+  return laneKeys.includes(lane) ? lane : null;
 };
 
-export type StatusLaneTaskIds = Record<StatusLaneKey, string[]>;
+export type StatusLaneTaskIds = Record<string, string[]>;
 
 type LaneReference = {
   lane: StatusLaneKey;
   index: number;
 };
 
-const cloneStatusLaneTaskIds = (groups: StatusLaneTaskIds): StatusLaneTaskIds => ({
-  in_progress: [...groups.in_progress],
-  active: [...groups.active],
-  waiting: [...groups.waiting],
-  done: [...groups.done],
-});
+const cloneStatusLaneTaskIds = (groups: StatusLaneTaskIds): StatusLaneTaskIds => {
+  const clone: StatusLaneTaskIds = {};
+  for (const key of Object.keys(groups)) {
+    clone[key] = [...groups[key]];
+  }
+  return clone;
+};
 
 const findTaskLane = (
   groups: StatusLaneTaskIds,
   taskId: string,
+  laneKeys: StatusLaneKey[],
 ): LaneReference | null => {
-  for (const lane of STATUS_LANE_KEYS) {
-    const index = groups[lane].indexOf(taskId);
+  for (const lane of laneKeys) {
+    const ids = groups[lane];
+    if (!ids) continue;
+    const index = ids.indexOf(taskId);
     if (index >= 0) {
       return { lane, index };
     }
@@ -64,29 +65,34 @@ export const moveTaskAcrossStatusLanes = ({
   groups,
   activeId,
   overId,
+  laneKeys,
 }: {
   groups: StatusLaneTaskIds;
   activeId: string;
   overId: string;
+  laneKeys: StatusLaneKey[];
 }): StatusLaneMoveResult | null => {
-  const source = findTaskLane(groups, activeId);
+  const source = findTaskLane(groups, activeId, laneKeys);
   if (!source) {
     return null;
   }
 
-  const overTask = findTaskLane(groups, overId);
-  const targetLane = overTask?.lane ?? parseStatusLaneId(overId);
+  const overTask = findTaskLane(groups, overId, laneKeys);
+  const targetLane = overTask?.lane ?? parseStatusLaneId(overId, laneKeys);
   if (!targetLane) {
     return null;
   }
 
-  const tentativeTargetIndex = overTask ? overTask.index : groups[targetLane].length;
+  const tentativeTargetIndex = overTask
+    ? overTask.index
+    : (groups[targetLane]?.length ?? 0);
   const nextGroups = cloneStatusLaneTaskIds(groups);
   const sourceList = nextGroups[source.lane];
 
   sourceList.splice(source.index, 1);
 
-  const targetList = nextGroups[targetLane];
+  const targetList = nextGroups[targetLane] ?? [];
+  nextGroups[targetLane] = targetList;
   let targetIndex = tentativeTargetIndex;
 
   if (source.lane === targetLane && source.index < targetIndex) {
@@ -111,8 +117,11 @@ export const moveTaskAcrossStatusLanes = ({
   };
 };
 
-export const flattenStatusLaneTaskIds = (groups: StatusLaneTaskIds): string[] =>
-  STATUS_LANE_KEYS.flatMap((lane) => groups[lane]);
+export const flattenStatusLaneTaskIds = (
+  groups: StatusLaneTaskIds,
+  laneKeys: StatusLaneKey[],
+): string[] =>
+  laneKeys.flatMap((lane) => groups[lane] ?? []);
 
 export const getTopLevelStatusScopedIds = (
   allTasks: Array<Pick<Task, 'id' | 'parentId' | 'status'>>,

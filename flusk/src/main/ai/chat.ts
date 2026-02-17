@@ -24,9 +24,6 @@ import {
   setConversationTitle,
   sweepChatRetention,
 } from '../services/chatService';
-import { writeJournalEntry } from '../services/journalService';
-import { getSetting, setSetting } from '../services/settingsService';
-
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { scheduleKnowledgeExtraction } from './knowledgeExtractor';
 import { createOpenRouterProviderFromEnv } from './openrouter';
@@ -39,28 +36,13 @@ import { loadPendingActions } from './autonomy';
 
 const activeChatRequestIds = new Set<string>();
 const canceledChatRequestIds = new Set<string>();
-const AUTO_JOURNAL_LAST_WRITE_AT_KEY = 'ai_journal_last_auto_write_at';
-const AUTO_JOURNAL_COOLDOWN_MS = 20 * 60 * 1000;
 const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
-const HISTORY_WINDOW_LIMIT = 60;
+const HISTORY_WINDOW_LIMIT = 20;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
 const AUTO_TITLE_MODEL_ID = 'openai/gpt-4o-mini';
 const AUTO_TITLE_TIMEOUT_MS = 5_000;
 const AUTO_TITLE_MAX_LENGTH = 80;
-const TOOL_MUTATION_NAMES = new Set([
-  'create_task',
-  'update_task',
-  'complete_task',
-  'move_task',
-  'set_today',
-  'parse_notes',
-  'edit_note',
-  'undo_last_action',
-  'update_identity',
-  'update_memory',
-]);
-
 type ClassifiedChatError = {
   code: ChatStreamErrorCode;
   retryable: boolean;
@@ -569,14 +551,6 @@ export const generateToolCallDescription = (
       return 'Completing task…';
     case 'delete_task':
       return 'Deleting task…';
-    case 'move_task':
-      return 'Moving task…';
-    case 'set_today':
-      return 'Updating Today list…';
-    case 'suggest_daily_plan':
-      return 'Generating daily plan';
-    case 'parse_notes':
-      return 'Extracting tasks from notes';
     case 'read_note':
       return 'Reading note';
     case 'edit_note':
@@ -587,30 +561,12 @@ export const generateToolCallDescription = (
           : 'Appending to note';
     case 'undo_last_action':
       return 'Undoing last action…';
-    case 'write_journal':
-      return 'Writing journal entry';
-    case 'read_journal':
-      return 'Reading journal entries';
-    case 'update_identity':
-      return 'Updating identity document';
     case 'update_memory':
       return input.section ? `Updating memory section "${truncate(String(input.section), 30)}"` : 'Updating memory';
-    case 'search_journal':
-      return input.query ? `Searching journal for "${truncate(String(input.query), 30)}"` : 'Searching journal';
-    case 'search_chat_history':
-      return input.query
-        ? `Searching chat history for "${truncate(String(input.query), 30)}"`
-        : 'Searching chat history';
     case 'emit_chips':
       return 'Attaching chips';
-    case 'improve_task':
-      return 'Analyzing task…';
     case 'list_tasks':
       return input.search ? `Searching tasks for "${truncate(String(input.search), 40)}"` : 'Listing tasks';
-    case 'get_task':
-      return 'Loading task…';
-    case 'fetch_url':
-      return input.url ? `Fetching ${truncate(String(input.url), 60)}` : 'Fetching URL';
     default:
       return `Running ${toolName}`;
   }
@@ -624,84 +580,6 @@ const generateToolCallSummary = (
     return `${toolName} completed.`;
   }
   return truncate(envelope.message, 120);
-};
-
-const isPlanningIntent = (message: string): boolean =>
-  /\b(plan|prioriti[sz]e|today|next step|focus|schedule)\b/i.test(message);
-
-const isPreferenceIntent = (message: string): boolean =>
-  /\b(i prefer|i usually|i tend to|my style|works best for me|i hate|i dislike)\b/i.test(
-    message,
-  );
-
-const hasToolMutation = (executions: ChatToolExecutionSummary[]): boolean =>
-  executions.some(
-    (execution) =>
-      execution.status === 'success' && TOOL_MUTATION_NAMES.has(execution.toolName),
-  );
-
-const shouldSkipAutoJournal = (nowMs: number): boolean => {
-  const lastWrittenAt = getSetting(AUTO_JOURNAL_LAST_WRITE_AT_KEY);
-  if (!lastWrittenAt) {
-    return false;
-  }
-
-  const parsed = Date.parse(lastWrittenAt);
-  if (Number.isNaN(parsed)) {
-    return false;
-  }
-
-  return nowMs - parsed < AUTO_JOURNAL_COOLDOWN_MS;
-};
-
-const maybeWriteMeaningfulInteractionJournal = (input: {
-  userMessage: string;
-  assistantText: string;
-  toolExecutions: ChatToolExecutionSummary[];
-}): void => {
-  const normalizedMessage = input.userMessage.trim();
-  if (normalizedMessage.length === 0) {
-    return;
-  }
-
-  const planningIntent = isPlanningIntent(normalizedMessage);
-  const preferenceIntent = isPreferenceIntent(normalizedMessage);
-  const toolMutation = hasToolMutation(input.toolExecutions);
-  const meaningful = planningIntent || preferenceIntent || toolMutation;
-
-  if (!meaningful) {
-    return;
-  }
-
-  const now = Date.now();
-  if (shouldSkipAutoJournal(now)) {
-    return;
-  }
-
-  const successfulTools = input.toolExecutions
-    .filter((execution) => execution.status === 'success')
-    .map((execution) => execution.toolName);
-  const category: 'pattern' | 'progress' | 'preference' | 'summary' =
-    preferenceIntent ? 'preference' : toolMutation ? 'progress' : 'pattern';
-  const toolSummary =
-    successfulTools.length > 0 ? `Tools: ${successfulTools.join(', ')}.` : '';
-  const content = [
-    `Meaningful turn: ${truncate(normalizedMessage, 180)}`,
-    toolSummary,
-    `Assistant outcome: ${truncate(input.assistantText.trim(), 180)}`,
-  ]
-    .filter((line) => line.trim().length > 0)
-    .join(' ');
-
-  try {
-    writeJournalEntry({
-      category,
-      content,
-    });
-    setSetting(AUTO_JOURNAL_LAST_WRITE_AT_KEY, new Date(now).toISOString());
-  } catch {
-    // Never block chat completion on auto-journal failures.
-  }
 };
 
 export type StartChatTurnInput = {
@@ -1238,12 +1116,6 @@ const runAssistantStream = async (
     void maybeAutoTitleConversation({
       conversationId: input.conversationId,
       userMessage: input.userMessage,
-    });
-
-    maybeWriteMeaningfulInteractionJournal({
-      userMessage: input.userMessage,
-      assistantText: outputText,
-      toolExecutions,
     });
 
     scheduleKnowledgeExtraction({

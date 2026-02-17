@@ -17,7 +17,7 @@ import {
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting } from './services/settingsService';
-import { migrateLegacyMemoryLayers } from './ai/memory';
+import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
 import { initSummonController, summonWindow } from './window/summonController';
 
@@ -81,6 +81,7 @@ const bootstrap = (): void => {
   initDatabase();
   runMigrations();
   migrateLegacyMemoryLayers();
+  migrateIdentityV2();
   initSearchFts();
   initChatSearchFts();
   registerIpcHandlers();

@@ -20,7 +20,7 @@ export const tasks = sqliteTable(
     title: text('title').notNull(),
     body: text('body'),
     status: text('status', {
-      enum: ['inbox', 'active', 'in_progress', 'waiting', 'done'],
+      enum: ['inbox', 'active', 'in_progress', 'waiting', 'review', 'someday', 'cancelled', 'done'],
     }).default('inbox'),
     priority: text('priority', {
       enum: ['none', 'low', 'medium', 'high'],
@@ -37,6 +37,7 @@ export const tasks = sqliteTable(
     order: integer('order').default(0),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     completedAt: text('completed_at'),
+    cancelledAt: text('cancelled_at'),
   },
   (table) => [
     index('tasks_parent_id_idx').on(table.parentId),
@@ -123,7 +124,7 @@ export const taskEvents = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     taskId: text('task_id').notNull(),
     action: text('action', {
-      enum: ['create', 'update', 'move', 'complete', 'delete'],
+      enum: ['create', 'update', 'move', 'complete', 'cancel', 'delete'],
     }).notNull(),
     before: text('before'),
     after: text('after'),

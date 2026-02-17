@@ -7,10 +7,17 @@ import {
   getDefaultReactSlashMenuItems,
 } from '@blocknote/react';
 
-import type { Task, TaskStatus } from '../../../types/models';
+import type { Task, TaskStatus, PredefinedStatusId } from '../../../types/models';
+import { PREDEFINED_STATUSES, isTerminalStatus, TERMINAL_STATUSES } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../stores/appStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
+import {
+  useTaskStatusConfigStore,
+  selectLaneOrder,
+  selectEnabledNonTerminal,
+  selectEnabledTerminal,
+} from '../../stores/taskStatusConfigStore';
 import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
 import { Popover, PopoverContent } from '../ui';
@@ -21,13 +28,7 @@ import { getNextPriority } from './taskInteraction';
 
 type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
-const STATUS_OPTIONS: Array<{ value: TaskStatus; label: string }> = [
-  { value: 'inbox', label: 'Inbox' },
-  { value: 'active', label: 'Backlog' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'waiting', label: 'On Hold' },
-  { value: 'done', label: 'Done' },
-];
+const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
 const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
   none: '',
@@ -41,14 +42,6 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
   low: 'Low',
   medium: 'Med',
   high: 'High',
-};
-
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  inbox: 'Inbox',
-  active: 'Backlog',
-  in_progress: 'In Progress',
-  waiting: 'On Hold',
-  done: 'Done',
 };
 
 const SEGMENT =
@@ -171,7 +164,7 @@ const ClientSegment = ({
           setIsEditing(false);
         }}
         onClick={(e) => e.stopPropagation()}
-        placeholder="Client name"
+        placeholder="Client"
         className="min-w-[60px] max-w-[140px] bg-transparent text-[11px] font-mono text-foreground outline-none"
         style={{
           width: `${Math.max(60, Math.min(140, draft.length * 7 + 16))}px`,
@@ -212,7 +205,9 @@ const StatusSegment = ({
 }) => {
   const [open, setOpen] = useState(false);
   const status = task.status ?? 'active';
-  const label = STATUS_LABEL[status];
+  const label = statusLabelMap.get(status as PredefinedStatusId) ?? status;
+  const enabledNonTerminal = useTaskStatusConfigStore(selectEnabledNonTerminal);
+  const enabledTerminal = useTaskStatusConfigStore(selectEnabledTerminal);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -234,20 +229,55 @@ const StatusSegment = ({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        {STATUS_OPTIONS.map((opt) => (
+        {/* Inbox always available */}
+        <button
+          type="button"
+          onClick={() => {
+            void onUpdate({ id: task.id, status: 'inbox' });
+            setOpen(false);
+          }}
+          className={cn(
+            'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+            status === 'inbox' && 'text-foreground',
+          )}
+        >
+          Inbox
+        </button>
+        {/* Enabled non-terminal statuses */}
+        {enabledNonTerminal.map((id) => (
           <button
-            key={opt.value}
+            key={id}
             type="button"
             onClick={() => {
-              void onUpdate({ id: task.id, status: opt.value });
+              void onUpdate({ id: task.id, status: id });
               setOpen(false);
             }}
             className={cn(
               'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-              status === opt.value && 'text-foreground',
+              status === id && 'text-foreground',
             )}
           >
-            {opt.label}
+            {statusLabelMap.get(id) ?? id}
+          </button>
+        ))}
+        {/* Divider + terminal statuses */}
+        {enabledTerminal.length > 0 && (
+          <div className="my-1 h-px bg-border/40" />
+        )}
+        {enabledTerminal.map((id) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              void onUpdate({ id: task.id, status: id });
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+              status === id && 'text-foreground',
+            )}
+          >
+            {statusLabelMap.get(id) ?? id}
           </button>
         ))}
       </PopoverContent>
@@ -264,6 +294,7 @@ const RECURRENCE_PRESETS = [
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'yearly', label: 'Yearly' },
+  { value: 'every weekday', label: 'Every weekday' },
 ];
 
 const RecurrenceSegment = ({
@@ -274,11 +305,25 @@ const RecurrenceSegment = ({
   onUpdate: UpdateTaskAction;
 }) => {
   const [open, setOpen] = useState(false);
-  const [customDraft, setCustomDraft] = useState('');
+  const [customN, setCustomN] = useState(2);
+  const [customUnit, setCustomUnit] = useState<'days' | 'weeks' | 'months'>('days');
+  const customTouched = useRef(false);
+  const presetApplied = useRef(false);
   const isEmpty = !task.recurrence;
 
+  const handleOpenChange = (next: boolean) => {
+    if (!next && customTouched.current && !presetApplied.current) {
+      void onUpdate({ id: task.id, recurrence: `every ${customN} ${customUnit}` });
+    }
+    if (next) {
+      customTouched.current = false;
+      presetApplied.current = false;
+    }
+    setOpen(next);
+  };
+
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
         <button
           type="button"
@@ -302,6 +347,7 @@ const RecurrenceSegment = ({
             key={opt.value}
             type="button"
             onClick={() => {
+              presetApplied.current = true;
               void onUpdate({ id: task.id, recurrence: opt.value });
               setOpen(false);
             }}
@@ -313,27 +359,73 @@ const RecurrenceSegment = ({
             {opt.label}
           </button>
         ))}
-        <div className="border-t border-border/40 px-2 py-1.5">
-          <input
-            type="text"
-            value={customDraft}
-            onChange={(e) => setCustomDraft(e.target.value)}
+        <div className="flex items-center gap-1.5 border-t border-border/40 px-2 py-1.5">
+          <span className="text-xs text-muted-foreground">Every</span>
+          <div className="flex items-center rounded border border-border/40">
+            <button
+              type="button"
+              onClick={() => { customTouched.current = true; setCustomN((n) => Math.max(1, n - 1)); }}
+              className="px-1 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Decrease"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M3 5L5 7L7 5" />
+              </svg>
+            </button>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={customN}
+              onChange={(e) => {
+                customTouched.current = true;
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1 && v <= 365) setCustomN(v);
+                if (e.target.value === '') setCustomN(1);
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  void onUpdate({ id: task.id, recurrence: `every ${customN} ${customUnit}` });
+                  setOpen(false);
+                }
+                if (e.key === 'ArrowUp') { e.preventDefault(); setCustomN((n) => Math.min(365, n + 1)); }
+                if (e.key === 'ArrowDown') { e.preventDefault(); setCustomN((n) => Math.max(1, n - 1)); }
+              }}
+              className="w-6 bg-transparent py-0.5 text-center text-xs text-foreground outline-none [appearance:textfield]"
+            />
+            <button
+              type="button"
+              onClick={() => { customTouched.current = true; setCustomN((n) => Math.min(365, n + 1)); }}
+              className="px-1 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Increase"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M7 5L5 3L3 5" />
+              </svg>
+            </button>
+          </div>
+          <select
+            value={customUnit}
+            onChange={(e) => { customTouched.current = true; setCustomUnit(e.target.value as 'days' | 'weeks' | 'months'); }}
             onKeyDown={(e) => {
               e.stopPropagation();
-              if (e.key === 'Enter' && customDraft.trim()) {
-                void onUpdate({ id: task.id, recurrence: customDraft.trim() });
-                setCustomDraft('');
+              if (e.key === 'Enter') {
+                void onUpdate({ id: task.id, recurrence: `every ${customN} ${customUnit}` });
                 setOpen(false);
               }
             }}
-            placeholder="Custom (e.g. every 3 days)"
-            className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50"
-          />
+            className="rounded border border-border/40 bg-transparent px-1 py-0.5 text-xs text-foreground outline-none"
+          >
+            <option value="days">day(s)</option>
+            <option value="weeks">week(s)</option>
+            <option value="months">month(s)</option>
+          </select>
         </div>
         {!isEmpty && (
           <button
             type="button"
             onClick={() => {
+              presetApplied.current = true;
               void onUpdate({ id: task.id, recurrence: null });
               setOpen(false);
             }}

@@ -14,7 +14,7 @@ export type ChatNoteContext = {
   markdown: string;
 };
 
-export type AutonomyMode = 'manual' | 'safe' | 'autopilot';
+export type AutonomyMode = 'auto' | 'confirm';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
@@ -119,10 +119,6 @@ export type ChatStreamEvent =
       assistantMessage: ChatMessage;
       actionCards: ChatActionCard[];
       chips?: ChipAction[];
-    }
-  | {
-      type: 'memory_updated';
-      requestId: string;
     }
   | {
       type: 'error';

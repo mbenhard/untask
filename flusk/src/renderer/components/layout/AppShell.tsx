@@ -21,6 +21,7 @@ import {
   selectTasks,
   useTaskStore,
 } from '../../stores/taskStore';
+import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
 import {
   selectChatActiveConversationId,
   selectChatConversations,
@@ -76,6 +77,7 @@ export const AppShell = () => {
   const peekChatOverlay = useAppStore((state) => state.peekChatOverlay);
 
   const fetchTasks = useTaskStore((state) => state.fetchTasks);
+  const fetchStatusConfig = useTaskStatusConfigStore((s) => s.fetchConfig);
   const tasks = useTaskStore(selectTasks);
   const isLoading = useTaskStore(selectIsLoading);
   const error = useTaskStore(selectError);
@@ -92,7 +94,8 @@ export const AppShell = () => {
 
   useEffect(() => {
     void fetchTasks();
-  }, [fetchTasks]);
+    void fetchStatusConfig();
+  }, [fetchTasks, fetchStatusConfig]);
 
   useEffect(() => {
     void initializeChat();

@@ -61,7 +61,7 @@ import {
   type SettingsReadJournalResultPayload,
   type SettingsBootstrapState,
 } from '../types/ipc';
-import type { Task } from '../types/models';
+import type { Task, TaskStatusConfig } from '../types/models';
 import type { FluskApi } from '../types/preload';
 
 const fluskApi: FluskApi = {
@@ -149,8 +149,16 @@ const fluskApi: FluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_REORDER, ids),
     complete: (payload: TaskCompleteRequestPayload) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_COMPLETE, payload),
+    cancel: (id: string): Promise<Task> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_CANCEL, id),
+    reopen: (id: string): Promise<Task> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_REOPEN, id),
     toggleToday: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_TOGGLE_TODAY, id),
+    getStatuses: (): Promise<TaskStatusConfig> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_STATUSES),
+    setStatuses: (config: TaskStatusConfig): Promise<TaskStatusConfig> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_SET_STATUSES, config),
   },
   chat: {
     send: (message: ChatSendRequest): Promise<ChatSendResult> =>

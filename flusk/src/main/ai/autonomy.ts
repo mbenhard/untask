@@ -6,7 +6,7 @@ import { getSetting, setSetting } from '../services/settingsService';
 
 // ─── Core types ──────────────────────────────────────────────
 
-export type AutonomyMode = 'manual' | 'safe' | 'autopilot';
+export type AutonomyMode = 'auto' | 'confirm';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
@@ -36,14 +36,23 @@ export type ResolvedAction = Omit<PendingAction, 'lifecycle'> & {
 const SETTINGS_KEY_AUTONOMY_MODE = 'ai_autonomy_mode';
 const SETTINGS_KEY_PENDING_ACTIONS = 'ai_autonomy_pending_actions';
 
-const VALID_MODES: ReadonlySet<AutonomyMode> = new Set(['manual', 'safe', 'autopilot']);
+const VALID_MODES: ReadonlySet<AutonomyMode> = new Set(['auto', 'confirm']);
 
-const DEFAULT_MODE: AutonomyMode = 'safe';
+const DEFAULT_MODE: AutonomyMode = 'auto';
 
 export const getAutonomyMode = (): AutonomyMode => {
   const raw = getSetting(SETTINGS_KEY_AUTONOMY_MODE);
   if (raw && VALID_MODES.has(raw as AutonomyMode)) {
     return raw as AutonomyMode;
+  }
+  // Migrate old values
+  const MIGRATION_MAP: Record<string, AutonomyMode> = {
+    manual: 'confirm', safe: 'confirm', autopilot: 'auto',
+  };
+  if (raw && raw in MIGRATION_MAP) {
+    const mapped = MIGRATION_MAP[raw];
+    setSetting(SETTINGS_KEY_AUTONOMY_MODE, mapped);
+    return mapped;
   }
   return DEFAULT_MODE;
 };
@@ -65,59 +74,9 @@ type ToolRiskHint = {
 
 const HARD_OVERRIDE_TOOLS: ReadonlySet<string> = new Set(['delete_task']);
 
-const isCompletedRewrite = (hint: ToolRiskHint): boolean => {
-  if (hint.toolName !== 'update_task') return false;
-  return hint.input._beforeStatus === 'done';
-};
-
-const isBulkWrite = (hint: ToolRiskHint): boolean => {
-  if (hint.toolName !== 'parse_notes') return false;
-  const count = hint.input._parsedCount;
-  return typeof count === 'number' && count > 5;
-};
-
-const noteEditAction = (
-  hint: ToolRiskHint,
-): 'append' | 'replace' | 'rewrite' | null => {
-  if (hint.toolName !== 'edit_note') return null;
-  const action = hint.input.action;
-  if (action === 'append' || action === 'replace' || action === 'rewrite') {
-    return action;
-  }
-  return null;
-};
-
 export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return 'critical';
-  if (isCompletedRewrite(hint)) return 'medium';
-  if (isBulkWrite(hint)) return 'high';
-
-  const noteAction = noteEditAction(hint);
-  if (noteAction === 'rewrite') return 'high';
-  if (noteAction === 'replace') return 'medium';
-  if (noteAction === 'append') return 'low';
-
-  switch (hint.toolName) {
-    case 'create_task':
-    case 'set_today':
-    case 'update_identity':
-    case 'update_memory':
-    case 'write_journal':
-      return 'low';
-
-    case 'update_task':
-      return 'low';
-
-    case 'move_task':
-    case 'complete_task':
-      return 'medium';
-
-    case 'parse_notes':
-      return 'low';
-
-    default:
-      return 'low';
-  }
+  return 'low';
 };
 
 export const requiresHardConfirmation = (hint: ToolRiskHint): boolean => {
@@ -137,29 +96,13 @@ export const evaluateGate = (
   hardOverride: boolean,
 ): GateDecision => {
   if (hardOverride) {
-    return {
-      action: 'pending',
-      reason: 'This action requires confirmation.',
-    };
+    return { action: 'pending', reason: 'Confirm delete?' };
   }
-
-  switch (mode) {
-    case 'manual':
-      return { action: 'pending', reason: 'Approval needed in manual mode.' };
-
-    case 'safe':
-      if (risk === 'low') return { action: 'execute' };
-      return {
-        action: 'pending',
-        reason: 'Approval needed.',
-      };
-
-    case 'autopilot':
-      return { action: 'execute' };
-
-    default:
-      return { action: 'pending', reason: 'Unknown mode: defaulting to pending.' };
+  if (mode === 'confirm') {
+    return { action: 'pending', reason: 'Approval needed.' };
   }
+  // mode === 'auto'
+  return { action: 'execute' };
 };
 
 // ─── Pending action queue persistence ────────────────────────
@@ -173,7 +116,7 @@ const pendingActionSchema = z.object({
   requiresHardConfirmation: z.boolean(),
   createdAt: z.string(),
   requestId: z.string().optional(),
-  modeAtCreation: z.enum(['manual', 'safe', 'autopilot']),
+  modeAtCreation: z.enum(['auto', 'confirm', 'manual', 'safe', 'autopilot']),
   lifecycle: z.literal('pending'),
 });
 
@@ -256,17 +199,10 @@ export const getPendingAction = (actionId: string): PendingAction | null => {
 // ─── Non-mutation tools (skip autonomy gating) ──────────────
 
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
-  'suggest_daily_plan',
-  'read_journal',
   'read_note',
-  'search_journal',
-  'search_chat_history',
   'emit_chips',
-  'improve_task',
   'undo_last_action',
   'list_tasks',
-  'get_task',
-  'fetch_url',
 ]);
 
 export const isMutationTool = (toolName: string): boolean =>

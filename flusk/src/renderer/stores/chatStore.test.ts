@@ -55,8 +55,8 @@ const createMockChatApi = () => {
       mode,
     })),
 
-    getAutonomyMode: vi.fn(async () => ({ mode: 'safe' as const })),
-    setAutonomyMode: vi.fn(async ({ mode }: { mode: 'manual' | 'safe' | 'autopilot' }) => ({
+    getAutonomyMode: vi.fn(async () => ({ mode: 'auto' as const })),
+    setAutonomyMode: vi.fn(async ({ mode }: { mode: 'auto' | 'confirm' }) => ({
       mode,
     })),
     resolvePendingAction: vi.fn(),
@@ -93,7 +93,7 @@ describe('chatStore stream reliability', () => {
       lastStreamError: null,
       unsubscribeStream: undefined,
       unsubscribeFocusMessage: undefined,
-      autonomyMode: 'safe',
+      autonomyMode: 'auto',
       pendingActions: [],
       pendingImages: [],
       processingImageCount: 0,
@@ -340,16 +340,16 @@ describe('chatStore stream reliability', () => {
     useChatStore.getState().applyStreamEvent({
       type: 'tool_call_completed',
       requestId: 'req-auto-1',
-      toolName: 'set_today',
+      toolName: 'update_task',
       toolCallId: 'tc-2',
       status: 'success',
-      message: 'Task added to Today',
+      message: 'Task updated',
       actionCard: {
         id: 'card-auto-2',
-        toolName: 'set_today',
+        toolName: 'update_task',
         status: 'success',
-        title: 'Task added to Today',
-        detail: 'Added to Today',
+        title: 'Task updated',
+        detail: 'Updated task',
         undoable: true,
         createdAt: now,
         viewIntent: 'today',
@@ -566,37 +566,6 @@ describe('chatStore stream reliability', () => {
 
     expect(textSteps).toHaveLength(1);
     expect((textSteps[0] as Extract<TurnStep, { kind: 'text' }>)?.content).toBe('Repeated summary.');
-  });
-
-  it('marks the related assistant message when memory_updated arrives', () => {
-    const now = new Date().toISOString();
-    useChatStore.setState({
-      messages: [
-        {
-          id: 'assistant-memory-1',
-          conversationId: 'thread-1',
-          role: 'assistant',
-          content: 'Done.',
-          createdAt: now,
-          actionCards: [],
-          steps: [],
-        },
-      ],
-      assistantMessageIdByRequestId: {
-        'req-memory-1': 'assistant-memory-1',
-      },
-    });
-
-    useChatStore.getState().applyStreamEvent({
-      type: 'memory_updated',
-      requestId: 'req-memory-1',
-    });
-
-    const updatedMessage = useChatStore
-      .getState()
-      .messages.find((message) => message.id === 'assistant-memory-1');
-
-    expect(updatedMessage?.memoryUpdated).toBe(true);
   });
 
   it('accumulates reasoning events into a thinking step', () => {
