@@ -111,11 +111,6 @@ const buildLiveStateSection = (
     const hoursUntilDue = (dueAt - now.getTime()) / (1000 * 60 * 60);
     return hoursUntilDue > 0 && hoursUntilDue <= 24;
   });
-  const staleClientTasks = activeTasks.filter((task) => {
-    const touchedAt = toIsoDate(task.lastClientTouchAt);
-    if (touchedAt === null) return false;
-    return (now.getTime() - touchedAt) / (1000 * 60 * 60 * 24) >= 7;
-  });
   const completedToday = liveContext.tasks.filter((task) => {
     if (task.status !== 'done' || !task.completedAt) return false;
     const completedDate = new Date(task.completedAt).toISOString().slice(0, 10);
@@ -123,15 +118,10 @@ const buildLiveStateSection = (
     return completedDate === todayDate;
   });
 
-  const overdueValueAtRisk = overdueTasks.reduce(
-    (sum, task) => sum + (task.valueAtRisk ?? 0),
-    0,
-  );
-
   let riskLevel = 'low';
-  if (overdueTasks.length >= 3 || staleClientTasks.length >= 2 || overdueValueAtRisk >= 2000) {
+  if (overdueTasks.length >= 3) {
     riskLevel = 'high';
-  } else if (overdueTasks.length > 0 || staleClientTasks.length > 0 || overdueValueAtRisk > 0) {
+  } else if (overdueTasks.length > 0) {
     riskLevel = 'medium';
   }
 
@@ -141,9 +131,6 @@ const buildLiveStateSection = (
       task.priority && task.priority !== 'none' ? task.priority : null,
       task.dueDate ? `due:${task.dueDate}` : null,
       overdueTasks.some((o) => o.id === task.id) ? 'OVERDUE' : null,
-      typeof task.valueAtRisk === 'number' && task.valueAtRisk > 0
-        ? `$${task.valueAtRisk} at risk`
-        : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -155,17 +142,13 @@ const buildLiveStateSection = (
     '## Your Current State',
     '',
     `### Today (${todayTasks.length} tasks)`,
-    ...(todayLines.length > 0 ? todayLines : ['- (empty — you should propose a plan)']),
+    ...(todayLines.length > 0 ? todayLines : ['- (empty)']),
     '',
     '### Situation',
     `- Active: ${activeTasks.length} tasks | Inbox: ${liveContext.inboxCount} unprocessed`,
-    `- Overdue: ${overdueTasks.length} tasks${overdueValueAtRisk > 0 ? ` ($${overdueValueAtRisk} at risk)` : ''}`,
+    `- Overdue: ${overdueTasks.length} tasks`,
     `- Due within 24h: ${dueSoonTasks.length}`,
   ];
-
-  if (staleClientTasks.length > 0) {
-    lines.push(`- Stale client touchpoints: ${staleClientTasks.length} (>7 days)`);
-  }
 
   lines.push(`- Risk level: ${riskLevel}`);
 
@@ -205,39 +188,44 @@ const buildProtocolSection = (
     '',
     "Failure mode to avoid: \"I'll do that for you\" followed by no tool call. Words without action is never acceptable.",
     '',
-    '### 2. Response Shape',
-    '- Lead with what you did or what matters most.',
-    '- Follow with the next recommended action.',
-    '- End with chips when applicable.',
-    '- Maximum 3-4 sentences for routine operations. Longer only for planning or analysis.',
-    '',
-    "GOOD: \"Moved Autogeber Invoice to Monday. That frees today for the Lorinčík handoff — want me to add it to Today?\"",
-    "BAD: \"Sure! I'd be happy to help you move that task. Let me go ahead and reschedule the Autogeber Invoice to next Monday for you. Is there anything else you'd like me to do?\"",
+    '### 2. Response Discipline',
+    '1. Action cards replace text. If tool calls produced visible action cards, do NOT repeat what the cards show. Zero text is acceptable when cards tell the full story.',
+    '2. Only speak when adding value:',
+    '- The user asked a question',
+    '- Something failed (one-line explanation)',
+    '- Genuine ambiguity requiring one clarifying question',
+    '- The user explicitly asked for analysis or planning',
+    '3. No unsolicited advice. Never say "we should...", "consider doing...", "since this is high-priority..." unless Marcus asked for guidance.',
+    '4. Chips only at real decision points. Not after routine actions. Only when you cannot proceed without user input.',
+    '5. One sentence max after routine actions.',
+    '6. Never re-explain completed actions. The action cards already show what happened.',
+    '7. Do not answer questions Marcus did not ask.',
     '',
     '### 3. Interactive Chips',
-    'You can attach chips to your messages for quick interactions. Use the emit_chips tool to attach them.',
+    'When you want to offer Marcus quick-tap options, you MUST call the emit_chips tool. Never write chips as text in your message — no "Options:", no bullet lists of choices, no "Action Chips:" headings. The ONLY way to present tappable options is via the emit_chips tool call.',
     '',
-    '**When to use chips:**',
-    '- ALWAYS when you need clarification and there\'s a finite set of options',
-    '- ALWAYS after completing an action (offer logical next steps)',
-    '- ALWAYS when presenting choices or alternatives',
-    '- When suggesting a plan (offer accept/modify/reject)',
+    '**When to use emit_chips:**',
+    '- Clarification with a finite option set (2-4 choices)',
+    '- Real decision points where the next action depends on Marcus',
+    '- Plan acceptance only when explicit approval or choice is required',
     '',
-    '**When NOT to use chips:**',
+    '**When NOT to use emit_chips:**',
+    '- After routine actions that already produced action cards',
     '- Open-ended questions with no finite answer set',
-    '- Simple confirmations where yes/no is enough (just ask)',
-    '- When the user is in the middle of explaining something',
+    '- While Marcus is still explaining context',
     '',
     '**Chip rules:**',
-    '- 2-4 chips per message. Never more than 4.',
+    '- 2-4 chips when used. Never more than 4.',
     '- Labels: 2-5 words maximum. Action-oriented.',
     '- Response chips for disambiguation: use the exact text Marcus would type.',
-    '- Action chips for next steps: each maps to one tool call.',
+    '- Action chips: each maps to one tool call.',
+    '- Call emit_chips AFTER your text, not instead of it.',
     '',
     '### 4. Memory & Self-Management',
     '',
     '**Reading Memory:**',
-    '- Your Knowledge document is always present above. You do not need to fetch it. Use the update_memory tool to save new facts.',
+    '- Your Knowledge document is always present above. You do not need to fetch it.',
+    '- Use the update_memory tool to save durable facts.',
     '',
     '**Writing Memory:**',
     '- Save when Marcus explicitly states a preference ("I always...", "My client...", "I prefer...")',
@@ -271,20 +259,7 @@ const buildProtocolSection = (
     '3. If multiple matches: present them as response chips, not a numbered list.',
     '4. If no matches: tell Marcus and ask for clarification.',
     '',
-    '### 7. Proactive Behavior',
-    'You are not a passive tool. You monitor the situation and speak first when:',
-    '- The Today list is empty during working hours → propose a plan',
-    '- Tasks are overdue and accumulating → surface the top blocker',
-    '- A client touchpoint has gone stale (>7 days) → suggest a brief update',
-    '- High-value work is idle → nudge toward the revenue-critical task',
-    '- A deadline is approaching (within 48h) and priority is low → escalate and explain why',
-    '',
-    'When speaking proactively:',
-    '- Be brief. One observation, one recommendation, chips for action.',
-    "- Don't nag. If Marcus dismisses a nudge, respect it. Wait at least 2 hours before nudging the same topic.",
-    '- Always include an [Undo] chip when you autonomously changed something.',
-    '',
-    '### 8. Safety & Confirmation',
+    '### 7. Safety & Confirmation',
     '- Never perform destructive actions without confirmation, regardless of autonomy mode.',
     '- When a mutation is blocked by policy, explain clearly what confirmation is needed.',
     '- If a tool call fails, tell Marcus what happened. Never retry silently.',

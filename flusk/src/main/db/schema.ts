@@ -3,7 +3,6 @@ import {
   sqliteTable,
   text,
   integer,
-  real,
   index,
 } from 'drizzle-orm/sqlite-core';
 
@@ -33,11 +32,6 @@ export const tasks = sqliteTable(
     effort: text('effort', {
       enum: ['unknown', 'tiny', 'small', 'medium', 'deep'],
     }).default('unknown'),
-    invoiceStatus: text('invoice_status', {
-      enum: ['none', 'draft', 'sent', 'paid', 'overdue'],
-    }),
-    valueAtRisk: real('value_at_risk'),
-    lastClientTouchAt: text('last_client_touch_at'),
     recurrence: text('recurrence'),
     recurrenceSourceId: text('recurrence_source_id'),
     order: integer('order').default(0),
@@ -74,19 +68,50 @@ export const notes = sqliteTable(
 );
 
 // ─── chat_messages ──────────────────────────────────────────
+export const conversations = sqliteTable(
+  'conversations',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    title: text('title').notNull().default('New Thread'),
+    isAutoTitle: integer('is_auto_title', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString()),
+    archivedAt: text('archived_at'),
+  },
+  (table) => [
+    index('conversations_updated_at_idx').on(table.updatedAt),
+    index('conversations_archived_at_idx').on(table.archivedAt),
+  ],
+);
+
 export const chatMessages = sqliteTable(
   'chat_messages',
   {
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
+    conversationId: text('conversation_id').references(
+      () => conversations.id,
+      { onDelete: 'cascade', onUpdate: 'cascade' },
+    ),
     role: text('role', { enum: ['user', 'assistant'] }).notNull(),
     content: text('content').notNull(),
     toolCalls: text('tool_calls'),
     chips: text('chips'),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
   },
-  (table) => [index('chat_messages_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('chat_messages_created_at_idx').on(table.createdAt),
+    index('chat_messages_conversation_id_idx').on(table.conversationId),
+    index('chat_messages_conversation_id_created_at_idx').on(
+      table.conversationId,
+      table.createdAt,
+    ),
+  ],
 );
 
 // ─── task_events ────────────────────────────────────────────
@@ -176,6 +201,9 @@ export type NewTask = typeof tasks.$inferInsert;
 
 export type Note = typeof notes.$inferSelect;
 export type NewNote = typeof notes.$inferInsert;
+
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;

@@ -33,9 +33,6 @@ vi.mock('../services/taskService', () => {
     dueDate: z.string().nullable().optional(),
     dueType: z.enum(['hard', 'soft']).nullable().optional(),
     effort: z.enum(['unknown', 'tiny', 'small', 'medium', 'deep']).optional(),
-    invoiceStatus: z.enum(['none', 'draft', 'sent', 'paid', 'overdue']).nullable().optional(),
-    valueAtRisk: z.number().nullable().optional(),
-    lastClientTouchAt: z.string().nullable().optional(),
     order: z.number().optional(),
   });
 
@@ -209,6 +206,50 @@ describe('create_task tool', () => {
       expect(result.output.actionCard?.viewIntent).toBe('today');
     }
   });
+
+  it('skips duplicate mutation calls within the same turn context', async () => {
+    isMutationToolMock.mockReturnValue(true);
+    createTaskMock.mockReturnValue({
+      id: 'task-dup-1',
+      title: 'Pupava Ice Arena (Lead)',
+      status: 'active',
+      today: false,
+      priority: 'medium',
+      dueDate: null,
+      client: null,
+    } as never);
+    getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-dup-1' } as never);
+
+    const mutationSignatures = new Set<string>();
+
+    const first = await executeToolCall(
+      {
+        name: 'create_task',
+        input: {
+          title: 'Pupava Ice Arena (Lead)',
+          priority: 'medium',
+        },
+      },
+      { mutationSignatures },
+    );
+    const second = await executeToolCall(
+      {
+        name: 'create_task',
+        input: {
+          title: 'Pupava Ice Arena (Lead)',
+          priority: 'medium',
+        },
+      },
+      { mutationSignatures },
+    );
+
+    expect(createTaskMock).toHaveBeenCalledTimes(1);
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (second.ok) {
+      expect(second.output.message).toContain('Skipped duplicate create_task call in the same turn.');
+    }
+  });
 });
 
 describe('emit_chips tool', () => {
@@ -248,6 +289,43 @@ describe('emit_chips tool', () => {
   });
 });
 
+describe('suggest_daily_plan tool', () => {
+  it('returns an action card and today view intent', async () => {
+    listTasksMock.mockReturnValue([
+      {
+        id: 'task-plan-1',
+        title: 'Finish proposal',
+        status: 'active',
+        today: true,
+        priority: 'high',
+        dueDate: '2026-02-20',
+      },
+    ] as never);
+
+    const result = await executeToolCall({
+      name: 'suggest_daily_plan',
+      input: { maxTasks: 5 },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+      expect(result.output.actionCard?.toolName).toBe('suggest_daily_plan');
+      expect(result.output.actionCard?.viewIntent).toBe('today');
+      expect(result.output.data).toEqual({
+        suggestions: [
+          {
+            rank: 1,
+            taskId: 'task-plan-1',
+            title: 'Finish proposal',
+            reason: 'already on today list, due 2026-02-20, priority high',
+          },
+        ],
+      });
+    }
+  });
+});
+
 describe('view intent mapping', () => {
   it('maps update_task to inbox view when resulting task is in inbox', async () => {
     getTaskByIdMock.mockReturnValue({
@@ -255,7 +333,6 @@ describe('view intent mapping', () => {
       title: 'Follow up with client',
       status: 'active',
       today: false,
-      invoiceStatus: 'none',
     } as never);
     updateTaskMock.mockReturnValue({
       id: 'task-upd-1',
@@ -265,7 +342,6 @@ describe('view intent mapping', () => {
       priority: 'none',
       dueDate: null,
       client: null,
-      invoiceStatus: 'none',
     } as never);
     getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-upd-1' } as never);
 
@@ -292,7 +368,6 @@ describe('view intent mapping', () => {
       priority: 'none',
       dueDate: null,
       client: null,
-      invoiceStatus: 'none',
     } as never);
     listTasksMock.mockReturnValue([] as never);
     completeTaskMock.mockReturnValue({

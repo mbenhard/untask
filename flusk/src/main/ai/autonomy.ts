@@ -65,12 +65,6 @@ type ToolRiskHint = {
 
 const HARD_OVERRIDE_TOOLS: ReadonlySet<string> = new Set(['delete_task']);
 
-const isInvoiceRisk = (hint: ToolRiskHint): boolean => {
-  if (hint.toolName !== 'update_task') return false;
-  const status = hint.input.invoiceStatus;
-  return status === 'paid' || status === 'overdue';
-};
-
 const isCompletedRewrite = (hint: ToolRiskHint): boolean => {
   if (hint.toolName !== 'update_task') return false;
   return hint.input._beforeStatus === 'done';
@@ -95,7 +89,6 @@ const noteEditAction = (
 
 export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return 'critical';
-  if (isInvoiceRisk(hint)) return 'critical';
   if (isCompletedRewrite(hint)) return 'critical';
   if (isBulkWrite(hint)) return 'high';
 
@@ -129,7 +122,6 @@ export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
 
 export const requiresHardConfirmation = (hint: ToolRiskHint): boolean => {
   if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return true;
-  if (isInvoiceRisk(hint)) return true;
   if (isCompletedRewrite(hint)) return true;
   if (isBulkWrite(hint)) return true;
   return false;
@@ -269,9 +261,8 @@ const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'suggest_daily_plan',
   'read_journal',
   'read_note',
-  'read_memory',
-  'search_memory',
   'search_journal',
+  'search_chat_history',
   'emit_chips',
   'improve_task',
   'undo_last_action',

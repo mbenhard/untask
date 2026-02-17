@@ -45,6 +45,7 @@ import {
   writeJournalEntrySchema,
 } from '../services/journalService';
 import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../services/notesService';
+import { searchChatMessages } from '../services/searchService';
 import {
   estimateTokens,
   getIdentity,
@@ -91,11 +92,6 @@ const sortPlanningTasks = (
     priorityScore[left.priority ?? 'none'] - priorityScore[right.priority ?? 'none'];
   if (priorityDiff !== 0) {
     return priorityDiff;
-  }
-
-  const valueDiff = (right.valueAtRisk ?? 0) - (left.valueAtRisk ?? 0);
-  if (valueDiff !== 0) {
-    return valueDiff;
   }
 
   return left.title.localeCompare(right.title);
@@ -244,6 +240,7 @@ type ToolExecutionContext = {
   autonomyBypass?: boolean;
   skipInternalConfirmation?: boolean;
   activeNoteId?: string;
+  mutationSignatures?: Set<string>;
 };
 
 type ToolInputSchema = z.ZodTypeAny;
@@ -312,6 +309,28 @@ const successResult = (
   };
 };
 
+const normalizeSignatureValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeSignatureValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    const normalized: Record<string, unknown> = {};
+    Object.keys(objectValue)
+      .sort((left, right) => left.localeCompare(right))
+      .forEach((key) => {
+        normalized[key] = normalizeSignatureValue(objectValue[key]);
+      });
+    return normalized;
+  }
+
+  return value;
+};
+
+const buildMutationSignature = (toolName: string, input: unknown): string =>
+  `${toolName}:${JSON.stringify(normalizeSignatureValue(input))}`;
+
 const createTaskToolInputSchema = createTaskSchema.strict();
 const completeTaskToolInputSchema = z.object({
   id: z.string().min(1),
@@ -355,6 +374,12 @@ const searchJournalInputSchema = z.object({
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
   limit: z.number().int().min(1).max(50).default(20),
+});
+const searchChatHistoryInputSchema = z.object({
+  query: z.string().min(1),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  limit: z.number().int().min(1).max(50).default(10),
 });
 const emitChipsInputSchema = z.object({
   chips: z.array(z.object({
@@ -454,7 +479,7 @@ const createTaskTool = {
 
 const updateTaskTool = {
   name: 'update_task',
-  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, client, notes, invoice fields, or recurrence. Requires the task id. dueDate supports date "2026-02-17" or date+time "2026-02-17T14:30". recurrence accepts rules like "daily", "weekly", "monthly", "every monday", "every 2 weeks". Set recurrence to null to remove. High-risk changes (invoice transitions, rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
+  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, client, notes, or recurrence. Requires the task id. dueDate supports date "2026-02-17" or date+time "2026-02-17T14:30". recurrence accepts rules like "daily", "weekly", "monthly", "every monday", "every 2 weeks". Set recurrence to null to remove. High-risk changes (rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
   schema: updateTaskSchema.strict(),
   execute: async (input, context) => {
     const before = getTaskById(input.id);
@@ -464,20 +489,6 @@ const updateTaskTool = {
     }
 
     if (!context.skipInternalConfirmation) {
-      const isInvoiceRisk =
-        (input.invoiceStatus === 'paid' || input.invoiceStatus === 'overdue') &&
-        input.invoiceStatus !== before.invoiceStatus;
-
-      if (isInvoiceRisk) {
-        return confirmationRequired(
-          context,
-          'update_task',
-          'Confirmation required',
-          'Invoice transitions to paid/overdue require confirmation.',
-          { taskId: before.id },
-        );
-      }
-
       if (before.status === 'done') {
         return confirmationRequired(
           context,
@@ -702,9 +713,9 @@ const setTodayTool = {
 const suggestDailyPlanTool = {
   name: 'suggest_daily_plan',
   description:
-    'Generate a focused daily plan. Use when the user asks to plan their day, prioritize work, or figure out what to focus on. Ranks tasks by Today list membership, due date proximity, priority level, and value-at-risk. Returns up to maxTasks suggestions (default 5, max 8).',
+    'Generate a focused daily plan. Use when the user asks to plan their day, prioritize work, or figure out what to focus on. Ranks tasks by Today list membership, due date proximity, and priority level. Returns up to maxTasks suggestions (default 5, max 8).',
   schema: suggestDailyPlanInputSchema,
-  execute: async (input) => {
+  execute: async (input, context) => {
     const activeTasks = listTasks().filter((task) => task.status !== 'done');
     const planned = [...activeTasks].sort(sortPlanningTasks).slice(0, input.maxTasks);
 
@@ -716,24 +727,27 @@ const suggestDailyPlanTool = {
         task.today ? 'already on today list' : null,
         task.dueDate ? `due ${task.dueDate}` : null,
         task.priority ? `priority ${task.priority}` : null,
-        typeof task.valueAtRisk === 'number' && task.valueAtRisk > 0
-          ? `$${task.valueAtRisk} at risk`
-          : null,
       ]
         .filter(Boolean)
         .join(', '),
     }));
 
-    return {
-      status: 'success',
-      message:
-        suggestions.length > 0
-          ? `Suggested ${suggestions.length} focus tasks for today.`
-          : 'No active tasks available for planning.',
-      data: {
-        suggestions,
+    const detail =
+      suggestions.length > 0
+        ? `Suggested ${suggestions.length} focus tasks for today.`
+        : 'No active tasks available for planning.';
+
+    return successResult(
+      context,
+      'suggest_daily_plan',
+      'Daily plan suggested',
+      detail,
+      { suggestions },
+      {
+        undoable: false,
+        viewIntent: 'today',
       },
-    };
+    );
   },
 } satisfies ToolRegistryEntry<'suggest_daily_plan', typeof suggestDailyPlanInputSchema>;
 
@@ -1111,9 +1125,29 @@ const searchJournalTool = {
   },
 } satisfies ToolRegistryEntry<'search_journal', typeof searchJournalInputSchema>;
 
+const searchChatHistoryTool = {
+  name: 'search_chat_history',
+  description: 'Search full chat history across all threads using keywords with optional date range. Returns matching messages with thread title, role, timestamp, and context snippet. Use when recalling prior decisions or locating past details.',
+  schema: searchChatHistoryInputSchema,
+  execute: async (input) => {
+    const result = searchChatMessages({
+      query: input.query,
+      dateFrom: input.dateFrom,
+      dateTo: input.dateTo,
+      limit: input.limit,
+    });
+
+    return {
+      status: 'success',
+      message: `Found ${result.results.length} chat message${result.results.length === 1 ? '' : 's'} matching "${input.query}".`,
+      data: result,
+    };
+  },
+} satisfies ToolRegistryEntry<'search_chat_history', typeof searchChatHistoryInputSchema>;
+
 const emitChipsTool = {
   name: 'emit_chips',
-  description: 'Attach interactive chips to your current message. Response chips let Marcus answer with a tap instead of typing. Action chips execute a tool call on tap. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
+  description: 'Attach interactive chips to your current message. This is the ONLY way to present tappable options — never write options as text bullets or numbered lists. Response chips let Marcus answer with a tap instead of typing. Action chips execute a tool call on tap. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
   schema: emitChipsInputSchema,
   execute: async (input) => {
     const normalizedChips = normalizeChipActions(input.chips as ChipAction[]);
@@ -1205,7 +1239,7 @@ const listTasksTool = {
 
 const getTaskTool = {
   name: 'get_task',
-  description: 'Fetch full details of a single task by ID. Returns all task fields (body, notes, invoice fields, timestamps) plus child subtasks. Use when you need complete context before acting on a task.',
+  description: 'Fetch full details of a single task by ID. Returns all task fields (body, notes, timestamps) plus child subtasks. Use when you need complete context before acting on a task.',
   schema: getTaskToolInputSchema,
   execute: async (input) => {
     const task = getTaskById(input.id);
@@ -1482,6 +1516,7 @@ export const AI_TOOL_REGISTRY = {
   update_identity: updateIdentityTool,
   update_memory: updateMemoryTool,
   search_journal: searchJournalTool,
+  search_chat_history: searchChatHistoryTool,
   emit_chips: emitChipsTool,
   improve_task: improveTaskTool,
   list_tasks: listTasksTool,
@@ -1617,9 +1652,29 @@ export const executeToolCall = async (
     };
   }
 
+  const mutationCall = isMutationTool(rawToolName);
+  const mutationSignature = mutationCall
+    ? buildMutationSignature(rawToolName, parsed.data)
+    : null;
+
+  if (
+    mutationCall &&
+    mutationSignature &&
+    context.mutationSignatures?.has(mutationSignature)
+  ) {
+    return {
+      ok: true,
+      toolName: rawToolName,
+      output: {
+        status: 'success',
+        message: `Skipped duplicate ${rawToolName} call in the same turn.`,
+      },
+    };
+  }
+
   // ─── Autonomy gate ─────────────────────────────────────
   let gateApproved = false;
-  if (!context.autonomyBypass && isMutationTool(rawToolName)) {
+  if (!context.autonomyBypass && mutationCall) {
     const hint = buildRiskHint(rawToolName, parsed.data as Record<string, unknown>);
     const risk = classifyRisk(hint);
     const hardOverride = requiresHardConfirmation(hint);
@@ -1649,6 +1704,9 @@ export const executeToolCall = async (
         },
       );
       emitActionCard(context, actionCard);
+      if (mutationSignature) {
+        context.mutationSignatures?.add(mutationSignature);
+      }
 
       return {
         ok: true,
@@ -1671,6 +1729,9 @@ export const executeToolCall = async (
 
   try {
     const output = await definition.execute(parsed.data, execContext);
+    if (mutationSignature) {
+      context.mutationSignatures?.add(mutationSignature);
+    }
 
     return {
       ok: true,

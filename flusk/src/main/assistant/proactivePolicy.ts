@@ -24,8 +24,6 @@ type TriggerCandidate = {
 
 const TRIGGER_COOLDOWNS: TriggerCooldownConfig[] = [
   { trigger: 'overdue_accumulation', cooldownMinutes: 120 },
-  { trigger: 'value_at_risk_idle', cooldownMinutes: 180 },
-  { trigger: 'stale_client_touchpoint', cooldownMinutes: 180 },
   { trigger: 'empty_today_list', cooldownMinutes: 90 },
 ];
 
@@ -93,46 +91,6 @@ const overdueTasks = (
     return dueAt !== null && dueAt < nowMs;
   });
 
-const staleClientTasks = (
-  tasks: Task[],
-  nowMs: number,
-): Task[] =>
-  tasks.filter((task) => {
-    if (!task.client) {
-      return false;
-    }
-
-    const touchedAt = parseDate(task.lastClientTouchAt);
-
-    if (touchedAt === null) {
-      return false;
-    }
-
-    const ageDays = (nowMs - touchedAt) / (1000 * 60 * 60 * 24);
-    return ageDays >= 7;
-  });
-
-const valueAtRiskIdleTasks = (
-  tasks: Task[],
-  nowMs: number,
-): Task[] =>
-  tasks.filter((task) => {
-    const value = task.valueAtRisk ?? 0;
-
-    if (value < 1000) {
-      return false;
-    }
-
-    const touchedAt = parseDate(task.lastClientTouchAt);
-
-    if (touchedAt === null) {
-      return true;
-    }
-
-    const ageDays = (nowMs - touchedAt) / (1000 * 60 * 60 * 24);
-    return ageDays >= 5;
-  });
-
 const buildCandidates = (
   liveContext: AssistantLiveContext,
   now: Date,
@@ -141,12 +99,6 @@ const buildCandidates = (
   const tasks = activeTasks(liveContext.tasks);
   const todayTasks = tasks.filter((task) => task.today);
   const overdue = overdueTasks(tasks, nowMs);
-  const stale = staleClientTasks(tasks, nowMs);
-  const valueRiskIdle = valueAtRiskIdleTasks(tasks, nowMs);
-  const overdueValueAtRisk = overdue.reduce(
-    (sum, task) => sum + (task.valueAtRisk ?? 0),
-    0,
-  );
 
   const candidates: TriggerCandidate[] = [];
 
@@ -165,50 +117,17 @@ const buildCandidates = (
     });
   }
 
-  if (overdue.length >= 2 || overdueValueAtRisk >= 1500) {
+  if (overdue.length >= 2) {
     candidates.push({
       trigger: 'overdue_accumulation',
       score: 0.85 + Math.min(0.12, overdue.length * 0.03),
       severity: 'high',
-      message: `Overdue tasks are accumulating (${overdue.length}) with $${overdueValueAtRisk} value at risk. Triage the top blocker first.`,
+      message: `Overdue tasks are accumulating (${overdue.length}). Triage the top blocker first.`,
       actions: [
         { label: 'Show overdue', command: 'show_overdue' },
         { label: 'Create recovery plan', command: 'suggest_daily_plan' },
       ],
-      reason: 'multiple overdue tasks or high overdue value at risk',
-    });
-  }
-
-  if (stale.length > 0) {
-    candidates.push({
-      trigger: 'stale_client_touchpoint',
-      score: 0.62 + Math.min(0.12, stale.length * 0.04),
-      severity: stale.length >= 2 ? 'high' : 'medium',
-      message: `${stale.length} client touchpoint${stale.length > 1 ? 's are' : ' is'} stale. Send one concise update to reduce risk.`,
-      actions: [
-        { label: 'Draft client update', command: 'draft_client_update' },
-        { label: 'List stale clients', command: 'show_stale_clients' },
-      ],
-      reason: 'client communication has been stale for at least 7 days',
-    });
-  }
-
-  if (valueRiskIdle.length > 0) {
-    const totalValue = valueRiskIdle.reduce(
-      (sum, task) => sum + (task.valueAtRisk ?? 0),
-      0,
-    );
-
-    candidates.push({
-      trigger: 'value_at_risk_idle',
-      score: 0.72 + Math.min(0.15, totalValue / 10000),
-      severity: totalValue >= 3000 ? 'high' : 'medium',
-      message: `$${totalValue} of value-at-risk work is idle. Advance one revenue-critical task now.`,
-      actions: [
-        { label: 'Focus revenue task', command: 'prioritize_value_at_risk' },
-        { label: 'Set today task', command: 'set_today' },
-      ],
-      reason: 'high value-at-risk tasks have no recent touchpoint',
+      reason: 'multiple overdue tasks',
     });
   }
 
@@ -256,8 +175,6 @@ export const evaluateProactiveTriggerPolicy = (
   const allTriggers: ProactiveTriggerType[] = [
     'empty_today_list',
     'overdue_accumulation',
-    'stale_client_touchpoint',
-    'value_at_risk_idle',
   ];
 
   for (const trigger of allTriggers) {

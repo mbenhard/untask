@@ -18,9 +18,6 @@ const makeTask = (overrides: Partial<Task> = {}): Task => ({
   dueDate: overrides.dueDate ?? null,
   dueType: null,
   effort: 'unknown',
-  invoiceStatus: null,
-  valueAtRisk: overrides.valueAtRisk ?? null,
-  lastClientTouchAt: overrides.lastClientTouchAt ?? null,
   recurrence: null,
   recurrenceSourceId: null,
   order: 0,
@@ -39,8 +36,8 @@ describe('evaluateProactiveTriggers', () => {
   it('prioritizes overdue accumulation for high overdue risk', () => {
     const now = Date.parse('2026-02-16T12:00:00.000Z');
     const tasks = [
-      makeTask({ dueDate: new Date(now - 24 * 60 * 60 * 1000).toISOString(), valueAtRisk: 1000 }),
-      makeTask({ dueDate: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(), valueAtRisk: 800 }),
+      makeTask({ dueDate: new Date(now - 24 * 60 * 60 * 1000).toISOString() }),
+      makeTask({ dueDate: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString() }),
       makeTask({ dueDate: new Date(now + 12 * 60 * 60 * 1000).toISOString() }),
     ];
 

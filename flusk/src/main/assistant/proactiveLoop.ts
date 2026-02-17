@@ -21,8 +21,6 @@ const MAX_SETTIMEOUT_MS = 2_147_483_647; // 2^31 - 1 (~24.8 days)
 const COOLDOWN_CONFIG: Record<ProactiveTriggerType, number> = {
   morning_briefing: 24 * 60, // once per day
   overdue_accumulation: 120,
-  stale_client_touchpoint: 180,
-  value_at_risk_idle: 180,
   empty_today_list: 90,
   deadline_approaching: 240,
   time_reminder: Infinity, // per-task, handled separately
@@ -54,16 +52,6 @@ const TRIGGER_TEMPLATES: Record<ProactiveTriggerType, string> = {
     '[PROACTIVE TRIGGER: overdue_accumulation]\n' +
     'Overdue tasks are accumulating. Surface the top blocker, explain the risk, ' +
     'and propose one concrete next step. Include chips for quick triage.',
-
-  stale_client_touchpoint:
-    '[PROACTIVE TRIGGER: stale_client_touchpoint]\n' +
-    'One or more client touchpoints have gone stale (>7 days). Identify which ones, ' +
-    'assess the risk, and suggest a brief client update. Include chips.',
-
-  value_at_risk_idle:
-    '[PROACTIVE TRIGGER: value_at_risk_idle]\n' +
-    'High-value tasks are sitting idle. Identify the revenue-critical work that needs attention ' +
-    'and propose advancing it. Include chips.',
 
   empty_today_list:
     '[PROACTIVE TRIGGER: empty_today_list]\n' +
@@ -377,8 +365,6 @@ const triggerLabel = (trigger: ProactiveTriggerType): string => {
   switch (trigger) {
     case 'morning_briefing': return 'Morning Briefing';
     case 'overdue_accumulation': return 'Overdue Tasks';
-    case 'stale_client_touchpoint': return 'Client Follow-up';
-    case 'value_at_risk_idle': return 'Revenue at Risk';
     case 'empty_today_list': return 'Plan Your Day';
     case 'deadline_approaching': return 'Deadline Approaching';
     case 'time_reminder': return 'Reminder';

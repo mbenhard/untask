@@ -17,10 +17,6 @@ export type TaskCreateInput = {
   dueType?: Task['dueType'];
   // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   effort?: Task['effort'];
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
-  invoiceStatus?: Task['invoiceStatus'];
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
-  valueAtRisk?: number | null;
   order?: number;
 };
 
@@ -39,10 +35,6 @@ export type TaskUpdateInput = {
   dueType?: Task['dueType'];
   // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   effort?: Task['effort'];
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
-  invoiceStatus?: Task['invoiceStatus'];
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
-  valueAtRisk?: number | null;
   order?: number;
 };
 
@@ -128,9 +120,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       dueDate: input.dueDate ?? null,
       dueType: input.dueType ?? null,
       effort: input.effort ?? 'unknown',
-      invoiceStatus: input.invoiceStatus ?? null,
-      valueAtRisk: input.valueAtRisk ?? null,
-      lastClientTouchAt: null,
       recurrence: input.recurrence ?? null,
       recurrenceSourceId: null,
       order: nextOrder,

@@ -27,12 +27,6 @@ export type Task = {
   dueType: 'hard' | 'soft' | null;
   // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
   effort: 'unknown' | 'tiny' | 'small' | 'medium' | 'deep' | null;
-  // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
-  invoiceStatus: 'none' | 'draft' | 'sent' | 'paid' | 'overdue' | null;
-  // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
-  valueAtRisk: number | null;
-  // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
-  lastClientTouchAt: string | null;
   recurrence: string | null;
   recurrenceSourceId: string | null;
   order: number | null;
@@ -42,11 +36,21 @@ export type Task = {
 
 export type ChatMessage = {
   id: string;
+  conversationId: string | null;
   role: 'user' | 'assistant';
   content: string;
   toolCalls: string | null;
   chips: string | null;
   createdAt: string | null;
+};
+
+export type Conversation = {
+  id: string;
+  title: string;
+  isAutoTitle: boolean | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  archivedAt: string | null;
 };
 
 export type Note = {
