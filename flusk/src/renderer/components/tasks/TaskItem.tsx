@@ -183,7 +183,7 @@ export const TaskItem = ({
       tabIndex={isFocused ? 0 : -1}
       onFocus={onFocus}
       className={cn(
-        'overflow-hidden border-b border-border/40 outline-none transition-colors duration-100',
+        'overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
         isFocused && 'bg-accent/20',
         isDragging && 'z-10 opacity-80',
       )}

@@ -32,7 +32,6 @@ type ChatUiMessage = {
   steps: TurnStep[];
   imageCount?: number;
   chips?: ChipAction[];
-  chipsUsed?: boolean;
   memoryUpdated?: boolean;
 };
 
@@ -154,53 +153,17 @@ const normalizeChip = (raw: unknown): ChipAction | null => {
     return null;
   }
 
-  if (chip.type === 'response') {
-    const responseText = typeof chip.responseText === 'string'
-      ? chip.responseText.trim()
-      : typeof chip.response === 'string'
-        ? chip.response.trim()
-        : '';
+  const responseText = typeof chip.responseText === 'string'
+    ? chip.responseText.trim()
+    : typeof chip.response === 'string'
+      ? (chip.response as string).trim()
+      : '';
 
-    return {
-      label,
-      type: 'response',
-      responseText: responseText.length > 0 ? responseText : label,
-    };
-  }
-
-  if (chip.type === 'action') {
-    if (!chip.toolCall || typeof chip.toolCall !== 'object') {
-      return {
-        label,
-        type: 'action',
-      };
-    }
-
-    const toolCall = chip.toolCall as Record<string, unknown>;
-    const name = typeof toolCall.name === 'string' ? toolCall.name : '';
-    const args = toolCall.args;
-
-    if (name.length === 0) {
-      return {
-        label,
-        type: 'action',
-      };
-    }
-
-    return {
-      label,
-      type: 'action',
-      toolCall: {
-        name,
-        args:
-          args && typeof args === 'object' && !Array.isArray(args)
-            ? (args as Record<string, unknown>)
-            : {},
-      },
-    };
-  }
-
-  return null;
+  return {
+    label,
+    type: 'response',
+    responseText: responseText.length > 0 ? responseText : label,
+  };
 };
 
 const normalizeChips = (raw: unknown): ChipAction[] | undefined => {
@@ -751,10 +714,6 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const noteContext = get().pendingNoteContext ?? undefined;
       set({ pendingImages: [] });
 
-      if (get().isSending) {
-        return;
-      }
-
       const conversationId = await ensureActiveConversationId();
       await sendPreparedMessage(
         content,
@@ -1203,10 +1162,21 @@ export const useChatStore = create<ChatStore>((set, get) => {
         const pendingViewSwitch = get().pendingViewSwitchByRequestId[event.requestId];
 
         set((state) => {
+          const mapped = mapMessageToUi(event.assistantMessage);
+
+          // Guard: skip if this exact message ID is already in the array
+          // (defensive against duplicate events or race conditions)
+          const alreadyExists = state.messages.some((m) => m.id === mapped.id);
+          if (alreadyExists && !inFlight) {
+            // Message was already added (e.g., by the proactive fallback path)
+            const remaining = { ...state.inFlightByRequestId };
+            delete remaining[event.requestId];
+            return { inFlightByRequestId: remaining };
+          }
+
           const baseMessages = state.messages.filter(
             (message) => message.id !== inFlight?.placeholderId,
           );
-          const mapped = mapMessageToUi(event.assistantMessage);
           const finalizedSteps = collapseDuplicateTextSteps(inFlight?.steps ?? mapped.steps);
           const finalizedChips = event.chips ?? inFlight?.chips ?? mapped.chips;
           const finalizedAssistantMessage: ChatUiMessage = {
@@ -1233,8 +1203,12 @@ export const useChatStore = create<ChatStore>((set, get) => {
           };
           delete nextConversationIds[event.requestId];
 
+          const noMoreInFlight = Object.keys(remaining).length === 0;
+
           return {
-            messages: nextMessages,
+            messages: noMoreInFlight
+              ? nextMessages.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+              : nextMessages,
             inFlightByRequestId: remaining,
             pendingViewSwitchByRequestId: nextPendingViewSwitches,
             requestPayloadByRequestId: nextPayloads,
@@ -1243,7 +1217,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
               ...state.assistantMessageIdByRequestId,
               [event.requestId]: finalizedAssistantMessage.id,
             },
-            isSending: Object.keys(remaining).length > 0,
+            isSending: !noMoreInFlight,
             error: null,
             lastStreamError:
               state.lastStreamError?.requestId === event.requestId
@@ -1328,13 +1302,17 @@ export const useChatStore = create<ChatStore>((set, get) => {
             delete nextConversationIds[event.requestId];
           }
 
+          const noMoreInFlight = Object.keys(remaining).length === 0;
+
           return {
-            messages: nextMessages,
+            messages: noMoreInFlight
+              ? nextMessages.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+              : nextMessages,
             inFlightByRequestId: remaining,
             pendingViewSwitchByRequestId: nextPendingViewSwitches,
             requestPayloadByRequestId: nextPayloads,
             conversationIdByRequestId: nextConversationIds,
-            isSending: Object.keys(remaining).length > 0,
+            isSending: !noMoreInFlight,
             error: event.message,
             lastStreamError: {
               requestId: event.requestId,

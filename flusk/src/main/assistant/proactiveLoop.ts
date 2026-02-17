@@ -14,7 +14,7 @@ const MAX_SETTIMEOUT_MS = 2_147_483_647; // 2^31 - 1 (~24.8 days)
 
 const cooldownMap = new Map<string, number>();
 
-const isCooldownActive = (key: string, nowMs: number): boolean => {
+const isCooldownActive = (key: string): boolean => {
   return cooldownMap.has(key);
 };
 
@@ -162,7 +162,7 @@ export class ProactiveLoop {
 
       // Skip if already reminded for this task
       const cooldownKey = `time_reminder:${task.id}`;
-      if (isCooldownActive(cooldownKey, nowMs)) continue;
+      if (isCooldownActive(cooldownKey)) continue;
 
       const taskContext = { id: task.id, title: task.title };
       const timer = setTimeout(() => {

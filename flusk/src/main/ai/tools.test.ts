@@ -258,12 +258,8 @@ describe('emit_chips tool', () => {
       name: 'emit_chips',
       input: {
         chips: [
-          { label: 'Review Inbox now', type: 'response' },
-          {
-            label: 'Suggest daily plan',
-            type: 'action',
-            toolCall: { name: 'suggest_daily_plan', args: { maxTasks: 5 } },
-          },
+          { label: 'Review Inbox now' },
+          { label: 'Suggest daily plan', responseText: 'Please suggest a daily plan' },
         ],
       },
     });
@@ -280,8 +276,8 @@ describe('emit_chips tool', () => {
           },
           {
             label: 'Suggest daily plan',
-            type: 'action',
-            toolCall: { name: 'suggest_daily_plan', args: { maxTasks: 5 } },
+            type: 'response',
+            responseText: 'Please suggest a daily plan',
           },
         ],
       });

@@ -27,8 +27,6 @@ import {
   type ChatResolvePendingActionRequest,
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
-  type ChatExecuteChipActionRequest,
-  type ChatExecuteChipActionResponse,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -800,43 +798,6 @@ export const registerIpcHandlers = (): void => {
         };
       }
       catch (e) { console.error('[ipc] CHAT_RESOLVE_PENDING_ACTION:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.CHAT_EXECUTE_CHIP_ACTION,
-    async (_event, request: ChatExecuteChipActionRequest): Promise<ChatExecuteChipActionResponse> => {
-      try {
-        const toolName = request?.toolName;
-        const args = request?.args;
-
-        if (!toolName || typeof toolName !== 'string') {
-          return { ok: false, status: 'error', message: 'Missing tool name in chip action.' };
-        }
-
-        const result = await executeToolCall(
-          { name: toolName, input: args ?? {} },
-          { toolCallId: `chip-action-${Date.now()}` },
-        );
-
-        if (result.ok) {
-          return {
-            ok: true,
-            status: result.output.status,
-            message: result.output.message,
-            actionCard: result.output.actionCard,
-          };
-        }
-
-        return {
-          ok: false,
-          status: 'error',
-          message: result.error.message,
-        };
-      } catch (e) {
-        console.error('[ipc] CHAT_EXECUTE_CHIP_ACTION:', e);
-        throw e;
-      }
     },
   );
 

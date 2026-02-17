@@ -39,7 +39,7 @@ export const TitleBar = () => {
               type="button"
               onClick={() => setView(view)}
               className={cn(
-                'no-drag relative rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] transition-colors',
+                'no-drag relative rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] outline-none transition-colors',
                 isActive
                   ? 'bg-accent text-foreground'
                   : 'text-muted-foreground hover:text-foreground/80',

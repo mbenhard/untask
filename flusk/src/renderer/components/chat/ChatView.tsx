@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Image as ImageIcon, Loader2, Undo2, X, Zap } from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, Image as ImageIcon, Loader2, Undo2, X, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 
@@ -16,8 +16,6 @@ import {
   selectPendingNoteContext,
   useChatStore,
 } from '../../stores/chatStore';
-import { useTaskStore } from '../../stores/taskStore';
-import { getFlusk } from '../../lib/flusk';
 import { Button } from '../ui/button';
 
 const formatTimestamp = (createdAt: string | null): string => {
@@ -60,20 +58,37 @@ const ThinkingStep = ({ content, isStreaming }: ThinkingStepProps) => {
   const [expanded, setExpanded] = useState(isStreaming);
 
   return (
-    <div className="text-xs text-muted-foreground/70">
+    <div>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1 hover:text-muted-foreground transition-colors"
+        className="flex items-center gap-1 text-muted-foreground/40 hover:text-muted-foreground/60 transition-colors"
       >
-        {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        <span className="italic">Thinking{isStreaming ? '...' : ''}</span>
+        <ChevronRight
+          className={cn(
+            'size-3 transition-transform duration-150',
+            expanded && 'rotate-90',
+          )}
+        />
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em]">
+          {isStreaming ? 'Thinking\u2026' : 'Reasoning'}
+        </span>
       </button>
-      {expanded ? (
-        <div className="mt-1 ml-4 whitespace-pre-wrap text-muted-foreground/60 leading-relaxed">
-          {content}
-        </div>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {expanded ? (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
+            <div className="mt-1.5 ml-1.5 border-l border-border/30 pl-3 whitespace-pre-wrap text-[11px] leading-relaxed text-muted-foreground/40">
+              {content}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };
@@ -161,41 +176,38 @@ type StreamingIndicatorProps = {
 };
 
 const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) => (
-  <div className="flex items-center gap-1.5 py-0.5" role="status" aria-label="Flusk is thinking">
-    {[0, 1, 2].map((dotIndex) => (
-      prefersReducedMotion ? (
-        <span
-          key={dotIndex}
-          className="size-1.5 rounded-full bg-muted-foreground/60"
-          style={{ opacity: 0.45 + dotIndex * 0.15 }}
-        />
-      ) : (
+  <div className="py-0.5 pl-1" role="status" aria-label="Flusk is thinking">
+    {prefersReducedMotion ? (
+      <span className="font-mono text-[11px] tracking-wide text-muted-foreground/40">
+        Thinking&hellip;
+      </span>
+    ) : (
+      <span className="font-mono text-[11px] tracking-wide text-muted-foreground">
         <motion.span
-          key={dotIndex}
-          className="size-1.5 rounded-full bg-muted-foreground/70"
-          initial={false}
-          animate={{ y: [0, -2, 0], opacity: [0.35, 0.9, 0.35] }}
-          transition={{
-            duration: 0.9,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: dotIndex * 0.12,
-          }}
-        />
-      )
-    ))}
+          animate={{ opacity: [0.2, 0.5, 0.2] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          Thinking
+        </motion.span>
+        <motion.span
+          animate={{ opacity: [0, 0.5, 0] }}
+          transition={{ duration: 1, repeat: Infinity }}
+        >
+          _
+        </motion.span>
+      </span>
+    )}
     <span className="sr-only">Flusk is thinking</span>
   </div>
 );
 
 type ChipBarProps = {
   chips: ChipAction[];
-  used: boolean;
-  stale: boolean;
-  onChipClick: (chip: ChipAction, index: number) => void;
+  disabled: boolean;
+  onChipClick: (chip: ChipAction) => void;
 };
 
-const ChipBar = ({ chips, used, stale, onChipClick }: ChipBarProps) => {
+const ChipBar = ({ chips, disabled, onChipClick }: ChipBarProps) => {
   if (chips.length === 0) return null;
 
   return (
@@ -204,15 +216,13 @@ const ChipBar = ({ chips, used, stale, onChipClick }: ChipBarProps) => {
         <button
           key={`${chip.label}-${index}`}
           type="button"
-          disabled={used}
-          onClick={() => onChipClick(chip, index)}
+          disabled={disabled}
+          onClick={() => onChipClick(chip)}
           className={cn(
             'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-150',
-            used
+            disabled
               ? 'cursor-default border-border/30 text-muted-foreground/40'
-              : stale
-                ? 'border-border/40 text-muted-foreground/70 hover:border-foreground/40 hover:text-foreground active:bg-foreground/5'
-                : 'border-border/60 text-muted-foreground hover:border-foreground/40 hover:text-foreground active:bg-foreground/5',
+              : 'border-border/60 text-muted-foreground hover:border-foreground/40 hover:text-foreground active:bg-foreground/5',
           )}
         >
           {chip.label}
@@ -383,59 +393,10 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   );
 
   const handleChipClick = useCallback(
-    (messageId: string, chip: ChipAction) => {
-      const setChipUsed = (used: boolean) => {
-        useChatStore.setState((state) => ({
-          messages: state.messages.map((msg) =>
-            msg.id === messageId ? { ...msg, chipsUsed: used } : msg,
-          ),
-        }));
-      };
-
-      // Action chip with a valid tool call — execute directly
-      if (chip.type === 'action' && chip.toolCall) {
-        setChipUsed(true);
-        const toolCall = chip.toolCall;
-        void (async () => {
-          try {
-            const result = await getFlusk().chat.executeChipAction({
-              toolName: toolCall.name,
-              args: toolCall.args,
-            });
-
-            if (result.ok && result.status === 'success') {
-              void useTaskStore.getState().fetchTasks();
-            }
-
-            if (result.status === 'confirmation_required') {
-              void useChatStore.getState().refreshPendingActions();
-            }
-
-            if (!result.ok) {
-              setChipUsed(false);
-            }
-          } catch {
-            setChipUsed(false);
-          }
-        })();
-        return;
-      }
-
-      // Response chip or action chip without toolCall — send label as message
-      const responseText = chip.responseText?.trim().length
-        ? chip.responseText.trim()
-        : chip.label.trim();
-
-      if (responseText.length === 0) {
-        return;
-      }
-
-      if (useChatStore.getState().isSending) {
-        return;
-      }
-
-      setChipUsed(true);
-      void sendMessage(responseText);
+    (_messageId: string, chip: ChipAction) => {
+      const text = (chip.responseText ?? chip.label).trim();
+      if (text.length === 0) return;
+      void sendMessage(text);
     },
     [sendMessage],
   );
@@ -443,6 +404,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const renderedMessages = useMemo(
     () => {
       const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
+      const lastAssistantMessageId = [...messages].reverse().find((m) => m.role === 'assistant')?.id ?? null;
 
       return messages.map((message, messageIndex) => {
         const isAssistant = message.role === 'assistant';
@@ -533,8 +495,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                 {message.chips && message.chips.length > 0 ? (
                   <ChipBar
                     chips={message.chips}
-                    used={Boolean(message.chipsUsed)}
-                    stale={!isLatest}
+                    disabled={message.id !== lastAssistantMessageId || isSending}
                     onChipClick={(chip) => handleChipClick(message.id, chip)}
                   />
                 ) : null}
@@ -544,6 +505,8 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                   </span>
                 ) : null}
               </div>
+            ) : isAssistant && isPendingAssistantPlaceholder ? (
+              <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] flex-col gap-1.5">
                 <div
@@ -552,19 +515,14 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     'border-border bg-card/80 text-foreground',
                   )}
                 >
-                  {isPendingAssistantPlaceholder ? (
-                    <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
-                  ) : (
-                    <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
-                    </div>
-                  )}
+                  <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                    <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
+                  </div>
                 </div>
                 {message.chips && message.chips.length > 0 ? (
                   <ChipBar
                     chips={message.chips}
-                    used={Boolean(message.chipsUsed)}
-                    stale={!isLatest}
+                    disabled={message.id !== lastAssistantMessageId || isSending}
                     onChipClick={(chip) => handleChipClick(message.id, chip)}
                   />
                 ) : null}
@@ -601,7 +559,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         );
       });
     },
-    [messages, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion],
+    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion],
   );
 
   return (

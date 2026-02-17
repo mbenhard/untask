@@ -141,38 +141,38 @@ const applyLaunchAtLogin = (): void => {
   }
 };
 
-const applyDevDockIcon = (): void => {
+const applyDevBranding = (): void => {
   if (process.platform !== 'darwin' || app.isPackaged) {
     return;
   }
 
-  const iconCandidates = [
-    path.join(app.getAppPath(), 'assets/icons/icon.icns'),
-    path.join(process.cwd(), 'assets/icons/icon.icns'),
-    path.resolve(__dirname, '../../assets/icons/icon.icns'),
-  ];
+  app.setName('Flusk');
 
-  for (const iconPath of iconCandidates) {
-    if (!existsSync(iconPath)) {
-      continue;
-    }
+  // Set About panel so "About Flusk" shows correct name/version
+  const iconPng = [process.cwd(), app.getAppPath()]
+    .map((base) => path.join(base, 'assets/icons/icon.png'))
+    .find((p) => existsSync(p));
 
+  app.setAboutPanelOptions({
+    applicationName: 'Flusk',
+    applicationVersion: app.getVersion(),
+  });
+
+  // Override dock icon (the padded PNG has proper macOS margins built in)
+  if (iconPng) {
     try {
-      const icon = nativeImage.createFromPath(iconPath);
-      if (icon.isEmpty()) {
-        continue;
+      const icon = nativeImage.createFromPath(iconPng);
+      if (!icon.isEmpty()) {
+        app.dock?.setIcon(icon);
       }
-      app.dock?.setIcon(icon);
-      return;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('[app] failed to set dev dock icon', iconPath, error);
+    } catch {
+      // Patch script handles the bundle icon as fallback
     }
   }
 };
 
 app.whenReady().then(() => {
-  applyDevDockIcon();
+  applyDevBranding();
   void emitIdentityContextDebugSnapshot();
   bootstrap();
   applyLaunchAtLogin();

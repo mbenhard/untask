@@ -27,8 +27,6 @@ import {
   type ChatResolvePendingActionRequest,
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
-  type ChatExecuteChipActionRequest,
-  type ChatExecuteChipActionResponse,
   type ChatFocusMessagePayload,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
@@ -225,10 +223,6 @@ const fluskApi: FluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION, payload),
     listPendingActions: (): Promise<ChatListPendingActionsResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
-    executeChipAction: (
-      payload: ChatExecuteChipActionRequest,
-    ): Promise<ChatExecuteChipActionResponse> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CHAT_EXECUTE_CHIP_ACTION, payload),
   },
   backup: {
     list: (): Promise<BackupListResponse> =>

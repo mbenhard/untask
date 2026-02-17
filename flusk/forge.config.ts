@@ -12,7 +12,10 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: './assets/icons/icon',
-    extraResource: ['./drizzle', './assets/tray'],
+    extraResource: ['./drizzle', './assets/tray', './assets/icons/Assets.car'],
+    extendInfo: {
+      CFBundleIconName: 'icon',
+    },
   },
   rebuildConfig: {},
   makers: [

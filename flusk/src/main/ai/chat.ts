@@ -34,7 +34,7 @@ import type { ChatModelId } from './models';
 import { getSelectedModelId, getModelWebSearchConfig, modelSupportsVision, resolveModelId } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, ToolExecutionEnvelope } from './tools';
-import { createSdkTools, executeToolCall } from './tools';
+import { PROACTIVE_ALLOWED_TOOLS, createSdkTools, executeToolCall } from './tools';
 import { loadPendingActions } from './autonomy';
 
 const activeChatRequestIds = new Set<string>();
@@ -755,6 +755,7 @@ const runAssistantStream = async (
     images?: string[];
     noteContext?: ChatNoteContext;
     tokenBudget?: number;
+    allowedTools?: ReadonlySet<import('./tools').AiToolName>;
     emit: (event: ChatStreamEvent) => void;
   },
 ): Promise<void> => {
@@ -942,7 +943,7 @@ const runAssistantStream = async (
               },
               activeNoteId: input.noteContext?.noteId,
               mutationSignatures,
-            });
+            }, input.allowedTools);
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
             if (webSearchConfig.supportsWebSearch && webSearchConfig.webSearchMethod) {
@@ -1422,5 +1423,6 @@ export const startProactiveTurn = async (
     userMessage: input.triggerMessage,
     modelId,
     emit: input.emit,
+    allowedTools: PROACTIVE_ALLOWED_TOOLS,
   });
 };

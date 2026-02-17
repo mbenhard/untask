@@ -90,6 +90,18 @@ describe('classifyChatError', () => {
       message: 'Provider returned empty response.',
     });
   });
+
+  it('classifies inactivity timeout as retryable provider error', () => {
+    expect(
+      classifyChatError(
+        new Error('Stream inactivity timeout: no data received for 90 seconds.'),
+      ),
+    ).toEqual({
+      code: 'provider_error',
+      retryable: true,
+      message: 'Stream inactivity timeout: no data received for 90 seconds.',
+    });
+  });
 });
 
 describe('shouldRequireToolChoice', () => {

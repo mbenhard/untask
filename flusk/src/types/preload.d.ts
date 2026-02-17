@@ -25,8 +25,6 @@ import type {
   ChatResolvePendingActionRequest,
   ChatResolvePendingActionResponse,
   ChatListPendingActionsResponse,
-  ChatExecuteChipActionRequest,
-  ChatExecuteChipActionResponse,
   ChatFocusMessagePayload,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
@@ -136,7 +134,6 @@ export type FluskApi = {
     setAutonomyMode: (payload: ChatSetAutonomyModeRequest) => Promise<ChatAutonomyModeResult>;
     resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
     listPendingActions: () => Promise<ChatListPendingActionsResponse>;
-    executeChipAction: (payload: ChatExecuteChipActionRequest) => Promise<ChatExecuteChipActionResponse>;
   };
   backup: {
     list: () => Promise<BackupListResponse>;

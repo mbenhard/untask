@@ -32,8 +32,6 @@ import type {
   ChatResolvePendingActionPayload,
   ChatResolvePendingActionResult,
   ChatListPendingActionsResult,
-  ChatExecuteChipActionPayload,
-  ChatExecuteChipActionResult,
 } from './chat';
 import type { AiJournal, Task } from './models';
 
@@ -83,7 +81,6 @@ export const IPC_CHANNELS = {
   CHAT_RESOLVE_PENDING_ACTION: 'chat:resolve-pending-action',
   CHAT_CANCEL: 'chat:cancel',
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
-  CHAT_EXECUTE_CHIP_ACTION: 'chat:execute-chip-action',
   CHAT_FOCUS_MESSAGE: 'chat:focus-message',
   BACKUP_LIST: 'backup:list',
   BACKUP_CREATE: 'backup:create',
@@ -150,8 +147,6 @@ export type ChatSetAutonomyModeRequest = ChatSetAutonomyModePayload;
 export type ChatResolvePendingActionRequest = ChatResolvePendingActionPayload;
 export type ChatResolvePendingActionResponse = ChatResolvePendingActionResult;
 export type ChatListPendingActionsResponse = ChatListPendingActionsResult;
-export type ChatExecuteChipActionRequest = ChatExecuteChipActionPayload;
-export type ChatExecuteChipActionResponse = ChatExecuteChipActionResult;
 export type ChatFocusMessagePayload = {
   messageId: string;
 };

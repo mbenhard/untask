@@ -23,11 +23,7 @@ export type ChatViewIntent = 'today' | 'tasks' | 'inbox' | 'notes';
 
 export type ChipAction = {
   label: string;
-  type: 'action' | 'response';
-  toolCall?: {
-    name: string;
-    args: Record<string, unknown>;
-  };
+  type: 'response';
   responseText?: string;
 };
 
@@ -263,14 +259,3 @@ export type ChatListPendingActionsResult = {
   actions: ChatPendingActionEntry[];
 };
 
-export type ChatExecuteChipActionPayload = {
-  toolName: string;
-  args: Record<string, unknown>;
-};
-
-export type ChatExecuteChipActionResult = {
-  ok: boolean;
-  status: ChatToolStatus;
-  message: string;
-  actionCard?: ChatActionCard;
-};

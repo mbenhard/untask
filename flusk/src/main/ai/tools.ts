@@ -384,27 +384,19 @@ const searchChatHistoryInputSchema = z.object({
 const emitChipsInputSchema = z.object({
   chips: z.array(z.object({
     label: z.string().min(1).max(40),
-    type: z.enum(['action', 'response']),
-    toolCall: z.object({
-      name: z.string(),
-      args: z.record(z.string(), z.unknown()),
-    }).optional(),
     responseText: z.string().optional(),
   })).min(1).max(4),
 });
 
-const normalizeChipActions = (chips: ChipAction[]): ChipAction[] =>
+const normalizeChipActions = (chips: Array<{ label: string; responseText?: string }>): ChipAction[] =>
   chips.map((chip) => {
-    if (chip.type !== 'response') {
-      return chip;
-    }
-
     const responseText = chip.responseText?.trim().length
       ? chip.responseText.trim()
       : chip.label.trim();
 
     return {
-      ...chip,
+      label: chip.label,
+      type: 'response',
       responseText: responseText.length > 0 ? responseText : chip.label,
     };
   });
@@ -1147,10 +1139,10 @@ const searchChatHistoryTool = {
 
 const emitChipsTool = {
   name: 'emit_chips',
-  description: 'Attach interactive chips to your current message. This is the ONLY way to present tappable options — never write options as text bullets or numbered lists. Response chips let Marcus answer with a tap instead of typing. Action chips execute a tool call on tap. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
+  description: 'Attach interactive response chips to your current message. This is the ONLY way to present tappable options — never write options as text bullets or numbered lists. Chips let Marcus answer with a tap instead of typing. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
   schema: emitChipsInputSchema,
   execute: async (input) => {
-    const normalizedChips = normalizeChipActions(input.chips as ChipAction[]);
+    const normalizedChips = normalizeChipActions(input.chips as Array<{ label: string; responseText?: string }>);
 
     // No-op execution. The renderer reads the tool call args directly.
     return {
@@ -1753,10 +1745,26 @@ export const executeToolCall = async (
   }
 };
 
-export const createSdkTools = (context: ToolExecutionContext = {}) => {
+export const PROACTIVE_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
+  'create_task',
+  'update_task',
+  'complete_task',
+  'move_task',
+  'set_today',
+  'list_tasks',
+  'get_task',
+  'emit_chips',
+]);
+
+export const createSdkTools = (
+  context: ToolExecutionContext = {},
+  allowedTools?: ReadonlySet<AiToolName>,
+) => {
   const tools: Record<string, unknown> = {};
 
-  (Object.keys(AI_TOOL_REGISTRY) as AiToolName[]).forEach((toolName) => {
+  (Object.keys(AI_TOOL_REGISTRY) as AiToolName[]).filter(
+    (name) => !allowedTools || allowedTools.has(name),
+  ).forEach((toolName) => {
     const definition = AI_TOOL_REGISTRY[toolName] as ToolRegistryEntry<
       AiToolName,
       ToolInputSchema
