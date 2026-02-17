@@ -6,6 +6,7 @@ import type {
   ChatActionCard,
   ChatNoteContext,
   ChipAction,
+  ChatConversationSummary,
   ChatModelCatalogEntry,
   ChatPendingActionEntry,
   ChatRetentionMode,
@@ -22,6 +23,7 @@ import { useTaskStore } from './taskStore';
 
 type ChatUiMessage = {
   id: string;
+  conversationId: string | null;
   role: 'user' | 'assistant';
   content: string;
   createdAt: string | null;
@@ -31,6 +33,7 @@ type ChatUiMessage = {
   imageCount?: number;
   chips?: ChipAction[];
   chipsUsed?: boolean;
+  memoryUpdated?: boolean;
 };
 
 type InFlightStream = {
@@ -60,6 +63,10 @@ type ChatLastStreamError = {
 
 type ChatStore = {
   messages: ChatUiMessage[];
+  conversations: ChatConversationSummary[];
+  conversationsTotal: number;
+  activeConversationId: string | null;
+  isLoadingConversations: boolean;
   isInitialized: boolean;
   isSending: boolean;
   error: string | null;
@@ -69,6 +76,8 @@ type ChatStore = {
   inFlightByRequestId: Record<string, InFlightStream>;
   pendingViewSwitchByRequestId: Record<string, PendingViewSwitch>;
   requestPayloadByRequestId: Record<string, ChatRequestPayload>;
+  conversationIdByRequestId: Record<string, string>;
+  assistantMessageIdByRequestId: Record<string, string>;
   lastStreamError: ChatLastStreamError | null;
   unsubscribeStream?: () => void;
   unsubscribeFocusMessage?: () => void;
@@ -80,6 +89,11 @@ type ChatStore = {
   pendingNoteContext: ChatNoteContext | null;
 
   initialize: () => Promise<void>;
+  refreshConversations: () => Promise<void>;
+  createConversation: (title?: string) => Promise<void>;
+  setActiveConversation: (conversationId: string) => Promise<void>;
+  archiveConversation: (conversationId: string) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   stageNoteContext: (context: ChatNoteContext) => void;
   consumePendingNoteContext: () => ChatNoteContext | null;
@@ -301,6 +315,25 @@ const parseChips = (raw: string | null): ChipAction[] | undefined => {
   }
 };
 
+const collapseDuplicateTextSteps = (steps: TurnStep[]): TurnStep[] => {
+  const collapsed: TurnStep[] = [];
+
+  steps.forEach((step) => {
+    const previous = collapsed[collapsed.length - 1];
+    if (
+      step.kind === 'text' &&
+      previous?.kind === 'text' &&
+      previous.content.trim() === step.content.trim()
+    ) {
+      return;
+    }
+
+    collapsed.push(step);
+  });
+
+  return collapsed;
+};
+
 const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
   const metadata = parseToolMetadata(message.toolCalls);
   const imageCount = metadata?.imageCount ?? parseImageCount(message.toolCalls);
@@ -308,12 +341,13 @@ const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
 
   return {
     id: message.id,
+    conversationId: message.conversationId,
     role: message.role,
     content: message.content,
     createdAt: message.createdAt,
     actionCards: dedupeActionCards(metadata?.actionCards ?? []),
     steps: message.role === 'assistant'
-      ? reconstructStepsFromMetadata(metadata, message.content)
+      ? collapseDuplicateTextSteps(reconstructStepsFromMetadata(metadata, message.content))
       : [],
     ...(imageCount ? { imageCount } : {}),
     ...(chips ? { chips } : {}),
@@ -348,6 +382,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
   const sendPreparedMessage = async (
     content: string,
     modelId: string | null,
+    conversationId: string,
     images?: string[],
     noteContext?: ChatNoteContext,
   ): Promise<void> => {
@@ -362,6 +397,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const response = await getFlusk().chat.send({
         content: trimmed,
         modelId,
+        conversationId,
         images: images?.length ? images : undefined,
         noteContext,
       });
@@ -370,6 +406,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const placeholderId = `assistant-stream-${response.requestId}`;
       const placeholderMessage: ChatUiMessage = {
         id: placeholderId,
+        conversationId: response.conversationId,
         role: 'assistant',
         content: '',
         createdAt: new Date().toISOString(),
@@ -399,6 +436,11 @@ export const useChatStore = create<ChatStore>((set, get) => {
             ...(noteContext ? { noteContext } : {}),
           },
         },
+        conversationIdByRequestId: {
+          ...state.conversationIdByRequestId,
+          [response.requestId]: response.conversationId,
+        },
+        activeConversationId: response.conversationId,
         pendingViewSwitchByRequestId: {
           ...state.pendingViewSwitchByRequestId,
           [response.requestId]: {
@@ -420,8 +462,61 @@ export const useChatStore = create<ChatStore>((set, get) => {
     }
   };
 
+  const refreshConversationsInternal = async (): Promise<void> => {
+    const result = await getFlusk().chat.listThreads({
+      includeArchived: true,
+      limit: 100,
+      offset: 0,
+    });
+
+    set((state) => ({
+      conversations: result.conversations,
+      conversationsTotal: result.total,
+      activeConversationId:
+        state.activeConversationId &&
+        result.conversations.some((conversation) => conversation.id === state.activeConversationId)
+          ? state.activeConversationId
+          : result.conversations.find((conversation) => !conversation.archivedAt)?.id ?? null,
+    }));
+  };
+
+  const ensureActiveConversationId = async (): Promise<string> => {
+    const active = get().activeConversationId;
+    if (active) {
+      return active;
+    }
+
+    const created = await getFlusk().chat.createThread();
+    set((state) => ({
+      activeConversationId: created.conversation.id,
+      conversations: [created.conversation, ...state.conversations],
+      conversationsTotal: Math.max(state.conversationsTotal + 1, state.conversations.length + 1),
+    }));
+    return created.conversation.id;
+  };
+
+  const loadConversationIntoState = async (conversationId: string): Promise<void> => {
+    const history = await getFlusk().chat.history({ conversationId });
+    set({
+      messages: history.map(mapMessageToUi),
+      activeConversationId: conversationId,
+      inFlightByRequestId: {},
+      pendingViewSwitchByRequestId: {},
+      requestPayloadByRequestId: {},
+      conversationIdByRequestId: {},
+      assistantMessageIdByRequestId: {},
+      isSending: false,
+      error: null,
+      focusMessageId: null,
+    });
+  };
+
   return {
     messages: [],
+    conversations: [],
+    conversationsTotal: 0,
+    activeConversationId: null,
+    isLoadingConversations: false,
     isInitialized: false,
     isSending: false,
     error: null,
@@ -431,6 +526,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
     inFlightByRequestId: {},
     pendingViewSwitchByRequestId: {},
     requestPayloadByRequestId: {},
+    conversationIdByRequestId: {},
+    assistantMessageIdByRequestId: {},
     lastStreamError: null,
     autonomyMode: 'safe',
     pendingActions: [],
@@ -451,15 +548,37 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
       initializePromise = (async () => {
         try {
-          const [history, models, selectedModel, retention, autonomy, pending] =
+          set({ isLoadingConversations: true });
+
+          const [threads, models, selectedModel, retention, autonomy, pending] =
             await Promise.all([
-              getFlusk().chat.history(),
+              getFlusk().chat.listThreads({
+                includeArchived: true,
+                limit: 100,
+                offset: 0,
+              }),
               getFlusk().chat.getModels(),
               getFlusk().chat.getSelectedModel(),
               getFlusk().chat.getRetentionMode(),
               getFlusk().chat.getAutonomyMode(),
               getFlusk().chat.listPendingActions(),
             ]);
+
+          let activeConversationId =
+            threads.conversations.find((conversation) => !conversation.archivedAt)?.id ?? null;
+          let conversations = threads.conversations;
+          let conversationsTotal = threads.total;
+
+          if (!activeConversationId) {
+            const created = await getFlusk().chat.createThread();
+            activeConversationId = created.conversation.id;
+            conversations = [created.conversation, ...conversations];
+            conversationsTotal = Math.max(conversationsTotal + 1, conversations.length);
+          }
+
+          const history = await getFlusk().chat.history({
+            conversationId: activeConversationId,
+          });
 
           const existingUnsubscribe = get().unsubscribeStream;
           existingUnsubscribe?.();
@@ -478,19 +597,25 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
           set({
             messages: history.map(mapMessageToUi),
+            conversations,
+            conversationsTotal,
+            activeConversationId,
+            isLoadingConversations: false,
             models,
             selectedModelId: selectedModel.modelId,
             retentionMode: retention.mode,
             autonomyMode: autonomy.mode,
             pendingActions: pending.actions,
             pendingViewSwitchByRequestId: {},
+            conversationIdByRequestId: {},
+            assistantMessageIdByRequestId: {},
             unsubscribeStream,
             unsubscribeFocusMessage,
             isInitialized: true,
             error: null,
           });
         } catch (error) {
-          set({ error: toErrorMessage(error) });
+          set({ error: toErrorMessage(error), isLoadingConversations: false });
         }
       })();
 
@@ -501,7 +626,113 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }
     },
 
+    refreshConversations: async () => {
+      try {
+        set({ isLoadingConversations: true });
+        await refreshConversationsInternal();
+        set({ isLoadingConversations: false, error: null });
+      } catch (error) {
+        set({ isLoadingConversations: false, error: toErrorMessage(error) });
+      }
+    },
+
+    createConversation: async (title) => {
+      try {
+        await getFlusk().chat.cancel();
+      } catch {
+        // Ignore cancel failures when no request is active.
+      }
+
+      try {
+        const created = await getFlusk().chat.createThread(
+          title?.trim().length ? { title: title.trim() } : undefined,
+        );
+        await loadConversationIntoState(created.conversation.id);
+        await refreshConversationsInternal();
+        set({ error: null });
+      } catch (error) {
+        set({ error: toErrorMessage(error) });
+      }
+    },
+
+    setActiveConversation: async (conversationId) => {
+      if (!conversationId || conversationId === get().activeConversationId) {
+        return;
+      }
+
+      try {
+        await getFlusk().chat.cancel();
+      } catch {
+        // Ignore cancel failures when no request is active.
+      }
+
+      try {
+        await loadConversationIntoState(conversationId);
+        await refreshConversationsInternal();
+      } catch (error) {
+        set({ error: toErrorMessage(error) });
+      }
+    },
+
+    archiveConversation: async (conversationId) => {
+      try {
+        await getFlusk().chat.archiveThread({ conversationId });
+        await refreshConversationsInternal();
+
+        if (get().activeConversationId === conversationId) {
+          const nextActive =
+            get().conversations.find(
+              (conversation) =>
+                conversation.id !== conversationId && !conversation.archivedAt,
+            )?.id ?? null;
+
+          if (nextActive) {
+            await loadConversationIntoState(nextActive);
+          } else {
+            const created = await getFlusk().chat.createThread();
+            await loadConversationIntoState(created.conversation.id);
+            await refreshConversationsInternal();
+          }
+        }
+
+        set({ error: null });
+      } catch (error) {
+        set({ error: toErrorMessage(error) });
+      }
+    },
+
+    deleteConversation: async (conversationId) => {
+      try {
+        await getFlusk().chat.deleteThread({ conversationId });
+        await refreshConversationsInternal();
+
+        if (get().activeConversationId === conversationId) {
+          const nextActive =
+            get().conversations.find(
+              (conversation) =>
+                conversation.id !== conversationId && !conversation.archivedAt,
+            )?.id ?? null;
+
+          if (nextActive) {
+            await loadConversationIntoState(nextActive);
+          } else {
+            const created = await getFlusk().chat.createThread();
+            await loadConversationIntoState(created.conversation.id);
+            await refreshConversationsInternal();
+          }
+        }
+
+        set({ error: null });
+      } catch (error) {
+        set({ error: toErrorMessage(error) });
+      }
+    },
+
     sendMessage: async (content) => {
+      if (get().isSending) {
+        return;
+      }
+
       // Wait for any in-flight image processing to complete
       const waitForProcessing = async () => {
         let checks = 0;
@@ -519,7 +750,19 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const images = get().pendingImages;
       const noteContext = get().pendingNoteContext ?? undefined;
       set({ pendingImages: [] });
-      await sendPreparedMessage(content, selected?.modelId ?? null, images, noteContext);
+
+      if (get().isSending) {
+        return;
+      }
+
+      const conversationId = await ensureActiveConversationId();
+      await sendPreparedMessage(
+        content,
+        selected?.modelId ?? null,
+        conversationId,
+        images,
+        noteContext,
+      );
     },
 
     stageNoteContext: (context) => {
@@ -556,6 +799,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
         isSending: false,
         inFlightByRequestId: {},
         pendingViewSwitchByRequestId: {},
+        conversationIdByRequestId: {},
+        assistantMessageIdByRequestId: {},
       });
     },
 
@@ -566,6 +811,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }
 
       const payload = get().requestPayloadByRequestId[failed.requestId];
+      const failedConversationId = get().conversationIdByRequestId[failed.requestId];
       if (!payload) {
         set({
           error:
@@ -581,15 +827,29 @@ export const useChatStore = create<ChatStore>((set, get) => {
           ...state.pendingViewSwitchByRequestId,
         };
         delete nextPendingViewSwitches[failed.requestId];
+        const nextConversationIds = {
+          ...state.conversationIdByRequestId,
+        };
+        delete nextConversationIds[failed.requestId];
         return {
           requestPayloadByRequestId: nextPayloads,
           pendingViewSwitchByRequestId: nextPendingViewSwitches,
+          conversationIdByRequestId: nextConversationIds,
           lastStreamError: null,
           error: null,
         };
       });
 
-      await sendPreparedMessage(payload.content, payload.modelId, undefined, payload.noteContext);
+      const conversationId =
+        failedConversationId ?? get().activeConversationId ?? (await ensureActiveConversationId());
+
+      await sendPreparedMessage(
+        payload.content,
+        payload.modelId,
+        conversationId,
+        undefined,
+        payload.noteContext,
+      );
     },
 
     clearHistory: async () => {
@@ -600,6 +860,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
           inFlightByRequestId: {},
           pendingViewSwitchByRequestId: {},
           requestPayloadByRequestId: {},
+          conversationIdByRequestId: {},
+          assistantMessageIdByRequestId: {},
           lastStreamError: null,
           isSending: false,
           focusMessageId: null,
@@ -682,6 +944,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         const placeholderId = `assistant-stream-${event.requestId}`;
         const placeholder: ChatUiMessage = {
           id: placeholderId,
+          conversationId: get().activeConversationId,
           role: 'assistant',
           content: '',
           createdAt: new Date().toISOString(),
@@ -703,12 +966,37 @@ export const useChatStore = create<ChatStore>((set, get) => {
           },
         }));
 
+        // Belt-and-suspenders: auto-remove stale proactive placeholder after 2 minutes
+        const PROACTIVE_PLACEHOLDER_TIMEOUT_MS = 2 * 60 * 1000;
+        setTimeout(() => {
+          const current = get().inFlightByRequestId[event.requestId];
+          if (!current) return; // Already finalized
+          const msg = get().messages.find((m) => m.id === placeholderId);
+          if (msg && !msg.content) {
+            // Placeholder still has no content — remove it
+            const { [event.requestId]: _, ...remaining } = get().inFlightByRequestId;
+            set((state) => ({
+              messages: state.messages.filter((m) => m.id !== placeholderId),
+              inFlightByRequestId: remaining,
+              isSending: Object.keys(remaining).length > 0,
+            }));
+          }
+        }, PROACTIVE_PLACEHOLDER_TIMEOUT_MS);
+
         inFlight = newInFlight;
       }
 
       // For proactive assistant_done with no inFlight, just append the message
       if (!inFlight && event.requestId.startsWith('proactive-') && event.type === 'assistant_done') {
         const mapped = mapMessageToUi(event.assistantMessage);
+        if (
+          mapped.conversationId &&
+          get().activeConversationId &&
+          mapped.conversationId !== get().activeConversationId
+        ) {
+          void get().refreshConversations();
+          return;
+        }
         const finalizedChips = event.chips ?? mapped.chips;
         const finalMessage: ChatUiMessage = {
           ...mapped,
@@ -717,6 +1005,10 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
         set((state) => ({
           messages: upsertMessage(state.messages, finalMessage),
+          assistantMessageIdByRequestId: {
+            ...state.assistantMessageIdByRequestId,
+            [event.requestId]: finalMessage.id,
+          },
         }));
 
         revealPeekIfChatNotOpen();
@@ -724,6 +1016,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         if (shouldRefreshTasks(finalMessage.actionCards)) {
           void useTaskStore.getState().fetchTasks();
         }
+        void get().refreshConversations();
         return;
       }
 
@@ -914,7 +1207,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
             (message) => message.id !== inFlight?.placeholderId,
           );
           const mapped = mapMessageToUi(event.assistantMessage);
-          const finalizedSteps = inFlight?.steps ?? mapped.steps;
+          const finalizedSteps = collapseDuplicateTextSteps(inFlight?.steps ?? mapped.steps);
           const finalizedChips = event.chips ?? inFlight?.chips ?? mapped.chips;
           const finalizedAssistantMessage: ChatUiMessage = {
             ...mapped,
@@ -935,12 +1228,21 @@ export const useChatStore = create<ChatStore>((set, get) => {
             ...state.pendingViewSwitchByRequestId,
           };
           delete nextPendingViewSwitches[event.requestId];
+          const nextConversationIds = {
+            ...state.conversationIdByRequestId,
+          };
+          delete nextConversationIds[event.requestId];
 
           return {
             messages: nextMessages,
             inFlightByRequestId: remaining,
             pendingViewSwitchByRequestId: nextPendingViewSwitches,
             requestPayloadByRequestId: nextPayloads,
+            conversationIdByRequestId: nextConversationIds,
+            assistantMessageIdByRequestId: {
+              ...state.assistantMessageIdByRequestId,
+              [event.requestId]: finalizedAssistantMessage.id,
+            },
             isSending: Object.keys(remaining).length > 0,
             error: null,
             lastStreamError:
@@ -964,6 +1266,24 @@ export const useChatStore = create<ChatStore>((set, get) => {
         if (shouldRefreshTasks(actionCards)) {
           void useTaskStore.getState().fetchTasks();
         }
+        void get().refreshConversations();
+
+        return;
+      }
+
+      if (event.type === 'memory_updated') {
+        const assistantMessageId = get().assistantMessageIdByRequestId[event.requestId];
+        if (!assistantMessageId) {
+          return;
+        }
+
+        set((state) => ({
+          messages: state.messages.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, memoryUpdated: true }
+              : message,
+          ),
+        }));
 
         return;
       }
@@ -1001,12 +1321,19 @@ export const useChatStore = create<ChatStore>((set, get) => {
             ...state.pendingViewSwitchByRequestId,
           };
           delete nextPendingViewSwitches[event.requestId];
+          const nextConversationIds = {
+            ...state.conversationIdByRequestId,
+          };
+          if (!event.retryable) {
+            delete nextConversationIds[event.requestId];
+          }
 
           return {
             messages: nextMessages,
             inFlightByRequestId: remaining,
             pendingViewSwitchByRequestId: nextPendingViewSwitches,
             requestPayloadByRequestId: nextPayloads,
+            conversationIdByRequestId: nextConversationIds,
             isSending: Object.keys(remaining).length > 0,
             error: event.message,
             lastStreamError: {
@@ -1136,6 +1463,10 @@ export const useChatStore = create<ChatStore>((set, get) => {
 });
 
 export const selectChatMessages = (state: ChatStore) => state.messages;
+export const selectChatConversations = (state: ChatStore) => state.conversations;
+export const selectChatConversationsTotal = (state: ChatStore) => state.conversationsTotal;
+export const selectChatActiveConversationId = (state: ChatStore) => state.activeConversationId;
+export const selectChatIsLoadingConversations = (state: ChatStore) => state.isLoadingConversations;
 export const selectChatIsSending = (state: ChatStore) => state.isSending;
 export const selectChatError = (state: ChatStore) => state.error;
 export const selectChatLastStreamError = (state: ChatStore) => state.lastStreamError;

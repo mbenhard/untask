@@ -237,7 +237,7 @@ const buildProtocolSection = (
     '**Writing Journal:**',
     '- After meaningful interactions where you learned something',
     '- After every Identity or Memory update (mandatory — log the diff and reason)',
-    '- After proactive interventions (did the nudge help?)',
+    '- After time reminders fire (did the nudge help?)',
     '- When you make a mistake (self-correction: what went wrong, what to do differently)',
     '',
     '**Updating Identity:**',

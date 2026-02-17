@@ -7,6 +7,13 @@ import {
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
 
+  type ChatHistoryRequest,
+  type ChatListThreadsRequest,
+  type ChatListThreadsResult,
+  type ChatCreateThreadRequest,
+  type ChatCreateThreadResult,
+  type ChatArchiveThreadRequest,
+  type ChatDeleteThreadRequest,
   type ChatRetentionResult,
   type ChatSendRequest,
   type ChatSendResult,
@@ -29,8 +36,6 @@ import {
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
   type MemoryPromotionEvaluationResultPayload,
-  type ProactiveTriggerEvaluationRequestPayload,
-  type ProactiveTriggerEvaluationResultPayload,
   type SettingsBootstrapState,
   type SettingsMemoryStatePayload,
   type SettingsMemoryHistoryRequestPayload,
@@ -60,7 +65,6 @@ import { buildSystemPrompt } from './ai/systemPrompt';
 import { closeDatabase, initDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { getIdentity, getMemory, setIdentity, setMemory } from './ai/memory';
-import { evaluateProactiveTriggerPolicy } from './assistant/proactivePolicy';
 import {
   listTasks,
   createTask,
@@ -73,9 +77,14 @@ import {
   undoTaskEvent,
 } from './services/taskService';
 import {
+  archiveConversation,
+  createConversation,
   clearChatHistory,
-  getChatHistory,
+  deleteConversation,
+  ensureConversation,
+  getConversationMessages,
   getChatRetentionMode,
+  listConversations,
   setChatRetentionMode,
 } from './services/chatService';
 import { readJournalEntries } from './services/journalService';
@@ -94,7 +103,7 @@ import {
   importBackup,
   listBackups,
 } from './services/backupService';
-import { initSearchFts, searchTasks } from './services/searchService';
+import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 
@@ -162,6 +171,7 @@ const taskCompleteRequestSchema = z.union([
 const chatSendSchema = z.object({
   content: z.string(),
   modelId: z.string().nullable().optional(),
+  conversationId: z.string().min(1).optional(),
   images: z.array(z.string().min(1)).optional(),
   noteContext: z
     .object({
@@ -170,6 +180,21 @@ const chatSendSchema = z.object({
       markdown: z.string().min(1),
     })
     .optional(),
+});
+const chatHistoryRequestSchema = z.object({
+  conversationId: z.string().min(1),
+});
+const chatListThreadsSchema = z.object({
+  includeArchived: z.boolean().optional(),
+  search: z.string().optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+  offset: z.number().int().min(0).max(10_000).optional(),
+});
+const chatCreateThreadSchema = z.object({
+  title: z.string().min(1).max(120).optional(),
+});
+const chatThreadMutationSchema = z.object({
+  conversationId: z.string().min(1),
 });
 
 const noteIdSchema = z.string().min(1);
@@ -247,6 +272,7 @@ const reinitializeDatabase = (): void => {
   initDatabase();
   runMigrations();
   initSearchFts();
+  initChatSearchFts();
   refreshTodayBadge();
 };
 
@@ -388,15 +414,6 @@ export const registerIpcHandlers = (): void => {
     }),
   );
 
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_EVALUATE_PROACTIVE_TRIGGERS,
-    (
-      _event,
-      request: ProactiveTriggerEvaluationRequestPayload,
-    ): ProactiveTriggerEvaluationResultPayload =>
-      evaluateProactiveTriggerPolicy(request),
-  );
-
   // Identity kernel status — always ready (identity is in DB now).
   ipcMain.handle(
     IPC_CHANNELS.CHAT_GET_KERNEL_STATUS,
@@ -424,7 +441,6 @@ export const registerIpcHandlers = (): void => {
         ok: true,
         kernelStatus: { ready: true, diagnostics: [] },
         context: result.contextSnapshot,
-        proactiveEvaluations: [],
       };
     },
   );
@@ -494,6 +510,7 @@ export const registerIpcHandlers = (): void => {
 
       return startChatTurn({
         content,
+        conversationId: parsedMessage.conversationId,
         modelId: parsedMessage.modelId,
         images: images?.length ? images : undefined,
         noteContext: parsedMessage.noteContext,
@@ -510,10 +527,17 @@ export const registerIpcHandlers = (): void => {
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.CHAT_HISTORY, () => {
-    try { return getChatHistory(); }
-    catch (e) { console.error('[ipc] CHAT_HISTORY:', e); throw e; }
-  });
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_HISTORY,
+    (_event, request: ChatHistoryRequest) => {
+      try {
+        const parsed = chatHistoryRequestSchema.parse(request ?? {});
+        const conversation = ensureConversation(parsed.conversationId);
+        return getConversationMessages(conversation.id);
+      }
+      catch (e) { console.error('[ipc] CHAT_HISTORY:', e); throw e; }
+    },
+  );
   ipcMain.handle(IPC_CHANNELS.CHAT_CLEAR, () => {
     try {
       cancelActiveChatTurns();
@@ -521,6 +545,62 @@ export const registerIpcHandlers = (): void => {
     }
     catch (e) { console.error('[ipc] CHAT_CLEAR:', e); throw e; }
   });
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_LIST_THREADS,
+    (_event, request?: ChatListThreadsRequest): ChatListThreadsResult => {
+      try {
+        const parsed = chatListThreadsSchema.parse(request ?? {});
+        return listConversations(parsed);
+      }
+      catch (e) { console.error('[ipc] CHAT_LIST_THREADS:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_CREATE_THREAD,
+    (_event, request?: ChatCreateThreadRequest): ChatCreateThreadResult => {
+      try {
+        const parsed = chatCreateThreadSchema.parse(request ?? {});
+        const created = createConversation({
+          title: parsed.title,
+          isAutoTitle: !parsed.title,
+        });
+        const listed = listConversations({ includeArchived: true, limit: 1, offset: 0 });
+        const conversation =
+          listed.conversations.find((entry) => entry.id === created.id) ??
+          {
+            id: created.id,
+            title: created.title,
+            isAutoTitle: created.isAutoTitle ?? true,
+            createdAt: created.createdAt,
+            updatedAt: created.updatedAt,
+            archivedAt: created.archivedAt,
+            messageCount: 0,
+          };
+        return { conversation };
+      }
+      catch (e) { console.error('[ipc] CHAT_CREATE_THREAD:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_ARCHIVE_THREAD,
+    (_event, request: ChatArchiveThreadRequest): void => {
+      try {
+        const parsed = chatThreadMutationSchema.parse(request ?? {});
+        archiveConversation(parsed.conversationId);
+      }
+      catch (e) { console.error('[ipc] CHAT_ARCHIVE_THREAD:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.CHAT_DELETE_THREAD,
+    (_event, request: ChatDeleteThreadRequest): void => {
+      try {
+        const parsed = chatThreadMutationSchema.parse(request ?? {});
+        deleteConversation(parsed.conversationId);
+      }
+      catch (e) { console.error('[ipc] CHAT_DELETE_THREAD:', e); throw e; }
+    },
+  );
   ipcMain.handle(
     IPC_CHANNELS.CHAT_GET_MODELS,
     (): ChatModelCatalogResult => {

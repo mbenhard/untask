@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { stepCountIs, streamText, type ModelMessage } from 'ai';
+import { generateText, stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
   ChipAction,
@@ -14,8 +14,14 @@ import type {
 } from '../../types/chat';
 import type { ProactiveTriggerType } from '../../types/assistant';
 import {
-  getRecentChatMessages,
+  DEFAULT_CONVERSATION_TITLE,
+  canAutoTitleConversation,
+  ensureConversation,
+  getConversationMessageCount,
+  getMostRecentConversation,
+  getRecentConversationMessages,
   saveChatMessage,
+  setConversationTitle,
   sweepChatRetention,
 } from '../services/chatService';
 import { writeJournalEntry } from '../services/journalService';
@@ -39,6 +45,9 @@ const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
 const HISTORY_WINDOW_LIMIT = 60;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
+const AUTO_TITLE_MODEL_ID = 'openai/gpt-4o-mini';
+const AUTO_TITLE_TIMEOUT_MS = 5_000;
+const AUTO_TITLE_MAX_LENGTH = 80;
 const TOOL_MUTATION_NAMES = new Set([
   'create_task',
   'update_task',
@@ -128,7 +137,8 @@ export const classifyChatError = (error: unknown): ClassifiedChatError => {
     normalized.includes('503') ||
     normalized.includes('502') ||
     normalized.includes('provider') ||
-    normalized.includes('empty response')
+    normalized.includes('empty response') ||
+    normalized.includes('inactivity timeout')
   ) {
     return {
       code: 'provider_error',
@@ -238,6 +248,115 @@ const toToolExecutionEnvelope = (
   }
 
   return null;
+};
+
+const CHIP_SECTION_HEADING_PATTERN =
+  /^\s*(?:\*\*)?(?:action|response|quick|suggested)?\s*chips?\s*:?\s*(?:\*\*)?\s*$/i;
+const OPTION_SECTION_HEADING_PATTERN =
+  /^\s*(?:\*\*)?(?:options|quick\s*replies|suggestions|here\s*are\s*(?:some|your|the)\s*options)\s*:?\s*(?:\*\*)?\s*$/i;
+const CHIP_LIST_ITEM_PREFIX_PATTERN =
+  /^\s*(?:[-*•]|\d+[.)]|[•●○◦▪▫]|\p{Extended_Pictographic})\s*/u;
+
+const stripChipListPrefix = (line: string): string =>
+  line
+    .trim()
+    .replace(/^(?:[-*•]|\d+[.)])\s+/, '')
+    .replace(/^(?:[•●○◦▪▫])\s+/, '')
+    .replace(/^(?:\p{Extended_Pictographic}|\uFE0F|\u200D)+\s*/u, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const looksLikeChipOptionLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) {
+    return false;
+  }
+
+  if (CHIP_LIST_ITEM_PREFIX_PATTERN.test(line)) {
+    return true;
+  }
+
+  return trimmed.length <= 48 && !/[.:;]$/.test(trimmed);
+};
+
+const isChipSectionHeading = (line: string): boolean =>
+  CHIP_SECTION_HEADING_PATTERN.test(line) || OPTION_SECTION_HEADING_PATTERN.test(line);
+
+const extractChipBlockFromLines = (
+  lines: string[],
+  headerIndex: number,
+): { chipLabels: string[]; endIndex: number } => {
+  const chipLabels: string[] = [];
+  let endIndex = headerIndex;
+
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (trimmed.length === 0) {
+      if (chipLabels.length > 0) {
+        endIndex = index;
+        break;
+      }
+      continue;
+    }
+
+    if (!looksLikeChipOptionLine(line)) {
+      if (chipLabels.length > 0) {
+        endIndex = index - 1;
+      }
+      break;
+    }
+
+    const cleaned = stripChipListPrefix(line)
+      .replace(/^["'`]+|["'`]+$/g, '')
+      .trim();
+
+    if (cleaned.length === 0) {
+      continue;
+    }
+
+    chipLabels.push(cleaned.slice(0, 40));
+    endIndex = index;
+
+    if (chipLabels.length >= 4) {
+      break;
+    }
+  }
+
+  return { chipLabels, endIndex };
+};
+
+export const extractInlineChipBlock = (
+  text: string,
+): { text: string; chips: ChipAction[] } | null => {
+  const lines = text.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => isChipSectionHeading(line));
+
+  if (headerIndex === -1) {
+    return null;
+  }
+
+  const { chipLabels, endIndex } = extractChipBlockFromLines(lines, headerIndex);
+
+  const uniqueLabels = Array.from(new Set(chipLabels));
+  if (uniqueLabels.length < 2) {
+    return null;
+  }
+
+  const chips: ChipAction[] = uniqueLabels.map((label) => ({
+    label,
+    type: 'response',
+    responseText: label,
+  }));
+
+  const keptLines = lines.filter((_, index) => index < headerIndex || index > endIndex);
+  const cleanedText = keptLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  return {
+    text: cleanedText.length > 0 ? cleanedText : text.trim(),
+    chips,
+  };
 };
 
 const normalizeFallbackTaskTitle = (rawTitle: string): string =>
@@ -369,6 +488,104 @@ export const parseExplicitFallbackToolCall = (
 const truncate = (value: string, max: number): string =>
   value.length <= max ? value : `${value.slice(0, max - 3).trimEnd()}...`;
 
+const normalizeConversationTitle = (raw: string): string => {
+  const trimmed = raw
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/[.]+$/g, '')
+    .replace(/\s+/g, ' ');
+
+  if (trimmed.length === 0) {
+    return '';
+  }
+
+  return trimmed.length <= AUTO_TITLE_MAX_LENGTH
+    ? trimmed
+    : `${trimmed.slice(0, AUTO_TITLE_MAX_LENGTH - 3).trimEnd()}...`;
+};
+
+const fallbackConversationTitleFromUserMessage = (userMessage: string): string => {
+  const normalized = normalizeConversationTitle(userMessage);
+  if (normalized.length === 0) {
+    return DEFAULT_CONVERSATION_TITLE;
+  }
+
+  return normalized.length <= 40
+    ? normalized
+    : `${normalized.slice(0, 37).trimEnd()}...`;
+};
+
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const timeoutPromise = new Promise<T>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('Timed out.')), timeoutMs);
+    });
+
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+};
+
+const maybeAutoTitleConversation = async (input: {
+  conversationId: string;
+  userMessage: string;
+}): Promise<void> => {
+  if (!canAutoTitleConversation(input.conversationId)) {
+    return;
+  }
+
+  if (getConversationMessageCount(input.conversationId) < 2) {
+    return;
+  }
+
+  const fallback = fallbackConversationTitleFromUserMessage(input.userMessage);
+  let resolvedTitle = fallback;
+
+  try {
+    const provider = createOpenRouterProviderFromEnv();
+    const model = provider.chat(AUTO_TITLE_MODEL_ID);
+    const titlePrompt = [
+      'Generate a concise chat thread title.',
+      'Rules:',
+      '- 3 to 6 words.',
+      '- Use specific keywords and action verbs.',
+      '- No quotes.',
+      '- No trailing period.',
+      '- Output only the title text.',
+      `User message: ${input.userMessage.trim()}`,
+    ].join('\n');
+
+    const generated = await withTimeout(
+      generateText({
+        model,
+        messages: [{ role: 'user', content: titlePrompt }],
+        maxOutputTokens: 24,
+      }),
+      AUTO_TITLE_TIMEOUT_MS,
+    );
+
+    const normalized = normalizeConversationTitle(generated.text);
+    if (normalized.length > 0) {
+      resolvedTitle = normalized;
+    }
+  } catch {
+    // Keep fallback title when generation fails or times out.
+  }
+
+  if (!canAutoTitleConversation(input.conversationId)) {
+    return;
+  }
+
+  setConversationTitle(input.conversationId, resolvedTitle, false);
+};
+
 export const generateToolCallDescription = (
   toolName: string,
   args: unknown,
@@ -411,6 +628,10 @@ export const generateToolCallDescription = (
       return input.section ? `Updating memory section "${truncate(String(input.section), 30)}"` : 'Updating memory';
     case 'search_journal':
       return input.query ? `Searching journal for "${truncate(String(input.query), 30)}"` : 'Searching journal';
+    case 'search_chat_history':
+      return input.query
+        ? `Searching chat history for "${truncate(String(input.query), 30)}"`
+        : 'Searching chat history';
     case 'emit_chips':
       return 'Attaching chips';
     case 'improve_task':
@@ -516,6 +737,7 @@ const maybeWriteMeaningfulInteractionJournal = (input: {
 
 export type StartChatTurnInput = {
   content: string;
+  conversationId?: string;
   modelId?: string | null;
   images?: string[];
   noteContext?: ChatNoteContext;
@@ -527,6 +749,7 @@ export type StartChatTurnInput = {
 const runAssistantStream = async (
   input: {
     requestId: string;
+    conversationId: string;
     userMessage: string;
     modelId: ChatModelId;
     images?: string[];
@@ -537,6 +760,7 @@ const runAssistantStream = async (
 ): Promise<void> => {
   const actionCards: PersistedChatToolMetadata['actionCards'] = [];
   const toolExecutions: ChatToolExecutionSummary[] = [];
+  const mutationSignatures = new Set<string>();
   const telemetry: ChatTurnTelemetry = {
     startedAt: new Date().toISOString(),
     attemptCount: 0,
@@ -587,7 +811,10 @@ const runAssistantStream = async (
                 input.noteContext.markdown,
               ].join('\n')
             : null;
-        const recentHistory = getRecentChatMessages(HISTORY_WINDOW_LIMIT).filter(
+        const recentHistory = getRecentConversationMessages(
+          input.conversationId,
+          HISTORY_WINDOW_LIMIT,
+        ).filter(
           (message) => message.role === 'user' || message.role === 'assistant',
         );
         const conversationMessages = buildConversationMessages({
@@ -634,8 +861,33 @@ const runAssistantStream = async (
           return { role: 'user', content: msg.content };
         });
 
+        // Inactivity timeout: abort stream if no chunks arrive for 90 seconds
+        const STREAM_INACTIVITY_TIMEOUT_MS = 90_000;
+        const inactivityAbort = new AbortController();
+        let inactivityTimer: NodeJS.Timeout | null = null;
+
+        const clearInactivityTimer = (): void => {
+          if (inactivityTimer) {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = null;
+          }
+        };
+
+        const resetInactivityTimer = (): void => {
+          clearInactivityTimer();
+          inactivityTimer = setTimeout(() => {
+            inactivityTimer = null;
+            inactivityAbort.abort(
+              new Error('Stream inactivity timeout: no data received for 90 seconds.'),
+            );
+          }, STREAM_INACTIVITY_TIMEOUT_MS);
+        };
+
+        resetInactivityTimer();
+
         const result = streamText({
           model,
+          abortSignal: inactivityAbort.signal,
           system: noteContextPrompt
             ? `${builtPrompt.modelInputPrompt}\n\n${noteContextPrompt}`
             : builtPrompt.modelInputPrompt,
@@ -689,6 +941,7 @@ const runAssistantStream = async (
                 actionCards.push(card);
               },
               activeNoteId: input.noteContext?.noteId,
+              mutationSignatures,
             });
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
@@ -703,7 +956,10 @@ const runAssistantStream = async (
         });
 
         for await (const part of result.fullStream) {
+          resetInactivityTimer();
+
           if (isChatRequestCanceled(input.requestId)) {
+            clearInactivityTimer();
             return;
           }
 
@@ -830,6 +1086,8 @@ const runAssistantStream = async (
           }
         }
 
+        clearInactivityTimer();
+
         if (isChatRequestCanceled(input.requestId)) {
           return;
         }
@@ -857,6 +1115,7 @@ const runAssistantStream = async (
                 actionCards.push(card);
               },
               activeNoteId: input.noteContext?.noteId,
+              mutationSignatures,
             });
 
             if (isChatRequestCanceled(input.requestId)) {
@@ -971,6 +1230,11 @@ const runAssistantStream = async (
       finalizedTextFromModel.length > 0
         ? finalizedTextFromModel
         : synthesizedToolSummary;
+    const inlineChips = emittedChips ? null : extractInlineChipBlock(finalizedText);
+    const outputText = inlineChips?.text ?? finalizedText;
+    if (!emittedChips && inlineChips?.chips) {
+      emittedChips = inlineChips.chips;
+    }
 
     const metadata: PersistedChatToolMetadata = {
       requestId: input.requestId,
@@ -991,24 +1255,30 @@ const runAssistantStream = async (
     }
 
     const assistantMessage = saveChatMessage({
+      conversationId: input.conversationId,
       role: 'assistant',
       content:
-        finalizedText.length > 0
-          ? finalizedText
+        outputText.length > 0
+          ? outputText
           : 'No assistant text was generated for this turn.',
       toolCalls: JSON.stringify(metadata),
       chips: emittedChips ? JSON.stringify(emittedChips) : null,
     });
 
+    void maybeAutoTitleConversation({
+      conversationId: input.conversationId,
+      userMessage: input.userMessage,
+    });
+
     maybeWriteMeaningfulInteractionJournal({
       userMessage: input.userMessage,
-      assistantText: finalizedText,
+      assistantText: outputText,
       toolExecutions,
     });
 
     scheduleKnowledgeExtraction({
       userMessage: input.userMessage,
-      assistantResponse: finalizedText,
+      assistantResponse: outputText,
       requestId: input.requestId,
       emit,
     });
@@ -1055,6 +1325,7 @@ export const startChatTurn = async (
 
   const requestId = input.requestId ?? randomUUID();
   const modelId = input.modelId ? resolveModelId(input.modelId) : getSelectedModelId();
+  const conversation = ensureConversation(input.conversationId);
   activeChatRequestIds.add(requestId);
   canceledChatRequestIds.delete(requestId);
 
@@ -1086,6 +1357,7 @@ export const startChatTurn = async (
     }
 
     const userMessage = saveChatMessage({
+      conversationId: conversation.id,
       role: 'user',
       content,
       toolCalls: JSON.stringify(userMessageMeta),
@@ -1094,6 +1366,7 @@ export const startChatTurn = async (
 
     void runAssistantStream({
       requestId,
+      conversationId: conversation.id,
       userMessage: content,
       modelId,
       images,
@@ -1104,6 +1377,7 @@ export const startChatTurn = async (
 
     return {
       requestId,
+      conversationId: conversation.id,
       userMessage,
     };
   } catch (error) {
@@ -1124,6 +1398,7 @@ export const cancelActiveChatTurns = (): void => {
 export type StartProactiveTurnInput = {
   triggerMessage: string;
   triggerType: ProactiveTriggerType;
+  conversationId?: string;
   emit: (event: ChatStreamEvent) => void;
 };
 
@@ -1132,6 +1407,10 @@ export const startProactiveTurn = async (
 ): Promise<void> => {
   const requestId = `proactive-${randomUUID()}`;
   const modelId = getSelectedModelId();
+  const conversation =
+    input.conversationId
+      ? ensureConversation(input.conversationId)
+      : getMostRecentConversation(false) ?? ensureConversation();
   activeChatRequestIds.add(requestId);
   canceledChatRequestIds.delete(requestId);
 
@@ -1139,6 +1418,7 @@ export const startProactiveTurn = async (
   // The assistant response will be saved by runAssistantStream as normal.
   await runAssistantStream({
     requestId,
+    conversationId: conversation.id,
     userMessage: input.triggerMessage,
     modelId,
     emit: input.emit,

@@ -4,6 +4,13 @@ import type {
   ChatKernelOrchestrationResultPayload,
   ChatKernelStatusResultPayload,
 
+  ChatHistoryRequest,
+  ChatListThreadsRequest,
+  ChatListThreadsResult,
+  ChatCreateThreadRequest,
+  ChatCreateThreadResult,
+  ChatArchiveThreadRequest,
+  ChatDeleteThreadRequest,
   ChatRetentionResult,
   ChatSelectedModelResult,
   ChatSendRequest,
@@ -30,8 +37,6 @@ import type {
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
   MemoryPromotionEvaluationResultPayload,
-  ProactiveTriggerEvaluationRequestPayload,
-  ProactiveTriggerEvaluationResultPayload,
   BackupExportRequest,
   BackupExportDialogRequest,
   BackupExportDialogResponse,
@@ -82,9 +87,6 @@ export type FluskApi = {
   confirmMemoryPromotion: (
     request: MemoryPromotionConfirmRequestPayload,
   ) => Promise<MemoryPromotionConfirmResultPayload>;
-  evaluateProactiveTriggers: (
-    request: ProactiveTriggerEvaluationRequestPayload,
-  ) => Promise<ProactiveTriggerEvaluationResultPayload>;
   getChatKernelStatus: () => Promise<ChatKernelStatusResultPayload>;
   orchestrateChatWithKernel: (
     request: ChatKernelOrchestrationRequestPayload,
@@ -117,8 +119,12 @@ export type FluskApi = {
     onFocusMessage: (
       listener: (payload: ChatFocusMessagePayload) => void,
     ) => () => void;
-    history: () => Promise<ChatMessage[]>;
+    history: (payload: ChatHistoryRequest) => Promise<ChatMessage[]>;
     clear: () => Promise<void>;
+    listThreads: (payload?: ChatListThreadsRequest) => Promise<ChatListThreadsResult>;
+    createThread: (payload?: ChatCreateThreadRequest) => Promise<ChatCreateThreadResult>;
+    archiveThread: (payload: ChatArchiveThreadRequest) => Promise<void>;
+    deleteThread: (payload: ChatDeleteThreadRequest) => Promise<void>;
     getModels: () => Promise<ChatModelCatalogResult>;
     getSelectedModel: () => Promise<ChatSelectedModelResult>;
     setSelectedModel: (payload: ChatSetModelRequest) => Promise<ChatSelectedModelResult>;

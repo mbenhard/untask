@@ -90,46 +90,7 @@ export type MemoryPromotionConfirmResult = {
   decision: MemoryPromotionDecision;
 };
 
-export type ProactiveTriggerType =
-  | 'empty_today_list'
-  | 'overdue_accumulation'
-  | 'morning_briefing'
-  | 'deadline_approaching'
-  | 'time_reminder';
-
-export type ProactiveTriggerAction = {
-  label: string;
-  command: string;
-};
-
-export type ProactiveTriggerRecommendation = {
-  trigger: ProactiveTriggerType;
-  severity: 'low' | 'medium' | 'high';
-  message: string;
-  actions: ProactiveTriggerAction[];
-  generatedAt: string;
-};
-
-export type ProactiveTriggerEvaluation = {
-  trigger: ProactiveTriggerType;
-  eligible: boolean;
-  suppressedByCooldown: boolean;
-  reason?: string;
-  score: number;
-};
-
-export type ProactiveTriggerRequest = {
-  liveContext: AssistantLiveContext;
-  applyCooldown?: boolean;
-  recordSelection?: boolean;
-  now?: string;
-  timezone?: string;
-};
-
-export type ProactiveTriggerResult = {
-  recommendation?: ProactiveTriggerRecommendation;
-  evaluations: ProactiveTriggerEvaluation[];
-};
+export type ProactiveTriggerType = 'time_reminder';
 
 export type IdentityKernelStatus = {
   ready: boolean;
@@ -148,8 +109,6 @@ export type ChatKernelOrchestrationSuccess = {
   ok: true;
   kernelStatus: IdentityKernelStatus;
   context: IdentityContextDebugSnapshot;
-  proactiveRecommendation?: ProactiveTriggerRecommendation;
-  proactiveEvaluations: ProactiveTriggerEvaluation[];
   memoryDecision?: MemoryPromotionDecision;
 };
 

@@ -6,7 +6,7 @@ import started from 'electron-squirrel-startup';
 import { buildSystemPrompt } from './ai/systemPrompt';
 import { startProactiveTurn } from './ai/chat';
 import { checkAndGenerateWeeklyDigest } from './ai/weeklyDigest';
-import { initProactiveLoop, stopProactiveLoop, getProactiveLoop } from './assistant/proactiveLoop';
+import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
@@ -14,7 +14,7 @@ import {
   startDailyBackupScheduler,
   stopDailyBackupScheduler,
 } from './services/backupService';
-import { initSearchFts } from './services/searchService';
+import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting } from './services/settingsService';
 import { migrateLegacyMemoryLayers } from './ai/memory';
@@ -48,8 +48,8 @@ const createMainWindow = (): BrowserWindow => {
   const window = new BrowserWindow({
     width: 680,
     height: 720,
-    minWidth: 480,
-    minHeight: 520,
+    minWidth: 680,
+    minHeight: 720,
     maxWidth: 900,
     maxHeight: 900,
     frame: false,
@@ -82,6 +82,7 @@ const bootstrap = (): void => {
   runMigrations();
   migrateLegacyMemoryLayers();
   initSearchFts();
+  initChatSearchFts();
   registerIpcHandlers();
 
   mainWindow = createMainWindow();
@@ -179,7 +180,7 @@ app.whenReady().then(() => {
   runWeeklyDigestStartupCheck();
 
   // Initialize the proactive loop with chat pipeline dependency
-  const proactiveLoop = initProactiveLoop({
+  initProactiveLoop({
     startProactiveTurn: async (input) => {
       await startProactiveTurn({
         triggerMessage: input.triggerMessage,
@@ -189,9 +190,6 @@ app.whenReady().then(() => {
     },
   });
 
-  // Fire morning briefing check on first ready
-  void proactiveLoop.onAppOpen();
-
   const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow();
@@ -199,12 +197,6 @@ app.whenReady().then(() => {
       summonWindow();
     } else {
       summonWindow();
-    }
-
-    // Check for morning briefing on each activation
-    const loop = getProactiveLoop();
-    if (loop) {
-      void loop.onAppOpen();
     }
   };
 

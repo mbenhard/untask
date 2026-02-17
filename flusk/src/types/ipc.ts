@@ -8,11 +8,15 @@ import type {
   MemoryPromotionConfirmResult,
   MemoryPromotionEvaluationRequest,
   MemoryPromotionDecision,
-  ProactiveTriggerRequest,
-  ProactiveTriggerResult,
 } from './assistant';
 import type {
   ChatModelCatalogEntry,
+  ChatListConversationsRequestPayload,
+  ChatListConversationsResultPayload,
+  ChatCreateConversationRequestPayload,
+  ChatCreateConversationResultPayload,
+  ChatArchiveConversationRequestPayload,
+  ChatDeleteConversationRequestPayload,
   ChatRetentionPayload,
   ChatSendRequestPayload,
   ChatSendResultPayload,
@@ -49,7 +53,6 @@ export const IPC_CHANNELS = {
     'settings:get-identity-context-snapshot',
   SETTINGS_EVALUATE_MEMORY_PROMOTION: 'settings:evaluate-memory-promotion',
   SETTINGS_CONFIRM_MEMORY_PROMOTION: 'settings:confirm-memory-promotion',
-  SETTINGS_EVALUATE_PROACTIVE_TRIGGERS: 'settings:evaluate-proactive-triggers',
   CHAT_GET_KERNEL_STATUS: 'chat:get-kernel-status',
   CHAT_ORCHESTRATE_WITH_KERNEL: 'chat:orchestrate-with-kernel',
   // ─── Database domain channels ─────────────────────────────
@@ -64,6 +67,10 @@ export const IPC_CHANNELS = {
   CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_HISTORY: 'chat:history',
   CHAT_CLEAR: 'chat:clear',
+  CHAT_CREATE_THREAD: 'chat:create-thread',
+  CHAT_LIST_THREADS: 'chat:list-threads',
+  CHAT_ARCHIVE_THREAD: 'chat:archive-thread',
+  CHAT_DELETE_THREAD: 'chat:delete-thread',
   CHAT_GET_MODELS: 'chat:get-models',
   CHAT_GET_SELECTED_MODEL: 'chat:get-selected-model',
   CHAT_SET_SELECTED_MODEL: 'chat:set-selected-model',
@@ -114,9 +121,6 @@ export type MemoryPromotionEvaluationResultPayload = MemoryPromotionDecision;
 export type MemoryPromotionConfirmRequestPayload = MemoryPromotionConfirmRequest;
 export type MemoryPromotionConfirmResultPayload = MemoryPromotionConfirmResult;
 
-export type ProactiveTriggerEvaluationRequestPayload = ProactiveTriggerRequest;
-export type ProactiveTriggerEvaluationResultPayload = ProactiveTriggerResult;
-
 export type ChatKernelStatusResultPayload = IdentityKernelStatus;
 export type ChatKernelOrchestrationRequestPayload =
   ChatKernelOrchestrationRequest;
@@ -124,6 +128,15 @@ export type ChatKernelOrchestrationResultPayload = ChatKernelOrchestrationResult
 
 export type ChatSendRequest = ChatSendRequestPayload;
 export type ChatSendResult = ChatSendResultPayload;
+export type ChatHistoryRequest = {
+  conversationId: string;
+};
+export type ChatListThreadsRequest = ChatListConversationsRequestPayload;
+export type ChatListThreadsResult = ChatListConversationsResultPayload;
+export type ChatCreateThreadRequest = ChatCreateConversationRequestPayload;
+export type ChatCreateThreadResult = ChatCreateConversationResultPayload;
+export type ChatArchiveThreadRequest = ChatArchiveConversationRequestPayload;
+export type ChatDeleteThreadRequest = ChatDeleteConversationRequestPayload;
 export type ChatStreamEventPayload = ChatStreamEvent;
 export type ChatModelCatalogResult = ChatModelCatalogEntry[];
 export type ChatSelectedModelResult = ChatSelectedModelPayload;

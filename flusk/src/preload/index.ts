@@ -6,6 +6,13 @@ import {
   type ChatKernelOrchestrationResultPayload,
   type ChatKernelStatusResultPayload,
 
+  type ChatHistoryRequest,
+  type ChatListThreadsRequest,
+  type ChatListThreadsResult,
+  type ChatCreateThreadRequest,
+  type ChatCreateThreadResult,
+  type ChatArchiveThreadRequest,
+  type ChatDeleteThreadRequest,
   type ChatRetentionResult,
   type ChatSelectedModelResult,
   type ChatSendRequest,
@@ -33,8 +40,6 @@ import {
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
   type MemoryPromotionEvaluationResultPayload,
-  type ProactiveTriggerEvaluationRequestPayload,
-  type ProactiveTriggerEvaluationResultPayload,
   type BackupExportRequest,
   type BackupExportDialogRequest,
   type BackupExportDialogResponse,
@@ -118,13 +123,6 @@ const fluskApi: FluskApi = {
     request: MemoryPromotionConfirmRequestPayload,
   ): Promise<MemoryPromotionConfirmResultPayload> =>
     ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_CONFIRM_MEMORY_PROMOTION, request),
-  evaluateProactiveTriggers: (
-    request: ProactiveTriggerEvaluationRequestPayload,
-  ): Promise<ProactiveTriggerEvaluationResultPayload> =>
-    ipcRenderer.invoke(
-      IPC_CHANNELS.SETTINGS_EVALUATE_PROACTIVE_TRIGGERS,
-      request,
-    ),
   getChatKernelStatus: (): Promise<ChatKernelStatusResultPayload> =>
     ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_KERNEL_STATUS),
   orchestrateChatWithKernel: (
@@ -184,8 +182,21 @@ const fluskApi: FluskApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.CHAT_FOCUS_MESSAGE, wrapped);
       };
     },
-    history: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_HISTORY),
+    history: (payload: ChatHistoryRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_HISTORY, payload),
     clear: () => ipcRenderer.invoke(IPC_CHANNELS.CHAT_CLEAR),
+    listThreads: (
+      payload?: ChatListThreadsRequest,
+    ): Promise<ChatListThreadsResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_THREADS, payload),
+    createThread: (
+      payload?: ChatCreateThreadRequest,
+    ): Promise<ChatCreateThreadResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_CREATE_THREAD, payload),
+    archiveThread: (payload: ChatArchiveThreadRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_ARCHIVE_THREAD, payload),
+    deleteThread: (payload: ChatDeleteThreadRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CHAT_DELETE_THREAD, payload),
     getModels: (): Promise<ChatModelCatalogResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_GET_MODELS),
     getSelectedModel: (): Promise<ChatSelectedModelResult> =>

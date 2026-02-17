@@ -3,93 +3,37 @@ import { BrowserWindow, Notification } from 'electron';
 import type { ProactiveTriggerType } from '../../types/assistant';
 import type { ChatStreamEvent } from '../../types/chat';
 import { IPC_CHANNELS } from '../../types/ipc';
-import { buildCanonicalRuntimeContext } from '../ai/contextBuilder';
 import { parseDueDate } from '../services/dueDateParser';
 import { listTasks, subscribeTaskChanges } from '../services/taskService';
-import { getSetting, setSetting } from '../services/settingsService';
-
-import { evaluateProactiveTriggers } from './proactiveTriggers';
 
 // ─── Constants ──────────────────────────────────────────────
 
-const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-const LAST_MORNING_BRIEFING_KEY = 'proactive_last_morning_briefing';
 const MAX_SETTIMEOUT_MS = 2_147_483_647; // 2^31 - 1 (~24.8 days)
 
-// ─── Cooldown system ────────────────────────────────────────
-
-const COOLDOWN_CONFIG: Record<ProactiveTriggerType, number> = {
-  morning_briefing: 24 * 60, // once per day
-  overdue_accumulation: 120,
-  empty_today_list: 90,
-  deadline_approaching: 240,
-  time_reminder: Infinity, // per-task, handled separately
-};
+// ─── Per-task cooldown (prevents re-reminding same task) ────
 
 const cooldownMap = new Map<string, number>();
 
-const isCooldownActive = (key: string, cooldownMinutes: number, nowMs: number): boolean => {
-  const lastFired = cooldownMap.get(key);
-  if (!lastFired) return false;
-  return nowMs - lastFired < cooldownMinutes * 60 * 1000;
+const isCooldownActive = (key: string, nowMs: number): boolean => {
+  return cooldownMap.has(key);
 };
 
-const recordCooldown = (key: string, nowMs: number): void => {
-  cooldownMap.set(key, nowMs);
+const recordCooldown = (key: string): void => {
+  cooldownMap.set(key, Date.now());
 };
 
-// ─── Trigger message templates ──────────────────────────────
+// ─── Trigger message template ───────────────────────────────
 
-const TRIGGER_TEMPLATES: Record<ProactiveTriggerType, string> = {
-  morning_briefing:
-    '[PROACTIVE TRIGGER: morning_briefing]\n' +
-    "It's the start of a new working day. Review Marcus's current state — " +
-    'today list, overdue tasks, upcoming deadlines, client touchpoints, inbox — ' +
-    'and deliver a concise morning briefing. Read your Memory and recent Journal ' +
-    'entries for context. End with 2-3 action chips for the most impactful next steps.',
-
-  overdue_accumulation:
-    '[PROACTIVE TRIGGER: overdue_accumulation]\n' +
-    'Overdue tasks are accumulating. Surface the top blocker, explain the risk, ' +
-    'and propose one concrete next step. Include chips for quick triage.',
-
-  empty_today_list:
-    '[PROACTIVE TRIGGER: empty_today_list]\n' +
-    "Marcus's Today list is empty during working hours. Propose a focused plan " +
-    'for the day based on deadlines, priorities, and recent momentum. Include chips.',
-
-  deadline_approaching:
-    '[PROACTIVE TRIGGER: deadline_approaching]\n' +
-    'A task deadline is approaching within 48 hours. Surface it, assess readiness, ' +
-    'and suggest the next concrete step. Include chips.',
-
-  time_reminder:
-    '[PROACTIVE TRIGGER: time_reminder]\n' +
-    'The following task is due now. Remind Marcus briefly ' +
-    'and suggest immediate action. Include chips.',
-};
+const TRIGGER_TEMPLATE =
+  '[PROACTIVE TRIGGER: time_reminder]\n' +
+  'The following task is due now. Remind Marcus briefly ' +
+  'and suggest immediate action. Include chips.';
 
 const buildTriggerMessage = (
-  trigger: ProactiveTriggerType,
   taskContext?: { id: string; title: string },
 ): string => {
-  const template = TRIGGER_TEMPLATES[trigger];
-  if (!taskContext) return template;
-  return `${template}\nTask: "${taskContext.title}" (ID: ${taskContext.id})`;
-};
-
-const toLocalDateKey = (now: Date, timezone: string): string => {
-  try {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    return formatter.format(now);
-  } catch {
-    return now.toISOString().slice(0, 10);
-  }
+  if (!taskContext) return TRIGGER_TEMPLATE;
+  return `${TRIGGER_TEMPLATE}\nTask: "${taskContext.title}" (ID: ${taskContext.id})`;
 };
 
 // ─── Stream event emitter ───────────────────────────────────
@@ -134,9 +78,7 @@ export type ProactiveLoopDeps = {
 };
 
 export class ProactiveLoop {
-  private intervalId: NodeJS.Timeout | null = null;
   private deps: ProactiveLoopDeps;
-  private running = false;
   private reminderTimers = new Map<string, NodeJS.Timeout>();
   private rescheduleTimer: NodeJS.Timeout | null = null;
   private unsubscribeTaskChange: (() => void) | null = null;
@@ -146,12 +88,6 @@ export class ProactiveLoop {
   }
 
   start(): void {
-    if (this.intervalId) return;
-
-    this.intervalId = setInterval(() => {
-      void this.evaluate();
-    }, INTERVAL_MS);
-
     this.unsubscribeTaskChange = subscribeTaskChanges(() => {
       this.onTaskChange();
     });
@@ -159,14 +95,10 @@ export class ProactiveLoop {
     this.scheduleUpcomingReminders();
 
     // eslint-disable-next-line no-console
-    console.info('[proactive-loop] started (interval: 30min)');
+    console.info('[proactive-loop] started (time reminders only)');
   }
 
   stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
     for (const timer of this.reminderTimers.values()) {
       clearTimeout(timer);
     }
@@ -186,25 +118,7 @@ export class ProactiveLoop {
     console.info('[proactive-loop] stopped');
   }
 
-  async onAppOpen(): Promise<void> {
-    const now = new Date();
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const today = toLocalDateKey(now, timezone);
-    const lastBriefing = getSetting(LAST_MORNING_BRIEFING_KEY);
-    if (lastBriefing === today) return;
-
-    setSetting(LAST_MORNING_BRIEFING_KEY, today);
-    recordCooldown('morning_briefing', now.getTime());
-
-    await this.fireProactiveMessage('morning_briefing');
-  }
-
-  onTaskChange(): void {
-    // Debounce: don't evaluate immediately, schedule in 2s
-    setTimeout(() => {
-      void this.evaluate();
-    }, 2000);
-
+  private onTaskChange(): void {
     // Debounce reminder reschedule (2s, latest wins)
     if (this.rescheduleTimer) clearTimeout(this.rescheduleTimer);
     this.rescheduleTimer = setTimeout(() => {
@@ -248,13 +162,13 @@ export class ProactiveLoop {
 
       // Skip if already reminded for this task
       const cooldownKey = `time_reminder:${task.id}`;
-      if (isCooldownActive(cooldownKey, Infinity, nowMs)) continue;
+      if (isCooldownActive(cooldownKey, nowMs)) continue;
 
       const taskContext = { id: task.id, title: task.title };
       const timer = setTimeout(() => {
         this.reminderTimers.delete(task.id);
-        recordCooldown(cooldownKey, Date.now());
-        void this.fireProactiveMessage('time_reminder', taskContext);
+        recordCooldown(cooldownKey);
+        void this.fireProactiveMessage(taskContext);
       }, delay);
 
       this.reminderTimers.set(task.id, timer);
@@ -266,50 +180,10 @@ export class ProactiveLoop {
     }
   }
 
-  private async evaluate(): Promise<void> {
-    if (this.running) return;
-    this.running = true;
-
-    try {
-      const now = new Date();
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      const { liveContext } = buildCanonicalRuntimeContext();
-      const triggers = evaluateProactiveTriggers({
-        liveContext,
-        now: now.toISOString(),
-        timezone,
-      });
-
-      if (triggers.length === 0) return;
-
-      // Pick highest priority that isn't on cooldown
-      const nowMs = now.getTime();
-      const selected = triggers.find((t) => {
-        const cooldownMinutes = COOLDOWN_CONFIG[t.trigger] ?? 120;
-        return !isCooldownActive(t.trigger, cooldownMinutes, nowMs);
-      });
-
-      if (!selected) return;
-
-      recordCooldown(selected.trigger, nowMs);
-      await this.fireProactiveMessage(selected.trigger);
-
-      // Refresh reminder schedule on each evaluation cycle
-      this.scheduleUpcomingReminders();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('[proactive-loop] evaluation error:', error);
-    } finally {
-      this.running = false;
-    }
-  }
-
   private async fireProactiveMessage(
-    trigger: ProactiveTriggerType,
     taskContext?: { id: string; title: string },
   ): Promise<void> {
-    const message = buildTriggerMessage(trigger, taskContext);
+    const message = buildTriggerMessage(taskContext);
     if (!message) return;
 
     const isWindowFocused = BrowserWindow.getAllWindows().some(
@@ -319,7 +193,7 @@ export class ProactiveLoop {
     try {
       await this.deps.startProactiveTurn({
         triggerMessage: message,
-        triggerType: trigger,
+        triggerType: 'time_reminder',
         emit: (event) => {
           emitToAllWindows(event);
 
@@ -333,7 +207,7 @@ export class ProactiveLoop {
               const firstSentence = content.split(/[.!?]\s/)[0] ?? content;
               if (assistantMessage?.id) {
                 showNativeNotification(
-                  triggerLabel(trigger),
+                  'Reminder',
                   firstSentence.slice(0, 100),
                   () => {
                     const windows = BrowserWindow.getAllWindows();
@@ -346,7 +220,7 @@ export class ProactiveLoop {
                 );
               } else {
                 showNativeNotification(
-                  triggerLabel(trigger),
+                  'Reminder',
                   firstSentence.slice(0, 100),
                 );
               }
@@ -356,20 +230,10 @@ export class ProactiveLoop {
       });
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn(`[proactive-loop] failed to fire ${trigger}:`, error);
+      console.warn('[proactive-loop] failed to fire time_reminder:', error);
     }
   }
 }
-
-const triggerLabel = (trigger: ProactiveTriggerType): string => {
-  switch (trigger) {
-    case 'morning_briefing': return 'Morning Briefing';
-    case 'overdue_accumulation': return 'Overdue Tasks';
-    case 'empty_today_list': return 'Plan Your Day';
-    case 'deadline_approaching': return 'Deadline Approaching';
-    case 'time_reminder': return 'Reminder';
-  }
-};
 
 // ─── Singleton ──────────────────────────────────────────────
 
