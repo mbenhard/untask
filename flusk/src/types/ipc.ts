@@ -113,6 +113,13 @@ export const IPC_CHANNELS = {
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
   SETTINGS_GET_MEMORY_HISTORY: 'settings:get-memory-history',
   SETTINGS_UNDO_MEMORY_EVENT: 'settings:undo-memory-event',
+  // ─── Attachment channels ─────────────────────────────────
+  ATTACHMENT_SAVE: 'attachment:save',
+  ATTACHMENT_OPEN: 'attachment:open',
+  ATTACHMENT_REVEAL: 'attachment:reveal',
+  ATTACHMENT_DELETE: 'attachment:delete',
+  ATTACHMENT_READ: 'attachment:read',
+  ATTACHMENT_PICK_AND_SAVE: 'attachment:pick-and-save',
 } as const;
 
 export type SettingsBootstrapState = {
@@ -344,4 +351,20 @@ export type ApiKeysValidateRequest = {
 export type ApiKeysValidateResult = {
   valid: boolean;
   error?: string;
+};
+
+// ─── Attachment payloads ──────────────────────────────────
+
+export type AttachmentSaveRequest = {
+  data: Uint8Array;
+  filename: string;
+};
+
+export type AttachmentIdRequest = {
+  id: string;
+};
+
+export type AttachmentPickAndSaveResult = {
+  canceled: boolean;
+  urls: string[];
 };

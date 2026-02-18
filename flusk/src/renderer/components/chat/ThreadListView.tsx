@@ -6,12 +6,11 @@ import type { ChatConversationSummary } from '../../../types/chat';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 
-type ThreadDropdownProps = {
-  open: boolean;
+type ThreadListViewProps = {
   conversations: ChatConversationSummary[];
   activeConversationId: string | null;
   isLoading: boolean;
-  onClose: () => void;
+  onCollapse: () => void;
   onSelect: (conversationId: string) => void;
   onCreate: () => void;
   onArchive: (conversationId: string) => void;
@@ -115,27 +114,23 @@ const groupConversations = (
     }));
 };
 
-export const ThreadDropdown = ({
-  open,
+export const ThreadListView = ({
   conversations,
   activeConversationId,
   isLoading,
-  onClose,
+  onCollapse,
   onSelect,
   onCreate,
   onArchive,
   onDelete,
-}: ThreadDropdownProps) => {
+}: ThreadListViewProps) => {
   const [query, setQuery] = useState('');
   const [cursorIndex, setCursorIndex] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) {
-      setQuery('');
-      setCursorIndex(0);
-      return;
-    }
+    setQuery('');
+    setCursorIndex(0);
 
     const frame = window.requestAnimationFrame(() => {
       searchRef.current?.focus();
@@ -145,7 +140,7 @@ export const ThreadDropdown = ({
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [open]);
+  }, []);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -171,17 +166,13 @@ export const ThreadDropdown = ({
     }
   }, [cursorIndex, flatIds.length]);
 
-  if (!open) {
-    return null;
-  }
-
   return (
     <div
-      className="absolute right-0 top-full z-40 mt-2 w-[312px] overflow-hidden rounded-lg border border-border/70 bg-card/95 shadow-xl backdrop-blur"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
-          onClose();
+          onCollapse();
           return;
         }
 
@@ -205,7 +196,6 @@ export const ThreadDropdown = ({
           if (targetId) {
             event.preventDefault();
             onSelect(targetId);
-            onClose();
           }
         }
       }}
@@ -229,7 +219,6 @@ export const ThreadDropdown = ({
           className="mt-2 w-full justify-start"
           onClick={() => {
             onCreate();
-            onClose();
           }}
         >
           <Plus className="size-3.5" />
@@ -237,7 +226,7 @@ export const ThreadDropdown = ({
         </Button>
       </div>
 
-      <div className="max-h-[400px] overflow-y-auto p-1.5">
+      <div className="flex-1 overflow-y-auto p-1.5">
         {isLoading ? (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">Loading threads...</p>
         ) : grouped.length === 0 ? (
@@ -270,13 +259,12 @@ export const ThreadDropdown = ({
                         className="min-w-0 flex-1 text-left"
                         onClick={() => {
                           onSelect(conversation.id);
-                          onClose();
                         }}
                       >
                         <p className="truncate text-xs text-foreground">{conversation.title}</p>
                         <p className="text-[10px] text-muted-foreground/80">
                           {formatRelativeTimestamp(conversation.updatedAt ?? conversation.createdAt)}
-                          {showArchived ? ' • archived' : ''}
+                          {showArchived ? ' \u2022 archived' : ''}
                         </p>
                       </button>
 

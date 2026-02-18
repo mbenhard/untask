@@ -65,6 +65,9 @@ import {
   type ApiKeysDeleteRequest,
   type ApiKeysValidateRequest,
   type ApiKeysValidateResult,
+  type AttachmentSaveRequest,
+  type AttachmentIdRequest,
+  type AttachmentPickAndSaveResult,
 } from '../types/ipc';
 import type { MemoryLayer } from '../types/assistant';
 import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
@@ -130,6 +133,13 @@ import {
 } from './ai/autonomy';
 import { executeToolCall } from './ai/tools';
 import { refreshTodayBadge } from './tray';
+import {
+  saveAttachment,
+  openAttachment,
+  revealAttachment,
+  deleteAttachment,
+  readAttachment,
+} from './attachments';
 import {
   requestHideFromRenderer,
   onEscapeLayerExit,
@@ -1176,6 +1186,89 @@ export const registerIpcHandlers = (): void => {
         };
       }
       catch (e) { console.error('[ipc] SETTINGS_READ_JOURNAL:', e); throw e; }
+    },
+  );
+
+  // ─── Attachment handlers ─────────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_SAVE,
+    async (_event, request: AttachmentSaveRequest): Promise<string> => {
+      try {
+        return await saveAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_SAVE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_OPEN,
+    async (_event, request: AttachmentIdRequest): Promise<void> => {
+      try {
+        await openAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_OPEN:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_REVEAL,
+    (_event, request: AttachmentIdRequest): void => {
+      try {
+        revealAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_REVEAL:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_DELETE,
+    async (_event, request: AttachmentIdRequest): Promise<void> => {
+      try {
+        await deleteAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_DELETE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_READ,
+    async (_event, request: AttachmentIdRequest): Promise<string> => {
+      try {
+        return await readAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_READ:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE,
+    async (event): Promise<AttachmentPickAndSaveResult> => {
+      try {
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Attach files',
+          properties: ['openFile' as const, 'multiSelections' as const],
+        };
+        const result = owner
+          ? await dialog.showOpenDialog(owner, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
+
+        if (result.canceled || result.filePaths.length === 0) {
+          return { canceled: true, urls: [] };
+        }
+
+        const { readFile } = await import('node:fs/promises');
+        const path = await import('node:path');
+
+        const urls: string[] = [];
+        for (const filePath of result.filePaths) {
+          const data = await readFile(filePath);
+          const filename = path.basename(filePath);
+          const url = await saveAttachment({
+            data: new Uint8Array(data),
+            filename,
+          });
+          urls.push(url);
+        }
+
+        return { canceled: false, urls };
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_PICK_AND_SAVE:', e); throw e; }
     },
   );
 };

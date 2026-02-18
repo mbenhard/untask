@@ -64,6 +64,9 @@ import {
   type SettingsSetAiEnabledResult,
   type ApiKeysHasResult,
   type ApiKeysValidateResult,
+  type AttachmentSaveRequest,
+  type AttachmentIdRequest,
+  type AttachmentPickAndSaveResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { FluskApi } from '../types/preload';
@@ -303,6 +306,20 @@ const fluskApi: FluskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_DELETE, { provider }),
     validate: (provider: string, key: string): Promise<ApiKeysValidateResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_VALIDATE, { provider, key }),
+  },
+  attachments: {
+    save: (request: AttachmentSaveRequest): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_SAVE, request),
+    open: (request: AttachmentIdRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_OPEN, request),
+    reveal: (request: AttachmentIdRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_REVEAL, request),
+    delete: (request: AttachmentIdRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_DELETE, request),
+    read: (request: AttachmentIdRequest): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_READ, request),
+    pickAndSave: (): Promise<AttachmentPickAndSaveResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE),
   },
 };
 

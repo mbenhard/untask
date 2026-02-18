@@ -61,6 +61,9 @@ import type {
   SettingsSetAiEnabledResult,
   ApiKeysHasResult,
   ApiKeysValidateResult,
+  AttachmentSaveRequest,
+  AttachmentIdRequest,
+  AttachmentPickAndSaveResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -179,6 +182,14 @@ export type FluskApi = {
     set: (provider: string, key: string) => Promise<void>;
     delete: (provider: string) => Promise<void>;
     validate: (provider: string, key: string) => Promise<ApiKeysValidateResult>;
+  };
+  attachments: {
+    save: (request: AttachmentSaveRequest) => Promise<string>;
+    open: (request: AttachmentIdRequest) => Promise<void>;
+    reveal: (request: AttachmentIdRequest) => Promise<void>;
+    delete: (request: AttachmentIdRequest) => Promise<void>;
+    read: (request: AttachmentIdRequest) => Promise<string>;
+    pickAndSave: () => Promise<AttachmentPickAndSaveResult>;
   };
 };
 

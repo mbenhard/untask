@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 
 import type { BlockNoteEditor, PartialBlock } from '@blocknote/core';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
@@ -29,7 +29,11 @@ export type BlockEditorProps = {
   editable?: boolean;
   /** Custom slash-menu items. If omitted, BlockNote defaults are used. */
   getSlashMenuItems?: (editor: BlockNoteEditor) => DefaultReactSuggestionItem[];
+  /** Ref to access the editor instance from parent components. */
+  editorRef?: MutableRefObject<BlockNoteEditor | null>;
 };
+
+const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50 MB
 
 export const BlockEditor = ({
   content,
@@ -39,9 +43,35 @@ export const BlockEditor = ({
   className,
   editable = true,
   getSlashMenuItems,
+  editorRef,
 }: BlockEditorProps) => {
   const { resolvedTheme } = useTheme();
-  const editor = useCreateBlockNote();
+  const editor = useCreateBlockNote({
+    uploadFile: async (file: File) => {
+      if (file.size > MAX_ATTACHMENT_SIZE) {
+        throw new Error('File exceeds 50MB limit');
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const url = await window.flusk?.attachments.save({
+        data: new Uint8Array(arrayBuffer),
+        filename: file.name,
+      });
+      return url ?? '';
+    },
+  });
+
+  // Expose editor instance to parent via ref
+  useEffect(() => {
+    if (editorRef) {
+      editorRef.current = editor;
+    }
+    return () => {
+      if (editorRef) {
+        editorRef.current = null;
+      }
+    };
+  }, [editor, editorRef]);
 
   const hasHydratedRef = useRef(false);
   const isHydratingRef = useRef(false);

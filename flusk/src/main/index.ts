@@ -1,4 +1,5 @@
 import { app, BrowserWindow, nativeImage } from 'electron';
+import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -32,6 +33,9 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 }
+
+// Must run before app.whenReady() — declares untask-file as a privileged scheme.
+registerAttachmentScheme();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -79,6 +83,7 @@ const createMainWindow = (): BrowserWindow => {
 };
 
 const bootstrap = (): void => {
+  registerAttachmentProtocol();
   initDatabase();
   runMigrations();
   ensureDefaultTaskStatusConfig();

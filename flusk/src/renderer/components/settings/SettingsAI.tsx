@@ -172,7 +172,7 @@ const COST_TIER_LABEL: Record<CostTier, string> = {
 
 const SETTING_KEY_AI_PROVIDER = 'ai_provider';
 const SETTING_KEY_AI_OLLAMA_BASE_URL = 'ai_ollama_base_url';
-const SETTING_KEY_AI_SHOW_ALL_MODELS = 'ai_show_all_models';
+
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -229,8 +229,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   // Model
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
-  const [isLoadingShowAll, setIsLoadingShowAll] = useState(false);
+
 
   // Behavior
   const [autonomyMode, setAutonomyMode] = useState<'auto' | 'confirm'>('auto');
@@ -307,17 +306,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     }
   }, [setError]);
 
-  const loadShowAllModels = useCallback(async () => {
-    try {
-      setIsLoadingShowAll(true);
-      const stored = await getUntask().settings.get(SETTING_KEY_AI_SHOW_ALL_MODELS);
-      setShowAllModels(stored === 'true');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load model display preference.');
-    } finally {
-      setIsLoadingShowAll(false);
-    }
-  }, [setError]);
+
 
   const loadAutonomyMode = useCallback(async () => {
     try {
@@ -350,7 +339,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
       void loadApiKeyStatus(resolvedProvider);
       void loadOllamaBaseUrl();
       void loadSelectedModel();
-      void loadShowAllModels();
       void loadAutonomyMode();
       void loadRetentionMode();
     })();
@@ -360,7 +348,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     loadApiKeyStatus,
     loadOllamaBaseUrl,
     loadSelectedModel,
-    loadShowAllModels,
     loadAutonomyMode,
     loadRetentionMode,
   ]);
@@ -531,17 +518,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     [selectedModelId, setError, setNotice],
   );
 
-  const handleShowAllModelsToggle = useCallback(async () => {
-    const next = !showAllModels;
-    setShowAllModels(next);
 
-    try {
-      await getUntask().settings.set(SETTING_KEY_AI_SHOW_ALL_MODELS, String(next));
-    } catch (e) {
-      setShowAllModels(!next);
-      setError(e instanceof Error ? e.message : 'Failed to update model display preference.');
-    }
-  }, [showAllModels, setError]);
 
   const handleAutonomyChange = useCallback(
     async (mode: 'auto' | 'confirm') => {
@@ -584,8 +561,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   // ─── Derived values ──────────────────────────────────────────────────────────
 
   const providerModels = getCuratedModelsForProvider(provider);
-  const displayedModels = showAllModels ? providerModels : providerModels.filter((m) => m.isRecommended);
-  const modelOptions = displayedModels.map((m) => ({
+  const modelOptions = providerModels.map((m) => ({
     value: m.id,
     label: buildModelLabel(m),
   }));
@@ -778,16 +754,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 className="max-w-[260px]"
               />
             </SettingsRow>
-            <div className="flex items-center justify-end px-2 py-1">
-              <button
-                type="button"
-                onClick={() => void handleShowAllModelsToggle()}
-                disabled={isLoadingShowAll}
-                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-              >
-                {showAllModels ? 'Show fewer models' : 'Show all models'}
-              </button>
-            </div>
           </SettingsSection>
 
           {/* ── Behavior ──────────────────────────────────────────────────── */}

@@ -47,15 +47,30 @@ chatView: 'threads' | 'conversation'
 setChatView: (view: 'threads' | 'conversation') => void
 ```
 
-**Default on open:**
-- If an active conversation exists (`activeConversationId !== null`) → `'conversation'`
-- If no active conversation → `'threads'`
+**Default on open — derived in `openChatOverlay`:**
+
+The `openChatOverlay` action in `appStore.ts` currently just sets `chatOverlayState: 'open'`. It needs to also derive and set `chatView`:
+
+```typescript
+openChatOverlay: () => {
+  // Need access to chatStore's activeConversationId.
+  // Import useChatStore.getState or pass it via a parameter.
+  const hasActiveConversation = useChatStore.getState().activeConversationId !== null;
+  set({
+    chatOverlayState: 'open',
+    unreadProactive: false,
+    chatView: hasActiveConversation ? 'conversation' : 'threads',
+  });
+}
+```
+
+This means `appStore.openChatOverlay` gains a cross-store dependency on `chatStore`. Since both are vanilla zustand stores (not React hooks), `useChatStore.getState()` is safe to call from inside `appStore`'s action.
 
 **Transitions:**
 - Selecting a thread from the list → `setChatView('conversation')` + `setActiveConversation(id)`
-- Creating a new thread → `createConversation()` + `setChatView('conversation')`
+- Creating a new thread → `await createConversation()` then `setChatView('conversation')` (must await since `createConversation` is async)
 - Pressing back arrow in conversation header → `setChatView('threads')`
-- Collapsing the panel → reset to default on next open
+- Collapsing the panel → no explicit reset needed; `openChatOverlay` re-derives on next open
 
 ### View transition animation
 
@@ -64,11 +79,11 @@ Simple crossfade using `AnimatePresence` with `mode="wait"`:
 ```tsx
 <AnimatePresence mode="wait">
   {chatView === 'threads' ? (
-    <motion.div key="threads" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+    <motion.div key="threads" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0 }}>
       <ThreadListView ... />
     </motion.div>
   ) : (
-    <motion.div key="conversation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+    <motion.div key="conversation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0 }}>
       <ChatView ... />
       <ChatInput ... />
     </motion.div>
@@ -77,6 +92,28 @@ Simple crossfade using `AnimatePresence` with `mode="wait"`:
 ```
 
 No horizontal slide — crossfade is simpler and consistent with the app's existing motion style.
+
+**Duration**: Use `duration: 0` to match the app's existing view transition convention (see `overlayTransition` in `AppShell.tsx`). The crossfade is effectively instant — `AnimatePresence` still handles mount/unmount correctly with zero-duration transitions.
+
+### Focus management on view switch
+
+The existing `useEffect` in `AppShell.tsx` focuses the chat input when `chatOverlayState` becomes `'open'`. This doesn't re-fire when switching from threads → conversation within an already-open panel.
+
+Add a second effect:
+
+```typescript
+// Focus chat input when switching to conversation view while panel is already open
+useEffect(() => {
+  if (chatOverlayState === 'open' && chatView === 'conversation') {
+    const frameId = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }
+}, [chatView, chatOverlayState]);
+```
+
+When switching to thread list view, `ThreadListView` handles its own search input auto-focus on mount (existing behavior from `ThreadDropdown`).
 
 ---
 
@@ -209,7 +246,11 @@ With:
 
 The `smooth-bop` variant (v6) has a calm rise-hold-land rhythm that reads as "working on it" without being distracting. The shadow bobbing reinforces the grounded feel.
 
-Reduced motion fallback keeps the existing "Thinking..." static text.
+**Reduced motion fallback:** The `StreamingIndicator` component should conditionally render based on `prefersReducedMotion` (which it already receives as a prop):
+- Normal: `<BirdMascot size={26} animated variant="smooth-bop" />`
+- Reduced motion: `<BirdMascot size={26} />` (static bird, no animation — NOT the old "Thinking..." text)
+
+The `BirdMascot` component itself also respects `prefers-reduced-motion` as a safety net, but the explicit conditional in `StreamingIndicator` keeps the intent clear.
 
 ### 4c. Message avatar (16-18px, static)
 
@@ -243,11 +284,15 @@ Rename and refactor:
 **Keep:**
 - Search input with auto-focus on mount
 - Time-grouped conversation list (Today, Yesterday, This Week, This Month, Older)
-- Keyboard navigation (ArrowUp/Down/Enter/Escape)
+- Keyboard navigation (ArrowUp/Down/Enter)
 - Per-item hover actions (archive, delete)
 - Active item highlighting
 - Loading skeleton state
 - `onSelect`, `onCreate`, `onArchive`, `onDelete` callbacks
+- "New Thread" button stays inside the list body (top of the list, same position as in the current dropdown)
+
+**Change:**
+- Escape key: instead of calling `onClose()` (which closed the dropdown), call a new `onCollapse` callback that collapses the entire panel. This replaces the `onClose` prop.
 
 **Add:**
 - The component now fills `flex-1 min-h-0 overflow-hidden` in the panel layout
@@ -258,8 +303,10 @@ Rename and refactor:
 **Remove:**
 - `threadDropdownOpen` state
 - `setThreadDropdownOpen` callbacks
+- `setThreadDropdownOpen(false)` call inside `collapseChatOverlay`
 - `<ThreadDropdown>` render and its absolute-position container
 - "Collapse" text button
+- The `useEffect` that resets `threadDropdownOpen` when `chatOverlayState` changes (line 246-250)
 
 **Add:**
 - `chatView` state from app store
