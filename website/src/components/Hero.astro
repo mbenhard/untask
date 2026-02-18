@@ -51,14 +51,12 @@
       class="group mt-5 inline-flex h-7 cursor-pointer items-center gap-2 rounded-md border border-border/40 px-3 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:border-border hover:text-foreground"
       aria-label="Copy install command"
     >
-      <span class="select-all">brew install --cask mbenhard/untask/untask</span>
-      <!-- Copy icon -->
-      <svg id="copy-icon" class="size-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <span>brew install --cask mbenhard/untask/untask</span>
+      <svg class="copy-icon size-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
         <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
       </svg>
-      <!-- Check icon (hidden, shown on copy) -->
-      <svg id="copy-check" class="hidden size-3 shrink-0 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="copy-check hidden size-3 shrink-0 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 6 9 17l-5-5" />
       </svg>
     </button>
@@ -196,13 +194,13 @@
 
   function copyInstall(btn) {
     navigator.clipboard.writeText('brew install --cask mbenhard/untask/untask').then(function() {
-      var icon = document.getElementById('copy-icon');
-      var check = document.getElementById('copy-check');
-      icon.classList.add('hidden');
-      check.classList.remove('hidden');
+      var copyIcon = btn.querySelector('.copy-icon');
+      var checkIcon = btn.querySelector('.copy-check');
+      copyIcon.classList.add('hidden');
+      checkIcon.classList.remove('hidden');
       setTimeout(function() {
-        icon.classList.remove('hidden');
-        check.classList.add('hidden');
+        copyIcon.classList.remove('hidden');
+        checkIcon.classList.add('hidden');
       }, 1500);
     });
   }
