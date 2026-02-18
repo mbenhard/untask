@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+
 import { getUntask } from '../../lib/untask';
 import { OnboardingBasics } from './OnboardingBasics';
 import { OnboardingIdentity } from './OnboardingIdentity';
@@ -16,6 +18,13 @@ type OnboardingFlowProps = {
 export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState<Step>(1);
   const [isFinishing, setIsFinishing] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  // Summary state captured across steps
+  const [userName, setUserName] = useState('');
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [providerName, setProviderName] = useState<string | null>(null);
+  const [roleName, setRoleName] = useState<string | null>(null);
 
   const goTo = (next: Step) => setStep(next);
 
@@ -23,17 +32,20 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     goTo(2);
   };
 
-  const handleBasicsNext = async (name: string, aiEnabled: boolean) => {
+  const handleBasicsNext = async (name: string, ai: boolean) => {
+    setUserName(name);
+    setAiEnabled(ai);
+
     try {
       if (name.length > 0) {
         await getUntask().settings.setUserName(name);
       }
-      await getUntask().settings.setAiEnabled(aiEnabled);
+      await getUntask().settings.setAiEnabled(ai);
     } catch {
       // Non-fatal — proceed anyway
     }
 
-    if (aiEnabled) {
+    if (ai) {
       goTo(3);
     } else {
       goTo(5);
@@ -41,6 +53,8 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   };
 
   const handleProviderNext = async (provider: string, keyOrUrl: string) => {
+    setProviderName(provider);
+
     try {
       if (provider === 'ollama') {
         await getUntask().settings.set('ai_ollama_base_url', keyOrUrl);
@@ -59,7 +73,9 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     goTo(4);
   };
 
-  const handleIdentityNext = async (identityString: string) => {
+  const handleIdentityNext = async (identityString: string, roleLabel: string | null) => {
+    setRoleName(roleLabel);
+
     try {
       if (identityString.trim().length > 0) {
         await getUntask().settings.setIdentity(identityString);
@@ -86,6 +102,47 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     }
   };
 
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return <OnboardingWelcome onNext={handleWelcomeNext} />;
+      case 2:
+        return (
+          <OnboardingBasics
+            onNext={(name, ai) => {
+              void handleBasicsNext(name, ai);
+            }}
+          />
+        );
+      case 3:
+        return (
+          <OnboardingProvider
+            onNext={(provider, keyOrUrl) => {
+              void handleProviderNext(provider, keyOrUrl);
+            }}
+            onSkip={handleProviderSkip}
+          />
+        );
+      case 4:
+        return (
+          <OnboardingIdentity
+            onNext={(identityString, roleLabel) => {
+              void handleIdentityNext(identityString, roleLabel);
+            }}
+            onSkip={handleIdentitySkip}
+          />
+        );
+      case 5:
+        return (
+          <OnboardingReady
+            onFinish={() => void handleFinish()}
+            isFinishing={isFinishing}
+            summary={{ userName, aiEnabled, providerName, roleName }}
+          />
+        );
+    }
+  };
+
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-6">
       <div className="w-full max-w-[480px]">
@@ -95,7 +152,7 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               <div
                 key={s}
                 className={[
-                  'h-0.5 flex-1 rounded-full transition-colors',
+                  'h-0.5 flex-1 rounded-full transition-all duration-300',
                   step >= s ? 'bg-foreground/40' : 'bg-border',
                 ].join(' ')}
               />
@@ -103,31 +160,17 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
           </div>
         ) : null}
 
-        {step === 1 ? (
-          <OnboardingWelcome onNext={handleWelcomeNext} />
-        ) : step === 2 ? (
-          <OnboardingBasics
-            onNext={(name, aiEnabled) => {
-              void handleBasicsNext(name, aiEnabled);
-            }}
-          />
-        ) : step === 3 ? (
-          <OnboardingProvider
-            onNext={(provider, keyOrUrl) => {
-              void handleProviderNext(provider, keyOrUrl);
-            }}
-            onSkip={handleProviderSkip}
-          />
-        ) : step === 4 ? (
-          <OnboardingIdentity
-            onNext={(identityString) => {
-              void handleIdentityNext(identityString);
-            }}
-            onSkip={handleIdentitySkip}
-          />
-        ) : (
-          <OnboardingReady onFinish={() => void handleFinish()} isFinishing={isFinishing} />
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -6 }}
+            transition={{ duration: prefersReducedMotion ? 0.05 : 0.2, ease: 'easeOut' }}
+          >
+            {renderStep()}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
