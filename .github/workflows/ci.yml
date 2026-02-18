@@ -18,7 +18,6 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --ignore-scripts
-      - run: pnpm rebuild better-sqlite3
+      - run: pnpm install
       - run: pnpm typecheck
       - run: pnpm test
