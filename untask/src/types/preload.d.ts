@@ -26,6 +26,7 @@ import type {
   ChatResolvePendingActionResponse,
   ChatListPendingActionsResponse,
   ChatFocusMessagePayload,
+  TaskNavigatePayload,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   LaunchAtLoginResult,
@@ -125,6 +126,7 @@ export type UntaskApi = {
     cancel: (id: string) => Promise<Task>;
     reopen: (id: string) => Promise<Task>;
     toggleToday: (id: string) => Promise<Task>;
+    onTaskNavigate: (listener: (payload: TaskNavigatePayload) => void) => () => void;
     getStatuses: () => Promise<TaskStatusConfig>;
     setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
   };

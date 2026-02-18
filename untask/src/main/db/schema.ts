@@ -34,6 +34,7 @@ export const tasks = sqliteTable(
     }).default('unknown'),
     recurrence: text('recurrence'),
     recurrenceSourceId: text('recurrence_source_id'),
+    reminderOffset: text('reminder_offset').default('at_due'),
     order: integer('order').default(0),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     completedAt: text('completed_at'),

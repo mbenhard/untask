@@ -68,6 +68,7 @@ export const IPC_CHANNELS = {
   TASK_CANCEL: 'task:cancel',
   TASK_REOPEN: 'task:reopen',
   TASK_TOGGLE_TODAY: 'task:toggle-today',
+  TASK_NAVIGATE: 'task:navigate',
   TASK_GET_STATUSES: 'task:get-statuses',
   TASK_SET_STATUSES: 'task:set-statuses',
   CHAT_SEND: 'chat:send',
@@ -225,6 +226,10 @@ export type SettingsUndoMemoryEventRequestPayload = {
 export type SettingsUndoMemoryEventResultPayload = {
   state: SettingsMemoryStatePayload;
   revertedEventIds: string[];
+};
+
+export type TaskNavigatePayload = {
+  taskId: string;
 };
 
 export type TaskDeleteRequestPayload = string | {

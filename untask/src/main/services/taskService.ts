@@ -28,6 +28,7 @@ export const createTaskSchema = z.object({
   effort: z.enum(['unknown', 'tiny', 'small', 'medium', 'deep']).optional(),
   recurrence: z.string().nullable().optional(),
   recurrenceSourceId: z.string().nullable().optional(),
+  reminderOffset: z.enum(['at_due', '15m', '1h', '1d']).nullable().optional(),
   order: z.number().optional(),
 });
 

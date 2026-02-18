@@ -121,7 +121,8 @@ import {
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
 import { SETTING_KEY_AI_ENABLED, SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
-import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
+import { fireAiReminder } from './assistant/proactiveLoop';
+import { initReminderScheduler } from './services/reminderScheduler';
 import { startProactiveTurn } from './ai/chat';
 import {
   storeApiKey,
@@ -1105,19 +1106,22 @@ export const registerIpcHandlers = (): void => {
     (_event, request: SettingsSetAiEnabledRequest): SettingsSetAiEnabledResult => {
       try {
         setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
-        if (request.enabled) {
-          initProactiveLoop({
-            startProactiveTurn: async (input) => {
-              await startProactiveTurn({
-                triggerMessage: input.triggerMessage,
-                triggerType: input.triggerType,
-                emit: input.emit,
-              });
-            },
-          });
-        } else {
-          stopProactiveLoop();
-        }
+        // Re-init scheduler with or without AI callback based on new setting
+        initReminderScheduler(
+          request.enabled
+            ? {
+                fireAiReminder: (taskContext) =>
+                  fireAiReminder(taskContext, {
+                    startProactiveTurn: (input) =>
+                      startProactiveTurn({
+                        triggerMessage: input.triggerMessage,
+                        triggerType: input.triggerType,
+                        emit: input.emit,
+                      }),
+                  }),
+              }
+            : {},
+        );
         return { enabled: request.enabled };
       }
       catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
