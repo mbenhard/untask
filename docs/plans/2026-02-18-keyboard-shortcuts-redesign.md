@@ -15,10 +15,10 @@ All view-switching shortcuts move from bare keys to `Cmd+` modifier using `event
 | `1` | `Cmd+1` (`Digit1`) | Today view |
 | `2` | `Cmd+2` (`Digit2`) | Tasks view |
 | `3` | `Cmd+3` (`Digit3`) | Inbox view |
-| `4` | `Cmd+4` (`Digit4`) | Notes view |
+| `4` (was: chat toggle) | `Cmd+4` (`Digit4`) | Notes view |
 | `,` | `Cmd+,` | Settings (macOS standard) |
 
-Chat keeps `Cmd+K` (overlay, not a tab).
+Note: bare `4` currently toggles the chat overlay, NOT Notes view. This change repurposes the `4` position to Notes (the 4th tab). Chat toggle is covered by `Cmd+K` which remains unchanged — no replacement for bare `4` is needed.
 
 ### 2. Resolve Cmd+N conflict
 
@@ -52,11 +52,11 @@ Drop `J`/`K` for notes. Add arrow key navigation matching the task list pattern:
 - `Arrow Up/Down` — move selection in notes list
 - `Enter` — open selected note
 
-This requires the notes list to gain a focused container with an `onKeyDown` handler, mirroring `useTaskListKeyboard`. A new `useNotesListKeyboard` hook with the same structure.
+This requires `NotesList.tsx` (`src/renderer/components/notes/NotesList.tsx`) to gain a focused container (`tabIndex={0}`, `ref`, `onKeyDown`) mirroring `useTaskListKeyboard`. A new `useNotesListKeyboard` hook with the same structure. The store already has `selectRelativeActive(delta)` and `openSelectedNote()` — the hook just wires them to arrow keys and Enter. Must work in both standalone list and split-view contexts (rendered by `NotesView.tsx`).
 
 ### 5. Fix visual highlight
 
-Both task list and notes list need a visible selected/focused item indicator. Currently the visual state either doesn't exist or is too subtle. Add a clear `bg-muted` or similar highlight to the focused row in both lists, driven by `focusedIndex` (tasks) and `selectedListNoteId` (notes).
+Both task list and notes list have a `bg-accent/20` highlight on the focused/selected item, but it may be too subtle. Evaluate and increase contrast if needed (e.g., `bg-accent/40` or `bg-muted`). The highlight is driven by `focusedIndex` in `TaskItem.tsx` and `selectedListNoteId` in `NotesList.tsx`.
 
 ### 6. Fix Settings hint inaccuracies
 
@@ -88,6 +88,9 @@ Replace the display-only `<code>` blocks for global shortcuts (toggle window, qu
 **Implementation:**
 - Recording state managed locally in `SettingsShortcuts` component
 - On save: call `settings.set(key, accelerator)` then notify main process to re-register via IPC (`shortcut:update`)
+- Add `SHORTCUT_UPDATE` to `IPC_CHANNELS` in `src/types/ipc.ts`
+- Expose the channel in `src/preload/index.ts` (under `settings` namespace or new `shortcuts` namespace)
+- Main process: export a `reRegisterShortcuts()` from `shortcuts.ts`, register the IPC handler in the main entry point (where other handlers live), calling into `reRegisterShortcuts()`
 - Main process unregisters old shortcut, registers new one via `globalShortcut.register()`
 - Validation rejects: bare keys without modifiers, already-taken combos, OS-reserved combos where detectable
 
@@ -132,7 +135,9 @@ These are correct and stay as-is:
 | `src/renderer/components/settings/SettingsShortcuts.tsx` | Update hint sections, add shortcut recorder UI for global shortcuts |
 | `src/renderer/stores/notesStore.ts` | No changes (store actions already exist) |
 | New: `src/renderer/hooks/useNotesListKeyboard.ts` | Arrow key + Enter handler for notes list (mirrors useTaskListKeyboard pattern) |
-| Notes list component | Add focused container, wire up useNotesListKeyboard, add visual highlight |
-| Task list component | Ensure visual highlight on focused row is visible |
-| `src/main/shortcuts.ts` | Add IPC handler for `shortcut:update` to re-register shortcuts at runtime |
-| `src/preload/` | Expose `shortcut:update` IPC channel |
+| `src/renderer/components/notes/NotesList.tsx` | Add `tabIndex={0}`, `ref`, `onKeyDown` to container; wire up useNotesListKeyboard; verify visual highlight contrast |
+| `src/renderer/components/tasks/TaskItem.tsx` | Verify visual highlight contrast on focused row (`bg-accent/20` may need bump) |
+| `src/types/ipc.ts` | Add `SHORTCUT_UPDATE` to `IPC_CHANNELS` |
+| `src/main/shortcuts.ts` | Export `reRegisterShortcuts()` for runtime re-registration |
+| Main process entry point (where IPC handlers live) | Register `ipcMain.handle` for `SHORTCUT_UPDATE`, calling `reRegisterShortcuts()` |
+| `src/preload/index.ts` | Expose `shortcut:update` IPC channel |

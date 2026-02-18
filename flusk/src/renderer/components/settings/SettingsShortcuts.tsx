@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getUntask } from '../../lib/untask';
+import { cn } from '../../lib/utils';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
@@ -43,7 +44,7 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
     entries: [
       { keys: 'Cmd/Ctrl + K', action: 'Toggle chat overlay and focus chat input.' },
       { keys: 'Cmd/Ctrl + F', action: 'Open or close Search.' },
-      { keys: 'Cmd/Ctrl + N', action: 'Jump to Notes view.' },
+      { keys: 'Cmd/Ctrl + N', action: 'Create a new task.' },
       { keys: 'Cmd/Ctrl + Shift + N', action: 'Create a new note and open it.' },
       {
         keys: 'Cmd/Ctrl + Z',
@@ -52,19 +53,14 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
       },
       {
         keys: 'Escape',
-        action: 'Layered dismiss: search -> clear chat input -> leave settings -> close chat overlay -> hide window.',
+        action: 'Layered dismiss: search → notes editor back-to-list → clear chat input → leave settings → close chat overlay.',
       },
-      { keys: '1', action: 'Go to Today view.' },
-      { keys: '2', action: 'Go to Tasks view.' },
-      { keys: '3', action: 'Go to Inbox view.' },
-      { keys: '4', action: 'Toggle chat overlay (peek/open).' },
-      { keys: ',', action: 'Open Settings view.' },
+      { keys: 'Cmd/Ctrl + 1', action: 'Go to Today view.' },
+      { keys: 'Cmd/Ctrl + 2', action: 'Go to Tasks view.' },
+      { keys: 'Cmd/Ctrl + 3', action: 'Go to Inbox view.' },
+      { keys: 'Cmd/Ctrl + 4', action: 'Go to Notes view.' },
+      { keys: 'Cmd/Ctrl + ,', action: 'Open Settings view.' },
       { keys: 'Cmd/Ctrl + Shift + L', action: 'Toggle light/dark theme.' },
-      {
-        keys: 'N',
-        action: 'Open new-task input.',
-        context: 'Only in Today, Tasks, or Inbox while chat is in peek mode and Search is closed.',
-      },
     ],
   },
   {
@@ -91,14 +87,14 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
         context: 'Only in Notes editor while chat overlay is peeked.',
       },
       {
-        keys: 'J / K',
+        keys: 'Arrow Up / Arrow Down',
         action: 'Move selected note up or down in the list.',
-        context: 'Notes view only, while not typing and chat overlay is peeked.',
+        context: 'When notes list is focused.',
       },
       {
         keys: 'Enter',
-        action: 'Open the currently selected note in the list.',
-        context: 'Notes view only while chat overlay is peeked.',
+        action: 'Open the currently selected note.',
+        context: 'When notes list is focused.',
       },
     ],
   },
@@ -143,6 +139,216 @@ const formatAccelerator = (value: string): string =>
     .replace(/Control/g, 'Ctrl')
     .replace(/\+/g, ' + ');
 
+const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift']);
+
+const CODE_TO_KEY: Record<string, string> = {
+  Space: 'Space',
+  Enter: 'Return',
+  Backspace: 'Backspace',
+  Delete: 'Delete',
+  Tab: 'Tab',
+  Escape: 'Escape',
+  ArrowUp: 'Up',
+  ArrowDown: 'Down',
+  ArrowLeft: 'Left',
+  ArrowRight: 'Right',
+  Home: 'Home',
+  End: 'End',
+  PageUp: 'PageUp',
+  PageDown: 'PageDown',
+  Comma: ',',
+  Period: '.',
+  Slash: '/',
+  Backslash: '\\',
+  Minus: '-',
+  Equal: '=',
+  BracketLeft: '[',
+  BracketRight: ']',
+  Semicolon: ';',
+  Quote: "'",
+  Backquote: '`',
+};
+
+function codeToElectronKey(code: string): string | null {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('F') && /^F\d{1,2}$/.test(code)) return code;
+  return CODE_TO_KEY[code] ?? null;
+}
+
+function keyEventToAccelerator(event: KeyboardEvent): string | null {
+  const parts: string[] = [];
+  if (event.metaKey) parts.push('CommandOrControl');
+  else if (event.ctrlKey) parts.push('Control');
+  if (event.altKey) parts.push('Alt');
+  if (event.shiftKey) parts.push('Shift');
+
+  if (parts.length === 0) return null;
+
+  const keyName = codeToElectronKey(event.code);
+  if (!keyName) return null;
+
+  parts.push(keyName);
+  return parts.join('+');
+}
+
+// ─── Shortcut Recorder ─────────────────────────────────────
+
+type ShortcutRecorderProps = {
+  settingKey: string;
+  currentAccelerator: string;
+  defaultAccelerator: string;
+  allResolvedShortcuts: Record<string, string>;
+  onSave: (key: string, accelerator: string) => void;
+};
+
+const ShortcutRecorder = ({
+  settingKey,
+  currentAccelerator,
+  defaultAccelerator,
+  allResolvedShortcuts,
+  onSave,
+}: ShortcutRecorderProps) => {
+  const [recording, setRecording] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const recorderRef = useRef<HTMLDivElement>(null);
+
+  const startRecording = useCallback(() => {
+    setRecording(true);
+    setPending(null);
+    setError(null);
+  }, []);
+
+  const cancelRecording = useCallback(() => {
+    setRecording(false);
+    setPending(null);
+    setError(null);
+  }, []);
+
+  const handleSave = useCallback(() => {
+    if (!pending) return;
+    onSave(settingKey, pending);
+    setRecording(false);
+    setPending(null);
+    setError(null);
+  }, [pending, onSave, settingKey]);
+
+  const handleReset = useCallback(() => {
+    onSave(settingKey, defaultAccelerator);
+  }, [onSave, settingKey, defaultAccelerator]);
+
+  useEffect(() => {
+    if (!recording) return;
+
+    const handler = (event: KeyboardEvent): void => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      if (MODIFIER_KEYS.has(event.key)) return;
+
+      if (event.key === 'Escape' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+        cancelRecording();
+        return;
+      }
+
+      const accelerator = keyEventToAccelerator(event);
+      if (!accelerator) {
+        setError('Include at least one modifier (Cmd, Ctrl, Alt, or Shift).');
+        return;
+      }
+
+      const conflict = GLOBAL_SHORTCUT_SETTINGS.find(
+        (s) =>
+          s.key !== settingKey &&
+          (allResolvedShortcuts[s.key] ?? s.defaultAccelerator) === accelerator,
+      );
+      if (conflict) {
+        setError(`Conflicts with "${conflict.label}".`);
+        return;
+      }
+
+      setError(null);
+      setPending(accelerator);
+    };
+
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [recording, settingKey, allResolvedShortcuts, cancelRecording]);
+
+  useEffect(() => {
+    if (recording) {
+      recorderRef.current?.focus();
+    }
+  }, [recording]);
+
+  const isDefault = currentAccelerator === defaultAccelerator;
+
+  if (recording) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <div
+          ref={recorderRef}
+          tabIndex={0}
+          className={cn(
+            'rounded-sm border px-2 py-0.5 font-mono text-[10px] outline-none transition-colors',
+            pending
+              ? 'border-foreground/30 bg-muted/40 text-foreground'
+              : 'animate-pulse border-foreground/20 bg-muted/20 text-muted-foreground',
+          )}
+        >
+          {pending ? formatAccelerator(pending) : 'Press a shortcut\u2026'}
+        </div>
+        {error ? (
+          <span className="text-[10px] text-destructive">{error}</span>
+        ) : null}
+        {pending ? (
+          <button
+            type="button"
+            onClick={handleSave}
+            className="rounded px-1.5 py-0.5 text-[10px] text-foreground transition-colors hover:bg-accent"
+          >
+            Save
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={cancelRecording}
+          className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <code className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        {formatAccelerator(currentAccelerator)}
+      </code>
+      <button
+        type="button"
+        onClick={startRecording}
+        className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        Record
+      </button>
+      {!isDefault ? (
+        <button
+          type="button"
+          onClick={handleReset}
+          className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          Reset
+        </button>
+      ) : null}
+    </div>
+  );
+};
+
+// ─── Main Component ─────────────────────────────────────────
+
 type SettingsShortcutsProps = {
   setError: (error: string | null) => void;
 };
@@ -173,6 +379,20 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
     void loadShortcuts();
   }, [loadShortcuts]);
 
+  const handleSaveShortcut = useCallback(
+    async (key: string, accelerator: string) => {
+      try {
+        setError(null);
+        await getUntask().settings.set(key, accelerator);
+        await getUntask().shortcuts.reRegister();
+        setResolvedShortcuts((prev) => ({ ...prev, [key]: accelerator }));
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : 'Failed to save shortcut.');
+      }
+    },
+    [setError],
+  );
+
   if (isLoadingShortcuts) {
     return (
       <div role="tabpanel" id="settings-panel-shortcuts">
@@ -192,9 +412,13 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
               label={entry.label}
               hint={entry.action}
             >
-              <code className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                {formatAccelerator(activeValue)}
-              </code>
+              <ShortcutRecorder
+                settingKey={entry.key}
+                currentAccelerator={activeValue}
+                defaultAccelerator={entry.defaultAccelerator}
+                allResolvedShortcuts={resolvedShortcuts}
+                onSave={(key, acc) => void handleSaveShortcut(key, acc)}
+              />
             </SettingsRow>
           );
         })}

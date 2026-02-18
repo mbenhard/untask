@@ -34,6 +34,8 @@ import {
   type LaunchAtLoginResult,
   type WindowDismissMode,
   type WindowDismissModeResult,
+  type DockMode,
+  type DockModeResult,
   type MemoryPromotionConfirmRequestPayload,
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
@@ -109,6 +111,24 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE),
     setWindowDismissMode: (mode: WindowDismissMode): Promise<WindowDismissModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE, mode),
+    getDockMode: (): Promise<DockModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_DOCK_MODE),
+    setDockMode: (mode: DockMode): Promise<DockModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_DOCK_MODE, mode),
+    onMenuNewTask: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.APP_MENU_NEW_TASK, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_NEW_TASK, wrapped);
+      };
+    },
+    onMenuNewNote: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.APP_MENU_NEW_NOTE, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_NEW_NOTE, wrapped);
+      };
+    },
   },
 
   getBootstrapState: (): Promise<SettingsBootstrapState> =>
@@ -269,6 +289,10 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content, title),
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
+  },
+  shortcuts: {
+    reRegister: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHORTCUT_UPDATE),
   },
   settings: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),

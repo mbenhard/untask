@@ -45,6 +45,11 @@ export const IPC_CHANNELS = {
   APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
   APP_GET_WINDOW_DISMISS_MODE: 'app:get-window-dismiss-mode',
   APP_SET_WINDOW_DISMISS_MODE: 'app:set-window-dismiss-mode',
+  APP_MENU_NEW_TASK: 'app:menu-new-task',
+  APP_MENU_NEW_NOTE: 'app:menu-new-note',
+  APP_GET_DOCK_MODE: 'app:get-dock-mode',
+  APP_SET_DOCK_MODE: 'app:set-dock-mode',
+  SHORTCUT_UPDATE: 'shortcut:update',
 
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
   SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT:
@@ -245,6 +250,12 @@ export type WindowDismissMode = 'persistent' | 'quick-hide';
 
 export type WindowDismissModeResult = {
   mode: WindowDismissMode;
+};
+
+export type DockMode = 'normal' | 'dock-only' | 'menu-bar-only';
+
+export type DockModeResult = {
+  mode: DockMode;
 };
 
 // ─── Backup payloads ──────────────────────────────────────

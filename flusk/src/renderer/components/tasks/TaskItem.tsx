@@ -189,7 +189,7 @@ export const TaskItem = ({
       onFocus={onFocus}
       className={cn(
         'overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
-        isFocused && 'bg-accent/20',
+        isFocused && 'bg-accent/40',
         isDragging && 'z-10 opacity-80',
       )}
     >

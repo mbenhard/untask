@@ -31,6 +31,8 @@ import type {
   LaunchAtLoginResult,
   WindowDismissMode,
   WindowDismissModeResult,
+  DockMode,
+  DockModeResult,
   MemoryPromotionConfirmRequestPayload,
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
@@ -79,6 +81,10 @@ export type UntaskApi = {
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
     getWindowDismissMode: () => Promise<WindowDismissModeResult>;
     setWindowDismissMode: (mode: WindowDismissMode) => Promise<WindowDismissModeResult>;
+    getDockMode: () => Promise<DockModeResult>;
+    setDockMode: (mode: DockMode) => Promise<DockModeResult>;
+    onMenuNewTask: (listener: () => void) => () => void;
+    onMenuNewNote: (listener: () => void) => () => void;
   };
 
   // ─── Existing kernel APIs ───────────────────────────────
@@ -164,6 +170,9 @@ export type UntaskApi = {
     save: (id: string, content: string, title?: string) => Promise<Note | undefined>;
     archive: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;
+  };
+  shortcuts: {
+    reRegister: () => Promise<void>;
   };
   settings: {
     get: (key: string) => Promise<string | null>;

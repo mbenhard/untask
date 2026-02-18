@@ -147,6 +147,9 @@ import {
   setWindowDismissMode,
 } from './window/summonController';
 import { windowDismissModeSchema } from './window/dismissMode';
+import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from './window/dockMode';
+import type { DockModeResult } from '../types/ipc';
+import { reRegisterShortcuts } from './shortcuts';
 
 const settingsMemoryUpdateSchema = z
   .object({
@@ -382,6 +385,32 @@ export const registerIpcHandlers = (): void => {
       return { mode: setWindowDismissMode(mode) };
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_DOCK_MODE,
+    (): DockModeResult => {
+      return { mode: readDockMode() };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_SET_DOCK_MODE,
+    (_event, modeInput: unknown): DockModeResult => {
+      const mode = dockModeSchema.parse(modeInput);
+      setSetting(DOCK_MODE_KEY, mode);
+      applyDockMode(mode);
+      return { mode };
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.SHORTCUT_UPDATE, () => {
+    try {
+      reRegisterShortcuts();
+    } catch (e) {
+      console.error('[ipc] SHORTCUT_UPDATE:', e);
+      throw e;
+    }
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT,

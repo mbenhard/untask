@@ -1,7 +1,8 @@
-import { type BrowserWindow, globalShortcut, Menu } from 'electron';
+import { type BrowserWindow, globalShortcut, Menu, shell } from 'electron';
 
+import { IPC_CHANNELS } from '../types/ipc';
 import { getSetting } from './services/settingsService';
-import { toggleWindow, showQuickAdd, hideWindow } from './window/summonController';
+import { toggleWindow, showQuickAdd, hideWindow, summonWindow } from './window/summonController';
 
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
   'shortcut.toggleWindow': 'CommandOrControl+Shift+Space',
@@ -38,6 +39,19 @@ function registerShortcut(
   return registered;
 }
 
+function getMainWindow(): BrowserWindow | undefined {
+  const { BrowserWindow: BW } = require('electron') as typeof import('electron');
+  return BW.getAllWindows()[0];
+}
+
+function sendMenuAction(channel: string): void {
+  summonWindow();
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel);
+  }
+}
+
 function setupApplicationMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -55,6 +69,33 @@ function setupApplicationMenu(): void {
       ],
     },
     {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Task',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => sendMenuAction(IPC_CHANNELS.APP_MENU_NEW_TASK),
+        },
+        {
+          label: 'New Note',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => sendMenuAction(IPC_CHANNELS.APP_MENU_NEW_NOTE),
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
       label: 'Window',
       submenu: [
         {
@@ -66,6 +107,17 @@ function setupApplicationMenu(): void {
         { role: 'front' },
       ],
     },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Report an Issue',
+          click: () => {
+            void shell.openExternal('https://github.com/mbenhard/untask/issues');
+          },
+        },
+      ],
+    },
   ];
 
   const menu = Menu.buildFromTemplate(template);
@@ -75,6 +127,16 @@ function setupApplicationMenu(): void {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const registerGlobalShortcuts = (_mainWindow: BrowserWindow): void => {
   setupApplicationMenu();
+
+  const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
+  const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');
+
+  registerShortcut(toggleAccelerator, toggleWindow, 'toggle-window');
+  registerShortcut(quickAddAccelerator, showQuickAdd, 'quick-add');
+};
+
+export const reRegisterShortcuts = (): void => {
+  globalShortcut.unregisterAll();
 
   const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
   const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');

@@ -7,6 +7,7 @@ import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 import { useTheme } from '../providers/ThemeProvider';
 
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useMenuActions } from '../../hooks/useMenuActions';
 import { useQuickAddListener } from '../../hooks/useQuickAddListener';
 import { cn } from '../../lib/utils';
 import {
@@ -137,6 +138,8 @@ export const AppShell = () => {
     inputRef,
     onPrefill: setChatInputValue,
   });
+
+  useMenuActions();
 
   const handleSubmit = useCallback(() => {
     const content = chatInputValue.trim();

@@ -7,6 +7,10 @@ import { getTrayIconPath } from './window/trayIcon';
 
 let tray: Tray | null = null;
 
+export function getTray(): Tray | null {
+  return tray;
+}
+
 export function setupTray(): void {
   if (process.platform !== 'darwin') {
     return;

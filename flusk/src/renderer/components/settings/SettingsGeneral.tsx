@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { WindowDismissMode } from '../../../types/ipc';
+import type { DockMode, WindowDismissMode } from '../../../types/ipc';
 import { getUntask } from '../../lib/untask';
 import {
   MONO_FONT_OPTIONS,
@@ -35,6 +35,9 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
   const [windowDismissMode, setWindowDismissModeState] = useState<WindowDismissMode>('persistent');
   const [isLoadingWindowDismissMode, setIsLoadingWindowDismissMode] = useState(false);
   const [isSavingWindowDismissMode, setIsSavingWindowDismissMode] = useState(false);
+  const [dockMode, setDockModeState] = useState<DockMode>('normal');
+  const [isLoadingDockMode, setIsLoadingDockMode] = useState(false);
+  const [isSavingDockMode, setIsSavingDockMode] = useState(false);
   const [isSavingTypography, setIsSavingTypography] = useState(false);
 
   const loadLaunchAtLogin = useCallback(async () => {
@@ -71,10 +74,26 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
     }
   }, [setError]);
 
+  const loadDockMode = useCallback(async () => {
+    try {
+      setIsLoadingDockMode(true);
+      setError(null);
+      const result = await getUntask().app.getDockMode();
+      setDockModeState(result.mode);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error ? loadError.message : 'Failed to load dock mode setting.',
+      );
+    } finally {
+      setIsLoadingDockMode(false);
+    }
+  }, [setError]);
+
   useEffect(() => {
     void loadLaunchAtLogin();
     void loadWindowDismissMode();
-  }, [loadLaunchAtLogin, loadWindowDismissMode]);
+    void loadDockMode();
+  }, [loadLaunchAtLogin, loadWindowDismissMode, loadDockMode]);
 
   const handleLaunchAtLoginChange = useCallback(
     async (value: 'on' | 'off') => {
@@ -135,6 +154,35 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
       }
     },
     [windowDismissMode, setError, setNotice],
+  );
+
+  const handleDockModeChange = useCallback(
+    async (mode: DockMode) => {
+      const previousMode = dockMode;
+      setDockModeState(mode);
+      setNotice(null);
+      setError(null);
+
+      try {
+        setIsSavingDockMode(true);
+        const result = await getUntask().app.setDockMode(mode);
+        setDockModeState(result.mode);
+        const labels: Record<DockMode, string> = {
+          normal: 'Normal',
+          'dock-only': 'Dock only',
+          'menu-bar-only': 'Menu bar only',
+        };
+        setNotice(`Appearance set to ${labels[result.mode]}.`);
+      } catch (saveError) {
+        setDockModeState(previousMode);
+        setError(
+          saveError instanceof Error ? saveError.message : 'Failed to update dock mode setting.',
+        );
+      } finally {
+        setIsSavingDockMode(false);
+      }
+    },
+    [dockMode, setError, setNotice],
   );
 
   const handleSansFontChange = useCallback(
@@ -225,6 +273,31 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
             value={launchAtLoginEnabled ? 'on' : 'off'}
             onChange={(v) => void handleLaunchAtLoginChange(v as 'on' | 'off')}
             disabled={isSavingLaunchAtLogin}
+          />
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Appearance">
+        <SettingsRow
+          label="Dock & menu bar"
+          hint={
+            dockMode === 'normal'
+              ? 'Show in dock and menu bar.'
+              : dockMode === 'dock-only'
+                ? 'Show in dock. Hide menu bar icon.'
+                : 'Hide from dock. Show in menu bar only.'
+          }
+          loading={isLoadingDockMode}
+        >
+          <SegmentedControl
+            options={[
+              { value: 'normal' as const, label: 'Normal' },
+              { value: 'dock-only' as const, label: 'Dock only' },
+              { value: 'menu-bar-only' as const, label: 'Menu bar' },
+            ]}
+            value={dockMode}
+            onChange={(v) => void handleDockModeChange(v as DockMode)}
+            disabled={isSavingDockMode}
           />
         </SettingsRow>
       </SettingsSection>

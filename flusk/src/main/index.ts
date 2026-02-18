@@ -21,6 +21,7 @@ import { getSetting } from './services/settingsService';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
+import { applyDockMode } from './window/dockMode';
 import {
   initSummonController,
   summonWindow,
@@ -31,6 +32,11 @@ import {
 if (started) {
   app.quit();
 }
+
+let isQuitting = false;
+app.on('before-quit', () => {
+  isQuitting = true;
+});
 
 // ─── Single-instance lock ─────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -79,8 +85,10 @@ const createMainWindow = (): BrowserWindow => {
   restoreWindowBounds(window);
 
   window.on('close', (event) => {
-    event.preventDefault();
-    hideWindow();
+    if (!isQuitting) {
+      event.preventDefault();
+      hideWindow();
+    }
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -109,6 +117,7 @@ const bootstrap = (): void => {
   mainWindow = createMainWindow();
   initSummonController(mainWindow);
   setupTray();
+  applyDockMode();
   registerGlobalShortcuts(mainWindow);
 };
 
