@@ -22,6 +22,7 @@ import type { Task } from '../db/schema';
 // ─── Constants ──────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000;
+const PULL_DEBOUNCE_MS = 500;
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const HELPER_TIMEOUT_MS = 15_000;
 const FETCH_ALL_TIMEOUT_MS = 60_000;
@@ -125,6 +126,7 @@ function convertRecurrenceRule(rrule: string | null): string | null {
 // ─── Module state ───────────────────────────────────────────
 
 let debounceTimer: NodeJS.Timeout | null = null;
+let pullDebounceTimer: NodeJS.Timeout | null = null;
 let pollInterval: NodeJS.Timeout | null = null;
 let unsubscribeTaskChange: (() => void) | null = null;
 let watcherProcess: ChildProcess | null = null;
@@ -135,6 +137,7 @@ let listId: string | null = null;
 // ─── Loop prevention state ──────────────────────────────────
 
 let pushInFlight = false;
+let pullInFlight = false;
 let pushCooldownTimer: NodeJS.Timeout | null = null;
 const recentlyPulled = new Map<string, number>();
 
@@ -422,7 +425,9 @@ type FetchedReminder = {
 };
 
 async function pullChanges(): Promise<void> {
-  if (!listId || pushInFlight) return;
+  if (!listId || pushInFlight || pullInFlight) return;
+
+  pullInFlight = true;
 
   try {
     const fetched = (await runHelper('--fetch-all', { listId }, FETCH_ALL_TIMEOUT_MS)) as FetchedReminder[];
@@ -504,6 +509,7 @@ async function pullChanges(): Promise<void> {
         }, 'user');
 
         insertMapping(task.id, reminder.reminderId, reminder.externalId);
+        markAsPulled(task.id); // Prevent push from unnecessarily updating
         console.info(`[reminders-sync] imported reminder "${reminder.title}" as task ${task.id}`);
       } catch (e) {
         console.warn(`[reminders-sync] import failed for reminder ${reminder.reminderId}:`, e);
@@ -511,6 +517,8 @@ async function pullChanges(): Promise<void> {
     }
   } catch (e) {
     console.error('[reminders-sync] pull failed:', e);
+  } finally {
+    pullInFlight = false;
   }
 }
 
@@ -600,7 +608,7 @@ function startWatcher(): void {
       try {
         const event = JSON.parse(trimmed);
         if (event.event === 'store_changed') {
-          void pullChanges();
+          schedulePull();
         }
       } catch {
         // Ignore malformed lines
@@ -653,6 +661,16 @@ function onTaskChange(): void {
     debounceTimer = null;
     void pushChanges();
   }, DEBOUNCE_MS);
+}
+
+// ─── Debounced pull handler ─────────────────────────────────
+
+function schedulePull(): void {
+  if (pullDebounceTimer) clearTimeout(pullDebounceTimer);
+  pullDebounceTimer = setTimeout(() => {
+    pullDebounceTimer = null;
+    void pullChanges();
+  }, PULL_DEBOUNCE_MS);
 }
 
 // ─── Public API ─────────────────────────────────────────────
@@ -713,6 +731,11 @@ export function stopRemindersSync(): void {
     debounceTimer = null;
   }
 
+  if (pullDebounceTimer) {
+    clearTimeout(pullDebounceTimer);
+    pullDebounceTimer = null;
+  }
+
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;
@@ -731,6 +754,7 @@ export function stopRemindersSync(): void {
   }
 
   pushInFlight = false;
+  pullInFlight = false;
   recentlyPulled.clear();
   listId = null;
 }
