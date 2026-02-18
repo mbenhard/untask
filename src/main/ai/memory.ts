@@ -6,6 +6,8 @@ import {
 } from '../services/memoryService';
 import { getSetting, setSetting, deleteSetting } from '../services/settingsService';
 
+const getUserName = (): string => getSetting('user.name')?.trim() || '';
+
 const hasContent = (value: string | null): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
@@ -46,15 +48,21 @@ const setLayerValue = (
 // Merges SOUL.md + CHARTER.md into a single first-person document.
 // Seeded into DB on first access. The AI evolves it over time.
 
-export const SEED_IDENTITY_DOCUMENT = `You are Marcus's personal assistant in Untask. Terse, direct, zero filler.
+export const buildSeedIdentityDocument = (name?: string): string => {
+  const who = name || getUserName();
+  const possessive = who ? `${who}'s` : "the user's";
+  const ref = who || 'the user';
+
+  return `You are ${possessive} personal assistant in Untask. Terse, direct, zero filler.
 
 Clear intent → act via tools. No narration, no "I'll do X for you" — just do it.
 Ambiguous → one short clarifying question. Never guess at destructive actions.
 After tool calls → action cards already show results in the UI. Add text only if it provides value beyond what the cards show. Zero text is often ideal.
 
-You act through tools only. You cannot do anything in the physical world — no meetings, calls, audits. Suggest what Marcus should do, never "I will."
+You act through tools only. You cannot do anything in the physical world — no meetings, calls, audits. Suggest what ${ref} should do, never "I will."
 If conversation history contains reverted or undone actions, do not re-execute them.
-Use emit_chips for 2-4 concrete options when Marcus needs to choose. Never write chips as text.`;
+Use emit_chips for 2-4 concrete options when ${ref} needs to choose. Never write chips as text.`;
+};
 
 // ─── Token estimation ────────────────────────────────────────
 
@@ -69,7 +77,7 @@ export const IDENTITY_TOKEN_HARD_LIMIT = 3000;
 
 export const getIdentity = (): string =>
   getLayerValue('identity', {
-    fallback: SEED_IDENTITY_DOCUMENT,
+    fallback: buildSeedIdentityDocument(),
     requireContent: true,
   });
 
@@ -77,7 +85,7 @@ export const setIdentity = (
   value: string,
   source: MemoryEventSource = 'user',
 ): string => {
-  const next = value.trim().length > 0 ? value : SEED_IDENTITY_DOCUMENT;
+  const next = value.trim().length > 0 ? value : buildSeedIdentityDocument();
   return setLayerValue('identity', next, source);
 };
 
@@ -221,7 +229,7 @@ export const migrateIdentityV2 = (): void => {
   const needsReset = LEGACY_IDENTITY_MARKERS.some((marker) => current.includes(marker));
 
   if (needsReset) {
-    setIdentity(SEED_IDENTITY_DOCUMENT, 'system');
+    setIdentity(buildSeedIdentityDocument(), 'system');
   }
 
   setSetting(IDENTITY_V2_MIGRATION_KEY, '1');

@@ -26,10 +26,10 @@ export const SETTING_KEY_AI_SHOW_ALL_MODELS = 'ai_show_all_models' as const;
 // ─── Default values ───────────────────────────────────────────────────────────
 // Single source of truth for all persisted setting defaults.
 //
-// Note: `ai_identity` default is `SEED_IDENTITY_DOCUMENT` defined in
-// `ai/memory.ts`. It is a complex multi-line string that belongs there; its
-// entry below is intentionally an empty string to signal "use the seed document
-// at runtime". The `getIdentity()` accessor in memory.ts handles the fallback.
+// Note: `ai_identity` default is built by `buildSeedIdentityDocument()` in
+// `ai/memory.ts`, personalized with the user's name. The entry below is
+// intentionally empty to signal "use the seed at runtime". The `getIdentity()`
+// accessor in memory.ts handles the fallback.
 
 export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_AI_MODEL]: 'openai/gpt-4o-mini',
