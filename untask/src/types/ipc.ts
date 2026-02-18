@@ -133,6 +133,7 @@ export const IPC_CHANNELS = {
   REMINDERS_GET_STATUS: 'reminders:get-status',
   REMINDERS_TOGGLE: 'reminders:toggle',
   REMINDERS_SET_FILTER: 'reminders:set-filter',
+  REMINDERS_SET_IMPORT: 'reminders:set-import',
   REMINDERS_REQUEST_ACCESS: 'reminders:request-access',
   REMINDERS_FORCE_SYNC: 'reminders:force-sync',
   REMINDERS_SYNC_STATUS: 'reminders:sync-status',
@@ -420,6 +421,7 @@ export type RemindersStatusResult = {
   enabled: boolean;
   authorized: boolean;
   syncFilter: RemindersSyncFilter;
+  importEnabled: boolean;
   lastSyncAt: string | null;
   syncedCount: number;
 };

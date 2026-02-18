@@ -391,6 +391,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_TOGGLE, enabled),
     setFilter: (filter: RemindersSyncFilter): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_SET_FILTER, filter),
+    setImport: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_SET_IMPORT, enabled),
     requestAccess: (): Promise<{ granted: boolean }> =>
       ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_REQUEST_ACCESS),
     forceSync: (): Promise<void> =>

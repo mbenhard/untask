@@ -11,11 +11,12 @@ import {
   SETTING_KEY_REMINDERS_SYNC_ENABLED,
   SETTING_KEY_REMINDERS_LIST_ID,
   SETTING_KEY_REMINDERS_SYNC_FILTER,
+  SETTING_KEY_REMINDERS_IMPORT_ENABLED,
 } from '../defaultSettings';
 import { getSetting, getSettingWithDefault, setSetting } from './settingsService';
-import { listTasks, getTaskById, completeTask, subscribeTaskChanges } from './taskService';
+import { listTasks, getTaskById, completeTask, subscribeTaskChanges, createTask, cancelTask } from './taskService';
 import { blockNoteToMarkdown } from './notesService';
-import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
+import { TERMINAL_STATUSES, type PredefinedStatusId, type TaskStatusConfig } from '../../types/models';
 import type { Task } from '../db/schema';
 
 // ─── Constants ──────────────────────────────────────────────
@@ -39,6 +40,87 @@ const PRIORITY_TO_EVENTKIT: Record<string, number> = {
   medium: 5,
   high: 1,
 };
+
+const EVENTKIT_TO_PRIORITY: Record<number, 'none' | 'low' | 'medium' | 'high'> = {
+  0: 'none',
+  1: 'high',
+  2: 'high',
+  3: 'high',
+  4: 'high',
+  5: 'medium',
+  6: 'medium',
+  7: 'medium',
+  8: 'medium',
+  9: 'low',
+};
+
+function eventKitToUntaskPriority(eventKitPriority: number): 'none' | 'low' | 'medium' | 'high' {
+  return EVENTKIT_TO_PRIORITY[eventKitPriority] ?? 'none';
+}
+
+function getTaskStatusConfig(): TaskStatusConfig {
+  const raw = getSetting('task_statuses');
+  if (!raw) return { enabled: ['inbox', 'active', 'in_progress', 'done'], order: ['active', 'in_progress', 'done'] };
+  try {
+    return JSON.parse(raw) as TaskStatusConfig;
+  } catch {
+    return { enabled: ['inbox', 'active', 'in_progress', 'done'], order: ['active', 'in_progress', 'done'] };
+  }
+}
+
+function getTerminalStatusForSync(preferred: 'done' | 'cancelled'): PredefinedStatusId {
+  if (preferred === 'done') return 'done';
+  const config = getTaskStatusConfig();
+  if (config.enabled.includes('cancelled')) return 'cancelled';
+  return 'done';
+}
+
+function isImportEnabled(): boolean {
+  return getSettingWithDefault(SETTING_KEY_REMINDERS_IMPORT_ENABLED) === 'true';
+}
+
+function convertRecurrenceRule(rrule: string | null): string | null {
+  if (!rrule) return null;
+
+  const parts: Record<string, string> = {};
+  for (const part of rrule.split(';')) {
+    const [key, value] = part.split('=');
+    if (key && value) parts[key] = value;
+  }
+
+  const freq = parts.FREQ;
+  const interval = parseInt(parts.INTERVAL ?? '1', 10);
+  const byDay = parts.BYDAY?.split(',');
+
+  if (interval === 1) {
+    if (freq === 'DAILY') return 'daily';
+    if (freq === 'WEEKLY') return 'weekly';
+    if (freq === 'MONTHLY') return 'monthly';
+    if (freq === 'YEARLY') return 'yearly';
+  }
+
+  if (interval > 1) {
+    if (freq === 'DAILY') return `every ${interval} days`;
+    if (freq === 'WEEKLY') return `every ${interval} weeks`;
+    if (freq === 'MONTHLY') return `every ${interval} months`;
+  }
+
+  if (freq === 'WEEKLY' && byDay?.length === 5 &&
+      ['MO', 'TU', 'WE', 'TH', 'FR'].every((d) => byDay.includes(d))) {
+    return 'every weekday';
+  }
+
+  if (freq === 'WEEKLY' && byDay?.length === 1) {
+    const dayMap: Record<string, string> = {
+      MO: 'monday', TU: 'tuesday', WE: 'wednesday',
+      TH: 'thursday', FR: 'friday', SA: 'saturday', SU: 'sunday',
+    };
+    return `every ${dayMap[byDay[0]] ?? byDay[0].toLowerCase()}`;
+  }
+
+  console.warn(`[reminders-sync] unsupported recurrence rule: ${rrule}`);
+  return null;
+}
 
 // ─── Module state ───────────────────────────────────────────
 
@@ -328,28 +410,33 @@ async function pushChanges(): Promise<void> {
 
 // ─── Pull: Reminders → Untask ───────────────────────────────
 
+type FetchedReminder = {
+  reminderId: string;
+  externalId: string | null;
+  title: string;
+  notes: string | null;
+  dueDate: string | null;
+  priority: number;
+  isCompleted: boolean;
+  recurrenceRule?: string | null;
+};
+
 async function pullChanges(): Promise<void> {
   if (!listId || pushInFlight) return;
 
   try {
-    const fetched = (await runHelper('--fetch-all', { listId }, FETCH_ALL_TIMEOUT_MS)) as Array<{
-      reminderId: string;
-      externalId: string | null;
-      title: string;
-      notes: string | null;
-      dueDate: string | null;
-      priority: number;
-      isCompleted: boolean;
-    }>;
+    const fetched = (await runHelper('--fetch-all', { listId }, FETCH_ALL_TIMEOUT_MS)) as FetchedReminder[];
 
     const fetchedById = new Map(fetched.map((r) => [r.reminderId, r]));
-    const fetchedByExternalId = new Map<string, typeof fetched[0]>();
+    const fetchedByExternalId = new Map<string, FetchedReminder>();
     for (const r of fetched) {
       if (r.externalId) fetchedByExternalId.set(r.externalId, r);
     }
 
     const mappings = getAllMappings();
+    const mappedReminderIds = new Set(mappings.map((m) => m.reminderId));
 
+    // ─── Handle existing mappings ─────────────────────────────
     for (const mapping of mappings) {
       let reminder = fetchedById.get(mapping.reminderId);
 
@@ -357,26 +444,27 @@ async function pullChanges(): Promise<void> {
       if (!reminder && mapping.externalId) {
         reminder = fetchedByExternalId.get(mapping.externalId);
         if (reminder) {
-          // Update the local reminderId in the mapping
           updateMappingReminderId(mapping.taskId, reminder.reminderId);
         }
       }
 
       if (!reminder) {
-        // Reminder was deleted from Reminders.app → recreate (Untask is source of truth)
+        // Reminder was DELETED in Reminders.app → mark task as cancelled
         const task = getTaskById(mapping.taskId);
         if (task && !isTerminal(task.status)) {
           try {
-            const payload = buildReminderPayload(task);
-            const result = await runHelper('--create', {
-              listId,
-              ...payload,
-            }) as { reminderId: string; externalId?: string };
-            updateMappingReminderId(mapping.taskId, result.reminderId);
+            const terminalStatus = getTerminalStatusForSync('cancelled');
+            if (terminalStatus === 'cancelled') {
+              cancelTask(task.id, 'user');
+            } else {
+              completeTask(task.id, 'user');
+            }
+            markAsPulled(task.id);
           } catch (e) {
-            console.warn(`[reminders-sync] recreate failed for task ${mapping.taskId}:`, e);
+            console.warn(`[reminders-sync] mark cancelled failed for task ${mapping.taskId}:`, e);
           }
         }
+        deleteMapping(mapping.taskId);
         continue;
       }
 
@@ -390,11 +478,36 @@ async function pullChanges(): Promise<void> {
           } catch (e) {
             console.warn(`[reminders-sync] pull complete failed for task ${mapping.taskId}:`, e);
           }
-          deleteMapping(mapping.taskId);
         }
+        deleteMapping(mapping.taskId);
+        continue;
       }
 
       updateMappingSyncTime(mapping.taskId);
+    }
+
+    // ─── Import NEW reminders (unmapped) ───────────────────────
+    if (!isImportEnabled()) return;
+
+    for (const reminder of fetched) {
+      if (mappedReminderIds.has(reminder.reminderId)) continue;
+      if (reminder.isCompleted) continue;
+
+      try {
+        const task = createTask({
+          title: reminder.title,
+          body: reminder.notes ?? null,
+          status: 'inbox',
+          dueDate: reminder.dueDate,
+          priority: eventKitToUntaskPriority(reminder.priority),
+          recurrence: convertRecurrenceRule(reminder.recurrenceRule ?? null),
+        }, 'user');
+
+        insertMapping(task.id, reminder.reminderId, reminder.externalId);
+        console.info(`[reminders-sync] imported reminder "${reminder.title}" as task ${task.id}`);
+      } catch (e) {
+        console.warn(`[reminders-sync] import failed for reminder ${reminder.reminderId}:`, e);
+      }
     }
   } catch (e) {
     console.error('[reminders-sync] pull failed:', e);
@@ -643,6 +756,10 @@ export function setRemindersSyncFilter(filter: string): void {
   }
 }
 
+export function setRemindersImportEnabled(enabled: boolean): void {
+  setSetting(SETTING_KEY_REMINDERS_IMPORT_ENABLED, String(enabled));
+}
+
 export async function requestRemindersAccess(): Promise<{ granted: boolean }> {
   const result = (await runHelper('--request-access')) as { granted: boolean };
   return result;
@@ -660,6 +777,7 @@ export type RemindersStatusResult = {
   enabled: boolean;
   authorized: boolean;
   syncFilter: SyncFilter;
+  importEnabled: boolean;
   lastSyncAt: string | null;
   syncedCount: number;
 };
@@ -692,6 +810,7 @@ export async function getRemindersStatus(): Promise<RemindersStatusResult> {
     enabled,
     authorized,
     syncFilter,
+    importEnabled: isImportEnabled(),
     lastSyncAt,
     syncedCount: mappings.length,
   };
