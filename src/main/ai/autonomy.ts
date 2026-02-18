@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
+import {
+  SETTING_KEY_AI_AUTONOMY_MODE,
+  SETTING_KEY_AI_AUTONOMY_PENDING_ACTIONS,
+} from '../defaultSettings';
 import { getSetting, setSetting } from '../services/settingsService';
 
 // ─── Core types ──────────────────────────────────────────────
@@ -33,8 +37,8 @@ export type ResolvedAction = Omit<PendingAction, 'lifecycle'> & {
 
 // ─── Mode policy ─────────────────────────────────────────────
 
-const SETTINGS_KEY_AUTONOMY_MODE = 'ai_autonomy_mode';
-const SETTINGS_KEY_PENDING_ACTIONS = 'ai_autonomy_pending_actions';
+const SETTINGS_KEY_AUTONOMY_MODE = SETTING_KEY_AI_AUTONOMY_MODE;
+const SETTINGS_KEY_PENDING_ACTIONS = SETTING_KEY_AI_AUTONOMY_PENDING_ACTIONS;
 
 const VALID_MODES: ReadonlySet<AutonomyMode> = new Set(['auto', 'confirm']);
 

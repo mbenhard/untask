@@ -26,7 +26,7 @@ const recordCooldown = (key: string): void => {
 
 const TRIGGER_TEMPLATE =
   '[PROACTIVE TRIGGER: time_reminder]\n' +
-  'The following task is due now. Remind Marcus briefly ' +
+  'The following task is due now. Remind the user briefly ' +
   'and suggest immediate action. Include chips.';
 
 const buildTriggerMessage = (

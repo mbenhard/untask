@@ -18,6 +18,7 @@ import {
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting, isAiEnabled } from './services/settingsService';
+import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
 import { migrateApiKeysToSafeStorage } from './services/keyStorage';
 import { startUpdateChecker, stopUpdateChecker } from './services/updateChecker';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
@@ -81,6 +82,7 @@ const createMainWindow = (): BrowserWindow => {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      devTools: !app.isPackaged,
     },
   });
 
@@ -152,7 +154,7 @@ app.on('second-instance', () => {
 
 const applyLaunchAtLogin = (): void => {
   try {
-    const stored = getSetting('app.launchAtLogin');
+    const stored = getSetting(SETTING_KEY_APP_LAUNCH_AT_LOGIN);
     const enabled = stored === 'true';
     if (!canApplyLaunchAtLogin()) {
       return;

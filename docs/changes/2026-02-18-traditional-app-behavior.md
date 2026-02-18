@@ -5,7 +5,7 @@
 
 ## Summary
 
-Implemented 5 changes to make Flusk behave like a traditional macOS desktop app.
+Implemented 5 changes to make Untask behave like a traditional macOS desktop app.
 
 ## Changes
 

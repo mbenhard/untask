@@ -120,7 +120,9 @@ import {
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
-import { SETTING_KEY_AI_ENABLED } from './defaultSettings';
+import { SETTING_KEY_AI_ENABLED, SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
+import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
+import { startProactiveTurn } from './ai/chat';
 import {
   storeApiKey,
   hasApiKey,
@@ -348,7 +350,7 @@ export const registerIpcHandlers = (): void => {
   });
 
   ipcMain.handle(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN, () => {
-    const stored = getSetting('app.launchAtLogin');
+    const stored = getSetting(SETTING_KEY_APP_LAUNCH_AT_LOGIN);
     const enabled = stored === 'true';
     const supported =
       process.platform === 'win32' || (process.platform === 'darwin' && app.isPackaged);
@@ -357,7 +359,7 @@ export const registerIpcHandlers = (): void => {
 
   ipcMain.handle(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN, (_event, enabledInput: unknown) => {
     const enabled = launchAtLoginSchema.parse(enabledInput);
-    setSetting('app.launchAtLogin', String(enabled));
+    setSetting(SETTING_KEY_APP_LAUNCH_AT_LOGIN, String(enabled));
     const supported =
       process.platform === 'win32' || (process.platform === 'darwin' && app.isPackaged);
 
@@ -1103,17 +1105,37 @@ export const registerIpcHandlers = (): void => {
     (_event, request: SettingsSetAiEnabledRequest): SettingsSetAiEnabledResult => {
       try {
         setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
+        if (request.enabled) {
+          initProactiveLoop({
+            startProactiveTurn: async (input) => {
+              await startProactiveTurn({
+                triggerMessage: input.triggerMessage,
+                triggerType: input.triggerType,
+                emit: input.emit,
+              });
+            },
+          });
+        } else {
+          stopProactiveLoop();
+        }
         return { enabled: request.enabled };
       }
       catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
     },
   );
   // ─── Secure API key handlers ─────────────────────────────
+  const apiKeyProviderSchema = z.string().min(1).max(64).regex(/^[a-z0-9_-]+$/);
+  const apiKeyValueSchema = z.string().min(1).max(512);
+  const setApiKeySchema = z.object({ provider: apiKeyProviderSchema, key: apiKeyValueSchema });
+  const providerOnlySchema = z.object({ provider: apiKeyProviderSchema });
+  const validateApiKeySchema = z.object({ provider: apiKeyProviderSchema, key: apiKeyValueSchema });
+
   ipcMain.handle(
     IPC_CHANNELS.API_KEYS_HAS,
     (_event, request: ApiKeysHasRequest): ApiKeysHasResult => {
       try {
-        return { hasKey: hasApiKey(request.provider) };
+        const validated = providerOnlySchema.parse(request);
+        return { hasKey: hasApiKey(validated.provider) };
       }
       catch (e) { console.error('[ipc] API_KEYS_HAS:', e); throw e; }
     },
@@ -1122,7 +1144,8 @@ export const registerIpcHandlers = (): void => {
     IPC_CHANNELS.API_KEYS_SET,
     (_event, request: ApiKeysSetRequest): void => {
       try {
-        storeApiKey(request.provider, request.key);
+        const validated = setApiKeySchema.parse(request);
+        storeApiKey(validated.provider, validated.key);
       }
       catch (e) { console.error('[ipc] API_KEYS_SET:', e); throw e; }
     },
@@ -1131,15 +1154,29 @@ export const registerIpcHandlers = (): void => {
     IPC_CHANNELS.API_KEYS_DELETE,
     (_event, request: ApiKeysDeleteRequest): void => {
       try {
-        deleteStoredApiKey(request.provider);
+        const validated = providerOnlySchema.parse(request);
+        deleteStoredApiKey(validated.provider);
       }
       catch (e) { console.error('[ipc] API_KEYS_DELETE:', e); throw e; }
     },
   );
   ipcMain.handle(
     IPC_CHANNELS.API_KEYS_VALIDATE,
-    async (_event, _request: ApiKeysValidateRequest): Promise<ApiKeysValidateResult> => {
+    async (_event, request: ApiKeysValidateRequest): Promise<ApiKeysValidateResult> => {
       try {
+        const validated = validateApiKeySchema.parse(request);
+        // Validate OpenRouter keys against their API
+        if (validated.provider === 'openrouter') {
+          const { net } = await import('electron');
+          const response = await net.fetch('https://openrouter.ai/api/v1/models', {
+            headers: { Authorization: `Bearer ${validated.key}` },
+          });
+          if (!response.ok) {
+            return { valid: false, error: `OpenRouter API returned ${response.status}` };
+          }
+          return { valid: true };
+        }
+        // Other providers: accept key as valid (no public validation endpoint)
         return { valid: true };
       }
       catch (e) { console.error('[ipc] API_KEYS_VALIDATE:', e); throw e; }
