@@ -28,6 +28,7 @@ import {
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
   type ChatFocusMessagePayload,
+  type TaskNavigatePayload,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -187,6 +188,20 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_REOPEN, id),
     toggleToday: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_TOGGLE_TODAY, id),
+    onTaskNavigate: (
+      listener: (payload: TaskNavigatePayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: TaskNavigatePayload,
+      ) => listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.TASK_NAVIGATE, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.TASK_NAVIGATE, wrapped);
+      };
+    },
     getStatuses: (): Promise<TaskStatusConfig> =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_STATUSES),
     setStatuses: (config: TaskStatusConfig): Promise<TaskStatusConfig> =>

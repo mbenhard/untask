@@ -74,6 +74,7 @@ export type Task = {
   effort: 'unknown' | 'tiny' | 'small' | 'medium' | 'deep' | null;
   recurrence: string | null;
   recurrenceSourceId: string | null;
+  reminderOffset: string | null;
   order: number | null;
   createdAt: string | null;
   completedAt: string | null;

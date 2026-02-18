@@ -116,6 +116,19 @@ export const AppShell = () => {
     };
   }, []);
 
+  // Listen for notification-driven task navigation
+  useEffect(() => {
+    const unsubscribe = window.untask?.tasks.onTaskNavigate((payload) => {
+      if (!payload?.taskId) return;
+      setView('tasks');
+      useTaskStore.getState().selectTask(payload.taskId);
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [setView]);
+
   const clearInput = useCallback(() => {
     setChatInputValue('');
   }, []);

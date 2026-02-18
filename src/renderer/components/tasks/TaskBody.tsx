@@ -115,8 +115,12 @@ const DueDateSegment = ({
     dueDate={task.dueDate}
     emptyLabel="+ due date"
     variant="segment"
+    reminderOffset={(task.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined}
     onChange={(nextDueDate) => {
       void onUpdate({ id: task.id, dueDate: nextDueDate });
+    }}
+    onReminderOffsetChange={(offset) => {
+      void onUpdate({ id: task.id, reminderOffset: offset });
     }}
   />
 );

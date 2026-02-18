@@ -7,7 +7,8 @@ import started from 'electron-squirrel-startup';
 import { buildSystemPrompt } from './ai/systemPrompt';
 import { startProactiveTurn } from './ai/chat';
 
-import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
+import { fireAiReminder } from './assistant/proactiveLoop';
+import { initReminderScheduler, stopReminderScheduler } from './services/reminderScheduler';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
@@ -224,19 +225,23 @@ app.whenReady().then(() => {
   summonWindow();
 
 
-  // Initialize the proactive loop with chat pipeline dependency.
-  // Only start when AI is enabled.
-  if (isAiEnabled()) {
-    initProactiveLoop({
-      startProactiveTurn: async (input) => {
-        await startProactiveTurn({
-          triggerMessage: input.triggerMessage,
-          triggerType: input.triggerType,
-          emit: input.emit,
-        });
-      },
-    });
-  }
+  // Initialize reminder scheduler — always runs for native notifications.
+  // Wire AI callback only when AI is enabled.
+  initReminderScheduler(
+    isAiEnabled()
+      ? {
+          fireAiReminder: (taskContext) =>
+            fireAiReminder(taskContext, {
+              startProactiveTurn: (input) =>
+                startProactiveTurn({
+                  triggerMessage: input.triggerMessage,
+                  triggerType: input.triggerType,
+                  emit: input.emit,
+                }),
+            }),
+        }
+      : {},
+  );
 
   const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -255,7 +260,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
-  stopProactiveLoop();
+  stopReminderScheduler();
   stopDailyBackupScheduler();
   stopUpdateChecker();
   unregisterGlobalShortcuts();

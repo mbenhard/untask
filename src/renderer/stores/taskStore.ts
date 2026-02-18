@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import type { Task } from '../../types/models';
 import { getUntask } from '../lib/untask';
 
+export type ReminderOffset = 'at_due' | '15m' | '1h' | '1d';
+
 export type TaskCreateInput = {
   title: string;
   parentId?: string | null;
@@ -13,6 +15,7 @@ export type TaskCreateInput = {
   client?: string | null;
   dueDate?: string | null;
   recurrence?: string | null;
+  reminderOffset?: ReminderOffset | null;
   // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
   // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
@@ -31,6 +34,7 @@ export type TaskUpdateInput = {
   client?: string | null;
   dueDate?: string | null;
   recurrence?: string | null;
+  reminderOffset?: ReminderOffset | null;
   // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
   // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
@@ -124,6 +128,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       effort: input.effort ?? 'unknown',
       recurrence: input.recurrence ?? null,
       recurrenceSourceId: null,
+      reminderOffset: input.reminderOffset ?? null,
       order: nextOrder,
       createdAt: new Date().toISOString(),
       completedAt: null,

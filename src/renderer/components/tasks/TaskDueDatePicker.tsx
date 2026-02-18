@@ -3,14 +3,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import type { ReminderOffset } from '../../stores/taskStore';
 import { Button, Calendar, Popover, PopoverContent } from '../ui';
-import { formatDueDateDisplay, parseDueDate, parseDueTime, toISODateTime } from './dueDate';
+import { formatDueDateDisplay, parseDueDate, parseDueTime, toISODate, toISODateTime } from './dueDate';
 
 export interface TaskDueDatePickerProps {
   dueDate: string | null;
   onChange: (next: string | null) => void | Promise<void>;
   emptyLabel: string;
   variant: 'row' | 'meta' | 'segment';
+  reminderOffset?: ReminderOffset | null;
+  onReminderOffsetChange?: (offset: ReminderOffset) => void;
 }
 
 const ROW_TRIGGER_BASE =
@@ -22,6 +25,22 @@ const SEGMENT_TRIGGER_BASE =
 
 const clampHours = (v: number) => Math.max(0, Math.min(23, v));
 const clampMinutes = (v: number) => Math.max(0, Math.min(59, v));
+
+const REMINDER_OFFSET_LABELS: Record<ReminderOffset, string> = {
+  at_due: 'At due time',
+  '15m': '15 min before',
+  '1h': '1 hour before',
+  '1d': '1 day before',
+};
+
+const getNextMonday = (): Date => {
+  const today = new Date();
+  const day = today.getDay();
+  const daysUntilMonday = day === 0 ? 1 : 8 - day;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + daysUntilMonday);
+  return monday;
+};
 
 const TimeInput = ({
   value,
@@ -169,12 +188,20 @@ export const TaskDueDatePicker = ({
   onChange,
   emptyLabel,
   variant,
+  reminderOffset,
+  onReminderOffsetChange,
 }: TaskDueDatePickerProps) => {
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
   const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
   const timeInputRef = useRef<HTMLInputElement>(null);
   const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
+
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   const triggerClassName = cn(
     variant === 'row'
@@ -199,6 +226,15 @@ export const TaskDueDatePicker = ({
     [currentTime, onChange],
   );
 
+  const handlePresetClick = useCallback(
+    (date: Date) => {
+      const nextValue = toISODate(date);
+      void onChange(nextValue);
+      setOpen(false);
+    },
+    [onChange],
+  );
+
   const handleTimeChange = useCallback(
     (time: string | null) => {
       if (!selected) return;
@@ -211,6 +247,13 @@ export const TaskDueDatePicker = ({
   const handleTimeDone = useCallback(() => {
     setOpen(false);
   }, []);
+
+  const handleReminderOffsetChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onReminderOffsetChange?.(e.target.value as ReminderOffset);
+    },
+    [onReminderOffsetChange],
+  );
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -232,11 +275,48 @@ export const TaskDueDatePicker = ({
         align="start"
         onKeyDown={(event) => event.stopPropagation()}
       >
+        {/* Quick presets */}
+        <div className="flex gap-1 border-b border-border px-3 py-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePresetClick(new Date());
+            }}
+            className="rounded border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              handlePresetClick(tomorrow);
+            }}
+            className="rounded border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            Tomorrow
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePresetClick(getNextMonday());
+            }}
+            className="rounded border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            Next Week
+          </button>
+        </div>
+
         <Calendar
           mode="single"
           required={!!selected}
           selected={selected}
           defaultMonth={selected}
+          disabled={{ before: today }}
           className="p-2 [--cell-size:1.5rem]"
           onSelect={handleDateSelect}
         />
@@ -249,6 +329,25 @@ export const TaskDueDatePicker = ({
               onDone={handleTimeDone}
               inputRef={timeInputRef}
             />
+          </div>
+        ) : null}
+
+        {/* Reminder offset selector */}
+        {dueDate && onReminderOffsetChange ? (
+          <div className="flex items-center gap-2 border-t border-border px-3 py-2">
+            <span className="font-mono text-[10px] text-muted-foreground">Remind me</span>
+            <select
+              value={reminderOffset ?? 'at_due'}
+              onChange={handleReminderOffsetChange}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded border border-border/60 bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-foreground outline-none focus:border-ring"
+            >
+              {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
+                <option key={key} value={key}>
+                  {REMINDER_OFFSET_LABELS[key]}
+                </option>
+              ))}
+            </select>
           </div>
         ) : null}
 
