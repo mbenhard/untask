@@ -1,6 +1,8 @@
 ---
 // Hero section — full viewport, centered, maximum negative space
 // Uses actual bird mascot from /icons/animation with peppy wobble (v3)
+
+const version = "v0.12.0";
 ---
 
 <section class="relative flex min-h-screen flex-col items-center justify-center px-6">
@@ -45,6 +47,16 @@
       </a>
     </div>
 
+    <a
+      href="/changelog"
+      class="mt-4 inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+    >
+      What's new
+      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </a>
+
     <!-- Copy install command -->
     <button
       onclick="copyInstall(this)"
@@ -62,7 +74,7 @@
     </button>
 
     <p class="mt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-      MIT Licensed &middot; macOS
+      {version} &middot; MIT Licensed &middot; macOS
     </p>
   </div>
 
