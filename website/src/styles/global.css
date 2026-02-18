@@ -14,6 +14,10 @@
   --border: #E3E3E3;
   --primary: #262626;
   --primary-foreground: #F7F7F7;
+  --dock-bg: rgba(255, 255, 255, 0.65);
+  --dock-border: rgba(0, 0, 0, 0.1);
+  --dock-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --dock-icon-opacity: 0.55;
 }
 
 /* ──────────────────────────────────────────────
@@ -28,6 +32,10 @@
   --border: #2A2A2A;
   --primary: #E5E5E5;
   --primary-foreground: #161616;
+  --dock-bg: rgba(255, 255, 255, 0.06);
+  --dock-border: rgba(255, 255, 255, 0.08);
+  --dock-shadow: none;
+  --dock-icon-opacity: 0.45;
 }
 
 /* ──────────────────────────────────────────────

@@ -226,6 +226,37 @@
       </div>
 
     </div>
+
+    <!-- macOS Dock — sits below app window like a real desktop -->
+    <div class="mt-24 flex flex-col items-center">
+      <div class="dock-bar">
+        <!-- Finder -->
+        <div class="dock-item">
+          <img class="dock-icon" src="/finder.png" alt="Finder" width="50" height="50" draggable="false" />
+        </div>
+        <!-- Safari -->
+        <div class="dock-item">
+          <img class="dock-icon" src="/safari.png" alt="Safari" width="50" height="50" draggable="false" />
+        </div>
+        <!-- Messages -->
+        <div class="dock-item">
+          <img class="dock-icon" src="/messages.png" alt="Messages" width="50" height="50" draggable="false" />
+        </div>
+        <!-- Untask (your app) -->
+        <div class="dock-item dock-app">
+          <a href="https://github.com/mbenhard/untask/releases/latest" class="dock-app-link" aria-label="Download Untask for macOS">
+            <img src="/icon-app.png" alt="Untask" width="50" height="50" draggable="false" />
+          </a>
+          <span class="dock-tooltip">Untask</span>
+          <span class="dock-dot"></span>
+        </div>
+        <!-- Calendar -->
+        <div class="dock-item">
+          <img class="dock-icon" src="/calendar.png" alt="Calendar" width="50" height="50" draggable="false" />
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -233,6 +264,106 @@
   .traffic-lights:hover span:nth-child(1) { background-color: #FF5F57; }
   .traffic-lights:hover span:nth-child(2) { background-color: #FEBC2E; }
   .traffic-lights:hover span:nth-child(3) { background-color: #28C840; }
+
+  /* ─── macOS Dock ─── */
+
+  .dock-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px;
+    border-radius: 18px;
+    background: var(--dock-bg);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 0.5px solid var(--dock-border);
+    box-shadow: var(--dock-shadow);
+  }
+
+  /* Wrapper — stays still, provides hit area + anchor for dot */
+  .dock-item {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    flex-shrink: 0;
+    /* extra space below for dot */
+    padding-bottom: 0;
+  }
+
+  /* The icon/link is what actually lifts on hover */
+  .dock-icon {
+    display: block;
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    opacity: var(--dock-icon-opacity);
+    transform-origin: bottom center;
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .dock-item:hover .dock-icon {
+    transform: translateY(-4px) scale(1.10);
+  }
+
+  /* Untask link wrapper */
+  .dock-app-link {
+    display: block;
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    transform-origin: bottom center;
+    transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .dock-item:hover .dock-app-link {
+    transform: translateY(-4px) scale(1.10);
+  }
+
+  .dock-app-link img {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    display: block;
+  }
+
+  /* Tooltip */
+  .dock-tooltip {
+    position: absolute;
+    bottom: calc(100% + 20px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.96);
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: var(--accent);
+    color: var(--foreground);
+    border: 0.5px solid var(--border);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+
+  .dock-app:hover .dock-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+    transition: opacity 0.15s ease 0.3s, transform 0.15s ease 0.3s;
+  }
+
+  /* Running dot — anchored to the wrapper, unaffected by icon hover */
+  .dock-dot {
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--muted-foreground);
+    opacity: 0.5;
+  }
 </style>
 
 <script is:inline>
