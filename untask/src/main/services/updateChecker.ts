@@ -6,10 +6,13 @@ import { getSetting, setSetting } from './settingsService';
 const SETTING_KEY_LAST_UPDATE_CHECK = 'app.last_update_check' as const;
 const SETTING_KEY_UPDATE_CHECK_ENABLED = 'app.update_check_enabled' as const;
 
-// ─── GitHub repository placeholder ───────────────────────────
+// ─── Update API endpoints ────────────────────────────────────
 const GITHUB_OWNER = 'mbenhard';
 const GITHUB_REPO = 'untask';
-const RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
+// Primary: our proxy (gives us DAU in Cloudflare dashboard)
+const UPDATE_API_URL = 'https://untask-api.marcus-2ef.workers.dev/api/updates/latest';
+// Fallback: direct GitHub (if our worker is down)
+const FALLBACK_API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const MIN_CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes throttle
@@ -109,16 +112,19 @@ export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
   }
 
   try {
-    const response = await net.fetch(RELEASES_API_URL, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': `${app.getName()}/${currentVersion}`,
-      },
-    });
+    const headers = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': `${app.getName()}/${currentVersion}`,
+    };
 
-    if (!response.ok) {
-      throw new Error(`GitHub API returned ${response.status}`);
+    let response: Response;
+    try {
+      response = await net.fetch(UPDATE_API_URL, { method: 'GET', headers });
+      if (!response.ok) throw new Error(`Worker returned ${response.status}`);
+    } catch {
+      // Fallback to direct GitHub if the worker is unreachable
+      response = await net.fetch(FALLBACK_API_URL, { method: 'GET', headers });
+      if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
     }
 
     const data = (await response.json()) as {
