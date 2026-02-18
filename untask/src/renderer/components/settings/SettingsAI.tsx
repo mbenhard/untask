@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { SegmentedControl } from './SegmentedControl';
+import { SettingsMemoryTab } from './SettingsMemoryTab';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 import { SettingsSelect } from './SettingsSelect';
@@ -236,6 +238,9 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   const [isLoadingAutonomy, setIsLoadingAutonomy] = useState(false);
   const [retentionMode, setRetentionMode] = useState<'session' | '30d' | 'forever'>('session');
   const [isLoadingRetention, setIsLoadingRetention] = useState(false);
+
+  // Sub-tabs
+  const [activeSubTab, setActiveSubTab] = useState<'ai' | 'identity' | 'knowledge'>('ai');
 
   // ─── Loaders ────────────────────────────────────────────────────────────────
 
@@ -571,30 +576,17 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
-  return (
-    <div role="tabpanel" id="settings-panel-ai" className="space-y-3">
-
-      {/* ── Assistant toggle ─────────────────────────────────────────────── */}
-      <SettingsSection title="Assistant">
-        <SettingsRow
-          label="Enable AI assistant"
-          hint="When off, the app works as a pure task manager. Chat history and memory are preserved."
-          loading={isLoadingAiEnabled}
-        >
-          <SegmentedControl
-            options={[
-              { value: 'on' as const, label: 'On' },
-              { value: 'off' as const, label: 'Off' },
-            ]}
-            value={aiEnabled ? 'on' : 'off'}
-            onChange={(v) => void handleAiEnabledChange(v as 'on' | 'off')}
-          />
-        </SettingsRow>
-      </SettingsSection>
-
-      {aiEnabled ? (
-        <>
-          {/* ── Provider ──────────────────────────────────────────────────── */}
+  const renderSubTabContent = () => {
+    switch (activeSubTab) {
+      case 'identity':
+        return <SettingsMemoryTab setError={setError} setNotice={setNotice} availableTabs={['identity']} />;
+      case 'knowledge':
+        return <SettingsMemoryTab setError={setError} setNotice={setNotice} availableTabs={['memory']} />;
+      case 'ai':
+      default:
+        return (
+          <>
+            {/* ── Provider ──────────────────────────────────────────────────── */}
           <SettingsSection title="Provider">
             <SettingsRow label="AI provider" loading={isLoadingProvider}>
               <SettingsSelect
@@ -781,7 +773,73 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
             </SettingsRow>
           </SettingsSection>
         </>
-      ) : null}
+      );
+    }
+  };
+
+  return (
+    <div role="tabpanel" id="settings-panel-ai" className="space-y-3">
+      <SettingsSection title="Assistant">
+        <SettingsRow
+          label="Enable AI assistant"
+          hint="When off, the app works as a pure task manager. Chat history and memory are preserved."
+          loading={isLoadingAiEnabled}
+        >
+          <SegmentedControl
+            options={[
+              { value: 'on' as const, label: 'On' },
+              { value: 'off' as const, label: 'Off' },
+            ]}
+            value={aiEnabled ? 'on' : 'off'}
+            onChange={(v) => void handleAiEnabledChange(v as 'on' | 'off')}
+          />
+        </SettingsRow>
+      </SettingsSection>
+
+      {aiEnabled && (
+        <>
+          <nav className="flex items-center gap-0.5" aria-label="Assistant sub-tabs">
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('ai')}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                activeSubTab === 'ai'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
+              )}
+            >
+              AI
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('identity')}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                activeSubTab === 'identity'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
+              )}
+            >
+              Identity
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('knowledge')}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                activeSubTab === 'knowledge'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
+              )}
+            >
+              Knowledge
+            </button>
+          </nav>
+
+          {renderSubTabContent()}
+        </>
+      )}
     </div>
   );
 };

@@ -42,8 +42,8 @@ export const OnboardingReady = ({ onFinish, isFinishing, summary }: OnboardingRe
   const hasSummaryData = summary.userName || summary.aiEnabled || providerDisplay || summary.roleName;
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <BirdMascot size={48} animated variant="double-tap" className="text-foreground/80" />
+    <div className="flex flex-col items-center gap-8 text-center">
+      <BirdMascot size={36} animated variant="wobble" className="text-foreground/80" />
 
       <div className="flex flex-col gap-3">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">You're all set.</h2>
@@ -81,34 +81,9 @@ export const OnboardingReady = ({ onFinish, isFinishing, summary }: OnboardingRe
         </div>
       ) : null}
 
-      <div className="flex w-full flex-col gap-2 rounded-md border border-border/50 bg-accent/30 px-3 py-2.5">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Keyboard shortcuts</span>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">Cmd+N</kbd>
-            <span className="text-[11px] text-muted-foreground">New task</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">Cmd+K</kbd>
-            <span className="text-[11px] text-muted-foreground">Chat</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">Up/Down</kbd>
-            <span className="text-[11px] text-muted-foreground">Navigate</span>
-          </div>
-        </div>
-      </div>
-
       <Button onClick={onFinish} disabled={isFinishing} className="w-full">
         {isFinishing ? 'Opening...' : 'Open App'}
       </Button>
-
-      <div className="flex items-center justify-center gap-4 text-muted-foreground/50">
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
-          <span className="text-[10px]">Open App</span>
-        </span>
-      </div>
     </div>
   );
 };
