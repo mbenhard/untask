@@ -1,0 +1,86 @@
+import { cn } from '../../lib/utils';
+
+type BirdVariant = 'float' | 'bop' | 'wobble' | 'double-tap' | 'snap' | 'smooth-bop';
+
+type BirdMascotProps = {
+  size: number;
+  animated?: boolean;
+  variant?: BirdVariant;
+  className?: string;
+};
+
+const VARIANT_STYLES: Record<BirdVariant, string> = {
+  float: 'bird-float',
+  bop: 'bird-bop',
+  wobble: 'bird-wobble',
+  'double-tap': 'bird-double-tap',
+  snap: 'bird-snap',
+  'smooth-bop': 'bird-smooth-bop',
+};
+
+const HeadSvg = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.89 166.04" className="block h-auto w-full">
+    <path
+      fill="currentColor"
+      d="M120.39,36.58c1.07-.22,1.56-.39,2.49-1.01-15.26-5.36-30.9-9.88-46.49-14.2C75.08,3.55,51.53-5.85,37.12,3.96c-13.89,9.55-12.2,28.04-16.23,42.7-5.67,28.52-11.32,57.04-17,85.55-3.1,15.47-11.57,36.65,13.69,33.52,16.92-.48,33.84-1.07,50.75-1.85,22.47-.89,39.64,3.24,30.44-26.67-6.31-30.86-12.58-61.72-18.81-92.6,13.56-2.23,26.95-5.41,40.44-8.03ZM59.02,23.22c-.01,9.92-15.48,8.5-13.45-1.25,1.54-7.53,13.49-6.61,13.45,1.25Z"
+    />
+  </svg>
+);
+
+const FeetSvg = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.72 50.38" className="block h-auto w-full">
+    <path
+      fill="currentColor"
+      d="M1.94,47.87c.23-.13.45-.26.69-.4.41-.22.83-.44,1.25-.65,0-.23,0-.46,0-.7.03-5.6.07-11.19.11-16.79.02-2.71.04-5.41.05-8.12.01-2.36.03-4.72.05-7.08,0-1.25.02-2.5.02-3.75,0-1.18.01-2.35.02-3.53,0-.64,0-1.27.01-1.91,0-.38,0-.76,0-1.15,0-.33,0-.66,0-1q.02-.94.37-2.15c1.17,0,2.34,0,3.55,0,.26,5.66.39,11.31.42,16.98,0,.82.01,1.64.02,2.46.02,1.91.03,3.83.04,5.74.02,2.19.03,4.37.05,6.56.04,4.48.07,8.97.1,13.45,1.37-.27,2.73-.56,4.1-.85.39-.08.77-.15,1.17-.23q3.2-.7,4.14-1.86c.2-.31.4-.62.6-.94q1.22-.75,2.58-.97c0-.37,0-.74,0-1.13,0-3.55-.01-7.1-.01-10.65,0-1.82,0-3.65,0-5.47q-.04-9.78.17-19.55.02-.55.04-1.1,0-1.6.47-3.09,1.64-.04,3.23.32c.4.8.36,1.32.36,2.21,0,.33,0,.66,0,1,0,.36,0,.73,0,1.1,0,.38,0,.76,0,1.15,0,1.05,0,2.09,0,3.14,0,1.09,0,2.19,0,3.28,0,2.07,0,4.14,0,6.21,0,2.36,0,4.71,0,7.07,0,4.85,0,9.7-.02,14.55.28-.07.55-.14.83-.22,1.02-.27,2.05-.53,3.08-.78.44-.11.89-.23,1.33-.34.64-.17,1.28-.33,1.92-.49.38-.1.77-.2,1.16-.3,1.14-.15,1.66-.05,2.66.51q.59.81.97,1.61c-1.59.57-3.19.95-4.84,1.29q.56.02,1.13.04c.5.02.99.04,1.49.06.25,0,.49.01.74.02,1.57.07,2.7.3,4.06,1.17q.74.91.65,1.94-10.55.16-21.31.32c.21.43.43.85.65,1.29-1.18.41-2.32.75-3.55.97.96.32,1.7.39,2.7.44,1.37.12,2.37.22,3.43,1.17.21.53.43,1.07.65,1.61-7.67,0-15.34,0-23.24,0q.63-1.66,1.94-2.5Z"
+    />
+  </svg>
+);
+
+export const BirdMascot = ({
+  size,
+  animated = false,
+  variant = 'smooth-bop',
+  className,
+}: BirdMascotProps) => {
+  const showFeet = size > 20;
+  const bodyWidthRatio = showFeet ? 0.75 : 1;
+
+  return (
+    <div
+      className={cn('bird-mascot inline-flex flex-col items-center', className)}
+      style={{ width: size * bodyWidthRatio, height: size }}
+    >
+      <div
+        className={cn(
+          'bird-body relative z-[2] flex-1',
+          animated && VARIANT_STYLES[variant],
+        )}
+        style={{
+          transformOrigin: 'center bottom',
+          marginBottom: showFeet ? '-10%' : 0,
+        }}
+      >
+        <HeadSvg />
+      </div>
+      {showFeet && (
+        <>
+          <div className="bird-feet relative z-[1]" style={{ width: '34%' }}>
+            <FeetSvg />
+          </div>
+          <div
+            className={cn(
+              'bird-shadow mt-[3px] rounded-[50%]',
+              animated && `${VARIANT_STYLES[variant]}-shadow`,
+            )}
+            style={{
+              width: '38%',
+              height: size * 0.04,
+              background: 'radial-gradient(ellipse, currentColor 0%, transparent 70%)',
+              opacity: 0.35,
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+};

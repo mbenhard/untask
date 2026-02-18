@@ -18,6 +18,7 @@ import type {
 } from '../../types/chat';
 import type { ChatMessage } from '../../types/models';
 import { getUntask } from '../lib/untask';
+import { resolveBlockNoteImages } from '../utils/imageResize';
 import { useAppStore } from './appStore';
 import { useTaskStore } from './taskStore';
 
@@ -277,22 +278,56 @@ const parseChips = (raw: string | null): ChipAction[] | undefined => {
   }
 };
 
+// Tool names whose steps are visible in the chat UI — must mirror ChatView's VISIBLE_TOOL_NAMES
+const MUTATION_TOOL_NAMES = new Set([
+  'create_task', 'update_task', 'complete_task', 'delete_task',
+  'edit_note', 'update_memory', 'undo_last_action',
+]);
+
+const isToolStepVisibleInUi = (step: TurnStep): boolean => {
+  if (step.kind !== 'tool') return false;
+  if (step.status === 'confirmation_required' || step.status === 'error') return true;
+  if ('actionCard' in step && step.actionCard?.lifecycle === 'pending') return true;
+  return MUTATION_TOOL_NAMES.has(step.toolName);
+};
+
+/**
+ * Collapse text steps that are adjacent or separated only by hidden (read-only)
+ * tool steps. This prevents the "double bubble" effect when the model generates
+ * text → hidden tool call → more text in a single turn.
+ */
 const collapseConsecutiveTextSteps = (steps: TurnStep[]): TurnStep[] => {
   const collapsed: TurnStep[] = [];
 
   steps.forEach((step) => {
-    const previous = collapsed[collapsed.length - 1];
-    if (step.kind === 'text' && previous?.kind === 'text') {
-      // Skip exact duplicates
-      if (previous.content.trim() === step.content.trim()) {
+    if (step.kind === 'text') {
+      // Find the last text step in collapsed, checking if everything between is a hidden tool
+      let lastTextIdx = -1;
+      let allBetweenHidden = true;
+      for (let i = collapsed.length - 1; i >= 0; i--) {
+        if (collapsed[i].kind === 'text') {
+          lastTextIdx = i;
+          break;
+        }
+        if (collapsed[i].kind !== 'tool' || isToolStepVisibleInUi(collapsed[i])) {
+          allBetweenHidden = false;
+          break;
+        }
+      }
+
+      if (lastTextIdx >= 0 && allBetweenHidden) {
+        const previous = collapsed[lastTextIdx] as Extract<TurnStep, { kind: 'text' }>;
+        // Skip exact duplicates
+        if (previous.content.trim() === step.content.trim()) {
+          return;
+        }
+        // Merge text steps
+        collapsed[lastTextIdx] = {
+          ...previous,
+          content: previous.content.trimEnd() + '\n\n' + step.content.trimStart(),
+        };
         return;
       }
-      // Merge different consecutive text steps into one — prevents double-bubble rendering
-      collapsed[collapsed.length - 1] = {
-        ...previous,
-        content: previous.content.trimEnd() + '\n\n' + step.content.trimStart(),
-      };
-      return;
     }
 
     collapsed.push(step);
@@ -342,6 +377,7 @@ const revealPeekIfChatNotOpen = (): void => {
     appStore.setUnreadProactive(true);
   }
 };
+
 
 export const useChatStore = create<ChatStore>((set, get) => {
   let initializePromise: Promise<void> | null = null;
@@ -714,9 +750,43 @@ export const useChatStore = create<ChatStore>((set, get) => {
       if (selected?.modelId) {
         set({ selectedModelId: selected.modelId });
       }
-      const images = get().pendingImages;
+      const images = [...get().pendingImages];
       const noteContext = get().pendingNoteContext ?? undefined;
-      set({ pendingImages: [] });
+      set({ pendingImages: [], pendingNoteContext: null });
+
+      // Inject images from the currently selected task's attachments
+      const taskState = useTaskStore.getState();
+      const selectedTask = taskState.selectedTaskId
+        ? taskState.tasks.find((t) => t.id === taskState.selectedTaskId)
+        : null;
+
+      if (selectedTask?.body) {
+        try {
+          const taskImages = await resolveBlockNoteImages(selectedTask.body);
+          images.push(...taskImages);
+        } catch {
+          // Non-fatal — send without task attachment images
+        }
+      }
+
+      // Inject images from the attached note's content
+      if (noteContext) {
+        try {
+          const { useNotesStore } = await import('./notesStore');
+          const notesState = useNotesStore.getState();
+          // Use the raw BlockNote content if we're looking at the same note
+          const rawContent =
+            notesState.activeNoteId === noteContext.noteId
+              ? notesState.content
+              : null;
+          if (rawContent) {
+            const noteImages = await resolveBlockNoteImages(rawContent);
+            images.push(...noteImages);
+          }
+        } catch {
+          // Non-fatal — send without note attachment images
+        }
+      }
 
       const conversationId = await ensureActiveConversationId();
       await sendPreparedMessage(

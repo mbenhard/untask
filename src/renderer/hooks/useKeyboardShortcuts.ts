@@ -95,10 +95,39 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n') {
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
-        setView('notes');
+        triggerNewTask();
         return;
+      }
+
+      // View navigation: Cmd+1–4, Cmd+, (use event.code for international keyboard support)
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey) {
+        if (event.code === 'Digit1') {
+          event.preventDefault();
+          setView('today');
+          return;
+        }
+        if (event.code === 'Digit2') {
+          event.preventDefault();
+          setView('tasks');
+          return;
+        }
+        if (event.code === 'Digit3') {
+          event.preventDefault();
+          setView('inbox');
+          return;
+        }
+        if (event.code === 'Digit4') {
+          event.preventDefault();
+          setView('notes');
+          return;
+        }
+        if (event.code === 'Comma') {
+          event.preventDefault();
+          setView('settings');
+          return;
+        }
       }
 
       if (
@@ -151,36 +180,32 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
+      // Escape layers: search → notes editor back-to-list → clear chat input → leave settings → close chat overlay
       if (event.key === 'Escape') {
-        // Layer 0: close search overlay (highest z-index).
         if (isSearchOpenRef.current) {
           event.preventDefault();
           closeSearch();
           return;
         }
 
-        // Notes editor shortcut: escape returns to list when chat overlay is not open.
         if (notesActive && notesState.subView === 'editor' && chatOverlayState === 'peek') {
           event.preventDefault();
           void notesState.backToList();
           return;
         }
 
-        // Layer 1: clear input text.
         if (inputValueRef.current.length > 0) {
           event.preventDefault();
           clearInput();
           return;
         }
 
-        // Layer 2: navigate away from settings view.
         if (activeViewRef.current === 'settings') {
           event.preventDefault();
           setView('today');
           return;
         }
 
-        // Layer 3: collapse chat overlay (open -> peek).
         if (chatOverlayState === 'open') {
           event.preventDefault();
           closeChatOverlayLayer();
@@ -190,90 +215,6 @@ export const useKeyboardShortcuts = ({
         }
       }
 
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-
-      if (isTextInputElement(document.activeElement)) {
-        return;
-      }
-
-      if (
-        notesActive
-        && chatOverlayState === 'peek'
-        && notesState.layoutMode !== 'focus'
-        && !isSearchOpenRef.current
-      ) {
-        if (event.key.toLowerCase() === 'j') {
-          event.preventDefault();
-          notesState.selectRelativeActive(1);
-          return;
-        }
-
-        if (event.key.toLowerCase() === 'k') {
-          event.preventDefault();
-          notesState.selectRelativeActive(-1);
-          return;
-        }
-
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          void notesState.openSelectedNote();
-          return;
-        }
-      }
-
-      if (event.key === '1') {
-        event.preventDefault();
-        setView('today');
-        return;
-      }
-
-      if (event.key === '2') {
-        event.preventDefault();
-        setView('tasks');
-        return;
-      }
-
-      if (event.key === '3') {
-        event.preventDefault();
-        setView('inbox');
-        return;
-      }
-
-      if (event.key === '4') {
-        event.preventDefault();
-        const isOpen = chatOverlayState === 'open';
-        toggleChatOverlay();
-        if (isOpen) {
-          clearPendingNoteContext();
-          inputRef.current?.blur();
-        } else {
-          inputRef.current?.focus();
-        }
-        return;
-      }
-
-      // Comma opens settings.
-      if (event.key === ',') {
-        event.preventDefault();
-        setView('settings');
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === 'n'
-        && (
-          activeViewRef.current === 'today'
-          || activeViewRef.current === 'tasks'
-          || activeViewRef.current === 'inbox'
-        )
-        && chatOverlayState === 'peek'
-        && !isSearchOpenRef.current
-      ) {
-        event.preventDefault();
-        triggerNewTask();
-      }
     };
 
     // Capture phase ensures editor-level handlers cannot swallow app shortcuts.

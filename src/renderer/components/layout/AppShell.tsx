@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { getUntask } from '../../lib/untask';
-
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ChevronDown, LampDesk, Settings } from 'lucide-react';
+import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 
 import { useTheme } from '../providers/ThemeProvider';
 
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useMenuActions } from '../../hooks/useMenuActions';
 import { useQuickAddListener } from '../../hooks/useQuickAddListener';
 import { cn } from '../../lib/utils';
 import {
   selectActiveView,
   selectAiEnabled,
   selectChatOverlayState,
+  selectChatView,
   selectUnreadProactive,
   useAppStore,
 } from '../../stores/appStore';
@@ -32,7 +32,7 @@ import {
   useChatStore,
 } from '../../stores/chatStore';
 import { ChatView } from '../chat/ChatView';
-import { ThreadDropdown } from '../chat/ThreadDropdown';
+import { ThreadListView } from '../chat/ThreadListView';
 import { NotesView } from '../notes/NotesView';
 import { SearchModal } from '../search/SearchModal';
 import { SettingsView } from '../settings/SettingsView';
@@ -42,15 +42,11 @@ import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
 
 import { TitleBar } from './TitleBar';
-import { UpdateBanner } from './UpdateBanner';
 
 export const AppShell = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openPanelRef = useRef<HTMLElement>(null);
   const [chatInputValue, setChatInputValue] = useState('');
-  const [threadDropdownOpen, setThreadDropdownOpen] = useState(false);
-  const aiEnabled = useAppStore(selectAiEnabled);
-  const setAiEnabled = useAppStore((state) => state.setAiEnabled);
 
   const { resolvedTheme, setTheme } = useTheme();
   const prefersReducedMotion = useReducedMotion();
@@ -76,11 +72,14 @@ export const AppShell = () => {
   }, [resolvedTheme, setTheme, prefersReducedMotion]);
 
   const activeView = useAppStore(selectActiveView);
+  const aiEnabled = useAppStore(selectAiEnabled);
   const chatOverlayState = useAppStore(selectChatOverlayState);
+  const chatView = useAppStore(selectChatView);
   const unreadProactive = useAppStore(selectUnreadProactive);
   const setView = useAppStore((state) => state.setView);
   const openChatOverlay = useAppStore((state) => state.openChatOverlay);
   const peekChatOverlay = useAppStore((state) => state.peekChatOverlay);
+  const setChatView = useAppStore((state) => state.setChatView);
 
   const fetchTasks = useTaskStore((state) => state.fetchTasks);
   const fetchStatusConfig = useTaskStatusConfigStore((s) => s.fetchConfig);
@@ -102,16 +101,6 @@ export const AppShell = () => {
     void fetchTasks();
     void fetchStatusConfig();
   }, [fetchTasks, fetchStatusConfig]);
-
-  // Load ai.enabled setting on mount
-  useEffect(() => {
-    void getUntask()
-      .settings.getAiEnabled()
-      .then((result) => setAiEnabled(result.enabled))
-      .catch(() => {
-        // On error, keep default (true) — AI features remain accessible
-      });
-  }, [setAiEnabled]);
 
   useEffect(() => {
     void initializeChat();
@@ -149,6 +138,8 @@ export const AppShell = () => {
     inputRef,
     onPrefill: setChatInputValue,
   });
+
+  useMenuActions();
 
   const handleSubmit = useCallback(() => {
     const content = chatInputValue.trim();
@@ -195,7 +186,6 @@ export const AppShell = () => {
   }, [openChatOverlay]);
 
   const collapseChatOverlay = useCallback(() => {
-    setThreadDropdownOpen(false);
     peekChatOverlay();
     clearPendingNoteContext();
     inputRef.current?.blur();
@@ -212,6 +202,7 @@ export const AppShell = () => {
     );
   }, [activeConversationId, conversations]);
 
+  // Focus chat input when panel opens
   useEffect(() => {
     if (chatOverlayState !== 'open') {
       return;
@@ -232,6 +223,16 @@ export const AppShell = () => {
       window.clearTimeout(timeoutId);
     };
   }, [chatOverlayState, prefersReducedMotion]);
+
+  // Focus chat input when switching to conversation view while panel is already open
+  useEffect(() => {
+    if (chatOverlayState === 'open' && chatView === 'conversation') {
+      const frameId = window.requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+      return () => window.cancelAnimationFrame(frameId);
+    }
+  }, [chatView, chatOverlayState]);
 
   useEffect(() => {
     if (chatOverlayState !== 'open') {
@@ -257,11 +258,18 @@ export const AppShell = () => {
     };
   }, [chatOverlayState, collapseChatOverlay]);
 
-  useEffect(() => {
-    if (chatOverlayState !== 'open') {
-      setThreadDropdownOpen(false);
-    }
-  }, [chatOverlayState]);
+  const handleThreadSelect = useCallback(
+    (conversationId: string) => {
+      void setActiveConversation(conversationId);
+      setChatView('conversation');
+    },
+    [setActiveConversation, setChatView],
+  );
+
+  const handleThreadCreate = useCallback(async () => {
+    await createConversation();
+    setChatView('conversation');
+  }, [createConversation, setChatView]);
 
   const isSettingsActive = activeView === 'settings';
 
@@ -269,7 +277,6 @@ export const AppShell = () => {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <TitleBar />
-      <UpdateBanner />
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <motion.section
@@ -329,63 +336,85 @@ export const AppShell = () => {
                   }}
                   className="pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm"
                 >
-                  <header className="relative flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
-                    <button
-                      type="button"
-                      className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      onClick={() => setThreadDropdownOpen((open) => !open)}
-                    >
-                      <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
-                        {activeConversationTitle}
+                  {/* Header: adapts based on chatView */}
+                  <header className="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
+                    {chatView === 'threads' ? (
+                      <span className="truncate px-1.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+                        Threads
                       </span>
-                      <ChevronDown
-                        className={cn(
-                          'size-3 transition-transform',
-                          threadDropdownOpen ? 'rotate-180' : '',
-                        )}
-                      />
-                    </button>
-                    <div className="flex items-center gap-1">
+                    ) : (
                       <button
                         type="button"
-                        onClick={collapseChatOverlay}
-                        className="rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        onClick={() => setChatView('threads')}
                       >
-                        Collapse
+                        <ArrowLeft className="size-3" />
+                        <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
+                          {activeConversationTitle}
+                        </span>
                       </button>
-                    </div>
-                    <ThreadDropdown
-                      open={threadDropdownOpen}
-                      conversations={conversations}
-                      activeConversationId={activeConversationId}
-                      isLoading={isLoadingConversations}
-                      onClose={() => setThreadDropdownOpen(false)}
-                      onSelect={(conversationId) => {
-                        void setActiveConversation(conversationId);
-                      }}
-                      onCreate={() => {
-                        void createConversation();
-                      }}
-                      onArchive={(conversationId) => {
-                        void archiveConversation(conversationId);
-                      }}
-                      onDelete={(conversationId) => {
-                        void deleteConversation(conversationId);
-                      }}
-                    />
+                    )}
+                    <button
+                      type="button"
+                      onClick={collapseChatOverlay}
+                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      aria-label="Close chat"
+                    >
+                      <X className="size-4" />
+                    </button>
                   </header>
 
-                  <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
-                    <ChatView onSuggestionClick={handleSuggestionClick} />
-                  </div>
-                  <div className="border-t border-dashed border-border/50">
-                    <ChatInput
-                      inputRef={inputRef}
-                      value={chatInputValue}
-                      onChange={setChatInputValue}
-                      onSubmit={handleSubmit}
-                    />
-                  </div>
+                  {/* Body: switches between thread list and conversation */}
+                  <AnimatePresence mode="wait">
+                    {chatView === 'threads' ? (
+                      <motion.div
+                        key="threads"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0 }}
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                      >
+                        <ThreadListView
+                          conversations={conversations}
+                          activeConversationId={activeConversationId}
+                          isLoading={isLoadingConversations}
+                          onCollapse={collapseChatOverlay}
+                          onSelect={handleThreadSelect}
+                          onCreate={() => {
+                            void handleThreadCreate();
+                          }}
+                          onArchive={(conversationId) => {
+                            void archiveConversation(conversationId);
+                          }}
+                          onDelete={(conversationId) => {
+                            void deleteConversation(conversationId);
+                          }}
+                        />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="conversation"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0 }}
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                      >
+                        <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
+                          <ChatView onSuggestionClick={handleSuggestionClick} />
+                        </div>
+                        <div className="border-t border-dashed border-border/50">
+                          <ChatInput
+                            inputRef={inputRef}
+                            value={chatInputValue}
+                            onChange={setChatInputValue}
+                            onSubmit={handleSubmit}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.aside>
               ) : null}
             </AnimatePresence>
@@ -393,8 +422,8 @@ export const AppShell = () => {
         </div>
         ) : null}
 
-        <div className="no-drag absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
-          <div className="flex shrink-0 items-center gap-1">
+        <div className="no-drag pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => setView(isSettingsActive ? 'today' : 'settings')}

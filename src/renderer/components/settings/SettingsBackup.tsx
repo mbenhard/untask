@@ -131,15 +131,15 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
   );
 
   return (
-    <div role="tabpanel" id="settings-panel-backup" className="space-y-6">
+    <div role="tabpanel" id="settings-panel-backup" className="space-y-3">
       <SettingsSection title="Actions">
-        <div className="flex items-center gap-2 py-2.5">
+        <div className="flex items-center gap-1.5 px-2 py-2">
           <Button
             type="button"
             size="sm"
             onClick={() => void handleCreateBackup()}
             disabled={isCreatingBackup}
-            className="h-8 text-[11px]"
+            className="h-7 text-[11px]"
           >
             {isCreatingBackup ? 'Creating...' : 'Create backup'}
           </Button>
@@ -149,7 +149,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
             variant="ghost"
             onClick={() => void handleExportBackup()}
             disabled={isExportingBackup}
-            className="h-8 text-[11px]"
+            className="h-7 text-[11px]"
           >
             {isExportingBackup ? 'Exporting...' : 'Export'}
           </Button>
@@ -159,7 +159,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
             variant="ghost"
             onClick={() => void handleImportBackupFromFile()}
             disabled={isImportingBackup || restoringBackupFilename !== null}
-            className="h-8 text-[11px]"
+            className="h-7 text-[11px]"
           >
             {isImportingBackup ? 'Importing...' : 'Import'}
           </Button>
@@ -169,7 +169,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
             variant="ghost"
             onClick={() => void loadBackups()}
             disabled={isLoadingBackups}
-            className="h-8 text-[11px]"
+            className="h-7 text-[11px]"
           >
             Refresh
           </Button>
@@ -183,7 +183,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
             value={exportPassphrase}
             onChange={(event) => setExportPassphrase(event.target.value)}
             placeholder="Optional passphrase"
-            className="h-8 w-48 text-[12px]"
+            className="h-7 w-44 text-[11px]"
             aria-label="Backup export passphrase"
           />
         </SettingsRow>
@@ -193,7 +193,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
             value={importPassphrase}
             onChange={(event) => setImportPassphrase(event.target.value)}
             placeholder="Passphrase for encrypted backup"
-            className="h-8 w-48 text-[12px]"
+            className="h-7 w-44 text-[11px]"
             aria-label="Backup import passphrase"
           />
         </SettingsRow>
@@ -201,24 +201,23 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
 
       <SettingsSection title="Backups">
         {isLoadingBackups ? (
-          <div className="py-2.5">
+          <div className="px-2 py-2">
             <p className="text-[11px] text-muted-foreground">Loading backups...</p>
           </div>
         ) : backups.length === 0 ? (
-          <div className="py-2.5">
+          <div className="px-2 py-2">
             <p className="text-[11px] text-muted-foreground">No backups found.</p>
           </div>
         ) : (
           backups.map((backup) => (
             <div
               key={backup.filename}
-              className="flex items-center justify-between gap-4 py-2.5"
+              className="flex items-center justify-between gap-3 px-2 py-2"
             >
               <div className="min-w-0 flex-1 space-y-0.5">
                 <span className="text-[13px] text-foreground">{backup.filename}</span>
-                <p className="text-[11px] text-muted-foreground">
-                  {new Date(backup.createdAt).toLocaleString()} &middot;{' '}
-                  {(backup.sizeBytes / 1024).toFixed(1)} KB
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  {new Date(backup.createdAt).toLocaleString()} · {(backup.sizeBytes / 1024).toFixed(1)} KB
                 </p>
               </div>
               <button

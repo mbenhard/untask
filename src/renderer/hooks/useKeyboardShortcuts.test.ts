@@ -109,7 +109,7 @@ describe('useKeyboardShortcuts', () => {
     vi.restoreAllMocks();
   });
 
-  it('maps key 4 to peek -> open and open -> peek', () => {
+  it('maps Cmd+4 to Notes view', () => {
     const inputRef = {
       current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
     };
@@ -125,14 +125,33 @@ describe('useKeyboardShortcuts', () => {
     });
 
     flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit4', key: '4', metaKey: true }));
     });
-    expect(useAppStore.getState().chatOverlayState).toBe('open');
+    expect(useAppStore.getState().activeView).toBe('notes');
+  });
+
+  it('maps Cmd+N to trigger new task', () => {
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
 
     flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
+      root.render(
+        createElement(HookHarness, {
+          inputRef,
+          inputValue: '',
+          clearInput: vi.fn(),
+        }),
+      );
     });
-    expect(useAppStore.getState().chatOverlayState).toBe('peek');
+
+    const beforeTrigger = useAppStore.getState().newTaskTrigger;
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true }));
+    });
+
+    expect(useAppStore.getState().newTaskTrigger).toBe(beforeTrigger + 1);
   });
 
   it('maps Cmd/Ctrl+K to peek -> open and open -> peek with focus changes', () => {
@@ -293,18 +312,7 @@ describe('useKeyboardShortcuts', () => {
     expect(backToList).toHaveBeenCalledTimes(1);
   });
 
-  it('navigates notes list with j/k and Enter', () => {
-    const selectRelativeActive = vi.fn(() => 'note-1');
-    const openSelectedNote = vi.fn(async () => true);
-
-    useAppStore.setState({ activeView: 'notes', chatOverlayState: 'peek' });
-    useNotesStore.setState({
-      subView: 'list',
-      layoutMode: 'list',
-      selectRelativeActive: selectRelativeActive as never,
-      openSelectedNote: openSelectedNote as never,
-    });
-
+  it('maps Cmd+1 through Cmd+3 to Today, Tasks, Inbox views', () => {
     const inputRef = {
       current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
     };
@@ -314,17 +322,18 @@ describe('useKeyboardShortcuts', () => {
     });
 
     flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2', key: '2', metaKey: true }));
     });
-    flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }));
-    });
-    flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    });
+    expect(useAppStore.getState().activeView).toBe('tasks');
 
-    expect(selectRelativeActive).toHaveBeenNthCalledWith(1, 1);
-    expect(selectRelativeActive).toHaveBeenNthCalledWith(2, -1);
-    expect(openSelectedNote).toHaveBeenCalledTimes(1);
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', key: '3', metaKey: true }));
+    });
+    expect(useAppStore.getState().activeView).toBe('inbox');
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', key: '1', metaKey: true }));
+    });
+    expect(useAppStore.getState().activeView).toBe('today');
   });
 });

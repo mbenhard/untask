@@ -5,11 +5,12 @@ import {
   type DefaultReactSuggestionItem,
   getDefaultReactSlashMenuItems,
 } from '@blocknote/react';
-import { Archive, ArrowLeft, CheckSquare, Sparkles } from 'lucide-react';
+import { Archive, ArrowLeft, CheckSquare, Sparkles, Trash2 } from 'lucide-react';
 
 import {
   selectActiveNoteId,
   selectActiveNoteTitle,
+  selectIsActiveNoteArchived,
   selectNotesContent,
   selectNotesError,
   selectNotesIsDirty,
@@ -95,13 +96,16 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const isProcessing = useNotesStore(selectNotesIsProcessing);
   const error = useNotesStore(selectNotesError);
   const notice = useNotesStore(selectNotesNotice);
+  const isArchived = useNotesStore(selectIsActiveNoteArchived);
   const setContent = useNotesStore((s) => s.setContent);
   const setTitle = useNotesStore((s) => s.setTitle);
   const backToList = useNotesStore((s) => s.backToList);
   const archiveNote = useNotesStore((s) => s.archiveNote);
+  const deleteNote = useNotesStore((s) => s.deleteNote);
   const processWithAI = useNotesStore((s) => s.processWithAI);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editorRef = useRef<BlockNoteEditor | null>(null);
 
   // 2s debounced auto-save
   const handleChange = useCallback(
@@ -133,9 +137,25 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     void archiveNote(activeNoteId);
   }, [activeNoteId, archiveNote]);
 
+  const handleDelete = useCallback(() => {
+    if (!activeNoteId) return;
+    void deleteNote(activeNoteId);
+  }, [activeNoteId, deleteNote]);
+
   const handleProcess = useCallback(() => {
     void processWithAI();
   }, [processWithAI]);
+
+  // Auto-focus editor when note opens
+  useEffect(() => {
+    if (!isLoading && activeNoteId && editorRef.current) {
+      // Small delay to let BlockNote finish hydration
+      const timer = setTimeout(() => {
+        editorRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeNoteId, isLoading]);
 
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,9 +211,17 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           placeholder="Untitled note"
         />
 
-        <span className="shrink-0 text-[10px] tracking-[0.01em] text-muted-foreground">
-          {isDirty ? 'unsaved' : isSaving ? 'saving' : ''}
-        </span>
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+          {notice ? (
+            <span className={`truncate text-[11px] ${noticeClassName}`}>{notice.message}</span>
+          ) : error ? (
+            <span className="truncate text-[11px] text-destructive">{error}</span>
+          ) : (
+            <span className="text-[10px] tracking-[0.01em] text-muted-foreground">
+              {isDirty ? 'unsaved' : isSaving ? 'saving' : ''}
+            </span>
+          )}
+        </div>
 
         <div className="flex shrink-0 items-center gap-1">
           <Button
@@ -208,26 +236,31 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
             {isProcessing ? 'processing' : 'process'}
           </Button>
 
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-            onClick={handleArchive}
-          >
-            <Archive size={12} />
-            archive
-          </Button>
+          {isArchived ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-destructive"
+              onClick={handleDelete}
+            >
+              <Trash2 size={12} />
+              delete
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={handleArchive}
+            >
+              <Archive size={12} />
+              archive
+            </Button>
+          )}
         </div>
       </header>
-
-      {notice ? (
-        <p className={`mx-3 mt-1 text-[11px] ${noticeClassName}`}>{notice.message}</p>
-      ) : null}
-
-      {error ? (
-        <p className="mx-3 mt-1 text-[11px] text-destructive">{error}</p>
-      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <BlockEditor
@@ -236,6 +269,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           onChange={handleChange}
           className="untask-notes-editor"
           getSlashMenuItems={getSlashMenuItems}
+          editorRef={editorRef}
         />
       </div>
     </div>

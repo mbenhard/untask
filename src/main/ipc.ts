@@ -56,6 +56,18 @@ import {
   type BackupImportDialogRequest,
   type BackupImportDialogResponse,
   type WindowDismissModeResult,
+  type SettingsGetAiEnabledResult,
+  type SettingsSetAiEnabledRequest,
+  type SettingsSetAiEnabledResult,
+  type ApiKeysHasRequest,
+  type ApiKeysHasResult,
+  type ApiKeysSetRequest,
+  type ApiKeysDeleteRequest,
+  type ApiKeysValidateRequest,
+  type ApiKeysValidateResult,
+  type AttachmentSaveRequest,
+  type AttachmentIdRequest,
+  type AttachmentPickAndSaveResult,
   type UpdateInfo,
 } from '../types/ipc';
 import type { MemoryLayer } from '../types/assistant';
@@ -107,21 +119,22 @@ import {
   listBackups,
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
-import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
-import { getSetting, setSetting, getAllSettings, isAiEnabled, setAiEnabled, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
+import { getSetting, setSetting, getAllSettings, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
+import { SETTING_KEY_AI_ENABLED, SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
+import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
+import { startProactiveTurn } from './ai/chat';
 import {
   storeApiKey,
   hasApiKey,
   deleteApiKey as deleteStoredApiKey,
 } from './services/keyStorage';
-import { startProactiveLoopIfDepsReady, stopProactiveLoop } from './assistant/proactiveLoop';
-import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
-
-import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
 import {
   checkForUpdates as runUpdateCheck,
   getUpdateInfo as getCachedUpdateInfo,
 } from './services/updateChecker';
+import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
+
+import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
 import {
   getAutonomyMode,
   setAutonomyMode,
@@ -133,12 +146,22 @@ import {
 import { executeToolCall } from './ai/tools';
 import { refreshTodayBadge } from './tray';
 import {
+  saveAttachment,
+  openAttachment,
+  revealAttachment,
+  deleteAttachment,
+  readAttachment,
+} from './attachments';
+import {
   requestHideFromRenderer,
   onEscapeLayerExit,
   getWindowDismissMode,
   setWindowDismissMode,
 } from './window/summonController';
 import { windowDismissModeSchema } from './window/dismissMode';
+import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from './window/dockMode';
+import type { DockModeResult } from '../types/ipc';
+import { reRegisterShortcuts } from './shortcuts';
 
 const settingsMemoryUpdateSchema = z
   .object({
@@ -247,20 +270,6 @@ const getMemoryState = (): SettingsMemoryStatePayload => ({
   memory: getMemory(),
 });
 
-const apiKeyProviderSchema = z.string().min(1).max(64).regex(/^[a-z0-9_-]+$/);
-const apiKeyValueSchema = z.string().min(1).max(512);
-const setApiKeySchema = z.object({
-  provider: apiKeyProviderSchema,
-  key: apiKeyValueSchema,
-});
-const providerOnlySchema = z.object({
-  provider: apiKeyProviderSchema,
-});
-const validateApiKeySchema = z.object({
-  provider: apiKeyProviderSchema,
-  key: apiKeyValueSchema,
-});
-
 const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 const BACKUP_JOB_TIMEOUT_MS = 120_000;
 
@@ -327,7 +336,7 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_STATE,
     (): SettingsBootstrapState => ({
-      status: 'ready',
+      status: isBootstrapCompleted() ? 'ready' : 'onboarding',
     }),
   );
 
@@ -388,6 +397,32 @@ export const registerIpcHandlers = (): void => {
       return { mode: setWindowDismissMode(mode) };
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_DOCK_MODE,
+    (): DockModeResult => {
+      return { mode: readDockMode() };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_SET_DOCK_MODE,
+    (_event, modeInput: unknown): DockModeResult => {
+      const mode = dockModeSchema.parse(modeInput);
+      setSetting(DOCK_MODE_KEY, mode);
+      applyDockMode(mode);
+      return { mode };
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.SHORTCUT_UPDATE, () => {
+    try {
+      reRegisterShortcuts();
+    } catch (e) {
+      console.error('[ipc] SHORTCUT_UPDATE:', e);
+      throw e;
+    }
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT,
@@ -1056,6 +1091,177 @@ export const registerIpcHandlers = (): void => {
     catch (e) { console.error('[ipc] SETTINGS_GET_ALL:', e); throw e; }
   });
   ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_AI_ENABLED,
+    (): SettingsGetAiEnabledResult => {
+      try {
+        const stored = getSetting(SETTING_KEY_AI_ENABLED);
+        return { enabled: stored !== 'false' };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_GET_AI_ENABLED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_AI_ENABLED,
+    (_event, request: SettingsSetAiEnabledRequest): SettingsSetAiEnabledResult => {
+      try {
+        setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
+        if (request.enabled) {
+          initProactiveLoop({
+            startProactiveTurn: async (input) => {
+              await startProactiveTurn({
+                triggerMessage: input.triggerMessage,
+                triggerType: input.triggerType,
+                emit: input.emit,
+              });
+            },
+          });
+        } else {
+          stopProactiveLoop();
+        }
+        return { enabled: request.enabled };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
+    },
+  );
+  // ─── Secure API key handlers ─────────────────────────────
+  const apiKeyProviderSchema = z.string().min(1).max(64).regex(/^[a-z0-9_-]+$/);
+  const apiKeyValueSchema = z.string().min(1).max(512);
+  const setApiKeySchema = z.object({ provider: apiKeyProviderSchema, key: apiKeyValueSchema });
+  const providerOnlySchema = z.object({ provider: apiKeyProviderSchema });
+  const validateApiKeySchema = z.object({ provider: apiKeyProviderSchema, key: apiKeyValueSchema });
+
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_HAS,
+    (_event, request: ApiKeysHasRequest): ApiKeysHasResult => {
+      try {
+        const validated = providerOnlySchema.parse(request);
+        return { hasKey: hasApiKey(validated.provider) };
+      }
+      catch (e) { console.error('[ipc] API_KEYS_HAS:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_SET,
+    (_event, request: ApiKeysSetRequest): void => {
+      try {
+        const validated = setApiKeySchema.parse(request);
+        storeApiKey(validated.provider, validated.key);
+      }
+      catch (e) { console.error('[ipc] API_KEYS_SET:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_DELETE,
+    (_event, request: ApiKeysDeleteRequest): void => {
+      try {
+        const validated = providerOnlySchema.parse(request);
+        deleteStoredApiKey(validated.provider);
+      }
+      catch (e) { console.error('[ipc] API_KEYS_DELETE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_VALIDATE,
+    async (_event, request: ApiKeysValidateRequest): Promise<ApiKeysValidateResult> => {
+      try {
+        const validated = validateApiKeySchema.parse(request);
+        if (validated.provider === 'openrouter') {
+          // /api/v1/auth/key requires a valid key (unlike /models which is public)
+          const { net } = await import('electron');
+          const response = await net.fetch('https://openrouter.ai/api/v1/auth/key', {
+            headers: { Authorization: `Bearer ${validated.key}` },
+          });
+          if (!response.ok) {
+            return { valid: false, error: `Invalid API key (HTTP ${response.status})` };
+          }
+          return { valid: true };
+        }
+        if (validated.provider === 'openai') {
+          const { net } = await import('electron');
+          const response = await net.fetch('https://api.openai.com/v1/models', {
+            headers: { Authorization: `Bearer ${validated.key}` },
+          });
+          if (!response.ok) {
+            return { valid: false, error: `Invalid API key (HTTP ${response.status})` };
+          }
+          return { valid: true };
+        }
+        if (validated.provider === 'anthropic') {
+          const { net } = await import('electron');
+          const response = await net.fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': validated.key,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+          });
+          // 401 = bad key, 400/200/etc = key works
+          if (response.status === 401) {
+            return { valid: false, error: 'Invalid API key' };
+          }
+          return { valid: true };
+        }
+        // Ollama and others: no key validation needed
+        return { valid: true };
+      }
+      catch (e) { console.error('[ipc] API_KEYS_VALIDATE:', e); throw e; }
+    },
+  );
+
+  // ─── Onboarding handlers ─────────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_COMPLETED,
+    (): { completed: boolean } => {
+      try { return { completed: isBootstrapCompleted() }; }
+      catch (e) { console.error('[ipc] SETTINGS_GET_BOOTSTRAP_COMPLETED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_MARK_BOOTSTRAP_COMPLETED,
+    (): void => {
+      try { markBootstrapCompleted(); }
+      catch (e) { console.error('[ipc] SETTINGS_MARK_BOOTSTRAP_COMPLETED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_USER_NAME,
+    (_event, nameInput: unknown): void => {
+      try {
+        const name = z.string().min(1).max(120).parse(nameInput);
+        setSetting('user.name', name.trim());
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_USER_NAME:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_IDENTITY,
+    (_event, identityInput: unknown): void => {
+      try {
+        const identity = z.string().min(1).max(4000).parse(identityInput);
+        setIdentity(identity.trim(), 'user');
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_IDENTITY:', e); throw e; }
+    },
+  );
+
+  // ─── Update checker handlers ──────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.APP_CHECK_FOR_UPDATES,
+    async (): Promise<UpdateInfo> => {
+      try { return await runUpdateCheck(); }
+      catch (e) { console.error('[ipc] APP_CHECK_FOR_UPDATES:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_UPDATE_INFO,
+    (): UpdateInfo | null => {
+      try { return getCachedUpdateInfo(); }
+      catch (e) { console.error('[ipc] APP_GET_UPDATE_INFO:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_MEMORY_STATE,
     (): SettingsMemoryStatePayload => {
       try { return getMemoryState(); }
@@ -1138,169 +1344,86 @@ export const registerIpcHandlers = (): void => {
     },
   );
 
-  // ─── Secure API key handlers ─────────────────────────────
-  // Keys are encrypted via Electron safeStorage. The raw key value never
-  // leaves the main process after the initial `set` call.
-
+  // ─── Attachment handlers ─────────────────────────────────
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_API_KEY,
-    (_event, payload: unknown): void => {
+    IPC_CHANNELS.ATTACHMENT_SAVE,
+    async (_event, request: AttachmentSaveRequest): Promise<string> => {
       try {
-        const { provider, key } = setApiKeySchema.parse(payload ?? {});
-        storeApiKey(provider, key);
+        return await saveAttachment(request);
       }
-      catch (e) { console.error('[ipc] SETTINGS_SET_API_KEY:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_SAVE:', e); throw e; }
     },
   );
-
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_HAS_API_KEY,
-    (_event, payload: unknown): { hasKey: boolean } => {
+    IPC_CHANNELS.ATTACHMENT_OPEN,
+    async (_event, request: AttachmentIdRequest): Promise<void> => {
       try {
-        const { provider } = providerOnlySchema.parse(payload ?? {});
-        return { hasKey: hasApiKey(provider) };
+        await openAttachment(request);
       }
-      catch (e) { console.error('[ipc] SETTINGS_HAS_API_KEY:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_OPEN:', e); throw e; }
     },
   );
-
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_DELETE_API_KEY,
-    (_event, payload: unknown): void => {
+    IPC_CHANNELS.ATTACHMENT_REVEAL,
+    (_event, request: AttachmentIdRequest): void => {
       try {
-        const { provider } = providerOnlySchema.parse(payload ?? {});
-        deleteStoredApiKey(provider);
+        revealAttachment(request);
       }
-      catch (e) { console.error('[ipc] SETTINGS_DELETE_API_KEY:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_REVEAL:', e); throw e; }
     },
   );
-
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_VALIDATE_API_KEY,
-    async (_event, payload: unknown): Promise<{ valid: boolean; error?: string }> => {
+    IPC_CHANNELS.ATTACHMENT_DELETE,
+    async (_event, request: AttachmentIdRequest): Promise<void> => {
       try {
-        const { provider, key } = validateApiKeySchema.parse(payload ?? {});
-
-        if (provider !== 'openrouter') {
-          return { valid: false, error: `Unknown provider: ${provider}` };
-        }
-
-        // Lightweight validation: fetch the models list — it requires a valid key
-        // and returns quickly without incurring any usage costs.
-        const response = await fetch('https://openrouter.ai/api/v1/models', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${key}`,
-            'Content-Type': 'application/json',
-          },
-          signal: AbortSignal.timeout(10_000),
-        });
-
-        if (response.ok) {
-          return { valid: true };
-        }
-
-        const errorBody = await response.text().catch(() => '');
-        return {
-          valid: false,
-          error: errorBody.length > 0 ? errorBody : `HTTP ${response.status}`,
+        await deleteAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_DELETE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_READ,
+    async (_event, request: AttachmentIdRequest): Promise<string> => {
+      try {
+        return await readAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_READ:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE,
+    async (event): Promise<AttachmentPickAndSaveResult> => {
+      try {
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Attach files',
+          properties: ['openFile' as const, 'multiSelections' as const],
         };
-      }
-      catch (e) {
-        console.error('[ipc] SETTINGS_VALIDATE_API_KEY:', e);
-        return {
-          valid: false,
-          error: e instanceof Error ? e.message : 'Validation failed',
-        };
-      }
-    },
-  );
+        const result = owner
+          ? await dialog.showOpenDialog(owner, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
 
-  // ─── AI enabled toggle handlers ──────────────────────────
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_GET_AI_ENABLED,
-    (): { enabled: boolean } => {
-      try { return { enabled: isAiEnabled() }; }
-      catch (e) { console.error('[ipc] SETTINGS_GET_AI_ENABLED:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_AI_ENABLED,
-    (_event, enabledInput: unknown): { enabled: boolean } => {
-      try {
-        const enabled = z.boolean().parse(enabledInput);
-        setAiEnabled(enabled);
-
-        if (enabled) {
-          startProactiveLoopIfDepsReady();
-        } else {
-          stopProactiveLoop();
+        if (result.canceled || result.filePaths.length === 0) {
+          return { canceled: true, urls: [] };
         }
 
-        return { enabled };
+        const { readFile } = await import('node:fs/promises');
+        const path = await import('node:path');
+
+        const urls: string[] = [];
+        for (const filePath of result.filePaths) {
+          const data = await readFile(filePath);
+          const filename = path.basename(filePath);
+          const url = await saveAttachment({
+            data: new Uint8Array(data),
+            filename,
+          });
+          urls.push(url);
+        }
+
+        return { canceled: false, urls };
       }
-      catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
-    },
-  );
-
-  // ─── Onboarding handlers ─────────────────────────────────
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_COMPLETED,
-    (): { completed: boolean } => {
-      try { return { completed: isBootstrapCompleted() }; }
-      catch (e) { console.error('[ipc] SETTINGS_GET_BOOTSTRAP_COMPLETED:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_MARK_BOOTSTRAP_COMPLETED,
-    (): void => {
-      try { markBootstrapCompleted(); }
-      catch (e) { console.error('[ipc] SETTINGS_MARK_BOOTSTRAP_COMPLETED:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_USER_NAME,
-    (_event, nameInput: unknown): void => {
-      try {
-        const name = z.string().min(1).max(120).parse(nameInput);
-        setSetting('user.name', name.trim());
-      }
-      catch (e) { console.error('[ipc] SETTINGS_SET_USER_NAME:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_IDENTITY,
-    (_event, identityInput: unknown): void => {
-      try {
-        const identity = z.string().min(1).max(4000).parse(identityInput);
-        setIdentity(identity.trim(), 'user');
-      }
-      catch (e) { console.error('[ipc] SETTINGS_SET_IDENTITY:', e); throw e; }
-    },
-  );
-
-  // ─── Update checker handlers ──────────────────────────────
-  ipcMain.handle(
-    IPC_CHANNELS.APP_CHECK_FOR_UPDATES,
-    async (): Promise<UpdateInfo> => {
-      try {
-        return await runUpdateCheck();
-      }
-      catch (e) { console.error('[ipc] APP_CHECK_FOR_UPDATES:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.APP_GET_UPDATE_INFO,
-    (): UpdateInfo | null => {
-      try {
-        return getCachedUpdateInfo();
-      }
-      catch (e) { console.error('[ipc] APP_GET_UPDATE_INFO:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_PICK_AND_SAVE:', e); throw e; }
     },
   );
 };

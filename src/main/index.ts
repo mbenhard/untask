@@ -1,4 +1,5 @@
 import { app, BrowserWindow, nativeImage } from 'electron';
+import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -16,18 +17,29 @@ import {
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
+import { getSetting, isAiEnabled } from './services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
-import { getSetting, isBootstrapCompleted, isAiEnabled } from './services/settingsService';
-import { ensureDefaultTaskStatusConfig } from './services/taskService';
-import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { migrateApiKeysToSafeStorage } from './services/keyStorage';
-import { setupTray, destroyTray } from './tray';
-import { initSummonController, summonWindow } from './window/summonController';
 import { startUpdateChecker, stopUpdateChecker } from './services/updateChecker';
+import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
+import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
+import { setupTray, destroyTray } from './tray';
+import { applyDockMode } from './window/dockMode';
+import {
+  initSummonController,
+  summonWindow,
+  hideWindow,
+  restoreWindowBounds,
+} from './window/summonController';
 
 if (started) {
   app.quit();
 }
+
+let isQuitting = false;
+app.on('before-quit', () => {
+  isQuitting = true;
+});
 
 // ─── Single-instance lock ─────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -35,6 +47,9 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 }
+
+// Must run before app.whenReady() — declares untask-file as a privileged scheme.
+registerAttachmentScheme();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -71,6 +86,15 @@ const createMainWindow = (): BrowserWindow => {
     },
   });
 
+  restoreWindowBounds(window);
+
+  window.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      hideWindow();
+    }
+  });
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
@@ -83,13 +107,11 @@ const createMainWindow = (): BrowserWindow => {
 };
 
 const bootstrap = (): void => {
+  registerAttachmentProtocol();
   initDatabase();
   runMigrations();
-
-  // TODO: Gate onboarding on this flag
-  void isBootstrapCompleted();
-
   ensureDefaultTaskStatusConfig();
+  clearStaleTodayFlags();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
   // Migrate any plaintext API keys to encrypted safeStorage.
@@ -102,6 +124,7 @@ const bootstrap = (): void => {
   mainWindow = createMainWindow();
   initSummonController(mainWindow);
   setupTray();
+  applyDockMode();
   registerGlobalShortcuts(mainWindow);
 };
 
@@ -179,21 +202,22 @@ app.whenReady().then(() => {
   applyLaunchAtLogin();
   startDailyBackupScheduler();
   startUpdateChecker();
+  summonWindow();
 
 
   // Initialize the proactive loop with chat pipeline dependency.
-  // Always call initProactiveLoop to register deps so the IPC toggle can
-  // restart it later — but only call start() when AI is enabled.
-  initProactiveLoop({
-    startProactiveTurn: async (input) => {
-      await startProactiveTurn({
-        triggerMessage: input.triggerMessage,
-        triggerType: input.triggerType,
-        emit: input.emit,
-      });
-    },
-    startImmediately: isAiEnabled(),
-  });
+  // Only start when AI is enabled.
+  if (isAiEnabled()) {
+    initProactiveLoop({
+      startProactiveTurn: async (input) => {
+        await startProactiveTurn({
+          triggerMessage: input.triggerMessage,
+          triggerType: input.triggerType,
+          emit: input.emit,
+        });
+      },
+    });
+  }
 
   const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {

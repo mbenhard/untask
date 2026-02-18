@@ -22,14 +22,18 @@ const BOUNDS_SAVE_DELAY_MS = 500;
 const BLUR_SUPPRESSION_MS = 150;
 
 let win: BrowserWindow | null = null;
-let hasEverSummoned = false;
 let blurSuppressedUntil = 0;
 let boundsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let windowDismissMode: WindowDismissMode = sanitizeWindowDismissMode(null);
 
+export function restoreWindowBounds(window: BrowserWindow): void {
+  const stored = parseBoundsJson(getSetting(BOUNDS_KEY));
+  const bounds = resolveTargetBounds(stored, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+  window.setBounds(bounds);
+}
+
 export function initSummonController(mainWindow: BrowserWindow): void {
   win = mainWindow;
-  hasEverSummoned = false;
   windowDismissMode = getWindowDismissMode();
 
   mainWindow.on('move', scheduleBoundsSave);
@@ -62,13 +66,6 @@ export function summonWindow(): void {
   if (!win || win.isDestroyed()) return;
 
   suppressBlur();
-
-  if (!hasEverSummoned) {
-    const stored = parseBoundsJson(getSetting(BOUNDS_KEY));
-    const bounds = resolveTargetBounds(stored, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-    win.setBounds(bounds);
-    hasEverSummoned = true;
-  }
 
   if (!win.isVisible()) {
     win.show();

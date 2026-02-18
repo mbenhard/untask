@@ -182,6 +182,15 @@
   height: 0;
 }
 
+/* ──────────────────────────────────────────────
+   Override BlockNote's blue selection outline with monochrome
+   ────────────────────────────────────────────── */
+.bn-block-content.ProseMirror-selectednode > *,
+.ProseMirror-selectednode > .bn-block-content > * {
+  outline: 2px solid var(--ring) !important;
+  border-radius: 2px !important;
+}
+
 /* Notes view: keep editor surface flush with app background */
 .untask-notes-editor .bn-container {
   --bn-colors-editor-background: transparent;
@@ -200,100 +209,153 @@
   cursor: text;
 }
 
-/* Notes view: tone down oversized markdown headings */
+/* Notes view: compact heading sizes (industrial, not document-editor) */
 .untask-notes-editor .bn-block-content[data-content-type="heading"] {
-  font-size: 1.3rem !important;
+  font-size: 1.1rem !important;
   font-weight: 600 !important;
-  line-height: 1.25 !important;
+  line-height: 1.3 !important;
 }
 
 .untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
-  font-size: 1.15rem !important;
+  font-size: 1.0rem !important;
 }
 
 .untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
-  font-size: 1.05rem !important;
-}
-
-.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"] {
-  font-size: 1rem !important;
-}
-
-.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"] {
   font-size: 0.95rem !important;
 }
 
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"],
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"],
 .untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
-  font-size: 0.9rem !important;
+  font-size: 0.875rem !important;
 }
 
-/* Keep side menu (+ / drag handle) vertically aligned with reduced heading sizes */
+/* Compact side menu icons (+ / drag handle) */
+.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:not(.mantine-Menu-item) svg {
+  height: 16px !important;
+  width: 16px !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0.4;
+}
+
+.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:hover svg {
+  opacity: 0.8;
+}
+
+/* Side menu heights aligned to reduced heading sizes */
 .untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
-  height: 42px !important;
+  height: 34px !important;
 }
 
 .untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
-  height: 36px !important;
+  height: 30px !important;
 }
 
 .untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
-  height: 32px !important;
+  height: 28px !important;
 }
 
 /* BlockNote drag preview is rendered outside the notes container.
    Override heading sizing there too so dragged headings match editor scale. */
 .bn-drag-preview [data-content-type="heading"] {
-  --level: 1.3rem !important;
+  --level: 1.1rem !important;
 }
 
 .bn-drag-preview [data-content-type="heading"][data-level="2"] {
-  --level: 1.15rem !important;
+  --level: 1.0rem !important;
 }
 
 .bn-drag-preview [data-content-type="heading"][data-level="3"] {
-  --level: 1.05rem !important;
-}
-
-.bn-drag-preview [data-content-type="heading"][data-level="4"] {
-  --level: 1rem !important;
-}
-
-.bn-drag-preview [data-content-type="heading"][data-level="5"] {
   --level: 0.95rem !important;
 }
 
+.bn-drag-preview [data-content-type="heading"][data-level="4"],
+.bn-drag-preview [data-content-type="heading"][data-level="5"],
 .bn-drag-preview [data-content-type="heading"][data-level="6"] {
-  --level: 0.9rem !important;
+  --level: 0.875rem !important;
 }
 
 .bn-drag-preview [data-prev-level="1"] {
-  --prev-level: 1.3rem !important;
+  --prev-level: 1.1rem !important;
 }
 
 .bn-drag-preview [data-prev-level="2"] {
-  --prev-level: 1.15rem !important;
+  --prev-level: 1.0rem !important;
 }
 
 .bn-drag-preview [data-prev-level="3"] {
-  --prev-level: 1.05rem !important;
-}
-
-.bn-drag-preview [data-prev-level="4"] {
-  --prev-level: 1rem !important;
-}
-
-.bn-drag-preview [data-prev-level="5"] {
   --prev-level: 0.95rem !important;
 }
 
+.bn-drag-preview [data-prev-level="4"],
+.bn-drag-preview [data-prev-level="5"],
 .bn-drag-preview [data-prev-level="6"] {
-  --prev-level: 0.9rem !important;
+  --prev-level: 0.875rem !important;
 }
 
 .bn-drag-preview .bn-block-outer[data-prev-type="heading"] > .bn-block > .bn-block-content {
   font-size: var(--prev-level) !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
+}
+
+/* ──────────────────────────────────────────────
+   File blocks: compact, industrial style
+   ────────────────────────────────────────────── */
+
+/* File placeholder button (before file is attached) */
+[data-file-block] .bn-add-file-button {
+  background-color: var(--accent) !important;
+  color: var(--muted-foreground) !important;
+  padding: 8px 10px !important;
+  gap: 6px !important;
+  border: 1px dashed var(--border) !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+}
+
+/* Hover for add-button and file-name row */
+.bn-editor[contenteditable="true"] [data-file-block] .bn-add-file-button:hover,
+[data-file-block] .bn-file-name-with-icon:hover,
+.ProseMirror-selectednode .bn-file-name-with-icon {
+  background-color: var(--accent) !important;
+}
+
+/* The file name + icon row */
+[data-file-block] .bn-file-name-with-icon {
+  gap: 6px !important;
+  padding: 6px 8px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  align-items: center !important;
+  cursor: pointer !important;
+}
+
+/* Shrink the file icon */
+[data-file-block] .bn-file-icon {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
+  opacity: 0.5;
+}
+
+/* File name text */
+[data-file-block] .bn-file-name {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  color: var(--foreground) !important;
+  opacity: 0.7;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Resize handles: theme-aware */
+[data-file-block] .bn-resize-handle {
+  background-color: var(--foreground) !important;
+  border-color: var(--background) !important;
 }
 
 /* ──────────────────────────────────────────────
@@ -342,4 +404,165 @@
 /* Reduce block outer margins for compact layout */
 .untask-task-editor .bn-block-outer {
   margin: 0 !important;
+}
+
+/* ──────────────────────────────────────────────
+   Thinking shimmer — gradient glide across text
+   ────────────────────────────────────────────── */
+.thinking-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--foreground) 40%,
+    var(--muted-foreground) 80%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  opacity: 0.4;
+  animation: thinking-shimmer 2.8s ease-in-out infinite;
+}
+
+@keyframes thinking-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ──────────────────────────────────────────────
+   Bird mascot animations
+   ────────────────────────────────────────────── */
+
+/* 1. Gentle float — 0.55s */
+.bird-float { animation: bird-float 0.55s ease-in-out infinite; }
+.bird-float-shadow { animation: bird-float-s 0.55s ease-in-out infinite; }
+
+@keyframes bird-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes bird-float-s {
+  0%, 100% { transform: scaleX(1); opacity: 0.4; }
+  50% { transform: scaleX(1.15); opacity: 0.2; }
+}
+
+/* 2. Bouncy + pause — 2.4s */
+.bird-bop { animation: bird-bop 2.4s ease-in-out infinite; }
+.bird-bop-shadow { animation: bird-bop-s 2.4s ease-in-out infinite; }
+
+@keyframes bird-bop {
+  0% { transform: translateY(0) scaleX(1) scaleY(1); }
+  8% { transform: translateY(2px) scaleX(1.04) scaleY(0.96); }
+  22% { transform: translateY(-10px) scaleX(0.96) scaleY(1.04); }
+  34% { transform: translateY(1px) scaleX(1.03) scaleY(0.97); }
+  42% { transform: translateY(0) scaleX(1) scaleY(1); }
+  100% { transform: translateY(0) scaleX(1) scaleY(1); }
+}
+@keyframes bird-bop-s {
+  0% { transform: scaleX(1); opacity: 0.4; }
+  8% { transform: scaleX(0.85); opacity: 0.55; }
+  22% { transform: scaleX(1.35); opacity: 0.12; }
+  34% { transform: scaleX(0.85); opacity: 0.55; }
+  42% { transform: scaleX(1); opacity: 0.4; }
+  100% { transform: scaleX(1); opacity: 0.4; }
+}
+
+/* 3. Peppy wobble — 1.2s */
+.bird-wobble { animation: bird-wobble 1.2s ease-in-out infinite; }
+.bird-wobble-shadow { animation: bird-wobble-s 1.2s ease-in-out infinite; }
+
+@keyframes bird-wobble {
+  0% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-9px) rotate(2.5deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-9px) rotate(-2.5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes bird-wobble-s {
+  0% { transform: scaleX(1) translateX(0); opacity: 0.35; }
+  25% { transform: scaleX(1.15) translateX(1px); opacity: 0.18; }
+  50% { transform: scaleX(1) translateX(0); opacity: 0.35; }
+  75% { transform: scaleX(1.15) translateX(-1px); opacity: 0.18; }
+  100% { transform: scaleX(1) translateX(0); opacity: 0.35; }
+}
+
+/* 4. Double tap — 1.4s */
+.bird-double-tap { animation: bird-double-tap 1.4s ease-out infinite; }
+.bird-double-tap-shadow { animation: bird-double-tap-s 1.4s ease-out infinite; }
+
+@keyframes bird-double-tap {
+  0% { transform: translateY(0) scaleX(1) scaleY(1); }
+  12% { transform: translateY(-10px) scaleX(0.96) scaleY(1.04); }
+  24% { transform: translateY(1px) scaleX(1.03) scaleY(0.97); }
+  36% { transform: translateY(-7px) scaleX(0.97) scaleY(1.03); }
+  48% { transform: translateY(0) scaleX(1) scaleY(1); }
+  100% { transform: translateY(0) scaleX(1) scaleY(1); }
+}
+@keyframes bird-double-tap-s {
+  0% { transform: scaleX(1); opacity: 0.35; }
+  12% { transform: scaleX(1.3); opacity: 0.12; }
+  24% { transform: scaleX(0.85); opacity: 0.5; }
+  36% { transform: scaleX(1.2); opacity: 0.18; }
+  48% { transform: scaleX(1); opacity: 0.35; }
+  100% { transform: scaleX(1); opacity: 0.35; }
+}
+
+/* 5. Elastic snap — 1s */
+.bird-snap { animation: bird-snap 1s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.bird-snap-shadow { animation: bird-snap-s 1s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+
+@keyframes bird-snap {
+  0% { transform: translateY(0) scaleX(1) scaleY(1); }
+  8% { transform: translateY(2px) scaleX(1.06) scaleY(0.94); }
+  30% { transform: translateY(-14px) scaleX(0.94) scaleY(1.06); }
+  52% { transform: translateY(2px) scaleX(1.04) scaleY(0.96); }
+  68% { transform: translateY(-3px) scaleX(0.98) scaleY(1.02); }
+  82% { transform: translateY(0.5px) scaleX(1.01) scaleY(0.99); }
+  100% { transform: translateY(0) scaleX(1) scaleY(1); }
+}
+@keyframes bird-snap-s {
+  0% { transform: scaleX(1); opacity: 0.35; }
+  8% { transform: scaleX(0.8); opacity: 0.55; }
+  30% { transform: scaleX(1.5); opacity: 0.08; }
+  52% { transform: scaleX(0.85); opacity: 0.5; }
+  68% { transform: scaleX(1.1); opacity: 0.25; }
+  82% { transform: scaleX(0.95); opacity: 0.38; }
+  100% { transform: scaleX(1); opacity: 0.35; }
+}
+
+/* 6. Smooth bop — 1.4s (default streaming indicator) */
+.bird-smooth-bop { animation: bird-smooth-bop 1.4s ease-in-out infinite; }
+.bird-smooth-bop-shadow { animation: bird-smooth-bop-s 1.4s ease-in-out infinite; }
+
+@keyframes bird-smooth-bop {
+  0% { transform: translateY(0) scaleX(1) scaleY(1); }
+  35% { transform: translateY(-9px) scaleX(0.97) scaleY(1.03); }
+  50% { transform: translateY(-9px) scaleX(0.97) scaleY(1.03); }
+  80% { transform: translateY(1px) scaleX(1.02) scaleY(0.98); }
+  100% { transform: translateY(0) scaleX(1) scaleY(1); }
+}
+@keyframes bird-smooth-bop-s {
+  0% { transform: scaleX(1); opacity: 0.35; }
+  35% { transform: scaleX(1.2); opacity: 0.18; }
+  50% { transform: scaleX(1.2); opacity: 0.18; }
+  80% { transform: scaleX(0.9); opacity: 0.5; }
+  100% { transform: scaleX(1); opacity: 0.35; }
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .bird-float,
+  .bird-bop,
+  .bird-wobble,
+  .bird-double-tap,
+  .bird-snap,
+  .bird-smooth-bop,
+  .bird-float-shadow,
+  .bird-bop-shadow,
+  .bird-wobble-shadow,
+  .bird-double-tap-shadow,
+  .bird-snap-shadow,
+  .bird-smooth-bop-shadow {
+    animation: none !important;
+  }
 }

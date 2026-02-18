@@ -34,7 +34,9 @@ import {
 } from '../services/taskService';
 import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
 import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../services/notesService';
-import { updateMemorySection } from './memory';
+import {
+  updateMemorySection,
+} from './memory';
 
 const todayIso = (): string => new Date().toISOString();
 
@@ -460,6 +462,31 @@ const deleteTaskTool = {
   },
 } satisfies ToolRegistryEntry<'delete_task', typeof deleteTaskToolInputSchema>;
 
+const listNotesToolInputSchema = z.object({});
+
+const listNotesTool = {
+  name: 'list_notes',
+  description: 'List all notes. Returns active notes and archived notes. Use when the user asks to see their notes or when you need to find a specific note.',
+  schema: listNotesToolInputSchema,
+  execute: async () => {
+    const { active, archived } = listNotes();
+
+    const formatNote = (note: { id: string; title: string; updatedAt: string | null }) => ({
+      id: note.id,
+      title: note.title,
+      updatedAt: note.updatedAt,
+    });
+
+    return {
+      status: 'success' as const,
+      message: `Found ${active.length} active note${active.length === 1 ? '' : 's'} and ${archived.length} archived.`,
+      data: {
+        active: active.map(formatNote),
+        archived: archived.map(formatNote),
+      },
+    };
+  },
+} satisfies ToolRegistryEntry<'list_notes', typeof listNotesToolInputSchema>;
 
 const resolveNoteId = (noteId?: string, activeNoteId?: string): string => {
   if (noteId) return noteId;
@@ -614,7 +641,7 @@ const undoLastActionTool = {
 
 const updateMemoryTool = {
   name: 'update_memory',
-  description: "Update a section of your Memory. Adds new knowledge or replaces existing entries in the specified section. Keep entries atomic (one fact per line). If the section doesn't exist, it's created. Announce what you're saving to the user. If Memory exceeds 8000 tokens, you'll get a warning to consolidate.",
+  description: "Update a section of your Memory. Adds new knowledge or replaces existing entries in the specified section. Keep entries atomic (one fact per line). If the section doesn't exist, it's created. Announce what you're saving to Marcus. If Memory exceeds 8000 tokens, you'll get a warning to consolidate.",
   schema: updateMemoryInputSchema,
   execute: async (input) => {
     try {
@@ -643,7 +670,7 @@ const updateMemoryTool = {
 
 const emitChipsTool = {
   name: 'emit_chips',
-  description: 'Attach interactive response chips to your current message. This is the ONLY way to present tappable options — never write options as text bullets or numbered lists. Chips let the user answer with a tap instead of typing. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
+  description: 'Attach interactive response chips to your current message. This is the ONLY way to present tappable options — never write options as text bullets or numbered lists. Chips let Marcus answer with a tap instead of typing. Call AFTER writing your text, not instead of it. 2-4 chips when used. Only emit chips at genuine decision points, not after routine actions.',
   schema: emitChipsInputSchema,
   execute: async (input) => {
     const normalizedChips = normalizeChipActions(input.chips as Array<{ label: string; responseText?: string }>);
@@ -726,6 +753,7 @@ export const AI_TOOL_REGISTRY = {
   update_task: updateTaskTool,
   complete_task: completeTaskTool,
   delete_task: deleteTaskTool,
+  list_notes: listNotesTool,
   read_note: readNoteTool,
   edit_note: editNoteTool,
   undo_last_action: undoLastActionTool,

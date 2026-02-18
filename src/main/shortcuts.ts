@@ -1,26 +1,19 @@
-import { type BrowserWindow, globalShortcut } from 'electron';
+import { type BrowserWindow, globalShortcut, Menu, shell } from 'electron';
 
-import {
-  DEFAULT_SETTINGS,
-  SETTING_KEY_SHORTCUT_QUICK_ADD,
-  SETTING_KEY_SHORTCUT_TOGGLE_WINDOW,
-} from './defaultSettings';
+import { IPC_CHANNELS } from '../types/ipc';
 import { getSetting } from './services/settingsService';
-import { toggleWindow, showQuickAdd } from './window/summonController';
+import { toggleWindow, showQuickAdd, hideWindow, summonWindow } from './window/summonController';
 
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
-  [SETTING_KEY_SHORTCUT_TOGGLE_WINDOW]: DEFAULT_SETTINGS[SETTING_KEY_SHORTCUT_TOGGLE_WINDOW],
-  [SETTING_KEY_SHORTCUT_QUICK_ADD]: DEFAULT_SETTINGS[SETTING_KEY_SHORTCUT_QUICK_ADD],
+  'shortcut.toggleWindow': 'CommandOrControl+Shift+Space',
+  'shortcut.quickAdd': 'CommandOrControl+Shift+Q',
 };
 
 function resolveAccelerator(settingKey: string): string {
   const stored = getSetting(settingKey);
-  // null/undefined → not yet configured, fall back to default
-  // empty string   → user explicitly disabled, skip registration
-  if (stored === null || stored === undefined) {
-    return DEFAULT_SHORTCUTS[settingKey] ?? '';
-  }
-  return stored.trim();
+  return stored && stored.trim().length > 0
+    ? stored.trim()
+    : DEFAULT_SHORTCUTS[settingKey] ?? '';
 }
 
 function registerShortcut(
@@ -46,8 +39,105 @@ function registerShortcut(
   return registered;
 }
 
+function getMainWindow(): BrowserWindow | undefined {
+  const { BrowserWindow: BW } = require('electron') as typeof import('electron');
+  return BW.getAllWindows()[0];
+}
+
+function sendMenuAction(channel: string): void {
+  summonWindow();
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel);
+  }
+}
+
+function setupApplicationMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'Untask',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Task',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => sendMenuAction(IPC_CHANNELS.APP_MENU_NEW_TASK),
+        },
+        {
+          label: 'New Note',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => sendMenuAction(IPC_CHANNELS.APP_MENU_NEW_NOTE),
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        {
+          label: 'Close',
+          accelerator: 'CmdOrCtrl+W',
+          click: hideWindow,
+        },
+        { role: 'minimize' },
+        { role: 'front' },
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Report an Issue',
+          click: () => {
+            void shell.openExternal('https://github.com/mbenhard/untask/issues');
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const registerGlobalShortcuts = (_mainWindow: BrowserWindow): void => {
+  setupApplicationMenu();
+
+  const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
+  const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');
+
+  registerShortcut(toggleAccelerator, toggleWindow, 'toggle-window');
+  registerShortcut(quickAddAccelerator, showQuickAdd, 'quick-add');
+};
+
+export const reRegisterShortcuts = (): void => {
+  globalShortcut.unregisterAll();
+
   const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
   const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');
 
