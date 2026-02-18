@@ -75,16 +75,26 @@ export const SettingsView = () => {
           })}
         </nav>
 
-        {error ? (
-          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p className="rounded-md border border-border bg-secondary px-3 py-2 text-xs text-foreground">
-            {notice}
-          </p>
-        ) : null}
+        <p
+          className={cn(
+            'rounded-md border px-3 py-2 text-xs transition-opacity',
+            error
+              ? 'border-destructive/40 bg-destructive/10 text-destructive-foreground opacity-100'
+              : 'opacity-0 pointer-events-none',
+          )}
+          aria-live="polite"
+        >
+          {error || '\u00A0'}
+        </p>
+        <p
+          className={cn(
+            'rounded-md border border-border bg-secondary px-3 py-2 text-xs text-foreground transition-opacity',
+            notice ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          )}
+          aria-live="polite"
+        >
+          {notice || '\u00A0'}
+        </p>
 
         {tabContent}
       </div>
