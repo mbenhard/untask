@@ -68,7 +68,7 @@ describe('chatStore stream reliability', () => {
   beforeEach(() => {
     const mockChatApi = createMockChatApi();
     (globalThis as { window?: unknown }).window = {
-      flusk: {
+      untask: {
         chat: mockChatApi,
       },
     };
@@ -112,8 +112,8 @@ describe('chatStore stream reliability', () => {
 
   it('guards initialize() against concurrent listener registration', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.history.mockImplementation(
       async () =>
@@ -132,8 +132,8 @@ describe('chatStore stream reliability', () => {
 
   it('opens chat overlay and stores focus target on focus-message event', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     await useChatStore.getState().initialize();
 
@@ -762,8 +762,8 @@ describe('chatStore stream reliability', () => {
     };
 
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.history.mockResolvedValue([historicalMessage]);
 
@@ -809,8 +809,8 @@ describe('chatStore stream reliability', () => {
     };
 
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.history.mockResolvedValue([historicalMessage]);
 
@@ -840,8 +840,8 @@ describe('chatStore stream reliability', () => {
     };
 
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.history.mockResolvedValue([historicalMessage]);
 
@@ -858,8 +858,8 @@ describe('chatStore stream reliability', () => {
 
   it('uses the main-selected model at send time instead of stale store state', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
     mockChatApi.send.mockResolvedValue({
@@ -891,8 +891,8 @@ describe('chatStore stream reliability', () => {
 
   it('does not dispatch a second send while a turn is already in flight', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     useChatStore.setState({ isSending: true });
 
@@ -904,8 +904,8 @@ describe('chatStore stream reliability', () => {
 
   it('attaches staged note context on the next outgoing message', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
     mockChatApi.send.mockResolvedValue({
@@ -946,8 +946,8 @@ describe('chatStore stream reliability', () => {
 
   it('falls back to main default model resolution when selected-model lookup fails', async () => {
     const mockChatApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { chat: ReturnType<typeof createMockChatApi> };
-    }).flusk.chat;
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
 
     mockChatApi.getSelectedModel.mockRejectedValue(new Error('lookup failed'));
     mockChatApi.send.mockResolvedValue({

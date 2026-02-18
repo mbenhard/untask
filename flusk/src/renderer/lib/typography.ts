@@ -22,8 +22,8 @@ export type TypographySelection = {
 export const UI_FONT_SANS_SETTING_KEY = 'ui_font_sans';
 export const UI_FONT_MONO_SETTING_KEY = 'ui_font_mono';
 
-export const UI_FONT_SANS_STORAGE_KEY = 'flusk-ui-font-sans';
-export const UI_FONT_MONO_STORAGE_KEY = 'flusk-ui-font-mono';
+export const UI_FONT_SANS_STORAGE_KEY = 'untask-ui-font-sans';
+export const UI_FONT_MONO_STORAGE_KEY = 'untask-ui-font-mono';
 
 export const DEFAULT_SANS_FONT_ID: SansFontId = 'geist';
 export const DEFAULT_MONO_FONT_ID: MonoFontId = 'geist-mono';

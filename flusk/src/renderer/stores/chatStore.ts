@@ -17,7 +17,7 @@ import type {
   TurnStep,
 } from '../../types/chat';
 import type { ChatMessage } from '../../types/models';
-import { getFlusk } from '../lib/flusk';
+import { getUntask } from '../lib/untask';
 import { resolveBlockNoteImages } from '../utils/imageResize';
 import { useAppStore } from './appStore';
 import { useTaskStore } from './taskStore';
@@ -397,7 +397,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     try {
       set({ isSending: true, error: null });
 
-      const response = await getFlusk().chat.send({
+      const response = await getUntask().chat.send({
         content: trimmed,
         modelId,
         conversationId,
@@ -466,7 +466,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
   };
 
   const refreshConversationsInternal = async (): Promise<void> => {
-    const result = await getFlusk().chat.listThreads({
+    const result = await getUntask().chat.listThreads({
       includeArchived: true,
       limit: 100,
       offset: 0,
@@ -489,7 +489,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       return active;
     }
 
-    const created = await getFlusk().chat.createThread();
+    const created = await getUntask().chat.createThread();
     set((state) => ({
       activeConversationId: created.conversation.id,
       conversations: [created.conversation, ...state.conversations],
@@ -499,7 +499,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
   };
 
   const loadConversationIntoState = async (conversationId: string): Promise<void> => {
-    const history = await getFlusk().chat.history({ conversationId });
+    const history = await getUntask().chat.history({ conversationId });
     set({
       messages: history.map(mapMessageToUi),
       activeConversationId: conversationId,
@@ -555,16 +555,16 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
           const [threads, models, selectedModel, retention, autonomy, pending] =
             await Promise.all([
-              getFlusk().chat.listThreads({
+              getUntask().chat.listThreads({
                 includeArchived: true,
                 limit: 100,
                 offset: 0,
               }),
-              getFlusk().chat.getModels(),
-              getFlusk().chat.getSelectedModel(),
-              getFlusk().chat.getRetentionMode(),
-              getFlusk().chat.getAutonomyMode(),
-              getFlusk().chat.listPendingActions(),
+              getUntask().chat.getModels(),
+              getUntask().chat.getSelectedModel(),
+              getUntask().chat.getRetentionMode(),
+              getUntask().chat.getAutonomyMode(),
+              getUntask().chat.listPendingActions(),
             ]);
 
           let activeConversationId =
@@ -573,13 +573,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
           let conversationsTotal = threads.total;
 
           if (!activeConversationId) {
-            const created = await getFlusk().chat.createThread();
+            const created = await getUntask().chat.createThread();
             activeConversationId = created.conversation.id;
             conversations = [created.conversation, ...conversations];
             conversationsTotal = Math.max(conversationsTotal + 1, conversations.length);
           }
 
-          const history = await getFlusk().chat.history({
+          const history = await getUntask().chat.history({
             conversationId: activeConversationId,
           });
 
@@ -588,10 +588,10 @@ export const useChatStore = create<ChatStore>((set, get) => {
           const existingFocusUnsubscribe = get().unsubscribeFocusMessage;
           existingFocusUnsubscribe?.();
 
-          const unsubscribeStream = getFlusk().chat.onStreamEvent((event) => {
+          const unsubscribeStream = getUntask().chat.onStreamEvent((event) => {
             get().applyStreamEvent(event);
           });
-          const unsubscribeFocusMessage = getFlusk().chat.onFocusMessage((payload) => {
+          const unsubscribeFocusMessage = getUntask().chat.onFocusMessage((payload) => {
             if (!payload?.messageId) return;
 
             useAppStore.getState().openChatOverlay();
@@ -641,13 +641,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     createConversation: async (title) => {
       try {
-        await getFlusk().chat.cancel();
+        await getUntask().chat.cancel();
       } catch {
         // Ignore cancel failures when no request is active.
       }
 
       try {
-        const created = await getFlusk().chat.createThread(
+        const created = await getUntask().chat.createThread(
           title?.trim().length ? { title: title.trim() } : undefined,
         );
         await loadConversationIntoState(created.conversation.id);
@@ -664,7 +664,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }
 
       try {
-        await getFlusk().chat.cancel();
+        await getUntask().chat.cancel();
       } catch {
         // Ignore cancel failures when no request is active.
       }
@@ -679,7 +679,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     archiveConversation: async (conversationId) => {
       try {
-        await getFlusk().chat.archiveThread({ conversationId });
+        await getUntask().chat.archiveThread({ conversationId });
         await refreshConversationsInternal();
 
         if (get().activeConversationId === conversationId) {
@@ -692,7 +692,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           if (nextActive) {
             await loadConversationIntoState(nextActive);
           } else {
-            const created = await getFlusk().chat.createThread();
+            const created = await getUntask().chat.createThread();
             await loadConversationIntoState(created.conversation.id);
             await refreshConversationsInternal();
           }
@@ -706,7 +706,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     deleteConversation: async (conversationId) => {
       try {
-        await getFlusk().chat.deleteThread({ conversationId });
+        await getUntask().chat.deleteThread({ conversationId });
         await refreshConversationsInternal();
 
         if (get().activeConversationId === conversationId) {
@@ -719,7 +719,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
           if (nextActive) {
             await loadConversationIntoState(nextActive);
           } else {
-            const created = await getFlusk().chat.createThread();
+            const created = await getUntask().chat.createThread();
             await loadConversationIntoState(created.conversation.id);
             await refreshConversationsInternal();
           }
@@ -746,7 +746,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       };
       await waitForProcessing();
 
-      const selected = await getFlusk().chat.getSelectedModel().catch(() => null);
+      const selected = await getUntask().chat.getSelectedModel().catch(() => null);
       if (selected?.modelId) {
         set({ selectedModelId: selected.modelId });
       }
@@ -819,7 +819,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     },
 
     cancelStream: async () => {
-      await getFlusk().chat.cancel();
+      await getUntask().chat.cancel();
       const { messages } = get();
       const updatedMessages = messages.map((msg) => {
         if (msg.isStreaming) {
@@ -887,7 +887,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     clearHistory: async () => {
       try {
-        await getFlusk().chat.clear();
+        await getUntask().chat.clear();
         set({
           messages: [],
           inFlightByRequestId: {},
@@ -908,7 +908,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     undoAction: async (taskEventId) => {
       try {
-        const result = await getFlusk().chat.undoLastAction(
+        const result = await getUntask().chat.undoLastAction(
           taskEventId ? { taskEventId } : undefined,
         );
 
@@ -941,8 +941,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
     setSelectedModel: async (modelId) => {
       try {
         const [selected, models] = await Promise.all([
-          getFlusk().chat.setSelectedModel({ modelId }),
-          getFlusk().chat.getModels(),
+          getUntask().chat.setSelectedModel({ modelId }),
+          getUntask().chat.getModels(),
         ]);
 
         set({
@@ -957,7 +957,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     setRetentionMode: async (mode) => {
       try {
-        const updated = await getFlusk().chat.setRetentionMode({ mode });
+        const updated = await getUntask().chat.setRetentionMode({ mode });
         set({ retentionMode: updated.mode, error: null });
       } catch (error) {
         set({ error: toErrorMessage(error) });
@@ -1384,7 +1384,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     setAutonomyMode: async (mode) => {
       try {
-        const result = await getFlusk().chat.setAutonomyMode({ mode });
+        const result = await getUntask().chat.setAutonomyMode({ mode });
         set({ autonomyMode: result.mode, error: null });
       } catch (error) {
         set({ error: toErrorMessage(error) });
@@ -1393,7 +1393,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     approvePendingAction: async (actionId) => {
       try {
-        const result = await getFlusk().chat.resolvePendingAction({
+        const result = await getUntask().chat.resolvePendingAction({
           actionId,
           decision: 'approve',
         });
@@ -1425,7 +1425,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     rejectPendingAction: async (actionId) => {
       try {
-        const result = await getFlusk().chat.resolvePendingAction({
+        const result = await getUntask().chat.resolvePendingAction({
           actionId,
           decision: 'reject',
         });
@@ -1446,7 +1446,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
 
     refreshPendingActions: async () => {
       try {
-        const result = await getFlusk().chat.listPendingActions();
+        const result = await getUntask().chat.listPendingActions();
         set({ pendingActions: result.actions });
       } catch (error) {
         set({ error: toErrorMessage(error) });

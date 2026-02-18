@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { getFlusk } from '../../lib/flusk';
+import { getUntask } from '../../lib/untask';
 import {
   type MonoFontId,
   type SansFontId,
@@ -90,10 +90,10 @@ export function TypographyProvider({ children }: { children: ReactNode }) {
 
     const loadCanonicalTypography = async (): Promise<void> => {
       try {
-        const flusk = getFlusk();
+        const untask = getUntask();
         const [storedSansId, storedMonoId] = await Promise.all([
-          flusk.settings.get(UI_FONT_SANS_SETTING_KEY),
-          flusk.settings.get(UI_FONT_MONO_SETTING_KEY),
+          untask.settings.get(UI_FONT_SANS_SETTING_KEY),
+          untask.settings.get(UI_FONT_MONO_SETTING_KEY),
         ]);
 
         if (!isActive) {
@@ -138,7 +138,7 @@ export function TypographyProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      await getFlusk().settings.set(UI_FONT_SANS_SETTING_KEY, nextSansId);
+      await getUntask().settings.set(UI_FONT_SANS_SETTING_KEY, nextSansId);
       writeTypographySelectionToStorage({
         sansId: nextSansId,
         monoId: monoIdRef.current,
@@ -161,7 +161,7 @@ export function TypographyProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      await getFlusk().settings.set(UI_FONT_MONO_SETTING_KEY, nextMonoId);
+      await getUntask().settings.set(UI_FONT_MONO_SETTING_KEY, nextMonoId);
       writeTypographySelectionToStorage({
         sansId: sansIdRef.current,
         monoId: nextMonoId,
@@ -195,10 +195,10 @@ export function TypographyProvider({ children }: { children: ReactNode }) {
     let hasSyncedFromDb = false;
 
     try {
-      const flusk = getFlusk();
+      const untask = getUntask();
       const [sansSaveResult, monoSaveResult] = await Promise.allSettled([
-        flusk.settings.set(UI_FONT_SANS_SETTING_KEY, nextSelection.sansId),
-        flusk.settings.set(UI_FONT_MONO_SETTING_KEY, nextSelection.monoId),
+        untask.settings.set(UI_FONT_SANS_SETTING_KEY, nextSelection.sansId),
+        untask.settings.set(UI_FONT_MONO_SETTING_KEY, nextSelection.monoId),
       ]);
 
       if (sansSaveResult.status === 'fulfilled' && monoSaveResult.status === 'fulfilled') {
@@ -207,8 +207,8 @@ export function TypographyProvider({ children }: { children: ReactNode }) {
       }
 
       const [storedSansId, storedMonoId] = await Promise.all([
-        flusk.settings.get(UI_FONT_SANS_SETTING_KEY),
-        flusk.settings.get(UI_FONT_MONO_SETTING_KEY),
+        untask.settings.get(UI_FONT_SANS_SETTING_KEY),
+        untask.settings.get(UI_FONT_MONO_SETTING_KEY),
       ]);
       const syncedSelection = resolveTypographySelection({
         sansId: storedSansId,

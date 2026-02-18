@@ -15,7 +15,7 @@ import type {
   WindowDismissMode,
 } from '../../../types/ipc';
 import { cn } from '../../lib/utils';
-import { getFlusk } from '../../lib/flusk';
+import { getUntask } from '../../lib/untask';
 import {
   MONO_FONT_OPTIONS,
   SANS_FONT_OPTIONS,
@@ -69,7 +69,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
     key: 'shortcut.toggleWindow',
     label: 'Toggle window',
     defaultAccelerator: 'CommandOrControl+Shift+Space',
-    action: 'Show or hide the Flusk window from anywhere in the OS.',
+    action: 'Show or hide the Untask window from anywhere in the OS.',
   },
   {
     key: 'shortcut.quickAdd',
@@ -82,7 +82,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
 const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
   {
     title: 'App-wide',
-    description: 'These work while the Flusk window is focused.',
+    description: 'These work while the Untask window is focused.',
     entries: [
       { keys: 'Cmd/Ctrl + K', action: 'Toggle chat overlay and focus chat input.' },
       { keys: 'Cmd/Ctrl + F', action: 'Open or close Search.' },
@@ -269,7 +269,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingMemory(true);
       setError(null);
-      const next = await getFlusk().settings.getMemoryState();
+      const next = await getUntask().settings.getMemoryState();
       setDraft(next);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load memory state.');
@@ -283,7 +283,7 @@ export const SettingsMemory = () => {
       try {
         setIsLoadingMemoryHistory(true);
         setError(null);
-        const response = await getFlusk().settings.getMemoryHistory({
+        const response = await getUntask().settings.getMemoryHistory({
           layer: memorySubTab,
           limit: 20,
           ...options,
@@ -302,7 +302,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingLaunchAtLogin(true);
       setLaunchAtLoginError(null);
-      const result = await getFlusk().app.getLaunchAtLogin();
+      const result = await getUntask().app.getLaunchAtLogin();
       setLaunchAtLoginEnabled(result.enabled);
       setLaunchAtLoginApplied(result.applied);
       if (result.error) {
@@ -323,7 +323,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingOpenRouterApiKey(true);
       setError(null);
-      const stored = await getFlusk().settings.get(OPENROUTER_API_KEY_SETTING_KEY);
+      const stored = await getUntask().settings.get(OPENROUTER_API_KEY_SETTING_KEY);
       setHasOpenRouterApiKey(Boolean(stored && stored.trim().length > 0));
       setOpenRouterApiKeyInput('');
     } catch (loadError) {
@@ -337,7 +337,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingWindowDismissMode(true);
       setError(null);
-      const result = await getFlusk().app.getWindowDismissMode();
+      const result = await getUntask().app.getWindowDismissMode();
       setWindowDismissModeState(result.mode);
     } catch (loadError) {
       setError(
@@ -353,7 +353,7 @@ export const SettingsMemory = () => {
   const loadModels = useCallback(async () => {
     try {
       setIsLoadingModels(true);
-      const catalog = await getFlusk().chat.getModels();
+      const catalog = await getUntask().chat.getModels();
       setModels(catalog);
       const selected = catalog.find((m) => m.selected);
       if (selected) {
@@ -369,7 +369,7 @@ export const SettingsMemory = () => {
   const loadAutonomyMode = useCallback(async () => {
     try {
       setIsLoadingAutonomy(true);
-      const result = await getFlusk().chat.getAutonomyMode();
+      const result = await getUntask().chat.getAutonomyMode();
       setAutonomyMode(result.mode);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load autonomy mode.');
@@ -381,7 +381,7 @@ export const SettingsMemory = () => {
   const loadRetentionMode = useCallback(async () => {
     try {
       setIsLoadingRetention(true);
-      const result = await getFlusk().chat.getRetentionMode();
+      const result = await getUntask().chat.getRetentionMode();
       setRetentionMode(result.mode);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load retention mode.');
@@ -396,7 +396,7 @@ export const SettingsMemory = () => {
       setError(null);
       const resolved: Record<string, string> = {};
       for (const entry of GLOBAL_SHORTCUT_SETTINGS) {
-        const stored = await getFlusk().settings.get(entry.key);
+        const stored = await getUntask().settings.get(entry.key);
         resolved[entry.key] = stored && stored.trim().length > 0
           ? stored
           : entry.defaultAccelerator;
@@ -413,7 +413,7 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingBackups(true);
       setError(null);
-      const result = await getFlusk().backup.list();
+      const result = await getUntask().backup.list();
       setBackups(result.backups);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load backups.');
@@ -427,7 +427,7 @@ export const SettingsMemory = () => {
       setIsCreatingBackup(true);
       setError(null);
       setNotice(null);
-      await getFlusk().backup.create();
+      await getUntask().backup.create();
       setNotice('Backup created successfully.');
       await loadBackups();
     } catch (createError) {
@@ -443,7 +443,7 @@ export const SettingsMemory = () => {
       setError(null);
       setNotice(null);
 
-      const response = await getFlusk().backup.exportWithDialog({
+      const response = await getUntask().backup.exportWithDialog({
         passphrase: exportPassphrase.trim() || undefined,
       });
 
@@ -466,7 +466,7 @@ export const SettingsMemory = () => {
       setError(null);
       setNotice(null);
 
-      const response = await getFlusk().backup.importWithDialog({
+      const response = await getUntask().backup.importWithDialog({
         passphrase: importPassphrase.trim() || undefined,
       });
 
@@ -497,7 +497,7 @@ export const SettingsMemory = () => {
       setError(null);
       setNotice(null);
 
-      await getFlusk().backup.import({
+      await getUntask().backup.import({
         source: backup.path,
         passphrase: importPassphrase.trim() || undefined,
       });
@@ -563,7 +563,7 @@ export const SettingsMemory = () => {
         setIsSaving(true);
         setNotice(null);
         setError(null);
-        const updated = await getFlusk().settings.updateMemoryState({ [field]: draft[field] });
+        const updated = await getUntask().settings.updateMemoryState({ [field]: draft[field] });
         setDraft(updated);
         setNotice(`${MEMORY_FIELD_LABELS[field]} saved.`);
         await loadMemoryHistory({ layer: field });
@@ -582,7 +582,7 @@ export const SettingsMemory = () => {
         setIsUndoingMemory(true);
         setNotice(null);
         setError(null);
-        const result = await getFlusk().settings.undoMemoryEvent(
+        const result = await getUntask().settings.undoMemoryEvent(
           eventId ? { eventId } : { steps: 1 },
         );
         setDraft(result.state);
@@ -612,7 +612,7 @@ export const SettingsMemory = () => {
 
       try {
         setIsSavingLaunchAtLogin(true);
-        const result = await getFlusk().app.setLaunchAtLogin(nextEnabled);
+        const result = await getUntask().app.setLaunchAtLogin(nextEnabled);
         setLaunchAtLoginEnabled(result.enabled);
         setLaunchAtLoginApplied(result.applied);
         if (result.error) {
@@ -647,7 +647,7 @@ export const SettingsMemory = () => {
 
       try {
         setIsSavingWindowDismissMode(true);
-        const result = await getFlusk().app.setWindowDismissMode(mode);
+        const result = await getUntask().app.setWindowDismissMode(mode);
         setWindowDismissModeState(result.mode);
         setNotice(
           result.mode === 'persistent'
@@ -745,7 +745,7 @@ export const SettingsMemory = () => {
       setIsSavingOpenRouterApiKey(true);
       setError(null);
       setNotice(null);
-      await getFlusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, normalized);
+      await getUntask().settings.set(OPENROUTER_API_KEY_SETTING_KEY, normalized);
       setHasOpenRouterApiKey(true);
       setOpenRouterApiKeyInput('');
       setNotice('OpenRouter API key saved.');
@@ -761,7 +761,7 @@ export const SettingsMemory = () => {
       setIsSavingOpenRouterApiKey(true);
       setError(null);
       setNotice(null);
-      await getFlusk().settings.set(OPENROUTER_API_KEY_SETTING_KEY, '');
+      await getUntask().settings.set(OPENROUTER_API_KEY_SETTING_KEY, '');
       setHasOpenRouterApiKey(false);
       setOpenRouterApiKeyInput('');
       setNotice('OpenRouter API key cleared.');
@@ -779,7 +779,7 @@ export const SettingsMemory = () => {
     setError(null);
 
     try {
-      const result = await getFlusk().chat.setSelectedModel({ modelId });
+      const result = await getUntask().chat.setSelectedModel({ modelId });
       setSelectedModelId(result.modelId);
       setNotice('Model updated.');
     } catch (saveError) {
@@ -795,7 +795,7 @@ export const SettingsMemory = () => {
     setError(null);
 
     try {
-      const result = await getFlusk().chat.setAutonomyMode({ mode });
+      const result = await getUntask().chat.setAutonomyMode({ mode });
       setAutonomyMode(result.mode);
       setNotice(`Autonomy mode set to ${result.mode}.`);
     } catch (saveError) {
@@ -811,7 +811,7 @@ export const SettingsMemory = () => {
     setError(null);
 
     try {
-      const result = await getFlusk().chat.setRetentionMode({ mode });
+      const result = await getUntask().chat.setRetentionMode({ mode });
       setRetentionMode(result.mode);
       setNotice(`Chat retention set to ${mode === '30d' ? '30 days' : mode}.`);
     } catch (saveError) {
@@ -877,7 +877,7 @@ export const SettingsMemory = () => {
                 </p>
                 <div className="rounded-md border border-border/60 px-3 py-3">
                   <label className="flex items-center justify-between gap-3 text-sm text-foreground">
-                    <span>Launch Flusk at login</span>
+                    <span>Launch Untask at login</span>
                     <input
                       type="checkbox"
                       checked={launchAtLoginEnabled}
@@ -903,7 +903,7 @@ export const SettingsMemory = () => {
                 <div className="rounded-md border border-border/60 px-3 py-3">
                   <p className="text-sm font-medium text-foreground">Window dismiss mode</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Choose how Flusk behaves when the window loses focus.
+                    Choose how Untask behaves when the window loses focus.
                   </p>
                   {isLoadingWindowDismissMode ? (
                     <p className="mt-2 text-xs text-muted-foreground">Loading window behavior...</p>
@@ -1289,7 +1289,7 @@ export const SettingsMemory = () => {
                   <section className="rounded-md border border-border/60 px-3 py-3">
                     <p className="text-sm font-medium text-foreground">Global (system)</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Works when Flusk is hidden or unfocused.
+                      Works when Untask is hidden or unfocused.
                     </p>
                     <div className="mt-3 space-y-2">
                       {GLOBAL_SHORTCUT_SETTINGS.map((entry) => {

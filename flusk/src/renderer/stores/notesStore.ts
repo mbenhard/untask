@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import type { Note } from '../../types/models';
 import { isBlockNoteJson } from '../components/editor/editorUtils';
-import { getFlusk } from '../lib/flusk';
+import { getUntask } from '../lib/untask';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
 
@@ -227,7 +227,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     if (get().isListLoading) return;
     set({ isListLoading: true, error: null });
     try {
-      const { active, archived } = await getFlusk().notes.list();
+      const { active, archived } = await getUntask().notes.list();
       set((state) => {
         const selectedStillExists =
           state.selectedListNoteId !== null
@@ -253,7 +253,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         return;
       }
 
-      const note = await getFlusk().notes.create();
+      const note = await getUntask().notes.create();
       const nextLayout = editorLayoutForViewport(get().isWideViewport);
 
       set({
@@ -281,7 +281,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const note = await getFlusk().notes.get(id);
+      const note = await getUntask().notes.get(id);
       if (!note) {
         set({ isLoading: false, error: 'Note not found.' });
         return;
@@ -383,7 +383,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
     set({ isSaving: true, error: null });
     try {
-      const saved = await getFlusk().notes.save(activeNoteId, content, activeNoteTitle);
+      const saved = await getUntask().notes.save(activeNoteId, content, activeNoteTitle);
       let persisted = false;
       set((state) => {
         // If content changed while saving, keep dirty.
@@ -421,7 +421,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   archiveNote: async (id) => {
     try {
-      await getFlusk().notes.archive(id);
+      await getUntask().notes.archive(id);
 
       // If we archived the currently open note, go back to list.
       if (get().activeNoteId === id) {
@@ -444,7 +444,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   deleteNote: async (id) => {
     try {
-      await getFlusk().notes.delete(id);
+      await getUntask().notes.delete(id);
 
       if (get().activeNoteId === id) {
         set({
@@ -518,7 +518,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       set({ isProcessing: false });
       get().setNotice({
         kind: 'info',
-        message: 'Note attached in chat. Tell Flusk what to do next.',
+        message: 'Note attached in chat. Tell Untask what to do next.',
       }, 5000);
       return { ok: true, reason: 'staged' };
     } catch (error) {

@@ -32,7 +32,7 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 1500): Promise<void
   throw new Error('Timed out waiting for condition.');
 };
 
-type MockFlusk = {
+type MockUntask = {
   settings: {
     get: ReturnType<typeof vi.fn<(key: string) => Promise<string | null>>>;
     set: ReturnType<typeof vi.fn<(key: string, value: string) => Promise<{ key: string; value: string }>>>;
@@ -44,7 +44,7 @@ type MockFlusk = {
   };
 };
 
-const buildFluskMock = (): MockFlusk => {
+const buildUntaskMock = (): MockUntask => {
   const settingsStore = new Map<string, string>([
     [UI_FONT_SANS_SETTING_KEY, 'geist'],
     [UI_FONT_MONO_SETTING_KEY, 'geist-mono'],
@@ -93,13 +93,13 @@ describe('SettingsMemory typography controls', () => {
     root.unmount();
     document.body.removeChild(container);
     localStorage.clear();
-    delete (window as Window & { flusk?: unknown }).flusk;
+    delete (window as Window & { untask?: unknown }).untask;
     vi.restoreAllMocks();
   });
 
   it('updates body and mono fonts from General settings controls', async () => {
-    const fluskMock = buildFluskMock();
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    const untaskMock = buildUntaskMock();
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(
@@ -127,24 +127,24 @@ describe('SettingsMemory typography controls', () => {
     });
 
     await waitFor(() =>
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'inter',
       ),
     );
     await waitFor(() =>
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) =>
           key === UI_FONT_MONO_SETTING_KEY && value === 'ibm-plex-mono',
       ),
     );
 
     expect(
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'inter',
       ),
     ).toBe(true);
     expect(
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) =>
           key === UI_FONT_MONO_SETTING_KEY && value === 'ibm-plex-mono',
       ),
@@ -152,8 +152,8 @@ describe('SettingsMemory typography controls', () => {
   });
 
   it('applies preset buttons and persists both font keys', async () => {
-    const fluskMock = buildFluskMock();
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    const untaskMock = buildUntaskMock();
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(
@@ -178,24 +178,24 @@ describe('SettingsMemory typography controls', () => {
     });
 
     await waitFor(() =>
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'inter',
       ),
     );
     await waitFor(() =>
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) =>
           key === UI_FONT_MONO_SETTING_KEY && value === 'jetbrains-mono',
       ),
     );
 
     expect(
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'inter',
       ),
     ).toBe(true);
     expect(
-      fluskMock.settings.set.mock.calls.some(
+      untaskMock.settings.set.mock.calls.some(
         ([key, value]) =>
           key === UI_FONT_MONO_SETTING_KEY && value === 'jetbrains-mono',
       ),

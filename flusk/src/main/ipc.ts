@@ -953,14 +953,14 @@ export const registerIpcHandlers = (): void => {
         const extension = validated.passphrase?.trim() ? 'taskdb.enc' : 'taskdb';
         const defaultPath = path.join(
           app.getPath('documents'),
-          `flusk-backup-${backupTimestamp()}.${extension}`,
+          `untask-backup-${backupTimestamp()}.${extension}`,
         );
         const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
         const dialogOptions = {
-          title: 'Export Flusk backup',
+          title: 'Export Untask backup',
           defaultPath,
           filters: [
-            { name: 'Flusk Backup', extensions: ['taskdb', 'enc', 'db'] },
+            { name: 'Untask Backup', extensions: ['taskdb', 'enc', 'db'] },
             { name: 'All Files', extensions: ['*'] },
           ],
         };
@@ -992,10 +992,10 @@ export const registerIpcHandlers = (): void => {
         const validated = backupDialogRequestSchema.parse(request ?? {});
         const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
         const dialogOptions = {
-          title: 'Import Flusk backup',
+          title: 'Import Untask backup',
           properties: ['openFile' as const],
           filters: [
-            { name: 'Flusk Backup', extensions: ['taskdb', 'enc', 'db'] },
+            { name: 'Untask Backup', extensions: ['taskdb', 'enc', 'db'] },
             { name: 'All Files', extensions: ['*'] },
           ],
         };

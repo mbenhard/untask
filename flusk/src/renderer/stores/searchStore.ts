@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import type { SearchResultItem } from '../../types/ipc';
-import { getFlusk } from '../lib/flusk';
+import { getUntask } from '../lib/untask';
 
 type SearchStore = {
   isOpen: boolean;
@@ -60,7 +60,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     set({ isSearching: true, error: null });
 
     try {
-      const result = await getFlusk().search.query({
+      const result = await getUntask().search.query({
         query: trimmed,
         limit: 50,
       });

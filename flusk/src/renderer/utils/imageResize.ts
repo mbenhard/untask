@@ -70,14 +70,14 @@ export const resolveBlockNoteImages = async (blockNoteJson: string | null): Prom
 
   if (imageUrls.length === 0) return [];
 
-  const flusk = window.flusk;
-  if (!flusk) return [];
+  const untask = window.untask;
+  if (!untask) return [];
 
   const results: string[] = [];
   for (const url of imageUrls) {
     try {
       const id = url.replace('untask-file://', '');
-      const dataUrl = await flusk.attachments.read({ id });
+      const dataUrl = await untask.attachments.read({ id });
       const resized = await resizeImageIfNeeded(dataUrl);
       results.push(resized);
     } catch {

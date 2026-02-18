@@ -10,7 +10,7 @@ type ThemeProviderState = {
 
 const ThemeContext = createContext<ThemeProviderState | undefined>(undefined);
 
-const STORAGE_KEY = 'flusk-theme';
+const STORAGE_KEY = 'untask-theme';
 
 const isTheme = (value: string | null): value is Theme =>
   value === 'dark' || value === 'light' || value === 'system';

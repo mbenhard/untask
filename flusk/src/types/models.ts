@@ -68,9 +68,9 @@ export type Task = {
   today: boolean | null;
   client: string | null;
   dueDate: string | null;
-  // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
+  // TODO(untask-task-ux): Remove after assistant risk/cashflow signal replacements ship.
   dueType: 'hard' | 'soft' | null;
-  // TODO(flusk-task-ux): Remove after assistant risk/cashflow signal replacements ship.
+  // TODO(untask-task-ux): Remove after assistant risk/cashflow signal replacements ship.
   effort: 'unknown' | 'tiny' | 'small' | 'medium' | 'deep' | null;
   recurrence: string | null;
   recurrenceSourceId: string | null;

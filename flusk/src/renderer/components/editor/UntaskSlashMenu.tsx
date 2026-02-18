@@ -5,13 +5,13 @@ import type { DefaultReactSuggestionItem, SuggestionMenuProps } from '@blocknote
 import { cn } from '../../lib/utils';
 
 /**
- * Custom slash menu that matches Flusk's industrial, compact aesthetic.
+ * Custom slash menu that matches Untask's industrial, compact aesthetic.
  * Replaces BlockNote's default Mantine-based suggestion menu.
  *
  * Keyboard navigation is handled by BlockNote's SuggestionMenuController —
  * this component only renders the visual list.
  */
-export const FluskSlashMenu = ({
+export const UntaskSlashMenu = ({
   items,
   selectedIndex,
   onItemClick,

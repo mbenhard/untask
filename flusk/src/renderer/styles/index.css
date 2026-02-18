@@ -31,7 +31,7 @@
 }
 
 /* ──────────────────────────────────────────────
-   Dark mode (Flusk default)
+   Dark mode (Untask default)
    ────────────────────────────────────────────── */
 .dark {
   --background: #161616;
@@ -183,60 +183,60 @@
 }
 
 /* Notes view: keep editor surface flush with app background */
-.flusk-notes-editor .bn-container {
+.untask-notes-editor .bn-container {
   --bn-colors-editor-background: transparent;
   background-color: transparent;
   min-height: 100%;
 }
 
-.flusk-notes-editor .bn-editor,
-.flusk-notes-editor .bn-root,
-.flusk-notes-editor .bn-default-styles {
+.untask-notes-editor .bn-editor,
+.untask-notes-editor .bn-root,
+.untask-notes-editor .bn-default-styles {
   background-color: transparent !important;
 }
 
-.flusk-notes-editor .bn-editor {
+.untask-notes-editor .bn-editor {
   min-height: 100%;
   cursor: text;
 }
 
 /* Notes view: tone down oversized markdown headings */
-.flusk-notes-editor .bn-block-content[data-content-type="heading"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"] {
   font-size: 1.3rem !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
   font-size: 1.15rem !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
   font-size: 1.05rem !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"] {
   font-size: 1rem !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"] {
   font-size: 0.95rem !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
   font-size: 0.9rem !important;
 }
 
 /* Keep side menu (+ / drag handle) vertically aligned with reduced heading sizes */
-.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
   height: 42px !important;
 }
 
-.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
   height: 36px !important;
 }
 
-.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
   height: 32px !important;
 }
 
@@ -299,48 +299,48 @@
 /* ──────────────────────────────────────────────
    Task body editor: compact BlockNote variant
    ────────────────────────────────────────────── */
-.flusk-task-editor .bn-container {
+.untask-task-editor .bn-container {
   --bn-colors-editor-background: transparent;
   background-color: transparent;
 }
 
-.flusk-task-editor .bn-editor,
-.flusk-task-editor .bn-root,
-.flusk-task-editor .bn-default-styles {
+.untask-task-editor .bn-editor,
+.untask-task-editor .bn-root,
+.untask-task-editor .bn-default-styles {
   background-color: transparent !important;
 }
 
-.flusk-task-editor .bn-editor {
+.untask-task-editor .bn-editor {
   cursor: text;
   font-size: 13px;
   padding: 0;
 }
 
 /* Hide drag handles in compact task context */
-.flusk-task-editor .bn-side-menu {
+.untask-task-editor .bn-side-menu {
   display: none !important;
 }
 
 /* Compact heading sizes for task notes */
-.flusk-task-editor .bn-block-content[data-content-type="heading"] {
+.untask-task-editor .bn-block-content[data-content-type="heading"] {
   font-size: 1.05rem !important;
   font-weight: 600 !important;
   line-height: 1.3 !important;
 }
 
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
   font-size: 0.95rem !important;
 }
 
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="3"],
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="4"],
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="5"],
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="3"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="4"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="5"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
   font-size: 0.9rem !important;
 }
 
 /* Reduce block outer margins for compact layout */
-.flusk-task-editor .bn-block-outer {
+.untask-task-editor .bn-block-outer {
   margin: 0 !important;
 }
 

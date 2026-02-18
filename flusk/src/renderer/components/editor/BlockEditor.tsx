@@ -11,8 +11,8 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react';
 
-import { FluskFormattingToolbar } from './FluskFormattingToolbar';
-import { FluskSlashMenu } from './FluskSlashMenu';
+import { UntaskFormattingToolbar } from './UntaskFormattingToolbar';
+import { UntaskSlashMenu } from './UntaskSlashMenu';
 
 import { useTheme } from '../providers/ThemeProvider';
 import { isBlockNoteJson, parseStoredBlocks } from './editorUtils';
@@ -24,7 +24,7 @@ export type BlockEditorProps = {
   onFocus?: () => void;
   onBlur?: () => void;
   placeholder?: string;
-  /** Wrapper CSS class (e.g. 'flusk-task-editor') */
+  /** Wrapper CSS class (e.g. 'untask-task-editor') */
   className?: string;
   editable?: boolean;
   /** Custom slash-menu items. If omitted, BlockNote defaults are used. */
@@ -53,7 +53,7 @@ export const BlockEditor = ({
       }
 
       const arrayBuffer = await file.arrayBuffer();
-      const url = await window.flusk?.attachments.save({
+      const url = await window.untask?.attachments.save({
         data: new Uint8Array(arrayBuffer),
         filename: file.name,
       });
@@ -163,7 +163,7 @@ export const BlockEditor = ({
       >
         <SuggestionMenuController
           triggerCharacter="/"
-          suggestionMenuComponent={FluskSlashMenu}
+          suggestionMenuComponent={UntaskSlashMenu}
           getItems={
             hasCustomSlashMenu
               ? async (query) =>
@@ -172,7 +172,7 @@ export const BlockEditor = ({
           }
         />
         <FormattingToolbarController
-          formattingToolbar={FluskFormattingToolbar}
+          formattingToolbar={UntaskFormattingToolbar}
         />
       </BlockNoteView>
     </div>

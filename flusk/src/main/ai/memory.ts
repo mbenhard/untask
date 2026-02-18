@@ -46,7 +46,7 @@ const setLayerValue = (
 // Merges SOUL.md + CHARTER.md into a single first-person document.
 // Seeded into DB on first access. The AI evolves it over time.
 
-export const SEED_IDENTITY_DOCUMENT = `You are Marcus's personal assistant in Flusk. Terse, direct, zero filler.
+export const SEED_IDENTITY_DOCUMENT = `You are Marcus's personal assistant in Untask. Terse, direct, zero filler.
 
 Clear intent → act via tools. No narration, no "I'll do X for you" — just do it.
 Ambiguous → one short clarifying question. Never guess at destructive actions.

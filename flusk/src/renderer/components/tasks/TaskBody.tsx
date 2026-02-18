@@ -611,7 +611,7 @@ export const TaskBody = ({
   const attachmentCount = useMemo(() => countAttachments(task.body), [task.body]);
 
   const handleAttach = useCallback(async () => {
-    const result = await window.flusk?.attachments.pickAndSave();
+    const result = await window.untask?.attachments.pickAndSave();
     if (!result || result.canceled || result.urls.length === 0) return;
 
     const editor = editorRef.current;
@@ -717,7 +717,7 @@ export const TaskBody = ({
           onChange={handleBodyChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          className="flusk-task-editor"
+          className="untask-task-editor"
           editorRef={editorRef}
           getSlashMenuItems={getAttachmentSlashMenuItems}
         />

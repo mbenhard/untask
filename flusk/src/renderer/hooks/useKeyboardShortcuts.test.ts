@@ -88,14 +88,14 @@ describe('useKeyboardShortcuts', () => {
     resetStores();
 
     requestHide = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const fluskWindow = window as unknown as {
-      flusk?: {
+    const untaskWindow = window as unknown as {
+      untask?: {
         app?: {
           requestHide?: () => Promise<void>;
         };
       };
     };
-    fluskWindow.flusk = {
+    untaskWindow.untask = {
       app: {
         requestHide,
       },
@@ -105,7 +105,7 @@ describe('useKeyboardShortcuts', () => {
   afterEach(() => {
     root.unmount();
     document.body.removeChild(container);
-    delete (window as Window & { flusk?: unknown }).flusk;
+    delete (window as Window & { untask?: unknown }).untask;
     vi.restoreAllMocks();
   });
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import type { Task } from '../../types/models';
-import { getFlusk } from '../lib/flusk';
+import { getUntask } from '../lib/untask';
 
 export type TaskCreateInput = {
   title: string;
@@ -13,9 +13,9 @@ export type TaskCreateInput = {
   client?: string | null;
   dueDate?: string | null;
   recurrence?: string | null;
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
+  // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
+  // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   effort?: Task['effort'];
   order?: number;
 };
@@ -31,9 +31,9 @@ export type TaskUpdateInput = {
   client?: string | null;
   dueDate?: string | null;
   recurrence?: string | null;
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
+  // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
-  // TODO(flusk-task-ux): Transitional backend-only fields; do not add new primary UI controls.
+  // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   effort?: Task['effort'];
   order?: number;
 };
@@ -99,7 +99,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   fetchTasks: async () => {
     set({ isLoading: true, error: null });
     try {
-      const tasks = await getFlusk().tasks.list();
+      const tasks = await getUntask().tasks.list();
       set({ tasks: [...tasks].sort(byOrderThenCreatedAt), isLoading: false });
     } catch (e) {
       set({ isLoading: false, error: toErrorMessage(e) });
@@ -133,7 +133,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set((s) => ({ tasks: [...s.tasks, tempTask].sort(byOrderThenCreatedAt), error: null }));
 
     try {
-      const created = await getFlusk().tasks.create(input as Record<string, unknown>);
+      const created = await getUntask().tasks.create(input as Record<string, unknown>);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === tempId ? created : t))
@@ -163,7 +163,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const updated = await getFlusk().tasks.update(input as Record<string, unknown>);
+      const updated = await getUntask().tasks.update(input as Record<string, unknown>);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? updated : t))
@@ -202,7 +202,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      await getFlusk().tasks.delete(cascade ? { id, cascade: true } : id);
+      await getUntask().tasks.delete(cascade ? { id, cascade: true } : id);
       return true;
     } catch (e) {
       // Rollback: restore all removed tasks
@@ -247,7 +247,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ tasks: reordered, error: null });
 
     try {
-      await getFlusk().tasks.reorder(ids);
+      await getUntask().tasks.reorder(ids);
       return true;
     } catch (e) {
       // Rollback to previous order
@@ -271,7 +271,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const completed = await getFlusk().tasks.complete(id);
+      const completed = await getUntask().tasks.complete(id);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? completed : t))
@@ -302,7 +302,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const cancelled = await getFlusk().tasks.cancel(id);
+      const cancelled = await getUntask().tasks.cancel(id);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? cancelled : t))
@@ -333,7 +333,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const reopened = await getFlusk().tasks.reopen(id);
+      const reopened = await getUntask().tasks.reopen(id);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? reopened : t))
@@ -362,7 +362,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const toggled = await getFlusk().tasks.toggleToday(id);
+      const toggled = await getUntask().tasks.toggleToday(id);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? toggled : t))

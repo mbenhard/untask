@@ -9,12 +9,12 @@ import {
 import { cn } from '../../lib/utils';
 
 /**
- * Compact formatting toolbar matching Flusk's industrial aesthetic.
+ * Compact formatting toolbar matching Untask's industrial aesthetic.
  * Replaces BlockNote's default Mantine-based FormattingToolbar.
  *
  * Buttons: Bold | Italic | Strikethrough | Code | separator | Link
  */
-export const FluskFormattingToolbar = () => {
+export const UntaskFormattingToolbar = () => {
   const editor = useBlockNoteEditor();
   const blocks = useSelectedBlocks(editor);
 

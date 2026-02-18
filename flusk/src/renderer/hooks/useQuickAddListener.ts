@@ -12,7 +12,7 @@ export function useQuickAddListener({
   onPrefill,
 }: UseQuickAddListenerOptions): void {
   useEffect(() => {
-    const unsubscribe = window.flusk?.app.onQuickAddPayload(
+    const unsubscribe = window.untask?.app.onQuickAddPayload(
       (payload: QuickAddPayload) => {
         onPrefill(payload.text);
 

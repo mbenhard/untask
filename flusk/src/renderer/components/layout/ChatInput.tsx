@@ -260,8 +260,8 @@ export const ChatInput = ({
             onPaste={handlePaste}
             placeholder={
               pendingNoteContext
-                ? `Ask Flusk about "${pendingNoteContext.title}"...`
-                : 'Ask Flusk...'
+                ? `Ask Untask about "${pendingNoteContext.title}"...`
+                : 'Ask Untask...'
             }
             aria-label="Chat input"
             className="h-7 max-h-32 !min-h-0 resize-none overflow-y-auto !border-0 !bg-transparent !px-0 py-1 text-[13px] leading-5 !shadow-none focus-visible:!border-0 focus-visible:!ring-0"

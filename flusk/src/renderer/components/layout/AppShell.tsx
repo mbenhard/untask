@@ -106,7 +106,7 @@ export const AppShell = () => {
   }, [initializeChat]);
 
   useEffect(() => {
-    const unsubscribe = window.flusk?.app.onBackupRestored(() => {
+    const unsubscribe = window.untask?.app.onBackupRestored(() => {
       window.location.reload();
     });
 
@@ -419,8 +419,8 @@ export const AppShell = () => {
         </div>
         ) : null}
 
-        <div className="no-drag absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
-          <div className="flex shrink-0 items-center gap-1">
+        <div className="no-drag pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => setView(isSettingsActive ? 'today' : 'settings')}

@@ -32,7 +32,7 @@ describe('notesStore', () => {
     const notes = createMockNotesApi();
 
     (globalThis as { window?: unknown }).window = {
-      flusk: {
+      untask: {
         notes,
       },
     };
@@ -117,8 +117,8 @@ describe('notesStore', () => {
 
   it('does not switch notes when flush save fails', async () => {
     const mockNotesApi = ((globalThis as { window?: unknown }).window as {
-      flusk: { notes: ReturnType<typeof createMockNotesApi> };
-    }).flusk.notes;
+      untask: { notes: ReturnType<typeof createMockNotesApi> };
+    }).untask.notes;
 
     mockNotesApi.save.mockRejectedValueOnce(new Error('save failed'));
 

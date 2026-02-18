@@ -25,7 +25,7 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 1500): Promise<void
   throw new Error('Timed out waiting for condition.');
 };
 
-type MockFlusk = {
+type MockUntask = {
   settings: {
     get: ReturnType<typeof vi.fn<(key: string) => Promise<string | null>>>;
     set: ReturnType<typeof vi.fn<(key: string, value: string) => Promise<{ key: string; value: string }>>>;
@@ -58,7 +58,7 @@ describe('TypographyProvider', () => {
     root.unmount();
     document.body.removeChild(container);
     localStorage.clear();
-    delete (window as Window & { flusk?: unknown }).flusk;
+    delete (window as Window & { untask?: unknown }).untask;
     vi.restoreAllMocks();
   });
 
@@ -66,7 +66,7 @@ describe('TypographyProvider', () => {
     localStorage.setItem(UI_FONT_SANS_STORAGE_KEY, 'inter');
     localStorage.setItem(UI_FONT_MONO_STORAGE_KEY, 'jetbrains-mono');
 
-    const fluskMock: MockFlusk = {
+    const untaskMock: MockUntask = {
       settings: {
         get: vi.fn<(key: string) => Promise<string | null>>().mockImplementation(
           () =>
@@ -79,7 +79,7 @@ describe('TypographyProvider', () => {
           .mockResolvedValue({ key: '', value: '' }),
       },
     };
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(
@@ -101,7 +101,7 @@ describe('TypographyProvider', () => {
     localStorage.setItem(UI_FONT_SANS_STORAGE_KEY, 'inter');
     localStorage.setItem(UI_FONT_MONO_STORAGE_KEY, 'jetbrains-mono');
 
-    const fluskMock: MockFlusk = {
+    const untaskMock: MockUntask = {
       settings: {
         get: vi.fn<(key: string) => Promise<string | null>>().mockImplementation(async (key) => {
           if (key === UI_FONT_SANS_SETTING_KEY) {
@@ -117,7 +117,7 @@ describe('TypographyProvider', () => {
           .mockResolvedValue({ key: '', value: '' }),
       },
     };
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(
@@ -138,7 +138,7 @@ describe('TypographyProvider', () => {
   });
 
   it('persists setSans and setMono and mirrors values to localStorage', async () => {
-    const fluskMock: MockFlusk = {
+    const untaskMock: MockUntask = {
       settings: {
         get: vi.fn<(key: string) => Promise<string | null>>().mockResolvedValue(null),
         set: vi
@@ -146,7 +146,7 @@ describe('TypographyProvider', () => {
           .mockImplementation(async (key, value) => ({ key, value })),
       },
     };
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(
@@ -158,12 +158,12 @@ describe('TypographyProvider', () => {
 
     await latestContext?.setSans('inter');
     await waitFor(() => latestContext?.sansId === 'inter');
-    expect(fluskMock.settings.set).toHaveBeenCalledWith(UI_FONT_SANS_SETTING_KEY, 'inter');
+    expect(untaskMock.settings.set).toHaveBeenCalledWith(UI_FONT_SANS_SETTING_KEY, 'inter');
     expect(localStorage.getItem(UI_FONT_SANS_STORAGE_KEY)).toBe('inter');
 
     await latestContext?.setMono('ibm-plex-mono');
     await waitFor(() => latestContext?.monoId === 'ibm-plex-mono');
-    expect(fluskMock.settings.set).toHaveBeenCalledWith(UI_FONT_MONO_SETTING_KEY, 'ibm-plex-mono');
+    expect(untaskMock.settings.set).toHaveBeenCalledWith(UI_FONT_MONO_SETTING_KEY, 'ibm-plex-mono');
     await waitFor(
       () => localStorage.getItem(UI_FONT_MONO_STORAGE_KEY) === 'ibm-plex-mono',
     );
@@ -171,7 +171,7 @@ describe('TypographyProvider', () => {
   });
 
   it('rolls back single-font updates when saving fails', async () => {
-    const fluskMock: MockFlusk = {
+    const untaskMock: MockUntask = {
       settings: {
         get: vi.fn<(key: string) => Promise<string | null>>().mockResolvedValue(null),
         set: vi
@@ -184,7 +184,7 @@ describe('TypographyProvider', () => {
           }),
       },
     };
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(
@@ -206,7 +206,7 @@ describe('TypographyProvider', () => {
     ]);
     let shouldFailMono = true;
 
-    const fluskMock: MockFlusk = {
+    const untaskMock: MockUntask = {
       settings: {
         get: vi.fn<(key: string) => Promise<string | null>>().mockImplementation(
           async (key) => db.get(key) ?? null,
@@ -223,7 +223,7 @@ describe('TypographyProvider', () => {
           }),
       },
     };
-    (window as unknown as { flusk?: unknown }).flusk = fluskMock;
+    (window as unknown as { untask?: unknown }).untask = untaskMock;
 
     flushSync(() => {
       root.render(

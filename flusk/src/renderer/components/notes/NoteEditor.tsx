@@ -57,7 +57,7 @@ const createProcessItem = (editor: BlockNoteEditor): DefaultReactSuggestionItem 
     void useNotesStore.getState().processWithAI(markdown);
   },
   aliases: ['process', 'ai'],
-  group: 'Flusk',
+  group: 'Untask',
   icon: <Sparkles size={18} />,
   subtext: 'Open AI chat with this note as context',
 });
@@ -68,7 +68,7 @@ const createTaskItem = (editor: BlockNoteEditor): DefaultReactSuggestionItem => 
     void createTaskFromCursor(editor);
   },
   aliases: ['task', 'todo'],
-  group: 'Flusk',
+  group: 'Untask',
   icon: <CheckSquare size={18} />,
   subtext: 'Create a task from selection or nearby text',
 });
@@ -234,7 +234,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           key={activeNoteId}
           content={content}
           onChange={handleChange}
-          className="flusk-notes-editor"
+          className="untask-notes-editor"
           getSlashMenuItems={getSlashMenuItems}
         />
       </div>

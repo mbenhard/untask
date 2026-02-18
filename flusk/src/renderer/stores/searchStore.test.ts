@@ -37,7 +37,7 @@ const createMockSearchApi = () => ({
 describe('searchStore', () => {
   beforeEach(() => {
     const search = createMockSearchApi();
-    (globalThis as { window?: unknown }).window = { flusk: { search } };
+    (globalThis as { window?: unknown }).window = { untask: { search } };
 
     useSearchStore.setState({
       isOpen: false,
@@ -133,7 +133,7 @@ describe('searchStore', () => {
     const search = {
       query: vi.fn(async () => { throw new Error('Network error'); }),
     };
-    (globalThis as { window?: unknown }).window = { flusk: { search } };
+    (globalThis as { window?: unknown }).window = { untask: { search } };
 
     useSearchStore.setState({ isOpen: true, query: 'fail' });
     await useSearchStore.getState().search();

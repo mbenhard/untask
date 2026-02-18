@@ -68,7 +68,7 @@ import type {
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
 
-export type FluskApi = {
+export type UntaskApi = {
   // ─── App/window lifecycle APIs ──────────────────────────
   app: {
     requestHide: () => Promise<void>;
@@ -195,7 +195,7 @@ export type FluskApi = {
 
 declare global {
   interface Window {
-    flusk?: FluskApi;
+    untask?: UntaskApi;
   }
 }
 

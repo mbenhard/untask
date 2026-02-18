@@ -7,7 +7,7 @@ import {
   TERMINAL_STATUSES,
   getDefaultStatusConfig,
 } from '../../types/models';
-import { getFlusk } from '../lib/flusk';
+import { getUntask } from '../lib/untask';
 
 type TaskStatusConfigStore = {
   config: TaskStatusConfig;
@@ -24,7 +24,7 @@ export const useTaskStatusConfigStore = create<TaskStatusConfigStore>(
 
     fetchConfig: async () => {
       try {
-        const config = await getFlusk().tasks.getStatuses();
+        const config = await getUntask().tasks.getStatuses();
         set({ config, loaded: true });
       } catch {
         set({ loaded: true });
@@ -35,7 +35,7 @@ export const useTaskStatusConfigStore = create<TaskStatusConfigStore>(
       const prev = get().config;
       set({ config });
       try {
-        await getFlusk().tasks.setStatuses(config);
+        await getUntask().tasks.setStatuses(config);
       } catch {
         set({ config: prev });
       }

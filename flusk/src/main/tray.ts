@@ -18,7 +18,7 @@ export function setupTray(): void {
     icon.setTemplateImage(true);
 
     tray = new Tray(icon);
-    tray.setToolTip('Flusk');
+    tray.setToolTip('Untask');
 
     tray.on('click', () => {
       toggleWindow();

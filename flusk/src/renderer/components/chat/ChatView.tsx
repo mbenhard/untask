@@ -247,7 +247,7 @@ type StreamingIndicatorProps = {
 };
 
 const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) => (
-  <div className="py-0.5 pl-1" role="status" aria-label="Flusk is thinking">
+  <div className="py-0.5 pl-1" role="status" aria-label="Untask is thinking">
     <span
       className={cn(
         'font-mono text-[11px] tracking-normal',
@@ -256,7 +256,7 @@ const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) =
     >
       Thinking&hellip;
     </span>
-    <span className="sr-only">Flusk is thinking</span>
+    <span className="sr-only">Untask is thinking</span>
   </div>
 );
 

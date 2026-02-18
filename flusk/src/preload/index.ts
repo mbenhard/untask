@@ -69,9 +69,9 @@ import {
   type AttachmentPickAndSaveResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
-import type { FluskApi } from '../types/preload';
+import type { UntaskApi } from '../types/preload';
 
-const fluskApi: FluskApi = {
+const untaskApi: UntaskApi = {
   // ─── App/window lifecycle APIs ──────────────────────────
   app: {
     requestHide: (): Promise<void> =>
@@ -323,4 +323,4 @@ const fluskApi: FluskApi = {
   },
 };
 
-contextBridge.exposeInMainWorld('flusk', fluskApi);
+contextBridge.exposeInMainWorld('untask', untaskApi);

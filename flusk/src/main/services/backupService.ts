@@ -80,7 +80,7 @@ export async function createBackup(): Promise<BackupMetadata> {
   checkpointDatabaseWal();
 
   const backupDir = await getBackupDir();
-  const filename = `flusk-backup-${formatTimestamp()}.db`;
+  const filename = `untask-backup-${formatTimestamp()}.db`;
   const backupPath = path.join(backupDir, filename);
 
   await copyFile(dbPath, backupPath);
@@ -100,7 +100,7 @@ export async function listBackups(): Promise<BackupMetadata[]> {
   const backupDir = await getBackupDir();
 
   const files = (await readdir(backupDir))
-    .filter((f) => f.startsWith('flusk-backup-') && f.endsWith('.db'))
+    .filter((f) => (f.startsWith('untask-backup-') || f.startsWith('flusk-backup-')) && f.endsWith('.db'))
     .sort()
     .reverse();
 
@@ -193,7 +193,7 @@ export async function importBackup(
 
   // Create safety backup of current DB
   const backupDir = await getBackupDir();
-  const safetyFilename = `flusk-safety-${formatTimestamp()}.db`;
+  const safetyFilename = `untask-safety-${formatTimestamp()}.db`;
   const safetyPath = path.join(backupDir, safetyFilename);
 
   if (await pathExists(dbPath)) {

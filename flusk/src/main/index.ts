@@ -18,7 +18,7 @@ import {
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting } from './services/settingsService';
-import { ensureDefaultTaskStatusConfig } from './services/taskService';
+import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
 import { initSummonController, summonWindow } from './window/summonController';
@@ -87,6 +87,7 @@ const bootstrap = (): void => {
   initDatabase();
   runMigrations();
   ensureDefaultTaskStatusConfig();
+  clearStaleTodayFlags();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
   initSearchFts();
@@ -141,15 +142,15 @@ const applyDevBranding = (): void => {
     return;
   }
 
-  app.setName('Flusk');
+  app.setName('Untask');
 
-  // Set About panel so "About Flusk" shows correct name/version
+  // Set About panel so "About Untask" shows correct name/version
   const iconPng = [process.cwd(), app.getAppPath()]
     .map((base) => path.join(base, 'assets/icons/icon.png'))
     .find((p) => existsSync(p));
 
   app.setAboutPanelOptions({
-    applicationName: 'Flusk',
+    applicationName: 'Untask',
     applicationVersion: app.getVersion(),
   });
 
