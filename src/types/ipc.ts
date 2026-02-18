@@ -129,6 +129,13 @@ export const IPC_CHANNELS = {
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
   SETTINGS_GET_MEMORY_HISTORY: 'settings:get-memory-history',
   SETTINGS_UNDO_MEMORY_EVENT: 'settings:undo-memory-event',
+  // ─── Reminders sync channels ────────────────────────────
+  REMINDERS_GET_STATUS: 'reminders:get-status',
+  REMINDERS_TOGGLE: 'reminders:toggle',
+  REMINDERS_SET_FILTER: 'reminders:set-filter',
+  REMINDERS_REQUEST_ACCESS: 'reminders:request-access',
+  REMINDERS_FORCE_SYNC: 'reminders:force-sync',
+  REMINDERS_SYNC_STATUS: 'reminders:sync-status',
   // ─── Attachment channels ─────────────────────────────────
   ATTACHMENT_SAVE: 'attachment:save',
   ATTACHMENT_OPEN: 'attachment:open',
@@ -403,4 +410,21 @@ export type AttachmentIdRequest = {
 export type AttachmentPickAndSaveResult = {
   canceled: boolean;
   urls: string[];
+};
+
+// ─── Reminders sync payloads ─────────────────────────────
+
+export type RemindersSyncFilter = 'due_date_only' | 'today' | 'all';
+
+export type RemindersStatusResult = {
+  enabled: boolean;
+  authorized: boolean;
+  syncFilter: RemindersSyncFilter;
+  lastSyncAt: string | null;
+  syncedCount: number;
+};
+
+export type RemindersSyncStatusPayload = {
+  status: 'syncing' | 'idle' | 'error';
+  message?: string;
 };

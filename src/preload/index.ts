@@ -71,6 +71,9 @@ import {
   type AttachmentSaveRequest,
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
+  type RemindersStatusResult,
+  type RemindersSyncStatusPayload,
+  type RemindersSyncFilter,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -380,6 +383,32 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_READ, request),
     pickAndSave: (): Promise<AttachmentPickAndSaveResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE),
+  },
+  reminders: {
+    getStatus: (): Promise<RemindersStatusResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_GET_STATUS),
+    toggle: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_TOGGLE, enabled),
+    setFilter: (filter: RemindersSyncFilter): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_SET_FILTER, filter),
+    requestAccess: (): Promise<{ granted: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_REQUEST_ACCESS),
+    forceSync: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_FORCE_SYNC),
+    onSyncStatus: (
+      listener: (payload: RemindersSyncStatusPayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: RemindersSyncStatusPayload,
+      ) => listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.REMINDERS_SYNC_STATUS, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.REMINDERS_SYNC_STATUS, wrapped);
+      };
+    },
   },
 };
 

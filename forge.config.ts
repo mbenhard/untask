@@ -12,9 +12,24 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: './assets/icons/icon',
-    extraResource: ['./drizzle', './assets/tray', './assets/icons/Assets.car'],
+    extraResource: ['./drizzle', './assets/tray', './assets/icons/Assets.car', './resources/bin/untask-helper'],
     extendInfo: {
       CFBundleIconName: 'icon',
+      NSRemindersFullAccessUsageDescription:
+        'Untask syncs your tasks with due dates to Reminders so you can check them off on your phone.',
+      NSRemindersUsageDescription:
+        'Untask syncs your tasks with due dates to Reminders so you can check them off on your phone.',
+    },
+    osxSign: {
+      optionsForFile: (filePath: string) => {
+        if (filePath.endsWith('untask-helper')) {
+          return {
+            entitlements: 'entitlements.plist',
+            hardenedRuntime: true,
+          };
+        }
+        return {};
+      },
     },
     // Override the Vite plugin's default ignore to include native modules.
     // The Vite plugin excludes everything except /.vite, but better-sqlite3

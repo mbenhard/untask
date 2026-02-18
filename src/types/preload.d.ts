@@ -68,6 +68,9 @@ import type {
   AttachmentSaveRequest,
   AttachmentIdRequest,
   AttachmentPickAndSaveResult,
+  RemindersStatusResult,
+  RemindersSyncStatusPayload,
+  RemindersSyncFilter,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -210,6 +213,14 @@ export type UntaskApi = {
     delete: (request: AttachmentIdRequest) => Promise<void>;
     read: (request: AttachmentIdRequest) => Promise<string>;
     pickAndSave: () => Promise<AttachmentPickAndSaveResult>;
+  };
+  reminders: {
+    getStatus: () => Promise<RemindersStatusResult>;
+    toggle: (enabled: boolean) => Promise<void>;
+    setFilter: (filter: RemindersSyncFilter) => Promise<void>;
+    requestAccess: () => Promise<{ granted: boolean }>;
+    forceSync: () => Promise<void>;
+    onSyncStatus: (listener: (payload: RemindersSyncStatusPayload) => void) => () => void;
   };
 };
 

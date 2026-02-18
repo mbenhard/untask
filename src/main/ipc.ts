@@ -69,6 +69,7 @@ import {
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
   type UpdateInfo,
+  type RemindersStatusResult,
 } from '../types/ipc';
 import type { MemoryLayer } from '../types/assistant';
 import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
@@ -122,6 +123,13 @@ import {
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
 import { SETTING_KEY_AI_ENABLED, SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
+import {
+  getRemindersStatus,
+  toggleRemindersSync,
+  setRemindersSyncFilter,
+  requestRemindersAccess,
+  forceRemindersSync,
+} from './services/remindersSync';
 import { fireAiReminder } from './assistant/proactiveLoop';
 import { initReminderScheduler } from './services/reminderScheduler';
 import { startProactiveTurn } from './ai/chat';
@@ -1436,6 +1444,58 @@ export const registerIpcHandlers = (): void => {
         return { canceled: false, urls };
       }
       catch (e) { console.error('[ipc] ATTACHMENT_PICK_AND_SAVE:', e); throw e; }
+    },
+  );
+
+  // ─── Reminders sync handlers ──────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_GET_STATUS,
+    async (): Promise<RemindersStatusResult> => {
+      try {
+        return await getRemindersStatus();
+      }
+      catch (e) { console.error('[ipc] REMINDERS_GET_STATUS:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_TOGGLE,
+    (_event, enabled: boolean) => {
+      try {
+        toggleRemindersSync(enabled);
+      }
+      catch (e) { console.error('[ipc] REMINDERS_TOGGLE:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_SET_FILTER,
+    (_event, filter: string) => {
+      try {
+        setRemindersSyncFilter(filter);
+      }
+      catch (e) { console.error('[ipc] REMINDERS_SET_FILTER:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_REQUEST_ACCESS,
+    async () => {
+      try {
+        return await requestRemindersAccess();
+      }
+      catch (e) { console.error('[ipc] REMINDERS_REQUEST_ACCESS:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_FORCE_SYNC,
+    async () => {
+      try {
+        await forceRemindersSync();
+      }
+      catch (e) { console.error('[ipc] REMINDERS_FORCE_SYNC:', e); throw e; }
     },
   );
 };
