@@ -1,15 +1,15 @@
 # Untask — Project Instructions for Coding Agents
 
 ## What This Is
-Untask is a local-first personal task manager with an optional AI assistant, built as a macOS Electron app. It was previously called "Flusk" — some internal code/paths still use that name.
+Untask is a local-first personal task manager with an optional AI assistant, built as a macOS Electron app.
 
 ## Repository Layout
 
 This is a **monorepo** with two independent projects:
 
 ```
-untitled/                         # Local monorepo (no remote)
-├── flusk/                        # Electron app (the product)
+untitled/                         # Local monorepo
+├── untask/                       # Electron app (git subtree → mbenhard/untask)
 │   ├── src/main/                 # Main process (Node/Electron)
 │   ├── src/preload/              # Preload bridge
 │   ├── src/renderer/             # React UI
@@ -28,14 +28,14 @@ untitled/                         # Local monorepo (no remote)
 └── CLAUDE.md                     # This file
 ```
 
-**Important**: The GitHub repo (`mbenhard/untask`) is separate — it contains only the `flusk/` contents at root level, with its own commit history.
+The `untask/` directory is a **git subtree** linked to `mbenhard/untask` on GitHub. Changes committed locally can be pushed directly to GitHub without manual copying.
 
 ## GitHub Repos
 
-| Repo | Purpose | URL |
-|------|---------|-----|
-| `mbenhard/untask` | App source + releases | https://github.com/mbenhard/untask |
-| `mbenhard/homebrew-untask` | Homebrew tap (cask) | https://github.com/mbenhard/homebrew-untask |
+| Repo | Purpose |
+|------|---------|
+| `mbenhard/untask` | App source + releases |
+| `mbenhard/homebrew-untask` | Homebrew tap (cask) |
 
 GitHub CLI is authenticated as `mbenhard`.
 
@@ -55,12 +55,8 @@ GitHub CLI is authenticated as `mbenhard`.
 ## Development Commands
 
 ```bash
-# Run the app (from flusk/)
-npm run start              # electron-forge start
-
-# If Electron binary is missing after install:
-node node_modules/electron/install.js
-npx electron-rebuild -f -w better-sqlite3
+# Run the app (from untask/)
+cd untask && npm run start
 
 # Type checking & tests
 pnpm typecheck             # All three tsconfigs
@@ -75,89 +71,49 @@ npm run db:generate        # Drizzle schema → SQL migrations
 npm run db:migrate         # Apply migrations (rebuilds native modules)
 ```
 
+## Git Subtree Workflow
+
+The `untask/` directory is a subtree of `mbenhard/untask`. The remote is named `untask`.
+
+```bash
+# Push local changes to GitHub
+git subtree push --prefix=untask untask main
+
+# Pull remote changes into local
+git subtree pull --prefix=untask untask main --squash
+```
+
+Workflow: develop in `untask/`, commit to the local monorepo, then subtree push when ready to sync to GitHub.
+
 ## Release Workflow
 
-Releases are **not automated from local dev**. The flow is:
+### 1. Develop and test
+Work in `untask/` locally. Test with `cd untask && npm run start`.
 
-### 1. Prepare changes
-Work in `flusk/` locally. Test with `npm run start`.
-
-### 2. Sync to GitHub
+### 2. Push to GitHub
 ```bash
-# Clone the GitHub repo to a temp location
-gh repo clone mbenhard/untask /tmp/untask-release
-
-# Copy changed files from flusk/ to the clone
-# (manually or with a diff tool — the directory structures match)
-
-# Commit, push
-cd /tmp/untask-release
-git add -A && git commit -m "description"
-git push origin main
+# Commit locally first, then:
+git subtree push --prefix=untask untask main
 ```
 
 ### 3. Tag and release
 ```bash
-# Bump version in package.json first, then:
-git tag v0.x.x
-git push origin v0.x.x
+# Bump version in untask/package.json, commit, subtree push, then:
+git push untask v0.x.x
 ```
 
 This triggers the **Release workflow** (`.github/workflows/release.yml`):
 - Runs on `macos-latest`
 - `pnpm install` → `pnpm typecheck` → `pnpm test` → `pnpm make`
 - Uploads `.zip` artifact as a **draft** GitHub release
-- You must **publish** the draft: `gh release edit v0.x.x --repo mbenhard/untask --draft=false`
+- Publish the draft: `gh release edit v0.x.x --repo mbenhard/untask --draft=false`
 
 ### 4. Update Homebrew cask
 ```bash
-# Download the release artifact and get SHA
 gh release download v0.x.x --repo mbenhard/untask --pattern '*.zip' --dir /tmp
 shasum -a 256 /tmp/Untask-darwin-arm64-0.x.x.zip
 
-# Clone and update the tap
-gh repo clone mbenhard/homebrew-untask /tmp/homebrew-untask
-# Edit Casks/untask.rb: update version + sha256
-# Commit and push
-```
-
-The cask file format:
-```ruby
-cask "untask" do
-  version "0.x.x"
-  sha256 "<sha256>"
-  url "https://github.com/mbenhard/untask/releases/download/v#{version}/Untask-darwin-arm64-#{version}.zip"
-  name "Untask"
-  desc "Local-first personal task manager with optional AI assistant"
-  homepage "https://github.com/mbenhard/untask"
-  app "Untask.app"
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Untask.app"], sudo: false
-  end
-end
-```
-
-## Known Build Gotchas
-
-### Native modules in packaged app
-`better-sqlite3` is a native Node module. The Vite plugin's default `ignore` function excludes all `node_modules` from the ASAR. We override it in `forge.config.ts` to include `better-sqlite3`, `bindings`, and `file-uri-to-path`. The `AutoUnpackNativesPlugin` then extracts the `.node` binary to `app.asar.unpacked/`.
-
-**If adding new native modules**: add them to the `ignore` function in `forge.config.ts`.
-
-### pnpm + Electron Forge
-`.npmrc` must have:
-```
-node-linker=hoisted
-symlink=false
-```
-- `node-linker=hoisted` — Forge's package manager detection requires it
-- `symlink=false` — Electron Packager can't follow pnpm symlinks into ASAR
-
-### Electron binary disappearing
-After `pnpm install`, if `node_modules/electron/dist/` is empty:
-```bash
-node node_modules/electron/install.js
-npx electron-rebuild -f -w better-sqlite3
+# Update version + sha256 in mbenhard/homebrew-untask Casks/untask.rb
 ```
 
 ## Database
@@ -165,10 +121,8 @@ npx electron-rebuild -f -w better-sqlite3
 - **Engine**: better-sqlite3 with WAL mode
 - **ORM**: Drizzle
 - **Location**: `~/Library/Application Support/Untask/untask.db`
-- **Legacy**: `~/Library/Application Support/flusk/flusk.db` (auto-migrated on first run if untask.db doesn't exist)
-- **Backups**: `~/Library/Application Support/Untask/backups/`
-- **Schema**: `flusk/src/main/db/schema.ts`
-- **Migrations**: `flusk/drizzle/` (SQL files, copied as extraResource)
+- **Schema**: `untask/src/main/db/schema.ts`
+- **Migrations**: `untask/drizzle/` (SQL files, copied as extraResource)
 
 Tables: `tasks`, `notes`, `conversations`, `chat_messages`, `task_events`, `ai_journal`, `ai_journal_archive`, `settings`, `memory_events`
 
@@ -182,8 +136,6 @@ Tables: `tasks`, `notes`, `conversations`, `chat_messages`, `task_events`, `ai_j
 - **Audit**: task mutations logged to `task_events`
 
 ## AI Assistant Design
-
-The app includes an AI chat assistant. Key design decisions:
 
 - **Identity**: personality defined in `docs/assistant/SOUL.md` and `docs/assistant/CHARTER.md`
 - **Providers**: supports OpenAI and Anthropic via Vercel AI SDK (see `src/main/ai/providers/`)
@@ -202,7 +154,7 @@ The app includes an AI chat assistant. Key design decisions:
 
 ## Website
 
-Astro static site in `website/`. Deploy by building and hosting `dist/`.
+Astro static site in `website/`.
 
 ```bash
 cd website
