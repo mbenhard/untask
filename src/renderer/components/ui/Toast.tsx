@@ -41,7 +41,7 @@ export const ToastContainer = () => {
   const handleUndo = () => {
     if (!toast.onUndo || undoing) return;
     setUndoing(true);
-    toast.onUndo();
+    void toast.onUndo();
   };
 
   const showUndo = toast.onUndo && !undoing;

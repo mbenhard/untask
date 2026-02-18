@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNotesStore } from '../stores/notesStore';
 import { useSearchStore } from '../stores/searchStore';
+import { useTaskStore } from '../stores/taskStore';
 
 type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -179,7 +180,10 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        void getUntask().tasks.undoLastUserAction();
+        void (async () => {
+          await getUntask().tasks.undoLastUserAction();
+          await useTaskStore.getState().fetchTasks();
+        })();
         return;
       }
 

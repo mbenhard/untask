@@ -207,8 +207,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
     try {
       await getUntask().tasks.delete(cascade ? { id, cascade: true } : id);
-      useToastStore.getState().showToast('Task deleted', () => {
-        void getUntask().tasks.undoLastUserAction();
+      useToastStore.getState().showToast('Task deleted', async () => {
+        await getUntask().tasks.undoLastUserAction();
+        await get().fetchTasks();
       });
       return true;
     } catch (e) {
@@ -283,8 +284,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           .map((t) => (t.id === id ? completed : t))
           .sort(byOrderThenCreatedAt),
       }));
-      useToastStore.getState().showToast('Task completed', () => {
-        void getUntask().tasks.undoLastUserAction();
+      useToastStore.getState().showToast('Task completed', async () => {
+        await getUntask().tasks.undoLastUserAction();
+        await get().fetchTasks();
       });
       return completed;
     } catch (e) {
@@ -317,8 +319,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           .map((t) => (t.id === id ? cancelled : t))
           .sort(byOrderThenCreatedAt),
       }));
-      useToastStore.getState().showToast('Task cancelled', () => {
-        void getUntask().tasks.undoLastUserAction();
+      useToastStore.getState().showToast('Task cancelled', async () => {
+        await getUntask().tasks.undoLastUserAction();
+        await get().fetchTasks();
       });
       return cancelled;
     } catch (e) {
@@ -351,8 +354,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           .map((t) => (t.id === id ? reopened : t))
           .sort(byOrderThenCreatedAt),
       }));
-      useToastStore.getState().showToast('Task reopened', () => {
-        void getUntask().tasks.undoLastUserAction();
+      useToastStore.getState().showToast('Task reopened', async () => {
+        await getUntask().tasks.undoLastUserAction();
+        await get().fetchTasks();
       });
       return reopened;
     } catch (e) {

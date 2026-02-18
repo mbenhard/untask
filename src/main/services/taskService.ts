@@ -82,11 +82,13 @@ export const subscribeTaskChanges = (
   };
 };
 
+type TaskEventSource = 'user' | 'ai' | 'undo';
+
 // ─── Service functions ──────────────────────────────────────
 function logTaskEvent(
   taskId: string,
   action: 'create' | 'update' | 'move' | 'complete' | 'cancel' | 'delete',
-  source: 'user' | 'ai',
+  source: TaskEventSource,
   before: Task | null,
   after: Task | null,
 ): TaskEvent {
@@ -295,7 +297,7 @@ export type UndoTaskEventResult = {
 
 export function undoTaskEvent(
   eventId: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): UndoTaskEventResult {
   const db = getDb();
   const [targetEvent] = db
@@ -406,7 +408,7 @@ export function undoTaskEvent(
 }
 
 export function undoLastAiTaskEvent(
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): UndoTaskEventResult | null {
   const latestAiEvent = getLastAiTaskEvent();
   if (!latestAiEvent) {
@@ -422,12 +424,12 @@ export function undoLastUserTaskEvent(): UndoTaskEventResult | null {
     return null;
   }
 
-  return undoTaskEvent(eventId, 'user');
+  return undoTaskEvent(eventId, 'undo');
 }
 
 export function createTask(
   input: z.infer<typeof createTaskSchema>,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const validated = createTaskSchema.parse(input);
   const db = getDb();
@@ -462,7 +464,7 @@ export function createTask(
 
 export function updateTask(
   input: z.infer<typeof updateTaskSchema>,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const validated = updateTaskSchema.parse(input);
   const { id, ...updates } = validated;
@@ -513,7 +515,7 @@ export function updateTask(
 
 const deleteTaskRecursive = (
   id: string,
-  source: 'user' | 'ai',
+  source: TaskEventSource,
   cascade: boolean,
   visited: Set<string>,
 ): void => {
@@ -566,7 +568,7 @@ const deleteTaskRecursive = (
 
 export function deleteTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
   options?: DeleteTaskOptions,
 ): void {
   deleteTaskRecursive(id, source, options?.cascade === true, new Set<string>());
@@ -575,7 +577,7 @@ export function deleteTask(
 
 const completeTaskRecursive = (
   id: string,
-  source: 'user' | 'ai',
+  source: TaskEventSource,
   completeChildren: boolean,
   visited: Set<string>,
 ): Task => {
@@ -625,7 +627,7 @@ export type CompleteTaskResult = {
 
 export function completeTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
   options?: CompleteTaskOptions,
 ): CompleteTaskResult {
   const completed = completeTaskRecursive(
@@ -644,7 +646,7 @@ export function completeTask(
 
 function spawnRecurringInstance(
   completedTask: Task,
-  source: 'user' | 'ai',
+  source: TaskEventSource,
 ): Task | null {
   if (!completedTask.recurrence) return null;
 
@@ -670,7 +672,7 @@ function spawnRecurringInstance(
   );
 }
 
-export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
+export function toggleToday(id: string, source: TaskEventSource = 'user'): Task {
   const db = getDb();
 
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
@@ -692,7 +694,7 @@ export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
 
 export function cancelTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const db = getDb();
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
@@ -712,7 +714,7 @@ export function cancelTask(
 
 export function reopenTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const db = getDb();
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
@@ -764,7 +766,7 @@ export function ensureDefaultTaskStatusConfig(): void {
 
 export function reorderTasks(
   orderedIds: string[],
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): void {
   const validatedIds = reorderTaskIdsSchema.parse(orderedIds);
   const db = getDb();
