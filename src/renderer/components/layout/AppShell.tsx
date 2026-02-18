@@ -42,6 +42,7 @@ import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
 
 import { TitleBar } from './TitleBar';
+import { UpdateBanner } from './UpdateBanner';
 
 export const AppShell = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -290,6 +291,7 @@ export const AppShell = () => {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <TitleBar />
+      <UpdateBanner />
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <motion.section
