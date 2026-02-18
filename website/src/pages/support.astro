@@ -35,6 +35,11 @@ const faqItems = [
     q: 'Is my data private?',
     a: '100%. Nothing leaves your machine. No telemetry, no cloud.',
   },
+  {
+    id: 'gatekeeper',
+    q: 'App won\'t open after download?',
+    a: 'macOS blocks apps downloaded outside the App Store. Open Terminal and run: xattr -cr /Applications/Untask.app — then open the app again. This only needs to be done once. Installing via Homebrew avoids this entirely.',
+  },
 ];
 ---
 
@@ -117,7 +122,7 @@ Free to use, no strings attached.<br/><br/>
 
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {faqItems.map((item) => (
-            <div class="rounded-md border border-dashed border-border/60 px-3 py-3">
+            <div id={item.id || undefined} class="rounded-md border border-dashed border-border/60 px-3 py-3">
               <h3 class="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
                 {item.q}
               </h3>
