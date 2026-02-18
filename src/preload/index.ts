@@ -135,6 +135,13 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_CHECK_FOR_UPDATES),
     getUpdateInfo: (): Promise<UpdateInfo | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_UPDATE_INFO),
+    onUpdateAvailable: (listener: (info: UpdateInfo) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, info: UpdateInfo) => listener(info);
+      ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_AVAILABLE, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_UPDATE_AVAILABLE, wrapped);
+      };
+    },
   },
 
   getBootstrapState: (): Promise<SettingsBootstrapState> =>
@@ -308,6 +315,7 @@ const untaskApi: UntaskApi = {
     save: (id: string, content: string, title?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content, title),
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
+    restore: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RESTORE, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
   },
   shortcuts: {

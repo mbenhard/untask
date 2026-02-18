@@ -1,4 +1,4 @@
-import { app, net } from 'electron';
+import { app, BrowserWindow, net } from 'electron';
 
 import { getSetting, setSetting } from './settingsService';
 
@@ -24,6 +24,27 @@ export interface UpdateInfo {
 // ─── In-memory cache ─────────────────────────────────────────
 let cachedUpdateInfo: UpdateInfo | null = null;
 let checkIntervalHandle: ReturnType<typeof setInterval> | null = null;
+
+// ─── Renderer notification ────────────────────────────────────
+
+let updateChannel: string | null = null;
+
+/**
+ * Call this from the main process once the IPC channel name is known.
+ * The update checker will push results to all open windows on that channel.
+ */
+export const setUpdateChannel = (channel: string): void => {
+  updateChannel = channel;
+};
+
+const notifyRenderer = (info: UpdateInfo): void => {
+  if (!updateChannel) return;
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(updateChannel, info);
+    }
+  }
+};
 
 // ─── Semver comparison ───────────────────────────────────────
 
@@ -110,6 +131,10 @@ export const checkForUpdates = async (): Promise<UpdateInfo> => {
 
     cachedUpdateInfo = info;
     setSetting(SETTING_KEY_LAST_UPDATE_CHECK, new Date().toISOString());
+
+    if (info.hasUpdate) {
+      notifyRenderer(info);
+    }
 
     return info;
   } catch (error) {

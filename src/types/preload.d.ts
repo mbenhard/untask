@@ -89,6 +89,7 @@ export type UntaskApi = {
     onMenuNewNote: (listener: () => void) => () => void;
     checkForUpdates: () => Promise<UpdateInfo>;
     getUpdateInfo: () => Promise<UpdateInfo | null>;
+    onUpdateAvailable: (listener: (info: UpdateInfo) => void) => () => void;
   };
 
   // ─── Existing kernel APIs ───────────────────────────────
@@ -174,6 +175,7 @@ export type UntaskApi = {
     create: (title?: string) => Promise<Note>;
     save: (id: string, content: string, title?: string) => Promise<Note | undefined>;
     archive: (id: string) => Promise<Note | undefined>;
+    restore: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;
   };
   shortcuts: {
@@ -217,4 +219,4 @@ declare global {
   }
 }
 
-export {};
+export { };
