@@ -16,71 +16,59 @@
 
       <div class="flex flex-col items-center text-center">
 
-        <!-- App icon -->
+        <!-- App icon + name -->
         <img
           src="/icon-app.png"
           alt="Untask"
-          width="56"
-          height="56"
+          width="48"
+          height="48"
           class="rounded-xl"
           draggable="false"
         />
-
-        <!-- Label -->
-        <h2 class="mt-5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground/60">
-          Download
-        </h2>
-
-        <!-- Name -->
-        <p class="mt-2 text-lg font-normal tracking-tight text-foreground">
+        <p class="mt-3 text-[15px] font-normal tracking-tight text-foreground">
           Untask
         </p>
-
-        <!-- Subtitle -->
-        <p class="mt-1.5 text-[13px] text-muted-foreground/70">
+        <p class="mt-1 text-[13px] text-muted-foreground/60">
           Free, open source, runs on your Mac.
         </p>
 
-        <!-- Buttons row -->
-        <div class="mt-6 flex items-center gap-2">
-          <a
-            href="https://github.com/mbenhard/untask/releases/latest"
-            onclick="downloadLatest(event)"
-            class="inline-flex h-7 items-center rounded-md bg-primary px-3.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-80"
+        <!-- Install actions -->
+        <div class="mt-5 flex flex-col items-center gap-2.5">
+          <div class="flex items-center gap-2">
+            <a
+              href="https://github.com/mbenhard/untask/releases/latest"
+              onclick="downloadLatest(event)"
+              class="inline-flex h-7 items-center rounded-md bg-primary px-3.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-80"
+            >
+              Download for macOS
+            </a>
+            <a
+              href="https://github.com/mbenhard/untask"
+              class="inline-flex h-7 items-center rounded-md border border-dashed border-border/60 px-3.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+            >
+              GitHub
+            </a>
+          </div>
+          <button
+            onclick="copyBrewInstall(this)"
+            class="group inline-flex h-6 cursor-pointer items-center gap-1.5 rounded border border-border/40 bg-accent/50 px-2.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
+            aria-label="Copy install command"
           >
-            Download for macOS
-          </a>
-          <a
-            href="https://github.com/mbenhard/untask"
-            class="inline-flex h-7 items-center rounded-md border border-dashed border-border/60 px-3.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-          >
-            GitHub
-          </a>
+            <span class="text-foreground/60">$</span>
+            <span>brew install mbenhard/untask/untask</span>
+            <svg class="copy-icon size-2.5 shrink-0 opacity-30 transition-opacity group-hover:opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            </svg>
+            <svg class="copy-check hidden size-2.5 shrink-0 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </button>
         </div>
 
-        <!-- Brew command -->
-        <button
-          onclick="copyBrewInstall(this)"
-          class="group mt-4 inline-flex h-6 cursor-pointer items-center gap-1.5 rounded border border-border/40 bg-accent/50 px-2.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
-          aria-label="Copy install command"
-        >
-          <span class="text-foreground/60">$</span>
-          <span>brew install mbenhard/untask/untask</span>
-          <svg class="copy-icon size-2.5 shrink-0 opacity-30 transition-opacity group-hover:opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-          </svg>
-          <svg class="copy-check hidden size-2.5 shrink-0 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-        </button>
-        <p class="mt-2 font-mono text-[11px] text-muted-foreground/40">
-          Recommended &middot; <a href="/support#gatekeeper" class="underline underline-offset-2 decoration-muted-foreground/25 transition-colors hover:text-muted-foreground hover:decoration-muted-foreground/50">having trouble?</a>
-        </p>
-
-        <!-- License -->
-        <p class="mt-4 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground/30">
-          MIT Licensed &middot; macOS only
+        <!-- Footer line -->
+        <p class="mt-4 font-mono text-[10px] text-muted-foreground/30">
+          MIT Licensed &middot; <a href="/support#gatekeeper" class="underline underline-offset-2 decoration-muted-foreground/20 transition-colors hover:text-muted-foreground/50 hover:decoration-muted-foreground/40">having trouble?</a>
         </p>
 
       </div>
