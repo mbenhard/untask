@@ -1,0 +1,124 @@
+export type { Task, AiJournal } from './models';
+import type { Task } from './models';
+
+export type AssistantLiveContext = {
+  tasks: Task[];
+  inboxCount: number;
+  now?: string;
+  timezone?: string;
+};
+
+export type AssistantMemoryInput = {
+  identity?: string;
+  memory?: string;
+};
+
+export type IdentityContextCompileRequest = {
+  request?: string;
+  tokenBudget?: number;
+  memory?: AssistantMemoryInput;
+  liveContext?: Partial<AssistantLiveContext>;
+};
+
+export type IdentityContextSectionSnapshot = {
+  id: string;
+  title: string;
+  estimatedTokens: number;
+  included: boolean;
+  truncated: boolean;
+  snippetIds: string[];
+};
+
+export type IdentityContextDebugSnapshot = {
+  generatedAt: string;
+  timezone: string;
+  tokenBudget: number;
+  estimatedTotalTokens: number;
+  sectionOrder: string[];
+  sections: IdentityContextSectionSnapshot[];
+  compiledPrompt: string;
+};
+
+export type MemoryLayer = 'identity' | 'memory';
+
+export type MemoryImpactSignal =
+  | 'financial'
+  | 'client_commitment'
+  | 'hard_deadline'
+  | 'identity_preference';
+
+export type MemoryPromotionAction =
+  | 'journal_only'
+  | 'needs_confirmation';
+
+export type MemoryPromotionReason =
+  | 'high_impact_assumption'
+  | 'low_confidence'
+  | 'ambiguous_statement'
+  | 'user_confirmed'
+  | 'user_rejected'
+  | 'invalid_observation'
+  | 'unknown_pending_decision';
+
+export type MemoryPromotionEvaluationRequest = {
+  observation: string;
+  candidateLayer?: MemoryLayer;
+  confidence?: number;
+  impactSignals?: MemoryImpactSignal[];
+  sourceMessage?: string;
+};
+
+export type MemoryPromotionDecision = {
+  action: MemoryPromotionAction;
+  proposedLayer: MemoryLayer;
+  proposedEntry: string;
+  confidence: number;
+  requiresConfirmation: boolean;
+  reasons: MemoryPromotionReason[];
+  impactSignals: MemoryImpactSignal[];
+  confirmationId?: string;
+  confirmationPrompt?: string;
+};
+
+export type MemoryPromotionConfirmRequest = {
+  confirmationId: string;
+  approved: boolean;
+};
+
+export type MemoryPromotionConfirmResult = {
+  resolved: boolean;
+  decision: MemoryPromotionDecision;
+};
+
+export type ProactiveTriggerType = 'time_reminder';
+
+export type IdentityKernelStatus = {
+  ready: boolean;
+  diagnostics: string[];
+};
+
+export type ChatKernelOrchestrationRequest = {
+  userMessage: string;
+  tokenBudget?: number;
+  memory?: AssistantMemoryInput;
+  liveContext?: Partial<AssistantLiveContext>;
+  memoryObservation?: MemoryPromotionEvaluationRequest;
+};
+
+export type ChatKernelOrchestrationSuccess = {
+  ok: true;
+  kernelStatus: IdentityKernelStatus;
+  context: IdentityContextDebugSnapshot;
+  memoryDecision?: MemoryPromotionDecision;
+};
+
+export type ChatKernelOrchestrationFailure = {
+  ok: false;
+  errorCode: 'IDENTITY_KERNEL_UNAVAILABLE';
+  message: string;
+  diagnostics: string[];
+};
+
+export type ChatKernelOrchestrationResult =
+  | ChatKernelOrchestrationSuccess
+  | ChatKernelOrchestrationFailure;
