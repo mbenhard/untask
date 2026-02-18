@@ -345,6 +345,29 @@
 }
 
 /* ──────────────────────────────────────────────
+   Thinking shimmer — gradient glide across text
+   ────────────────────────────────────────────── */
+.thinking-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--foreground) 40%,
+    var(--muted-foreground) 80%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  opacity: 0.4;
+  animation: thinking-shimmer 2.8s ease-in-out infinite;
+}
+
+@keyframes thinking-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ──────────────────────────────────────────────
    Bird mascot animations
    ────────────────────────────────────────────── */
 

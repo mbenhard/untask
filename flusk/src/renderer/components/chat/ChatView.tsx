@@ -8,6 +8,24 @@ import remarkBreaks from 'remark-breaks';
 import type { ChipAction, TurnStep } from '../../../types/chat';
 import { cn } from '../../lib/utils';
 import { BirdMascot } from './BirdMascot';
+
+const AvatarIcon = ({ size, className }: { size: number; className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 100 95.17"
+    className={className}
+    style={{ width: size, height: size }}
+  >
+    <path
+      fill="currentColor"
+      d="M50,0C22.39,0,0,22.39,0,50c0,15.54,7.09,29.43,18.22,38.6,3.07-15.42,6.13-30.85,9.19-46.27,2.25-8.16,1.31-18.45,9.04-23.77,8.03-5.46,21.14-.23,21.87,9.69,8.68,2.4,17.39,4.93,25.88,7.91-.52.35-.79.44-1.39.56h0c-7.51,1.46-14.97,3.24-22.52,4.47,3.47,17.2,6.96,34.38,10.48,51.57.26.86.49,1.66.67,2.42,16.88-8.03,28.55-25.24,28.55-45.17C100,22.39,77.61,0,50,0Z"
+    />
+    <path
+      fill="currentColor"
+      d="M48.65,29.27c.03-4.38-6.63-4.89-7.49-.69-1.13,5.42,7.48,6.22,7.49.69Z"
+    />
+  </svg>
+);
 import {
   selectChatError,
   selectChatIsSending,
@@ -230,16 +248,14 @@ type StreamingIndicatorProps = {
 
 const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) => (
   <div className="py-0.5 pl-1" role="status" aria-label="Flusk is thinking">
-    {prefersReducedMotion ? (
-      <BirdMascot size={26} className="text-muted-foreground/50" />
-    ) : (
-      <BirdMascot
-        size={26}
-        animated
-        variant="smooth-bop"
-        className="text-muted-foreground/50"
-      />
-    )}
+    <span
+      className={cn(
+        'font-mono text-[11px] tracking-normal',
+        prefersReducedMotion ? 'text-muted-foreground/40' : 'thinking-shimmer',
+      )}
+    >
+      Thinking&hellip;
+    </span>
     <span className="sr-only">Flusk is thinking</span>
   </div>
 );
@@ -287,7 +303,7 @@ type EmptyStateProps = {
 
 const EmptyState = ({ onSuggestionClick }: EmptyStateProps) => (
   <div className="flex h-full flex-col items-center justify-center gap-4 px-4">
-    <BirdMascot size={56} className="text-muted-foreground/50" />
+    <BirdMascot size={36} className="text-muted-foreground" />
     <p className="max-w-[260px] text-center text-xs leading-relaxed text-muted-foreground/50">
       Your personal assistant. Asks before acting,
       double-checks risky changes, and remembers
@@ -485,7 +501,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
           >
             {isAssistant && hasSteps ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
-                <BirdMascot size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
+                <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 {message.steps.map((step, index) => {
                   if (step.kind === 'thinking') {
@@ -549,10 +565,13 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
               </div>
               </div>
             ) : isAssistant && isPendingAssistantPlaceholder ? (
-              <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+              <div className="flex w-full max-w-[88%] items-center gap-2">
+                <AvatarIcon size={16} className="shrink-0 text-muted-foreground/40" />
+                <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+              </div>
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
-                <BirdMascot size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
+                <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div
                   className={cn(

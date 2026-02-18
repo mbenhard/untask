@@ -21,52 +21,12 @@ import {
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 
+import { resizeImageIfNeeded, readFileAsDataUrl } from '../../utils/imageResize';
+
 const MAX_IMAGES = 4;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-const MAX_IMAGE_DIMENSION = 2048;
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const ACCEPT_STRING = 'image/png,image/jpeg,image/webp,image/gif';
-
-const detectMimeType = (dataUrl: string): string => {
-  const match = dataUrl.match(/^data:(image\/\w+);/);
-  return match?.[1] ?? 'image/jpeg';
-};
-
-const resizeImageIfNeeded = (dataUrl: string): Promise<string> =>
-  new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      if (img.width <= MAX_IMAGE_DIMENSION && img.height <= MAX_IMAGE_DIMENSION) {
-        resolve(dataUrl);
-        return;
-      }
-
-      const scale = Math.min(MAX_IMAGE_DIMENSION / img.width, MAX_IMAGE_DIMENSION / img.height);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const mime = detectMimeType(dataUrl);
-      const quality = mime === 'image/png' ? undefined : 0.85;
-      resolve(canvas.toDataURL(mime, quality));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-
-const readFileAsDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
 
 type ChatInputProps = {
   className?: string;
