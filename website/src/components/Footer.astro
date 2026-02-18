@@ -1,0 +1,59 @@
+---
+// Footer — minimal, centered
+---
+
+<footer class="px-6 pb-16 pt-24 sm:pt-32">
+  <div class="mx-auto max-w-2xl">
+
+    <!-- Ruled line -->
+    <div class="border-t border-border"></div>
+
+    <div class="mt-12 flex flex-col items-center text-center">
+      <p class="text-[14px] text-muted-foreground">
+        Untask is MIT licensed and open source.
+      </p>
+
+      <div class="mt-6 flex items-center gap-4">
+        <a
+          href="https://github.com/untask/untask"
+          class="font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          GitHub
+        </a>
+        <span class="text-border" aria-hidden="true">&middot;</span>
+        <a
+          href="https://github.com/untask/untask/releases"
+          class="font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Download
+        </a>
+        <span class="text-border" aria-hidden="true">&middot;</span>
+        <a
+          href="https://github.com/untask/untask/releases"
+          class="font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Releases
+        </a>
+      </div>
+
+      <!-- Theme toggle (real LampDesk icon) -->
+      <button
+        onclick="toggleTheme(event)"
+        class="mt-8 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+        aria-label="Toggle theme"
+      >
+        <svg class="h-[14px] w-[14px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" />
+          <path d="m14.207 4.793-3.414 3.414" />
+          <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+          <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" />
+        </svg>
+      </button>
+
+      <p class="mt-4 font-mono text-[10px] tracking-[0.1em] text-muted-foreground/30">
+        v0.1.0
+      </p>
+    </div>
+
+  </div>
+</footer>

@@ -1,0 +1,69 @@
+---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Untask — Local-first task manager with an AI assistant',
+  description = 'A local-first personal task manager with an optional AI assistant. Open source, zero telemetry, MIT licensed.',
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <slot />
+
+    <script is:inline>
+      // Theme toggle
+      function initTheme() {
+        const stored = localStorage.getItem('untask-theme');
+        if (stored === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else if (stored === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+
+      initTheme();
+
+      window.toggleTheme = function (event) {
+        const isDark = document.documentElement.classList.contains('dark');
+        const next = isDark ? 'light' : 'dark';
+
+        // Set CSS custom properties for the reveal origin
+        if (event) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const x = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+          const y = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+          document.documentElement.style.setProperty('--toggle-x', x + '%');
+          document.documentElement.style.setProperty('--toggle-y', y + '%');
+        }
+
+        if (document.startViewTransition) {
+          document.startViewTransition(() => {
+            document.documentElement.classList.toggle('dark', next === 'dark');
+            localStorage.setItem('untask-theme', next);
+          });
+        } else {
+          document.documentElement.classList.toggle('dark', next === 'dark');
+          localStorage.setItem('untask-theme', next);
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,74 @@
+---
+// Features — 2-column card grid inspired by app's SettingsSection + border card patterns
+const features = [
+  {
+    badge: 'Tasks',
+    title: 'Status lanes and drag-and-drop',
+    description: 'Configurable status columns. Reorder tasks by dragging. Full event audit trail with undo.',
+  },
+  {
+    badge: 'Capture',
+    title: 'Quick-add from anywhere',
+    description: 'Global shortcut to capture tasks instantly. Clipboard paste. Tray icon shows your today count.',
+  },
+  {
+    badge: 'Notes',
+    title: 'Rich text editor',
+    description: 'BlockNote-powered notes with formatting. Full-text search across all tasks and notes.',
+  },
+  {
+    badge: '⌘',
+    title: 'Keyboard-first',
+    description: 'Shortcuts for every action. Navigate, create, complete — without touching the mouse.',
+  },
+  {
+    badge: 'AI',
+    title: 'Chat with your tasks',
+    description: 'Create and modify tasks through conversation. Threaded chat panel alongside your workflow.',
+  },
+  {
+    badge: 'Memory',
+    title: 'AI that learns you',
+    description: 'Identity, profile, and pattern learning. Proactive reminders and nudges when things slip.',
+  },
+  {
+    badge: 'BYOK',
+    title: 'Bring your own key',
+    description: 'OpenRouter, OpenAI, Anthropic, or local Ollama. Pick your provider. Use your own API key.',
+  },
+  {
+    badge: 'System',
+    title: 'Backup, themes, and more',
+    description: 'Full backup and restore. Dark and light mode. Curated model list with capability badges.',
+  },
+];
+---
+
+<section class="px-6 py-24 sm:py-32">
+  <div class="mx-auto max-w-2xl">
+
+    <!-- Section header -->
+    <div class="mb-8">
+      <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        Features
+      </h2>
+      <div class="mt-3 border-t border-border"></div>
+    </div>
+
+    <!-- 2-column card grid -->
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {features.map((f) => (
+        <div class="rounded-md border border-dashed border-border/60 px-3 py-3">
+          <div class="mb-1.5">
+            <span class="inline-block rounded bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+              {f.badge}
+            </span>
+          </div>
+          <p class="text-[13px] font-medium text-foreground">{f.title}</p>
+          <p class="mt-1 text-[12px] leading-relaxed text-muted-foreground">{f.description}</p>
+        </div>
+      ))}
+    </div>
+
+  </div>
+</section>
