@@ -104,6 +104,7 @@ export const IPC_CHANNELS = {
   NOTES_CREATE: 'notes:create',
   NOTES_SAVE: 'notes:save',
   NOTES_ARCHIVE: 'notes:archive',
+  NOTES_RESTORE: 'notes:restore',
   NOTES_DELETE: 'notes:delete',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
@@ -122,6 +123,7 @@ export const IPC_CHANNELS = {
   // ─── Update checker channels ──────────────────────────────
   APP_CHECK_FOR_UPDATES: 'app:check-for-updates',
   APP_GET_UPDATE_INFO: 'app:get-update-info',
+  APP_UPDATE_AVAILABLE: 'app:update-available',
   SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',

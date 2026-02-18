@@ -28,28 +28,23 @@ export const UpdateBanner = () => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const load = async (): Promise<void> => {
-      try {
-        const info = await getUntask().app.getUpdateInfo();
-        if (info?.hasUpdate && !isDismissed(info.latestVersion)) {
-          setUpdateInfo(info);
-          setVisible(true);
-        }
-      } catch {
-        // Silently ignore — update banner is non-critical
+    const show = (info: UpdateInfo): void => {
+      if (info.hasUpdate && !isDismissed(info.latestVersion)) {
+        setUpdateInfo(info);
+        setVisible(true);
       }
     };
 
-    void load();
+    // Fast path: check if the main process already has a result cached.
+    void getUntask().app.getUpdateInfo().then((info) => {
+      if (info) show(info);
+    }).catch(() => { /* non-critical */ });
 
-    // Also poll after the initial check completes (in case main process
-    // hasn't finished the first check yet when the renderer mounts).
-    const pollHandle = window.setTimeout(() => {
-      void load();
-    }, 5000);
+    // Push path: main process notifies us the moment a check completes.
+    const unsubscribe = getUntask().app.onUpdateAvailable(show);
 
     return () => {
-      window.clearTimeout(pollHandle);
+      unsubscribe();
     };
   }, []);
 

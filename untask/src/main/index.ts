@@ -12,6 +12,7 @@ import { initReminderScheduler, stopReminderScheduler } from './services/reminde
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
+import { IPC_CHANNELS } from '../types/ipc';
 import {
   startDailyBackupScheduler,
   stopDailyBackupScheduler,
@@ -21,7 +22,7 @@ import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts'
 import { getSetting, isAiEnabled } from './services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
 import { migrateApiKeysToSafeStorage } from './services/keyStorage';
-import { startUpdateChecker, stopUpdateChecker } from './services/updateChecker';
+import { startUpdateChecker, stopUpdateChecker, setUpdateChannel } from './services/updateChecker';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
@@ -221,6 +222,7 @@ app.whenReady().then(() => {
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
+  setUpdateChannel(IPC_CHANNELS.APP_UPDATE_AVAILABLE);
   startUpdateChecker();
   summonWindow();
 
@@ -230,16 +232,16 @@ app.whenReady().then(() => {
   initReminderScheduler(
     isAiEnabled()
       ? {
-          fireAiReminder: (taskContext) =>
-            fireAiReminder(taskContext, {
-              startProactiveTurn: (input) =>
-                startProactiveTurn({
-                  triggerMessage: input.triggerMessage,
-                  triggerType: input.triggerType,
-                  emit: input.emit,
-                }),
-            }),
-        }
+        fireAiReminder: (taskContext) =>
+          fireAiReminder(taskContext, {
+            startProactiveTurn: (input) =>
+              startProactiveTurn({
+                triggerMessage: input.triggerMessage,
+                triggerType: input.triggerType,
+                emit: input.emit,
+              }),
+          }),
+      }
       : {},
   );
 
