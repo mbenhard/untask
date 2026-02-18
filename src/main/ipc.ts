@@ -89,6 +89,7 @@ import {
   reorderTasks,
   undoLastAiTaskEvent,
   undoTaskEvent,
+  undoLastUserTaskEvent,
   getTaskStatusConfig,
   setTaskStatusConfig,
 } from './services/taskService';
@@ -172,7 +173,7 @@ import {
 import { windowDismissModeSchema } from './window/dismissMode';
 import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from './window/dockMode';
 import type { DockModeResult } from '../types/ipc';
-import { reRegisterShortcuts } from './shortcuts';
+import { reRegisterShortcuts, getShortcutRegistrationStatus } from './shortcuts';
 
 const settingsMemoryUpdateSchema = z
   .object({
@@ -436,6 +437,18 @@ export const registerIpcHandlers = (): void => {
   });
 
   ipcMain.handle(
+    IPC_CHANNELS.SHORTCUT_GET_REGISTRATION_STATUS,
+    (): import('../types/ipc').ShortcutRegistrationStatusResult => {
+      return {
+        status: {
+          'shortcut.toggleWindow': getShortcutRegistrationStatus('shortcut.toggleWindow'),
+          'shortcut.quickAdd': getShortcutRegistrationStatus('shortcut.quickAdd'),
+        },
+      };
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT,
     async (
       _event,
@@ -577,6 +590,29 @@ export const registerIpcHandlers = (): void => {
     try { return setTaskStatusConfig(config); }
     catch (e) { console.error('[ipc] TASK_SET_STATUSES:', e); throw e; }
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.TASK_UNDO_LAST_USER_ACTION,
+    (): import('../types/ipc').TaskUndoResultPayload => {
+      try {
+        const result = undoLastUserTaskEvent();
+        if (!result) {
+          return { ok: true, undone: false, message: 'No user action available to undo.' };
+        }
+        return {
+          ok: true,
+          undone: result.undone,
+          message: result.undone
+            ? 'Undid action successfully.'
+            : (result.reason ?? 'No changes were made by undo.'),
+          targetTaskId: result.targetTaskId,
+          originalEventId: result.originalEventId,
+          originalAction: result.originalAction,
+        };
+      }
+      catch (e) { console.error('[ipc] TASK_UNDO_LAST_USER_ACTION:', e); throw e; }
+    },
+  );
 
   ipcMain.handle(IPC_CHANNELS.CHAT_CANCEL, () => {
     try { cancelActiveChatTurns(); }

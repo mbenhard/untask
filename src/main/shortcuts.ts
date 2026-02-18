@@ -6,8 +6,10 @@ import { toggleWindow, showQuickAdd, hideWindow, summonWindow } from './window/s
 
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
   'shortcut.toggleWindow': 'CommandOrControl+Shift+Space',
-  'shortcut.quickAdd': 'CommandOrControl+Shift+Q',
+  'shortcut.quickAdd': 'CommandOrControl+Shift+A',
 };
+
+const registrationStatus: Map<string, boolean> = new Map();
 
 function resolveAccelerator(settingKey: string): string {
   const stored = getSetting(settingKey);
@@ -20,14 +22,17 @@ function registerShortcut(
   accelerator: string,
   callback: () => void,
   label: string,
+  settingKey: string,
 ): boolean {
   if (!accelerator) {
+    registrationStatus.set(settingKey, false);
     return false;
   }
 
   globalShortcut.unregister(accelerator);
 
   const registered = globalShortcut.register(accelerator, callback);
+  registrationStatus.set(settingKey, registered);
 
   if (!registered) {
     // eslint-disable-next-line no-console
@@ -131,8 +136,8 @@ export const registerGlobalShortcuts = (_mainWindow: BrowserWindow): void => {
   const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
   const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');
 
-  registerShortcut(toggleAccelerator, toggleWindow, 'toggle-window');
-  registerShortcut(quickAddAccelerator, showQuickAdd, 'quick-add');
+  registerShortcut(toggleAccelerator, toggleWindow, 'toggle-window', 'shortcut.toggleWindow');
+  registerShortcut(quickAddAccelerator, showQuickAdd, 'quick-add', 'shortcut.quickAdd');
 };
 
 export const reRegisterShortcuts = (): void => {
@@ -141,10 +146,14 @@ export const reRegisterShortcuts = (): void => {
   const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
   const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');
 
-  registerShortcut(toggleAccelerator, toggleWindow, 'toggle-window');
-  registerShortcut(quickAddAccelerator, showQuickAdd, 'quick-add');
+  registerShortcut(toggleAccelerator, toggleWindow, 'toggle-window', 'shortcut.toggleWindow');
+  registerShortcut(quickAddAccelerator, showQuickAdd, 'quick-add', 'shortcut.quickAdd');
 };
 
 export const unregisterGlobalShortcuts = (): void => {
   globalShortcut.unregisterAll();
+};
+
+export const getShortcutRegistrationStatus = (settingKey: string): boolean => {
+  return registrationStatus.get(settingKey) ?? true;
 };

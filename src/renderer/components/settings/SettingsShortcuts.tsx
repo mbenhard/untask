@@ -33,7 +33,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
   {
     key: 'shortcut.quickAdd',
     label: 'Quick add',
-    defaultAccelerator: 'CommandOrControl+Shift+Q',
+    defaultAccelerator: 'CommandOrControl+Shift+A',
     action: 'Open quick add and prefill from clipboard when available.',
   },
 ];
@@ -301,6 +301,7 @@ type SettingsShortcutsProps = {
 
 export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
   const [resolvedShortcuts, setResolvedShortcuts] = useState<Record<string, string>>({});
+  const [registrationStatus, setRegistrationStatus] = useState<Record<string, boolean>>({});
   const [isLoadingShortcuts, setIsLoadingShortcuts] = useState(false);
 
   const loadShortcuts = useCallback(async () => {
@@ -314,6 +315,8 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
           stored && stored.trim().length > 0 ? stored : entry.defaultAccelerator;
       }
       setResolvedShortcuts(resolved);
+      const status = await getUntask().shortcuts.getRegistrationStatus();
+      setRegistrationStatus(status.status);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load shortcuts.');
     } finally {
@@ -332,6 +335,8 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
         await getUntask().settings.set(key, accelerator);
         await getUntask().shortcuts.reRegister();
         setResolvedShortcuts((prev) => ({ ...prev, [key]: accelerator }));
+        const status = await getUntask().shortcuts.getRegistrationStatus();
+        setRegistrationStatus(status.status);
       } catch (saveError) {
         setError(saveError instanceof Error ? saveError.message : 'Failed to save shortcut.');
       }
@@ -352,19 +357,27 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
       <SettingsSection title="Global (system)">
         {GLOBAL_SHORTCUT_SETTINGS.map((entry) => {
           const activeValue = resolvedShortcuts[entry.key] ?? entry.defaultAccelerator;
+          const isRegistered = registrationStatus[entry.key] ?? true;
           return (
             <SettingsRow
               key={entry.key}
               label={entry.label}
               hint={entry.action}
             >
-              <ShortcutRecorder
-                settingKey={entry.key}
-                currentAccelerator={activeValue}
-                defaultAccelerator={entry.defaultAccelerator}
-                allResolvedShortcuts={resolvedShortcuts}
-                onSave={(key, acc) => void handleSaveShortcut(key, acc)}
-              />
+              <div className="flex flex-col gap-0.5">
+                <ShortcutRecorder
+                  settingKey={entry.key}
+                  currentAccelerator={activeValue}
+                  defaultAccelerator={entry.defaultAccelerator}
+                  allResolvedShortcuts={resolvedShortcuts}
+                  onSave={(key, acc) => void handleSaveShortcut(key, acc)}
+                />
+                {!isRegistered && (
+                  <span className="text-[11px] text-destructive">
+                    Shortcut may conflict with system or another app
+                  </span>
+                )}
+              </div>
             </SettingsRow>
           );
         })}

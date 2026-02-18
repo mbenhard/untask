@@ -54,6 +54,7 @@ import {
   type SearchQueryResponse,
   type TaskDeleteRequestPayload,
   type TaskCompleteRequestPayload,
+  type TaskUndoResultPayload,
   type SettingsMemoryStatePayload,
   type SettingsMemoryHistoryRequestPayload,
   type SettingsMemoryHistoryResultPayload,
@@ -74,6 +75,7 @@ import {
   type RemindersStatusResult,
   type RemindersSyncStatusPayload,
   type RemindersSyncFilter,
+  type ShortcutRegistrationStatusResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -216,6 +218,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_STATUSES),
     setStatuses: (config: TaskStatusConfig): Promise<TaskStatusConfig> =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_SET_STATUSES, config),
+    undoLastUserAction: (): Promise<TaskUndoResultPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_UNDO_LAST_USER_ACTION),
   },
   chat: {
     send: (message: ChatSendRequest): Promise<ChatSendResult> =>
@@ -324,6 +328,8 @@ const untaskApi: UntaskApi = {
   shortcuts: {
     reRegister: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SHORTCUT_UPDATE),
+    getRegistrationStatus: (): Promise<ShortcutRegistrationStatusResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHORTCUT_GET_REGISTRATION_STATUS),
   },
   settings: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),

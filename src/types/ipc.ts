@@ -50,6 +50,7 @@ export const IPC_CHANNELS = {
   APP_GET_DOCK_MODE: 'app:get-dock-mode',
   APP_SET_DOCK_MODE: 'app:set-dock-mode',
   SHORTCUT_UPDATE: 'shortcut:update',
+  SHORTCUT_GET_REGISTRATION_STATUS: 'shortcut:get-registration-status',
 
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
   SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT:
@@ -71,6 +72,7 @@ export const IPC_CHANNELS = {
   TASK_NAVIGATE: 'task:navigate',
   TASK_GET_STATUSES: 'task:get-statuses',
   TASK_SET_STATUSES: 'task:set-statuses',
+  TASK_UNDO_LAST_USER_ACTION: 'task:undo-last-user-action',
   CHAT_SEND: 'chat:send',
   CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_HISTORY: 'chat:history',
@@ -252,6 +254,15 @@ export type TaskCompleteRequestPayload = string | {
   completeChildren?: boolean;
 };
 
+export type TaskUndoResultPayload = {
+  ok: boolean;
+  undone: boolean;
+  message?: string;
+  targetTaskId?: string;
+  originalEventId?: string;
+  originalAction?: 'create' | 'update' | 'move' | 'complete' | 'cancel' | 'delete';
+};
+
 // ─── App/window lifecycle payloads ────────────────────────
 
 export type QuickAddPayload = {
@@ -279,6 +290,10 @@ export type DockMode = 'normal' | 'dock-only' | 'menu-bar-only';
 
 export type DockModeResult = {
   mode: DockMode;
+};
+
+export type ShortcutRegistrationStatusResult = {
+  status: Record<string, boolean>;
 };
 
 // ─── Backup payloads ──────────────────────────────────────

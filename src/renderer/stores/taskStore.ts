@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import type { Task } from '../../types/models';
 import { getUntask } from '../lib/untask';
+import { useToastStore } from './toastStore';
 
 export type ReminderOffset = 'at_due' | '15m' | '1h' | '1d';
 
@@ -191,7 +192,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const deletedIndex = previousTasks.findIndex((task) => task.id === id);
     if (deletedIndex === -1) return false;
 
-    // Collect IDs to remove (parent + children when cascading)
     const idsToRemove = new Set([id]);
     if (cascade) {
       for (const t of previousTasks) {
@@ -199,7 +199,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
     }
 
-    // Optimistic remove
     set((s) => ({
       tasks: s.tasks.filter((t) => !idsToRemove.has(t.id)),
       selectedTaskId: s.selectedTaskId && idsToRemove.has(s.selectedTaskId) ? null : s.selectedTaskId,
@@ -208,9 +207,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
     try {
       await getUntask().tasks.delete(cascade ? { id, cascade: true } : id);
+      useToastStore.getState().showToast('Task deleted', () => {
+        void getUntask().tasks.undoLastUserAction();
+      });
       return true;
     } catch (e) {
-      // Rollback: restore all removed tasks
       set(() => ({
         tasks: previousTasks,
         error: toErrorMessage(e),
@@ -282,6 +283,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           .map((t) => (t.id === id ? completed : t))
           .sort(byOrderThenCreatedAt),
       }));
+      useToastStore.getState().showToast('Task completed', () => {
+        void getUntask().tasks.undoLastUserAction();
+      });
       return completed;
     } catch (e) {
       set((s) => ({
@@ -313,6 +317,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           .map((t) => (t.id === id ? cancelled : t))
           .sort(byOrderThenCreatedAt),
       }));
+      useToastStore.getState().showToast('Task cancelled', () => {
+        void getUntask().tasks.undoLastUserAction();
+      });
       return cancelled;
     } catch (e) {
       set((s) => ({
@@ -344,6 +351,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           .map((t) => (t.id === id ? reopened : t))
           .sort(byOrderThenCreatedAt),
       }));
+      useToastStore.getState().showToast('Task reopened', () => {
+        void getUntask().tasks.undoLastUserAction();
+      });
       return reopened;
     } catch (e) {
       set((s) => ({
