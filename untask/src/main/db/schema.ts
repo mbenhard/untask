@@ -172,6 +172,22 @@ export const aiJournalArchive = sqliteTable(
   ],
 );
 
+// ─── reminders_mapping ─────────────────────────────────────
+export const remindersMappings = sqliteTable(
+  'reminders_mapping',
+  {
+    taskId: text('task_id').primaryKey(),
+    reminderId: text('reminder_id').notNull(),
+    externalId: text('external_id'),
+    lastSyncedAt: text('last_synced_at'),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index('idx_reminders_mapping_reminder_id').on(table.reminderId),
+    index('idx_reminders_mapping_external_id').on(table.externalId),
+  ],
+);
+
 // ─── settings ───────────────────────────────────────────────
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
@@ -221,3 +237,6 @@ export type NewAiJournalArchive = typeof aiJournalArchive.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type MemoryEvent = typeof memoryEvents.$inferSelect;
 export type NewMemoryEvent = typeof memoryEvents.$inferInsert;
+
+export type RemindersMapping = typeof remindersMappings.$inferSelect;
+export type NewRemindersMapping = typeof remindersMappings.$inferInsert;

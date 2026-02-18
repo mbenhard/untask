@@ -22,6 +22,9 @@ export const SETTING_KEY_APP_BOOTSTRAP_COMPLETED = 'app.bootstrap_completed' as 
 export const SETTING_KEY_APP_LAUNCH_AT_LOGIN = 'app.launchAtLogin' as const;
 export const SETTING_KEY_AI_ENABLED = 'ai.enabled' as const;
 export const SETTING_KEY_AI_SHOW_ALL_MODELS = 'ai_show_all_models' as const;
+export const SETTING_KEY_REMINDERS_SYNC_ENABLED = 'reminders.sync_enabled' as const;
+export const SETTING_KEY_REMINDERS_LIST_ID = 'reminders.list_id' as const;
+export const SETTING_KEY_REMINDERS_SYNC_FILTER = 'reminders.sync_filter' as const;
 
 // ─── Default values ───────────────────────────────────────────────────────────
 // Single source of truth for all persisted setting defaults.
@@ -52,4 +55,6 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_APP_LAUNCH_AT_LOGIN]: 'false',
   [SETTING_KEY_AI_ENABLED]: 'true',
   [SETTING_KEY_AI_SHOW_ALL_MODELS]: 'false',
+  [SETTING_KEY_REMINDERS_SYNC_ENABLED]: 'false',
+  [SETTING_KEY_REMINDERS_SYNC_FILTER]: 'due_date_only',
 };

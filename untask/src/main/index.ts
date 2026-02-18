@@ -9,6 +9,7 @@ import { startProactiveTurn } from './ai/chat';
 
 import { fireAiReminder } from './assistant/proactiveLoop';
 import { initReminderScheduler, stopReminderScheduler } from './services/reminderScheduler';
+import { initRemindersSync, stopRemindersSync } from './services/remindersSync';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
@@ -250,6 +251,9 @@ app.whenReady().then(() => {
       : {},
   );
 
+  // Initialize Reminders sync (if enabled in settings)
+  void initRemindersSync();
+
   const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow();
@@ -269,6 +273,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  stopRemindersSync();
   stopReminderScheduler();
   stopDailyBackupScheduler();
   stopUpdateChecker();

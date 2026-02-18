@@ -114,3 +114,7 @@ Thumbs.db
 
 # Electron
 forge.env
+
+# Swift helper
+swift-helper/.build
+resources/bin/untask-helper

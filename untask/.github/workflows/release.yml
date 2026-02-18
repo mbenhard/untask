@@ -22,6 +22,11 @@ jobs:
       - run: pnpm install
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Build Swift helper
+        run: |
+          cd swift-helper
+          swift build -c release --arch arm64 --arch x86_64
+          cp .build/apple/Products/Release/UntaskHelper ../resources/bin/untask-helper
       - run: pnpm make
       - name: Upload artifacts
         uses: softprops/action-gh-release@v2
