@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { Archive, ChevronRight, Plus, Sparkles } from 'lucide-react';
+import { Archive, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react';
 
 import type { Note } from '../../../types/models';
 import { cn } from '../../lib/utils';
@@ -60,9 +60,10 @@ type NoteListItemProps = {
   selected: boolean;
   onClick: (id: string) => void;
   onHover: (id: string) => void;
+  onDelete?: (id: string) => void;
 };
 
-const NoteListItem = ({ note, selected, onClick, onHover }: NoteListItemProps) => {
+const NoteListItem = ({ note, selected, onClick, onHover, onDelete }: NoteListItemProps) => {
   const preview = getPreview(note.content);
   const isArchived = note.status === 'archived';
 
@@ -96,6 +97,26 @@ const NoteListItem = ({ note, selected, onClick, onHover }: NoteListItemProps) =
           {preview}
         </p>
       </div>
+      {onDelete ? (
+        <span
+          role="button"
+          tabIndex={0}
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(note.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              onDelete(note.id);
+            }
+          }}
+          aria-label="Delete note"
+        >
+          <Trash2 size={12} />
+        </span>
+      ) : null}
       <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
         {formatRelativeTime(note.createdAt)}
       </span>
@@ -115,6 +136,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
 
   const createNote = useNotesStore((s) => s.createNote);
   const openNote = useNotesStore((s) => s.openNote);
+  const deleteNote = useNotesStore((s) => s.deleteNote);
   const setSelectedListNoteId = useNotesStore((s) => s.setSelectedListNoteId);
 
   const [archiveExpanded, setArchiveExpanded] = useState(false);
@@ -143,6 +165,13 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
       setSelectedListNoteId(id);
     },
     [setSelectedListNoteId],
+  );
+
+  const handleDelete = useCallback(
+    (id: string) => {
+      void deleteNote(id);
+    },
+    [deleteNote],
   );
 
   if (isLoading && activeNotes.length === 0) {
@@ -223,6 +252,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                     selected={false}
                     onClick={handleOpen}
                     onHover={handleHover}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>

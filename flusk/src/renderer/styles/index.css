@@ -300,6 +300,64 @@
 }
 
 /* ──────────────────────────────────────────────
+   File blocks: compact, industrial style
+   ────────────────────────────────────────────── */
+
+/* File placeholder button (before file is attached) */
+[data-file-block] .bn-add-file-button {
+  background-color: var(--accent) !important;
+  color: var(--muted-foreground) !important;
+  padding: 8px 10px !important;
+  gap: 6px !important;
+  border: 1px dashed var(--border) !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+}
+
+/* Hover for add-button and file-name row */
+.bn-editor[contenteditable="true"] [data-file-block] .bn-add-file-button:hover,
+[data-file-block] .bn-file-name-with-icon:hover,
+.ProseMirror-selectednode .bn-file-name-with-icon {
+  background-color: var(--accent) !important;
+}
+
+/* The file name + icon row */
+[data-file-block] .bn-file-name-with-icon {
+  gap: 6px !important;
+  padding: 6px 8px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  align-items: center !important;
+}
+
+/* Shrink the file icon */
+[data-file-block] .bn-file-icon {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
+  opacity: 0.5;
+}
+
+/* File name text */
+[data-file-block] .bn-file-name {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  color: var(--foreground) !important;
+  opacity: 0.7;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Resize handles: theme-aware */
+[data-file-block] .bn-resize-handle {
+  background-color: var(--foreground) !important;
+  border-color: var(--background) !important;
+}
+
+/* ──────────────────────────────────────────────
    Task body editor: compact BlockNote variant
    ────────────────────────────────────────────── */
 .untask-task-editor .bn-container {

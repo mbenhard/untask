@@ -639,3 +639,6 @@ export const selectNotesIsProcessing = (state: NotesStore) => state.isProcessing
 export const selectNotesError = (state: NotesStore) => state.error;
 export const selectNotesNotice = (state: NotesStore) => state.notice;
 export const selectIsListLoading = (state: NotesStore) => state.isListLoading;
+export const selectIsActiveNoteArchived = (state: NotesStore) =>
+  state.activeNoteId != null &&
+  state.archivedNotes.some((n) => n.id === state.activeNoteId);

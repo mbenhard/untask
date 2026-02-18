@@ -298,10 +298,10 @@ export const SUGGESTIONS = [
 ] as const;
 
 type EmptyStateProps = {
-  onSuggestionClick: (prefill: string) => void;
+  onSend: (message: string) => void;
 };
 
-const EmptyState = ({ onSuggestionClick }: EmptyStateProps) => (
+const EmptyState = ({ onSend }: EmptyStateProps) => (
   <div className="flex h-full flex-col items-center justify-center gap-4 px-4">
     <BirdMascot size={36} className="text-muted-foreground" />
     <p className="max-w-[260px] text-center text-xs leading-relaxed text-muted-foreground/50">
@@ -314,7 +314,7 @@ const EmptyState = ({ onSuggestionClick }: EmptyStateProps) => (
         <button
           key={suggestion.label}
           type="button"
-          onClick={() => onSuggestionClick(suggestion.prefill)}
+          onClick={() => onSend(suggestion.prefill)}
           className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
         >
           {suggestion.label}
