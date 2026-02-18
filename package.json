@@ -1,7 +1,7 @@
 {
   "name": "untask",
   "productName": "Untask",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "description": "Untask - AI-powered personal assistant for focus and execution",
   "main": ".vite/build/index.js",
   "private": true,
