@@ -97,6 +97,9 @@ type StoredBlock = {
   type?: string;
   props?: {
     level?: number;
+    url?: string;
+    caption?: string;
+    name?: string;
   };
   content?: StoredInlineContent[];
   children?: StoredBlock[];
@@ -143,12 +146,23 @@ const appendMarkdownLines = (
   depth = 0,
 ): void => {
   for (const block of blocks) {
-    const text = extractInlineText(block.content);
     const indent = depth > 0 ? `${'  '.repeat(depth)}` : '';
-    const prefix = blockPrefix(block);
 
-    if (text.length > 0) {
-      lines.push(`${indent}${prefix}${text}`.trimEnd());
+    if (block.type === 'image') {
+      const url = block.props?.url ?? '';
+      const caption = block.props?.caption ?? block.props?.name ?? 'image';
+      lines.push(`${indent}![${caption}](${url})`.trimEnd());
+    } else if (block.type === 'file') {
+      const url = block.props?.url ?? '';
+      const name = block.props?.name ?? 'file';
+      lines.push(`${indent}[${name}](${url})`.trimEnd());
+    } else {
+      const text = extractInlineText(block.content);
+      const prefix = blockPrefix(block);
+
+      if (text.length > 0) {
+        lines.push(`${indent}${prefix}${text}`.trimEnd());
+      }
     }
 
     if (Array.isArray(block.children) && block.children.length > 0) {

@@ -940,11 +940,8 @@ describe('chatStore stream reliability', () => {
         markdown: '- send proposal',
       },
     });
-    expect(useChatStore.getState().pendingNoteContext).toEqual({
-      noteId: 'note-42',
-      title: 'Client call',
-      markdown: '- send proposal',
-    });
+    // Note context is consumed (cleared) after send
+    expect(useChatStore.getState().pendingNoteContext).toBeNull();
   });
 
   it('falls back to main default model resolution when selected-model lookup fails', async () => {

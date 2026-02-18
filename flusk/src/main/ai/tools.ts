@@ -462,6 +462,31 @@ const deleteTaskTool = {
   },
 } satisfies ToolRegistryEntry<'delete_task', typeof deleteTaskToolInputSchema>;
 
+const listNotesToolInputSchema = z.object({});
+
+const listNotesTool = {
+  name: 'list_notes',
+  description: 'List all notes. Returns active notes and archived notes. Use when the user asks to see their notes or when you need to find a specific note.',
+  schema: listNotesToolInputSchema,
+  execute: async () => {
+    const { active, archived } = listNotes();
+
+    const formatNote = (note: { id: string; title: string; updatedAt: string }) => ({
+      id: note.id,
+      title: note.title,
+      updatedAt: note.updatedAt,
+    });
+
+    return {
+      status: 'success' as const,
+      message: `Found ${active.length} active note${active.length === 1 ? '' : 's'} and ${archived.length} archived.`,
+      data: {
+        active: active.map(formatNote),
+        archived: archived.map(formatNote),
+      },
+    };
+  },
+} satisfies ToolRegistryEntry<'list_notes', typeof listNotesToolInputSchema>;
 
 const resolveNoteId = (noteId?: string, activeNoteId?: string): string => {
   if (noteId) return noteId;
@@ -728,6 +753,7 @@ export const AI_TOOL_REGISTRY = {
   update_task: updateTaskTool,
   complete_task: completeTaskTool,
   delete_task: deleteTaskTool,
+  list_notes: listNotesTool,
   read_note: readNoteTool,
   edit_note: editNoteTool,
   undo_last_action: undoLastActionTool,
