@@ -41,36 +41,14 @@
           Free, open source, runs on your Mac.
         </p>
 
-        <!-- Brew command (preferred) -->
-        <button
-          onclick="copyBrewInstall(this)"
-          class="group mt-6 inline-flex h-8 cursor-pointer items-center gap-2 rounded-md bg-primary px-4 font-mono text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-80"
-          aria-label="Copy install command"
-        >
-          <span>brew install mbenhard/untask/untask</span>
-          <svg class="copy-icon size-3 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-          </svg>
-          <svg class="copy-check hidden size-3 shrink-0 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-        </button>
-        <p class="mt-1.5 font-mono text-[9px] text-muted-foreground/30">
-          Recommended — installs and updates cleanly
-        </p>
-
-        <!-- Divider -->
-        <div class="mt-5 h-px w-12 border-t border-dashed border-border/40"></div>
-
-        <!-- Direct download + GitHub -->
-        <div class="mt-4 flex items-center gap-2">
+        <!-- Buttons row -->
+        <div class="mt-6 flex items-center gap-2">
           <a
             href="https://github.com/mbenhard/untask/releases/latest"
             onclick="downloadLatest(event)"
-            class="inline-flex h-7 items-center rounded-md border border-dashed border-border/60 px-3.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+            class="inline-flex h-7 items-center rounded-md bg-primary px-3.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-80"
           >
-            Direct download
+            Download for macOS
           </a>
           <a
             href="https://github.com/mbenhard/untask"
@@ -79,8 +57,25 @@
             GitHub
           </a>
         </div>
-        <p class="mt-1.5 max-w-xs font-mono text-[9px] leading-relaxed text-muted-foreground/25">
-          Direct download requires: xattr -cr /Applications/Untask.app
+
+        <!-- Brew command -->
+        <button
+          onclick="copyBrewInstall(this)"
+          class="group mt-4 inline-flex h-6 cursor-pointer items-center gap-1.5 rounded border border-border/40 bg-accent/50 px-2.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
+          aria-label="Copy install command"
+        >
+          <span class="text-foreground/60">$</span>
+          <span>brew install mbenhard/untask/untask</span>
+          <svg class="copy-icon size-2.5 shrink-0 opacity-30 transition-opacity group-hover:opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+          </svg>
+          <svg class="copy-check hidden size-2.5 shrink-0 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </button>
+        <p class="mt-1.5 font-mono text-[9px] text-muted-foreground/25">
+          Recommended &middot; direct download may need xattr -cr
         </p>
 
         <!-- License -->
