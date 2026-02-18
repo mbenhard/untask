@@ -92,8 +92,32 @@ export const SettingsView = () => {
           </div>
         )}
 
-        {/* Tab content */}
         {tabContent}
+
+        {/* Footer / Credits */}
+        <footer className="mt-12 mb-6 flex flex-col items-center gap-2 border-t border-border/40 pt-6 text-center">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span>Signed by</span>
+            <span className="font-medium text-foreground">Marcus</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const email = atob('bWFyY3VzQG9mZmJyYW5kLmRlc2lnbg==');
+              void navigator.clipboard.writeText(email);
+              setNotice('Email copied to clipboard');
+              setTimeout(() => setNotice(null), 2000);
+            }}
+            className="font-mono text-[10px] text-muted-foreground/60 transition-colors hover:text-foreground"
+          >
+            marcus@offbrand.design
+          </button>
+
+          <div className="mt-2 font-mono text-[10px] text-muted-foreground/40">
+            untask v0.1.6 • MIT Licensed
+          </div>
+        </footer>
       </div>
     </div>
   );
