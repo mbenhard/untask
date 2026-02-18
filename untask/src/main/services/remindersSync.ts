@@ -14,6 +14,7 @@ import {
 } from '../defaultSettings';
 import { getSetting, getSettingWithDefault, setSetting } from './settingsService';
 import { listTasks, getTaskById, completeTask, subscribeTaskChanges } from './taskService';
+import { blockNoteToMarkdown } from './notesService';
 import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
 import type { Task } from '../db/schema';
 
@@ -223,9 +224,10 @@ function buildReminderPayload(task: {
   dueDate: string | null;
   priority: number;
 } {
+  const notesText = task.body ? blockNoteToMarkdown(task.body) : null;
   return {
     title: task.title,
-    notes: task.body ? task.body.slice(0, 500) : null,
+    notes: notesText ? notesText.slice(0, 500) : null,
     dueDate: task.dueDate,
     priority: PRIORITY_TO_EVENTKIT[task.priority ?? 'none'] ?? 0,
   };
