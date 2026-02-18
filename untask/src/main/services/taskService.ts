@@ -59,6 +59,20 @@ const emitTaskChange = (): void => {
   }
 };
 
+const USER_UNDO_STACK_SIZE = 20;
+const userUndoStack: string[] = [];
+
+const pushUserUndoEvent = (eventId: string): void => {
+  userUndoStack.unshift(eventId);
+  if (userUndoStack.length > USER_UNDO_STACK_SIZE) {
+    userUndoStack.pop();
+  }
+};
+
+const popUserUndoEvent = (): string | null => {
+  return userUndoStack.shift() ?? null;
+};
+
 export const subscribeTaskChanges = (
   listener: TaskChangeListener,
 ): (() => void) => {
@@ -84,6 +98,11 @@ function logTaskEvent(
     before: before ? JSON.stringify(before) : null,
     after: after ? JSON.stringify(after) : null,
   }).returning().all();
+
+  if (source === 'user') {
+    pushUserUndoEvent(created.id);
+  }
+
   return created;
 }
 
@@ -395,6 +414,15 @@ export function undoLastAiTaskEvent(
   }
 
   return undoTaskEvent(latestAiEvent.id, source);
+}
+
+export function undoLastUserTaskEvent(): UndoTaskEventResult | null {
+  const eventId = popUserUndoEvent();
+  if (!eventId) {
+    return null;
+  }
+
+  return undoTaskEvent(eventId, 'user');
 }
 
 export function createTask(

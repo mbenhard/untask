@@ -40,6 +40,7 @@ import { InboxView } from '../views/InboxView';
 import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
+import { ToastContainer } from '../ui/Toast';
 
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
@@ -472,6 +473,7 @@ export const AppShell = () => {
       </div>
 
       <SearchModal />
+      <ToastContainer />
     </div>
   );
 };

@@ -60,6 +60,7 @@ import type {
   SettingsBootstrapState,
   TaskDeleteRequestPayload,
   TaskCompleteRequestPayload,
+  TaskUndoResultPayload,
   SettingsGetAiEnabledResult,
   SettingsSetAiEnabledResult,
   ApiKeysHasResult,
@@ -71,6 +72,7 @@ import type {
   RemindersStatusResult,
   RemindersSyncStatusPayload,
   RemindersSyncFilter,
+  ShortcutRegistrationStatusResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -133,6 +135,7 @@ export type UntaskApi = {
     onTaskNavigate: (listener: (payload: TaskNavigatePayload) => void) => () => void;
     getStatuses: () => Promise<TaskStatusConfig>;
     setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
+    undoLastUserAction: () => Promise<TaskUndoResultPayload>;
   };
   chat: {
     send: (message: ChatSendRequest) => Promise<ChatSendResult>;
@@ -183,6 +186,7 @@ export type UntaskApi = {
   };
   shortcuts: {
     reRegister: () => Promise<void>;
+    getRegistrationStatus: () => Promise<ShortcutRegistrationStatusResult>;
   };
   settings: {
     get: (key: string) => Promise<string | null>;

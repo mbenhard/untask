@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
+import { getUntask } from '../lib/untask';
 import { useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNotesStore } from '../stores/notesStore';
@@ -167,11 +168,19 @@ export const useKeyboardShortcuts = ({
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
-        if (chatOverlayState === 'open' && !isTextInputElement(document.activeElement)) {
-          event.preventDefault();
+        if (isTextInputElement(document.activeElement)) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (chatOverlayState === 'open') {
           void undoAction();
           return;
         }
+
+        void getUntask().tasks.undoLastUserAction();
+        return;
       }
 
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
