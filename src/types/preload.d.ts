@@ -218,6 +218,7 @@ export type UntaskApi = {
     getStatus: () => Promise<RemindersStatusResult>;
     toggle: (enabled: boolean) => Promise<void>;
     setFilter: (filter: RemindersSyncFilter) => Promise<void>;
+    setImport: (enabled: boolean) => Promise<void>;
     requestAccess: () => Promise<{ granted: boolean }>;
     forceSync: () => Promise<void>;
     onSyncStatus: (listener: (payload: RemindersSyncStatusPayload) => void) => () => void;

@@ -84,111 +84,50 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
     title: 'App-wide',
     description: 'These work while the Untask window is focused.',
     entries: [
-      { keys: 'Cmd/Ctrl + K', action: 'Toggle chat overlay and focus chat input.' },
-      { keys: 'Cmd/Ctrl + F', action: 'Open or close Search.' },
-      { keys: 'Cmd/Ctrl + N', action: 'Jump to Notes view.' },
-      { keys: 'Cmd/Ctrl + Shift + N', action: 'Create a new note and open it.' },
-      {
-        keys: 'Cmd/Ctrl + Z',
-        action: 'Undo the last assistant action.',
-        context: 'Only when chat overlay is open and you are not typing in an input.',
-      },
-      {
-        keys: 'Escape',
-        action: 'Layered dismiss: search -> clear chat input -> leave settings -> close chat overlay -> hide window.',
-      },
-      { keys: '1', action: 'Go to Today view.' },
-      { keys: '2', action: 'Go to Tasks view.' },
-      { keys: '3', action: 'Go to Inbox view.' },
-      { keys: '4', action: 'Toggle chat overlay (peek/open).' },
-      { keys: ',', action: 'Open Settings view.' },
-      { keys: 'Cmd/Ctrl + Shift + L', action: 'Toggle light/dark theme.' },
-      {
-        keys: 'N',
-        action: 'Open new-task input.',
-        context: 'Only in Today, Tasks, or Inbox while chat is in peek mode and Search is closed.',
-      },
+      { keys: '⌘ K', action: 'Toggle chat overlay' },
+      { keys: '⌘ F', action: 'Search' },
+      { keys: '⌘ N', action: 'New task' },
+      { keys: '⌘ ⇧ N', action: 'New note' },
+      { keys: '⌘ 1', action: 'Today view' },
+      { keys: '⌘ 2', action: 'Tasks view' },
+      { keys: '⌘ 3', action: 'Inbox view' },
+      { keys: '⌘ 4', action: 'Notes view' },
+      { keys: '⌘ ,', action: 'Settings' },
+      { keys: '⌘ ⇧ L', action: 'Toggle theme' },
+      { keys: '⌘ Z', action: 'Undo assistant action', context: 'When chat is open' },
+      { keys: 'Escape', action: 'Dismiss current layer (search, input, overlay)' },
     ],
   },
   {
-    title: 'Notes',
-    description: 'These work while Notes view is active.',
+    title: 'Notes editor',
+    description: 'These work while editing a note.',
     entries: [
-      {
-        keys: 'Cmd/Ctrl + Enter',
-        action: 'Process active note with AI.',
-        context: 'Only in Notes editor.',
-      },
-      {
-        keys: 'Cmd/Ctrl + Shift + A',
-        action: 'Archive active note.',
-        context: 'Only in Notes editor.',
-      },
-      {
-        keys: 'Alt + Arrow Up / Arrow Down',
-        action: 'Open previous or next active note.',
-        context: 'Only in Notes editor.',
-      },
-      {
-        keys: 'Escape',
-        action: 'Return from note editor to notes list.',
-        context: 'Only in Notes editor while chat overlay is peeked.',
-      },
-      {
-        keys: 'J / K',
-        action: 'Move selected note up or down in the list.',
-        context: 'Notes view only, while not typing and chat overlay is peeked.',
-      },
-      {
-        keys: 'Enter',
-        action: 'Open the currently selected note in the list.',
-        context: 'Notes view only while chat overlay is peeked.',
-      },
+      { keys: '⌘ Enter', action: 'Process with AI' },
+      { keys: '⌘ ⇧ A', action: 'Archive' },
+      { keys: '⌥ ↑ / ↓', action: 'Prev/next note' },
     ],
   },
   {
-    title: 'Task list (focused list)',
+    title: 'Task list (when focused)',
     description: 'These work when a task list has keyboard focus.',
     entries: [
-      { keys: 'Arrow Up / Arrow Down', action: 'Move focus between tasks.' },
-      { keys: 'Enter', action: 'Expand or collapse focused task.' },
-      { keys: 'Space', action: 'Toggle complete or reopen focused task.' },
-      { keys: 'T', action: 'Toggle Today flag on focused task.' },
-      { keys: 'P', action: 'Cycle focused task priority.' },
-      { keys: 'S', action: 'Cycle focused task status.' },
-      { keys: 'E', action: 'Edit focused task title.' },
-      { keys: 'Escape', action: 'Collapse expanded task, then blur list focus.' },
-    ],
-  },
-  {
-    title: 'Search modal',
-    description: 'These work while Search is open.',
-    entries: [
-      { keys: 'Arrow Up / Arrow Down', action: 'Move selected result.' },
-      { keys: 'Enter', action: 'Open the selected result.' },
-      { keys: 'Escape', action: 'Close Search.' },
-    ],
-  },
-  {
-    title: 'Input actions',
-    description: 'Contextual input shortcuts.',
-    entries: [
-      { keys: 'Enter', action: 'Send chat message from chat input.' },
-      { keys: 'Shift + Enter', action: 'Insert newline in chat input.' },
-      { keys: 'Enter', action: 'Submit inline task input.' },
-      { keys: 'Escape', action: 'Cancel inline task input.' },
-      { keys: 'Enter', action: 'Save task title/client inline edits.' },
-      { keys: 'Escape', action: 'Cancel task title/client inline edits.' },
+      { keys: '↑ / ↓', action: 'Navigate' },
+      { keys: 'Enter', action: 'Expand' },
+      { keys: 'Space', action: 'Complete' },
+      { keys: 'T', action: 'Today flag' },
+      { keys: 'P', action: 'Cycle priority' },
+      { keys: 'S', action: 'Cycle status' },
+      { keys: 'E', action: 'Edit title' },
     ],
   },
 ];
 
 const formatAccelerator = (value: string): string =>
   value
-    .replace(/CommandOrControl/g, 'Cmd/Ctrl')
-    .replace(/Command/g, 'Cmd')
-    .replace(/Control/g, 'Ctrl')
-    .replace(/\+/g, ' + ');
+    .replace(/CommandOrControl/g, '⌘')
+    .replace(/Command/g, '⌘')
+    .replace(/Control/g, '⌘')
+    .replace(/\+/g, ' ');
 
 const MEMORY_FIELD_LABELS: Record<'identity' | 'memory', string> = {
   identity: 'Identity',

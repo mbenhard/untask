@@ -127,6 +127,7 @@ import {
   getRemindersStatus,
   toggleRemindersSync,
   setRemindersSyncFilter,
+  setRemindersImportEnabled,
   requestRemindersAccess,
   forceRemindersSync,
 } from './services/remindersSync';
@@ -1476,6 +1477,16 @@ export const registerIpcHandlers = (): void => {
         setRemindersSyncFilter(filter);
       }
       catch (e) { console.error('[ipc] REMINDERS_SET_FILTER:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_SET_IMPORT,
+    (_event, enabled: boolean) => {
+      try {
+        setRemindersImportEnabled(enabled);
+      }
+      catch (e) { console.error('[ipc] REMINDERS_SET_IMPORT:', e); throw e; }
     },
   );
 

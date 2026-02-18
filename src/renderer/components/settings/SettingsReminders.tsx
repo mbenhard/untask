@@ -27,6 +27,7 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
   const [enabled, setEnabled] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [syncFilter, setSyncFilter] = useState<RemindersSyncFilter>('due_date_only');
+  const [importEnabled, setImportEnabled] = useState(true);
   const [syncedCount, setSyncedCount] = useState(0);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<RemindersSyncStatusPayload>({ status: 'idle' });
@@ -40,6 +41,7 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
       setEnabled(result.enabled);
       setAuthorized(result.authorized);
       setSyncFilter(result.syncFilter);
+      setImportEnabled(result.importEnabled);
       setSyncedCount(result.syncedCount);
       setLastSyncAt(result.lastSyncAt);
     } catch (e) {
@@ -131,6 +133,28 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
     [syncFilter, setError, setNotice],
   );
 
+  const handleImportToggle = useCallback(
+    async (value: 'on' | 'off') => {
+      const nextEnabled = value === 'on';
+      const previousEnabled = importEnabled;
+      setImportEnabled(nextEnabled);
+      setNotice(null);
+      setError(null);
+
+      try {
+        setIsSaving(true);
+        await getUntask().reminders.setImport(nextEnabled);
+        setNotice(nextEnabled ? 'Import from Reminders enabled.' : 'Import from Reminders disabled.');
+      } catch (e) {
+        setImportEnabled(previousEnabled);
+        setError(e instanceof Error ? e.message : 'Failed to update import setting.');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [importEnabled, setError, setNotice],
+  );
+
   const handleForceSync = useCallback(async () => {
     setNotice(null);
     setError(null);
@@ -191,6 +215,21 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
                 ]}
                 value={syncFilter}
                 onChange={(v) => void handleFilterChange(v as RemindersSyncFilter)}
+                disabled={isSaving}
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              label="Import from Reminders"
+              hint="Import reminders added to the Untask list as new tasks."
+            >
+              <SegmentedControl
+                options={[
+                  { value: 'on' as const, label: 'On' },
+                  { value: 'off' as const, label: 'Off' },
+                ]}
+                value={importEnabled ? 'on' : 'off'}
+                onChange={(v) => void handleImportToggle(v as 'on' | 'off')}
                 disabled={isSaving}
               />
             </SettingsRow>

@@ -69,6 +69,7 @@ struct FetchedReminder: Codable {
     let dueDate: String?
     let priority: Int
     let isCompleted: Bool
+    let recurrenceRule: String?
 }
 
 struct ErrorResult: Codable {

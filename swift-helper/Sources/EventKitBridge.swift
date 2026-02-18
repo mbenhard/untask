@@ -224,7 +224,8 @@ final class EventKitBridge {
                 notes: reminder.notes,
                 dueDate: formatDueDate(reminder.dueDateComponents),
                 priority: reminder.priority,
-                isCompleted: reminder.isCompleted
+                isCompleted: reminder.isCompleted,
+                recurrenceRule: formatRecurrenceRule(reminder.recurrenceRules)
             )
         }
     }
@@ -326,6 +327,67 @@ final class EventKitBridge {
         guard let components = components else { return nil }
         guard let date = Calendar.current.date(from: components) else { return nil }
         return Self.isoFormatterNoFrac.string(from: date)
+    }
+
+    /// Convert EKRecurrenceRule to RRULE string (RFC 5545 format).
+    private func formatRecurrenceRule(_ rules: [EKRecurrenceRule]?) -> String? {
+        guard let rule = rules?.first else { return nil }
+
+        var parts: [String] = []
+
+        // FREQ is required
+        let freq: String
+        switch rule.frequency {
+        case .daily: freq = "DAILY"
+        case .weekly: freq = "WEEKLY"
+        case .monthly: freq = "MONTHLY"
+        case .yearly: freq = "YEARLY"
+        @unknown default: return nil
+        }
+        parts.append("FREQ=\(freq)")
+
+        // INTERVAL (default is 1, only include if > 1)
+        if rule.interval > 1 {
+            parts.append("INTERVAL=\(rule.interval)")
+        }
+
+        // BYDAY (days of week)
+        if let daysOfTheWeek = rule.daysOfTheWeek, !daysOfTheWeek.isEmpty {
+            let dayStrings = daysOfTheWeek.map { dayOfWeek -> String in
+                let dayStr: String
+                switch dayOfWeek.dayOfTheWeek {
+                case .monday: dayStr = "MO"
+                case .tuesday: dayStr = "TU"
+                case .wednesday: dayStr = "WE"
+                case .thursday: dayStr = "TH"
+                case .friday: dayStr = "FR"
+                case .saturday: dayStr = "SA"
+                case .sunday: dayStr = "SU"
+                @unknown default: dayStr = "??"
+                }
+                // Include week number if present (for "2nd Tuesday" type rules)
+                let week = dayOfWeek.weekNumber
+                if week != 0 {
+                    return "\(week)\(dayStr)"
+                }
+                return dayStr
+            }
+            parts.append("BYDAY=\(dayStrings.joined(separator: ","))")
+        }
+
+        // COUNT or UNTIL (recurrence end)
+        if let end = rule.recurrenceEnd {
+            let count = end.occurrenceCount
+            if count > 0 {
+                parts.append("COUNT=\(count)")
+            } else if let endDate = end.endDate {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime]
+                parts.append("UNTIL=\(formatter.string(from: endDate))")
+            }
+        }
+
+        return parts.joined(separator: ";")
     }
 }
 
