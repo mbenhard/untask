@@ -347,17 +347,8 @@ const normalizeFallbackTaskTitle = (rawTitle: string): string =>
 const looksLikeQuestion = (message: string): boolean =>
   message.includes('?') || /^(can|could|would|will|should|please)\b/i.test(message);
 
-const TASK_MUTATION_VERB_PATTERN =
-  /\b(create|add|update|edit|complete|finish|move|schedule|plan|undo|mark|done|remove|delete|set|change|rename|prioritize|defer|remember|save|note|log)\b/i;
-const TASK_ENTITY_PATTERN = /\b(task|todo|to-do|today|inbox)\b/i;
-const TASK_CLARIFICATION_PATTERN =
-  /\b(what(?:'| i)s the task|give me a title|title and any details|which task|clarify)\b/i;
-const PRONOUN_WITH_VERB_PATTERN =
-  /\b(mark|complete|finish|delete|remove|update|set|change|move|done)\b.*\b(it|that|this|them)\b|\b(it|that|this|them)\b.*\b(mark|complete|finish|delete|remove|update|set|change|move|done|as done|as complete)\b/i;
 const CONFIRMATION_PATTERN =
   /^(yes|yeah|yep|do it|go ahead|sure|ok|okay|confirmed|approve|please|absolutely|definitely)\s*[.!]?\s*$/i;
-const WEB_SEARCH_INTENT_PATTERN =
-  /\b(search for|look up|find out|latest news|current price|stock price|price of)\b/i;
 
 export const shouldRequireToolChoice = (input: {
   userMessage: string;

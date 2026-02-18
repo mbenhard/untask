@@ -108,7 +108,7 @@ const StatusRow = ({ id, label, enabled, locked, onToggle }: StatusRowProps) => 
   );
 };
 
-export const SettingsTasks = ({ setError, setNotice }: SettingsTasksProps) => {
+export const SettingsTasks = ({ setError: _setError, setNotice: _setNotice }: SettingsTasksProps) => {
   const config = useTaskStatusConfigStore((s) => s.config);
   const updateConfig = useTaskStatusConfigStore((s) => s.updateConfig);
   const tasks = useTaskStore((s) => s.tasks);
@@ -257,9 +257,9 @@ export const SettingsTasks = ({ setError, setNotice }: SettingsTasksProps) => {
   }, [config.enabled, pendingDisable]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <SettingsSection title="Status Lanes">
-        <p className="pb-2 text-[11px] text-muted-foreground">
+        <p className="px-2 pb-1 text-[11px] text-muted-foreground">
           Toggle statuses on/off and drag to reorder. Inbox is always separate.
         </p>
 
@@ -315,7 +315,7 @@ export const SettingsTasks = ({ setError, setNotice }: SettingsTasksProps) => {
 
         {/* Inline dialog for disabling a status with tasks */}
         {pendingDisable && (
-          <div className="mt-2 rounded-md border border-border bg-accent/30 p-3">
+          <div className="mt-1.5 rounded-md border border-border/60 bg-accent/20 p-2">
             <p className="text-[12px] text-foreground">
               {pendingDisable.taskCount} task{pendingDisable.taskCount !== 1 ? 's are' : ' is'} in{' '}
               <strong>
@@ -327,7 +327,7 @@ export const SettingsTasks = ({ setError, setNotice }: SettingsTasksProps) => {
               <select
                 value={moveTarget}
                 onChange={(e) => setMoveTarget(e.target.value as PredefinedStatusId)}
-                className="rounded border border-border bg-background px-2 py-1 text-[12px] text-foreground outline-none"
+                className="rounded-md border border-border/60 bg-transparent px-2 py-1 text-[11px] text-foreground outline-none"
               >
                 <option value="">Select status...</option>
                 {availableMoveTargets.map((opt) => (

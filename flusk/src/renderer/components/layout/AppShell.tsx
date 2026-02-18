@@ -11,6 +11,7 @@ import { useQuickAddListener } from '../../hooks/useQuickAddListener';
 import { cn } from '../../lib/utils';
 import {
   selectActiveView,
+  selectAiEnabled,
   selectChatOverlayState,
   selectUnreadProactive,
   useAppStore,
@@ -70,6 +71,7 @@ export const AppShell = () => {
   }, [resolvedTheme, setTheme, prefersReducedMotion]);
 
   const activeView = useAppStore(selectActiveView);
+  const aiEnabled = useAppStore(selectAiEnabled);
   const chatOverlayState = useAppStore(selectChatOverlayState);
   const unreadProactive = useAppStore(selectUnreadProactive);
   const setView = useAppStore((state) => state.setView);
@@ -276,6 +278,7 @@ export const AppShell = () => {
           </AnimatePresence>
         </motion.section>
 
+        {aiEnabled ? (
         <div className="pointer-events-none absolute inset-0 z-20">
           <div className="absolute inset-0">
             <AnimatePresence initial={false} mode="wait">
@@ -373,6 +376,7 @@ export const AppShell = () => {
             </AnimatePresence>
           </div>
         </div>
+        ) : null}
 
         <div className="no-drag absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
           <div className="flex shrink-0 items-center gap-1">

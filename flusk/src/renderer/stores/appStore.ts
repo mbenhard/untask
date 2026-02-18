@@ -11,6 +11,7 @@ type AppStore = {
   chatOverlayState: ChatOverlayState;
   unreadProactive: boolean;
   newTaskTrigger: number;
+  aiEnabled: boolean;
   setView: (view: AppView) => void;
   setViewFromAssistant: (view: AppView) => void;
   openChatOverlay: () => void;
@@ -19,6 +20,7 @@ type AppStore = {
   closeChatOverlayLayer: () => void;
   setUnreadProactive: (value: boolean) => void;
   triggerNewTask: () => void;
+  setAiEnabled: (enabled: boolean) => void;
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -27,6 +29,7 @@ export const useAppStore = create<AppStore>((set) => ({
   chatOverlayState: 'peek',
   unreadProactive: false,
   newTaskTrigger: 0,
+  aiEnabled: true,
   setView: (view) =>
     set((state) => {
       if (state.activeView === view) {
@@ -66,6 +69,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setUnreadProactive: (value) => set({ unreadProactive: value }),
   triggerNewTask: () =>
     set((state) => ({ newTaskTrigger: state.newTaskTrigger + 1 })),
+  setAiEnabled: (enabled) => set({ aiEnabled: enabled }),
 }));
 
 export const selectActiveView = (state: AppStore) => state.activeView;
@@ -78,3 +82,4 @@ export const selectUnreadProactive = (state: AppStore) =>
   state.unreadProactive;
 export const selectNewTaskTrigger = (state: AppStore) =>
   state.newTaskTrigger;
+export const selectAiEnabled = (state: AppStore) => state.aiEnabled;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { getFlusk } from '../../lib/flusk';
+import { getUntask } from '../../lib/untask';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
@@ -27,7 +27,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
     key: 'shortcut.toggleWindow',
     label: 'Toggle window',
     defaultAccelerator: 'CommandOrControl+Shift+Space',
-    action: 'Show or hide the Flusk window from anywhere in the OS.',
+    action: 'Show or hide the Untask window from anywhere in the OS.',
   },
   {
     key: 'shortcut.quickAdd',
@@ -157,7 +157,7 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
       setError(null);
       const resolved: Record<string, string> = {};
       for (const entry of GLOBAL_SHORTCUT_SETTINGS) {
-        const stored = await getFlusk().settings.get(entry.key);
+        const stored = await getUntask().settings.get(entry.key);
         resolved[entry.key] =
           stored && stored.trim().length > 0 ? stored : entry.defaultAccelerator;
       }
@@ -182,7 +182,7 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
   }
 
   return (
-    <div role="tabpanel" id="settings-panel-shortcuts" className="space-y-6">
+    <div role="tabpanel" id="settings-panel-shortcuts" className="space-y-3">
       <SettingsSection title="Global (system)">
         {GLOBAL_SHORTCUT_SETTINGS.map((entry) => {
           const activeValue = resolvedShortcuts[entry.key] ?? entry.defaultAccelerator;
@@ -192,7 +192,7 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
               label={entry.label}
               hint={entry.action}
             >
-              <code className="rounded bg-muted px-2 py-1 text-[11px] text-foreground">
+              <code className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                 {formatAccelerator(activeValue)}
               </code>
             </SettingsRow>
@@ -208,7 +208,7 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
               label={entry.action}
               hint={entry.context}
             >
-              <code className="rounded bg-muted px-2 py-1 text-[11px] text-foreground">
+              <code className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                 {entry.keys}
               </code>
             </SettingsRow>

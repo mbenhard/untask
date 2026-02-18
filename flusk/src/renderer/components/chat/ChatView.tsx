@@ -462,7 +462,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
       const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
       const lastAssistantMessageId = [...messages].reverse().find((m) => m.role === 'assistant')?.id ?? null;
 
-      return messages.map((message, messageIndex) => {
+      return messages.map((message, _messageIndex) => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
         const hasSteps = isAssistant && message.steps.length > 0;

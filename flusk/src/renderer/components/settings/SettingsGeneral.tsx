@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { WindowDismissMode } from '../../../types/ipc';
-import { getFlusk } from '../../lib/flusk';
+import { getUntask } from '../../lib/untask';
 import {
   MONO_FONT_OPTIONS,
   SANS_FONT_OPTIONS,
@@ -41,7 +41,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
     try {
       setIsLoadingLaunchAtLogin(true);
       setLaunchAtLoginError(null);
-      const result = await getFlusk().app.getLaunchAtLogin();
+      const result = await getUntask().app.getLaunchAtLogin();
       setLaunchAtLoginEnabled(result.enabled);
       setLaunchAtLoginApplied(result.applied);
       if (result.error) {
@@ -60,7 +60,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
     try {
       setIsLoadingWindowDismissMode(true);
       setError(null);
-      const result = await getFlusk().app.getWindowDismissMode();
+      const result = await getUntask().app.getWindowDismissMode();
       setWindowDismissModeState(result.mode);
     } catch (loadError) {
       setError(
@@ -87,7 +87,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
 
       try {
         setIsSavingLaunchAtLogin(true);
-        const result = await getFlusk().app.setLaunchAtLogin(nextEnabled);
+        const result = await getUntask().app.setLaunchAtLogin(nextEnabled);
         setLaunchAtLoginEnabled(result.enabled);
         setLaunchAtLoginApplied(result.applied);
         if (result.error) {
@@ -118,7 +118,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
 
       try {
         setIsSavingWindowDismissMode(true);
-        const result = await getFlusk().app.setWindowDismissMode(mode);
+        const result = await getUntask().app.setWindowDismissMode(mode);
         setWindowDismissModeState(result.mode);
         setNotice(
           result.mode === 'persistent'
@@ -210,7 +210,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
       : 'Not supported in this runtime (preference is still saved).';
 
   return (
-    <div role="tabpanel" id="settings-panel-general" className="space-y-6">
+    <div role="tabpanel" id="settings-panel-general" className="space-y-3">
       <SettingsSection title="Startup">
         <SettingsRow
           label="Launch at login"
@@ -288,22 +288,31 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
               />
             </SettingsRow>
 
-            <div className="py-2.5">
-              <div className="rounded-md border border-border/50 bg-muted/20 px-3 py-3">
-                <p className="text-[13px] text-foreground">
-                  The quick brown fox jumps over 13 invoices due this week.
-                </p>
-                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                  quick.add --client="Northwind" --due=tomorrow --priority=high
-                </p>
-              </div>
-            </div>
+
           </>
         )}
 
         {typography.error ? (
           <p className="py-2 text-[11px] text-destructive">{typography.error}</p>
         ) : null}
+      </SettingsSection>
+      <SettingsSection title="Setup">
+        <SettingsRow
+          label="Restart onboarding"
+          hint="Re-run the initial setup flow."
+        >
+          <button
+            type="button"
+            className="rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+            onClick={() => {
+              void getUntask()
+                .settings.set('app.bootstrap_completed', 'false')
+                .then(() => window.location.reload());
+            }}
+          >
+            Reset
+          </button>
+        </SettingsRow>
       </SettingsSection>
     </div>
   );

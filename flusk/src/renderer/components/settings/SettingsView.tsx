@@ -10,16 +10,14 @@ import { SettingsBackup } from './SettingsBackup';
 
 type SettingsTab = 'general' | 'tasks' | 'ai' | 'memory' | 'shortcuts' | 'backup';
 
-const TAB_ORDER: SettingsTab[] = ['general', 'tasks', 'ai', 'memory', 'shortcuts', 'backup'];
-
-const TAB_LABELS: Record<SettingsTab, string> = {
-  general: 'General',
-  tasks: 'Tasks',
-  ai: 'AI',
-  memory: 'Knowledge',
-  shortcuts: 'Shortcuts',
-  backup: 'Backup',
-};
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'general', label: 'General' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'ai', label: 'Assistant' },
+  { id: 'memory', label: 'Knowledge' },
+  { id: 'shortcuts', label: 'Shortcuts' },
+  { id: 'backup', label: 'Backup' },
+];
 
 export const SettingsView = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -46,56 +44,55 @@ export const SettingsView = () => {
   return (
     <div className="h-full overflow-y-auto p-3">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        <nav className="flex items-center gap-0.5" role="tablist" aria-label="Settings sections">
-          {TAB_ORDER.map((tab) => {
-            const isActive = activeTab === tab;
-
+        {/* Tab strip */}
+        <nav className="flex items-center gap-0.5" aria-label="Settings tabs">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
             return (
               <button
-                key={tab}
+                key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`settings-panel-${tab}`}
                 onClick={() => {
-                  setActiveTab(tab);
+                  setActiveTab(tab.id);
                   setError(null);
                   setNotice(null);
                 }}
                 className={cn(
-                  'rounded-md px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] transition-colors',
+                  'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
                   isActive
                     ? 'bg-accent text-foreground'
                     : 'text-muted-foreground hover:text-foreground/80',
                 )}
               >
-                {TAB_LABELS[tab]}
+                {tab.label}
               </button>
             );
           })}
         </nav>
 
-        <p
-          className={cn(
-            'rounded-md border px-3 py-2 text-xs transition-opacity',
-            error
-              ? 'border-destructive/40 bg-destructive/10 text-destructive-foreground opacity-100'
-              : 'opacity-0 pointer-events-none',
-          )}
-          aria-live="polite"
-        >
-          {error || '\u00A0'}
-        </p>
-        <p
-          className={cn(
-            'rounded-md border border-border bg-secondary px-3 py-2 text-xs text-foreground transition-opacity',
-            notice ? 'opacity-100' : 'opacity-0 pointer-events-none',
-          )}
-          aria-live="polite"
-        >
-          {notice || '\u00A0'}
-        </p>
+        {/* Messages */}
+        {(error || notice) && (
+          <div className="space-y-1.5">
+            {error && (
+              <div
+                className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive"
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
+            {notice && (
+              <div
+                className="rounded-md border border-border/40 px-2 py-1.5 text-[11px] text-muted-foreground"
+                role="status"
+              >
+                {notice}
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* Tab content */}
         {tabContent}
       </div>
     </div>

@@ -92,7 +92,7 @@ export type GateDecision =
 
 export const evaluateGate = (
   mode: AutonomyMode,
-  risk: RiskLevel,
+  _risk: RiskLevel,
   hardOverride: boolean,
 ): GateDecision => {
   if (hardOverride) {
@@ -128,7 +128,14 @@ export const loadPendingActions = (): PendingAction[] => {
 
   try {
     const parsed = JSON.parse(raw);
-    return pendingQueueSchema.parse(parsed);
+    const actions = pendingQueueSchema.parse(parsed);
+    const MIGRATION_MAP: Record<string, AutonomyMode> = {
+      manual: 'confirm', safe: 'confirm', autopilot: 'auto',
+    };
+    return actions.map((action) => ({
+      ...action,
+      modeAtCreation: MIGRATION_MAP[action.modeAtCreation] ?? action.modeAtCreation,
+    })) as PendingAction[];
   } catch {
     return [];
   }
@@ -167,18 +174,17 @@ export const addPendingAction = (
 };
 
 export const requeuePendingAction = (action: PendingAction): PendingAction => {
-  const validatedAction = pendingActionSchema.parse(action);
   const queue = loadPendingActions();
-  const existingIndex = queue.findIndex((entry) => entry.actionId === validatedAction.actionId);
+  const existingIndex = queue.findIndex((entry) => entry.actionId === action.actionId);
 
   if (existingIndex === -1) {
-    queue.push(validatedAction);
+    queue.push(action);
   } else {
-    queue[existingIndex] = validatedAction;
+    queue[existingIndex] = action;
   }
 
   persistPendingActions(queue);
-  return validatedAction;
+  return action;
 };
 
 export const removePendingAction = (actionId: string): PendingAction | null => {

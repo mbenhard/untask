@@ -102,6 +102,12 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_GET_ALL: 'settings:get-all',
+  SETTINGS_GET_AI_ENABLED: 'settings:get-ai-enabled',
+  SETTINGS_SET_AI_ENABLED: 'settings:set-ai-enabled',
+  API_KEYS_HAS: 'api-keys:has',
+  API_KEYS_SET: 'api-keys:set',
+  API_KEYS_DELETE: 'api-keys:delete',
+  API_KEYS_VALIDATE: 'api-keys:validate',
   SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
@@ -299,4 +305,43 @@ export type SearchResultItem = {
 export type SearchQueryResponse = {
   results: SearchResultItem[];
   total: number;
+};
+
+export type SettingsGetAiEnabledResult = {
+  enabled: boolean;
+};
+
+export type SettingsSetAiEnabledRequest = {
+  enabled: boolean;
+};
+
+export type SettingsSetAiEnabledResult = {
+  enabled: boolean;
+};
+
+export type ApiKeysHasRequest = {
+  provider: string;
+};
+
+export type ApiKeysHasResult = {
+  hasKey: boolean;
+};
+
+export type ApiKeysSetRequest = {
+  provider: string;
+  key: string;
+};
+
+export type ApiKeysDeleteRequest = {
+  provider: string;
+};
+
+export type ApiKeysValidateRequest = {
+  provider: string;
+  key: string;
+};
+
+export type ApiKeysValidateResult = {
+  valid: boolean;
+  error?: string;
 };

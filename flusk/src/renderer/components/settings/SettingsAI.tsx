@@ -596,7 +596,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div role="tabpanel" id="settings-panel-ai" className="space-y-6">
+    <div role="tabpanel" id="settings-panel-ai" className="space-y-3">
 
       {/* ── Assistant toggle ─────────────────────────────────────────────── */}
       <SettingsSection title="Assistant">
@@ -637,10 +637,10 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
 
           {/* ── API Key / Connection ──────────────────────────────────────── */}
           <SettingsSection title={isKeyedProvider ? 'API Key' : 'Connection'}>
-            <div className="py-2.5">
+            <div className="px-2 py-2">
               {isKeyedProvider ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
                     <Input
                       type="password"
                       value={apiKeyInput}
@@ -653,11 +653,11 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                         isLoadingApiKey
                           ? 'Checking...'
                           : hasApiKey
-                          ? 'Saved key (enter to replace)'
-                          : PROVIDER_KEY_PLACEHOLDER[provider]
+                            ? 'Saved key (enter to replace)'
+                            : PROVIDER_KEY_PLACEHOLDER[provider]
                       }
                       disabled={isLoadingApiKey || isSavingApiKey}
-                      className="h-8 flex-1 text-[12px]"
+                      className="h-7 flex-1 text-[11px]"
                       aria-label={`${PROVIDER_LABELS[provider]} API key`}
                     />
                     <Button
@@ -666,7 +666,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       variant="outline"
                       onClick={() => void handleValidateApiKey()}
                       disabled={isLoadingApiKey || isSavingApiKey || apiKeyValidating || apiKeyInput.trim().length === 0}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       {apiKeyValidating ? 'Checking...' : 'Validate'}
                     </Button>
@@ -675,7 +675,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       size="sm"
                       onClick={() => void handleSaveApiKey()}
                       disabled={isLoadingApiKey || isSavingApiKey || apiKeyInput.trim().length === 0}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       Save
                     </Button>
@@ -685,14 +685,14 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       variant="ghost"
                       onClick={() => void handleClearApiKey()}
                       disabled={isLoadingApiKey || isSavingApiKey || !hasApiKey}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       Clear
                     </Button>
                   </div>
 
                   {/* Status line */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {apiKeyValid === true ? (
                       <span className="text-[11px] text-green-600 dark:text-green-400">Key is valid.</span>
                     ) : apiKeyError ? (
@@ -702,8 +702,8 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                         {isLoadingApiKey
                           ? 'Checking key status...'
                           : hasApiKey
-                          ? 'A key is currently saved.'
-                          : 'No key saved yet.'}
+                            ? 'A key is currently saved.'
+                            : 'No key saved yet.'}
                       </p>
                     )}
                   </div>
@@ -724,15 +724,15 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 </div>
               ) : (
                 /* Ollama base URL */
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
                     <Input
                       type="text"
                       value={ollamaBaseUrl}
                       onChange={(event) => setOllamaBaseUrl(event.target.value)}
                       placeholder={DEFAULT_OLLAMA_BASE_URL}
                       disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-                      className="h-8 flex-1 text-[12px]"
+                      className="h-7 flex-1 text-[11px]"
                       aria-label="Ollama base URL"
                     />
                     <Button
@@ -740,7 +740,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       size="sm"
                       onClick={() => void handleSaveOllamaUrl()}
                       disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       Save
                     </Button>
@@ -778,7 +778,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 className="max-w-[260px]"
               />
             </SettingsRow>
-            <div className="flex items-center justify-end py-1.5">
+            <div className="flex items-center justify-end px-2 py-1">
               <button
                 type="button"
                 onClick={() => void handleShowAllModelsToggle()}

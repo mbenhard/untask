@@ -15,7 +15,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { Task, PredefinedStatusId } from '../../../types/models';
+import type { Task, PredefinedStatusId, TaskStatus } from '../../../types/models';
 import { isTerminalStatus, getStatusLabel } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
@@ -317,7 +317,7 @@ export const TasksView = ({
                     activeDragId={activeDragId}
                     addTaskConfig={
                       !isTerminal
-                        ? { defaultStatus: key, showMetadata: true, placeholder: 'Add task...' }
+                        ? { defaultStatus: key as Exclude<TaskStatus, 'done'>, showMetadata: true, placeholder: 'Add task...' }
                         : undefined
                     }
                     triggerAdd={

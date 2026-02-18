@@ -62,7 +62,6 @@ export const TaskList = ({
   sharedActiveDragId = null,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
-  const cancelTask = useTaskStore((state) => state.cancelTask);
   const reopenTask = useTaskStore((state) => state.reopenTask);
   const createTask = useTaskStore((state) => state.createTask);
   const updateTask = useTaskStore((state) => state.updateTask);

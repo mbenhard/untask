@@ -35,9 +35,6 @@ import {
 import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
 import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../services/notesService';
 import {
-  getMemory,
-  setMemory,
-  readMemorySection,
   updateMemorySection,
 } from './memory';
 
@@ -55,35 +52,6 @@ const normalizeForSummary = (value: string, maxLength: number): string => {
     ? normalized
     : `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 };
-
-const normalizeDiffLines = (value: string): string[] =>
-  value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-const summarizeLineDiff = (
-  before: string,
-  after: string,
-): { added: string[]; removed: string[] } => {
-  const beforeLines = normalizeDiffLines(before);
-  const afterLines = normalizeDiffLines(after);
-  const beforeSet = new Set(beforeLines);
-  const afterSet = new Set(afterLines);
-
-  const added = afterLines.filter((line) => !beforeSet.has(line));
-  const removed = beforeLines.filter((line) => !afterSet.has(line));
-
-  return {
-    added: added.slice(0, 3),
-    removed: removed.slice(0, 3),
-  };
-};
-
-const formatDiffItems = (items: string[]): string =>
-  items.length > 0
-    ? items.map((item) => `- ${normalizeForSummary(item, 160)}`).join('\n')
-    : '- (none)';
 
 const resolveTaskLensViewIntent = (task: {
   today?: boolean | null;

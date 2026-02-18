@@ -57,6 +57,10 @@ import type {
   SettingsBootstrapState,
   TaskDeleteRequestPayload,
   TaskCompleteRequestPayload,
+  SettingsGetAiEnabledResult,
+  SettingsSetAiEnabledResult,
+  ApiKeysHasResult,
+  ApiKeysValidateResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -167,6 +171,14 @@ export type FluskApi = {
     getMemoryHistory: (payload?: SettingsMemoryHistoryRequestPayload) => Promise<SettingsMemoryHistoryResultPayload>;
     undoMemoryEvent: (payload?: SettingsUndoMemoryEventRequestPayload) => Promise<SettingsUndoMemoryEventResultPayload>;
     readJournal: (payload?: SettingsReadJournalRequestPayload) => Promise<SettingsReadJournalResultPayload>;
+    getAiEnabled: () => Promise<SettingsGetAiEnabledResult>;
+    setAiEnabled: (enabled: boolean) => Promise<SettingsSetAiEnabledResult>;
+  };
+  apiKeys: {
+    has: (provider: string) => Promise<ApiKeysHasResult>;
+    set: (provider: string, key: string) => Promise<void>;
+    delete: (provider: string) => Promise<void>;
+    validate: (provider: string, key: string) => Promise<ApiKeysValidateResult>;
   };
 };
 

@@ -60,6 +60,10 @@ import {
   type SettingsReadJournalRequestPayload,
   type SettingsReadJournalResultPayload,
   type SettingsBootstrapState,
+  type SettingsGetAiEnabledResult,
+  type SettingsSetAiEnabledResult,
+  type ApiKeysHasResult,
+  type ApiKeysValidateResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { FluskApi } from '../types/preload';
@@ -285,6 +289,20 @@ const fluskApi: FluskApi = {
       payload?: SettingsReadJournalRequestPayload,
     ): Promise<SettingsReadJournalResultPayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_READ_JOURNAL, payload),
+    getAiEnabled: (): Promise<SettingsGetAiEnabledResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_AI_ENABLED),
+    setAiEnabled: (enabled: boolean): Promise<SettingsSetAiEnabledResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_AI_ENABLED, { enabled }),
+  },
+  apiKeys: {
+    has: (provider: string): Promise<ApiKeysHasResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_HAS, { provider }),
+    set: (provider: string, key: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_SET, { provider, key }),
+    delete: (provider: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_DELETE, { provider }),
+    validate: (provider: string, key: string): Promise<ApiKeysValidateResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_VALIDATE, { provider, key }),
   },
 };
 

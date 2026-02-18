@@ -56,6 +56,15 @@ import {
   type BackupImportDialogRequest,
   type BackupImportDialogResponse,
   type WindowDismissModeResult,
+  type SettingsGetAiEnabledResult,
+  type SettingsSetAiEnabledRequest,
+  type SettingsSetAiEnabledResult,
+  type ApiKeysHasRequest,
+  type ApiKeysHasResult,
+  type ApiKeysSetRequest,
+  type ApiKeysDeleteRequest,
+  type ApiKeysValidateRequest,
+  type ApiKeysValidateResult,
 } from '../types/ipc';
 import type { MemoryLayer } from '../types/assistant';
 import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
@@ -107,6 +116,7 @@ import {
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
 import { getSetting, setSetting, getAllSettings } from './services/settingsService';
+import { SETTING_KEY_AI_ENABLED } from './defaultSettings';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 
 import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
@@ -1029,6 +1039,63 @@ export const registerIpcHandlers = (): void => {
     try { return getAllSettings(); }
     catch (e) { console.error('[ipc] SETTINGS_GET_ALL:', e); throw e; }
   });
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_AI_ENABLED,
+    (): SettingsGetAiEnabledResult => {
+      try {
+        const stored = getSetting(SETTING_KEY_AI_ENABLED);
+        return { enabled: stored !== 'false' };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_GET_AI_ENABLED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_AI_ENABLED,
+    (_event, request: SettingsSetAiEnabledRequest): SettingsSetAiEnabledResult => {
+      try {
+        setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
+        return { enabled: request.enabled };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_HAS,
+    (_event, request: ApiKeysHasRequest): ApiKeysHasResult => {
+      try {
+        const key = getSetting(`api_key_${request.provider}`);
+        return { hasKey: typeof key === 'string' && key.length > 0 };
+      }
+      catch (e) { console.error('[ipc] API_KEYS_HAS:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_SET,
+    (_event, request: ApiKeysSetRequest): void => {
+      try {
+        setSetting(`api_key_${request.provider}`, request.key);
+      }
+      catch (e) { console.error('[ipc] API_KEYS_SET:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_DELETE,
+    (_event, request: ApiKeysDeleteRequest): void => {
+      try {
+        setSetting(`api_key_${request.provider}`, '');
+      }
+      catch (e) { console.error('[ipc] API_KEYS_DELETE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_VALIDATE,
+    async (_event, _request: ApiKeysValidateRequest): Promise<ApiKeysValidateResult> => {
+      try {
+        return { valid: true };
+      }
+      catch (e) { console.error('[ipc] API_KEYS_VALIDATE:', e); throw e; }
+    },
+  );
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_MEMORY_STATE,
     (): SettingsMemoryStatePayload => {

@@ -32,13 +32,13 @@
 
     <div class="mt-8 flex items-center gap-2.5">
       <a
-        href="https://github.com/untask/untask/releases"
+        href="https://github.com/mbenhard/untask/releases/latest"
         class="inline-flex h-8 items-center rounded-md bg-primary px-4 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-80"
       >
         Download for macOS
       </a>
       <a
-        href="https://github.com/untask/untask"
+        href="https://github.com/mbenhard/untask"
         class="inline-flex h-8 items-center rounded-md border border-border px-4 text-[12px] font-medium text-foreground transition-colors hover:bg-accent"
       >
         GitHub
@@ -64,12 +64,12 @@
     </button>
 
     <p class="mt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-      MIT Licensed &middot; macOS &middot; v0.1.0
+      MIT Licensed &middot; macOS
     </p>
   </div>
 
   <!-- Scroll hint -->
-  <div class="absolute bottom-8 text-muted-foreground/40" aria-hidden="true">
+  <div class="scroll-hint absolute bottom-8 text-muted-foreground/40" aria-hidden="true">
     <svg width="16" height="24" viewBox="0 0 16 24" fill="none">
       <path d="M8 4v12M4 12l4 4 4-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
@@ -167,6 +167,15 @@
     68%  { transform: scaleX(1.1); opacity: 0.25; }
     82%  { transform: scaleX(0.95); opacity: 0.38; }
     100% { transform: scaleX(1); opacity: 0.35; }
+  }
+
+  .scroll-hint {
+    animation: bob 2s ease-in-out infinite;
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(6px); }
   }
 
   @keyframes wobble-shadow {

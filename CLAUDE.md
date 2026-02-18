@@ -1,98 +1,213 @@
-# Flusk Project Instructions for Coding Agents
+# Untask — Project Instructions for Coding Agents
 
-## Mission
-Build Flusk as a personal AI assistant for Marcus, not just a chat UI. The assistant should feel like a durable extension of the user: same priorities, stable personality, strong memory, and proactive execution support.
+## What This Is
+Untask is a local-first personal task manager with an optional AI assistant, built as a macOS Electron app. It was previously called "Flusk" — some internal code/paths still use that name.
 
-## Product Principle: Assistant First
-Chat is a transport layer, not the product. Core value is:
-1. Identity continuity (consistent personality and decision style)
-2. Personal memory continuity (profile, patterns, commitments, context)
-3. Useful agency (proactive planning, reminders, and prioritization)
-4. Safe actioning (clear boundaries and confirmations for risky actions)
+## Repository Layout
 
-Any feature that improves chat UX but weakens these four goals is not acceptable.
+This is a **monorepo** with two independent projects:
 
-## Source of Truth
-- Product requirements: `docs/plans/2026-02-15-flusk-design.md`
-- Assistant identity docs: `docs/assistant/SOUL.md`, `docs/assistant/CHARTER.md`
-- Task plan and dependencies: `.taskmaster/tasks/tasks.json`
-- Complexity guidance: `.taskmaster/reports/task-complexity-report.json`
-- Workflow command docs: `.opencode/command/tm-*.md`
+```
+untitled/                         # Local monorepo (no remote)
+├── flusk/                        # Electron app (the product)
+│   ├── src/main/                 # Main process (Node/Electron)
+│   ├── src/preload/              # Preload bridge
+│   ├── src/renderer/             # React UI
+│   ├── src/types/                # Shared types
+│   ├── forge.config.ts           # Electron Forge config
+│   ├── vite.main.config.ts       # Vite config for main process
+│   ├── vite.renderer.config.ts   # Vite config for renderer
+│   └── package.json              # App package (pnpm)
+├── website/                      # Astro landing page (untask.app)
+│   ├── src/components/           # Astro components
+│   ├── src/pages/                # Routes
+│   └── package.json
+├── docs/
+│   ├── assistant/                # SOUL.md, CHARTER.md — AI personality
+│   └── plans/                    # Design docs
+└── CLAUDE.md                     # This file
+```
 
-If there is a conflict, prioritize in this order:
-1. User request
-2. Assistant identity docs (`docs/assistant/*`)
-3. Product plan (`docs/plans/2026-02-15-flusk-design.md`)
-4. Task plan (`.taskmaster/tasks/tasks.json`)
-5. Other docs
+**Important**: The GitHub repo (`mbenhard/untask`) is separate — it contains only the `flusk/` contents at root level, with its own commit history.
 
-## Execution Order
-Current bootstrap remains valid, with one critical gate:
-1. Complete foundation work (Task 1, then dependencies)
-2. Complete Assistant Identity Kernel task before deep AI chat behavior work
-3. Only then implement full chat/tool orchestration flows
+## GitHub Repos
 
-Hard gate:
-- Do not ship Task 7 behavior (AI chat orchestration) without identity kernel outputs integrated into context building and response policy.
+| Repo | Purpose | URL |
+|------|---------|-----|
+| `mbenhard/untask` | App source + releases | https://github.com/mbenhard/untask |
+| `mbenhard/homebrew-untask` | Homebrew tap (cask) | https://github.com/mbenhard/homebrew-untask |
 
-## Assistant Architecture Requirements
-The runtime assistant must combine these layers on every response:
-1. Soul: stable personality and communication style (`SOUL.md`)
-2. Charter: role, boundaries, and operating rules (`CHARTER.md`)
-3. User Profile: durable facts/preferences (editable)
-4. Patterns: learned workflows and recurring structures
-5. Journal: time-based observations and progress notes
-6. Live Context: current tasks, due risk, today focus, recent activity
+GitHub CLI is authenticated as `mbenhard`.
 
-## Behavior Requirements
-- Tone: direct, concise, non-corporate, accountability-oriented.
-- Agency: propose next actions without waiting for prompts when context indicates drift, risk, or ambiguity.
-- Time awareness: adapt behavior by morning/afternoon/evening and deadline pressure.
-- Decision posture: optimize for user outcomes (completion, focus, cashflow) over conversational niceness.
-- Safety: confirm destructive/high-financial actions regardless of autonomy mode.
+## Tech Stack
 
-## Personalization Rules
-- Promote stable facts to profile/patterns only when confidence is high.
-- Ask for confirmation before saving high-impact personal assumptions.
-- Keep memory entries atomic and editable; avoid opaque hidden state.
-- Track preference changes over time instead of overwriting history blindly.
+| Layer | Technology |
+|-------|------------|
+| Framework | Electron 40 + Electron Forge |
+| Bundler | Vite (via @electron-forge/plugin-vite) |
+| Database | better-sqlite3 + Drizzle ORM |
+| UI | React 19 + Tailwind v4 + Radix UI |
+| AI | Vercel AI SDK (@ai-sdk/openai, @ai-sdk/anthropic) |
+| Editor | BlockNote |
+| State | Zustand v5 |
+| Package manager | pnpm |
 
-## Development Guardrails
-- Maintain strict process boundaries:
-  - Main process owns DB, filesystem, tray, and shortcuts.
-  - Preload exposes minimal typed APIs only.
-  - Renderer never accesses raw Node/Electron internals.
-- Keep IPC domain-first (`task:*`, `chat:*`, `settings:*`), never generic raw DB IPC.
-- Validate write payloads (zod) before mutation.
-- Log task mutations to `task_events` for undo/audit.
-- Preserve PRD model names (`today`, `client`, `order`, etc.).
+## Development Commands
 
-## Session Workflow
-1. Run `task-master next`
-2. Run `task-master show <id>`
-3. Set status to in-progress
-4. Implement in small validated increments
-5. Update task/subtask notes with implementation and behavior decisions
-6. Validate build/type/lint/test for touched scope
-7. Mark done only after acceptance checks pass
+```bash
+# Run the app (from flusk/)
+npm run start              # electron-forge start
 
-## Acceptance Checks (Assistant-Specific)
-Before closing any assistant-related task:
-- Soul and charter constraints are actually consumed by runtime prompt/context assembly.
-- At least one proactive behavior path is implemented and testable.
-- Memory updates are auditable and reversible.
-- High-risk actions require confirmation.
-- Response style matches assistant identity docs.
+# If Electron binary is missing after install:
+node node_modules/electron/install.js
+npx electron-rebuild -f -w better-sqlite3
 
-## UI and UX Guardrails
-- Follow PRD visual direction:
-  - Monochrome, minimal, keyboard-first
-  - 8px spacing grid
-  - Inter typography
-  - Dark mode default with light mode parity
-- Keep motion subtle (200ms clean transitions; no bouncy animation).
+# Type checking & tests
+pnpm typecheck             # All three tsconfigs
+pnpm test                  # Vitest
 
-## Safety
-- Do not rewrite task history or mutate unrelated tasks.
-- Avoid broad refactors during bootstrap unless explicitly requested.
-- Prefer incremental delivery and keep dependency order intact.
+# Build for distribution
+pnpm package               # Creates out/Untask-darwin-arm64/
+pnpm make                  # Creates distributable .zip/.dmg
+
+# Database
+npm run db:generate        # Drizzle schema → SQL migrations
+npm run db:migrate         # Apply migrations (rebuilds native modules)
+```
+
+## Release Workflow
+
+Releases are **not automated from local dev**. The flow is:
+
+### 1. Prepare changes
+Work in `flusk/` locally. Test with `npm run start`.
+
+### 2. Sync to GitHub
+```bash
+# Clone the GitHub repo to a temp location
+gh repo clone mbenhard/untask /tmp/untask-release
+
+# Copy changed files from flusk/ to the clone
+# (manually or with a diff tool — the directory structures match)
+
+# Commit, push
+cd /tmp/untask-release
+git add -A && git commit -m "description"
+git push origin main
+```
+
+### 3. Tag and release
+```bash
+# Bump version in package.json first, then:
+git tag v0.x.x
+git push origin v0.x.x
+```
+
+This triggers the **Release workflow** (`.github/workflows/release.yml`):
+- Runs on `macos-latest`
+- `pnpm install` → `pnpm typecheck` → `pnpm test` → `pnpm make`
+- Uploads `.zip` artifact as a **draft** GitHub release
+- You must **publish** the draft: `gh release edit v0.x.x --repo mbenhard/untask --draft=false`
+
+### 4. Update Homebrew cask
+```bash
+# Download the release artifact and get SHA
+gh release download v0.x.x --repo mbenhard/untask --pattern '*.zip' --dir /tmp
+shasum -a 256 /tmp/Untask-darwin-arm64-0.x.x.zip
+
+# Clone and update the tap
+gh repo clone mbenhard/homebrew-untask /tmp/homebrew-untask
+# Edit Casks/untask.rb: update version + sha256
+# Commit and push
+```
+
+The cask file format:
+```ruby
+cask "untask" do
+  version "0.x.x"
+  sha256 "<sha256>"
+  url "https://github.com/mbenhard/untask/releases/download/v#{version}/Untask-darwin-arm64-#{version}.zip"
+  name "Untask"
+  desc "Local-first personal task manager with optional AI assistant"
+  homepage "https://github.com/mbenhard/untask"
+  app "Untask.app"
+  postflight do
+    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Untask.app"], sudo: false
+  end
+end
+```
+
+## Known Build Gotchas
+
+### Native modules in packaged app
+`better-sqlite3` is a native Node module. The Vite plugin's default `ignore` function excludes all `node_modules` from the ASAR. We override it in `forge.config.ts` to include `better-sqlite3`, `bindings`, and `file-uri-to-path`. The `AutoUnpackNativesPlugin` then extracts the `.node` binary to `app.asar.unpacked/`.
+
+**If adding new native modules**: add them to the `ignore` function in `forge.config.ts`.
+
+### pnpm + Electron Forge
+`.npmrc` must have:
+```
+node-linker=hoisted
+symlink=false
+```
+- `node-linker=hoisted` — Forge's package manager detection requires it
+- `symlink=false` — Electron Packager can't follow pnpm symlinks into ASAR
+
+### Electron binary disappearing
+After `pnpm install`, if `node_modules/electron/dist/` is empty:
+```bash
+node node_modules/electron/install.js
+npx electron-rebuild -f -w better-sqlite3
+```
+
+## Database
+
+- **Engine**: better-sqlite3 with WAL mode
+- **ORM**: Drizzle
+- **Location**: `~/Library/Application Support/Untask/untask.db`
+- **Legacy**: `~/Library/Application Support/flusk/flusk.db` (auto-migrated on first run if untask.db doesn't exist)
+- **Backups**: `~/Library/Application Support/Untask/backups/`
+- **Schema**: `flusk/src/main/db/schema.ts`
+- **Migrations**: `flusk/drizzle/` (SQL files, copied as extraResource)
+
+Tables: `tasks`, `notes`, `conversations`, `chat_messages`, `task_events`, `ai_journal`, `ai_journal_archive`, `settings`, `memory_events`
+
+## Architecture Rules
+
+- **Main process** owns: DB, filesystem, tray, shortcuts, AI calls
+- **Preload** exposes: minimal typed IPC APIs only
+- **Renderer** never: accesses Node/Electron internals directly
+- **IPC** is domain-first: `task:*`, `chat:*`, `settings:*` — never generic raw DB queries
+- **Validation**: zod on write payloads before mutation
+- **Audit**: task mutations logged to `task_events`
+
+## AI Assistant Design
+
+The app includes an AI chat assistant. Key design decisions:
+
+- **Identity**: personality defined in `docs/assistant/SOUL.md` and `docs/assistant/CHARTER.md`
+- **Providers**: supports OpenAI and Anthropic via Vercel AI SDK (see `src/main/ai/providers/`)
+- **Context injection**: full task/note context injected into system prompt (no RAG — data is small)
+- **Privacy**: chat messages stored locally in SQLite, never sent to external services beyond the LLM API
+- **Memory layers**: profile, patterns, journal — all editable and auditable
+
+## UI Guidelines
+
+- Monochrome, minimal, keyboard-first
+- 8px spacing grid
+- Inter typography (+ Geist Mono for code)
+- Dark mode default with light mode parity
+- Subtle motion only (200ms transitions, no bouncy animations)
+- Use Radix UI primitives, not raw HTML for interactive elements
+
+## Website
+
+Astro static site in `website/`. Deploy by building and hosting `dist/`.
+
+```bash
+cd website
+pnpm dev     # Dev server
+pnpm build   # Build to dist/
+```
+
+Download links point to `https://github.com/mbenhard/untask/releases/latest` — no version hardcoding needed.
