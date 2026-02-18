@@ -8,7 +8,7 @@ export const SUPPORTED_MODEL_IDS = [
   // OpenRouter models
   'openai/gpt-4o-mini',
   'openai/gpt-4o',
-  'anthropic/claude-sonnet-4-5',
+  'anthropic/claude-sonnet-4-6',
   'anthropic/claude-haiku-4-5',
   'google/gemini-2.5-flash-preview',
   'google/gemini-3-flash-preview',
@@ -17,7 +17,7 @@ export const SUPPORTED_MODEL_IDS = [
   'gpt-4o-mini',
   'gpt-4o',
   // Anthropic direct models
-  'claude-sonnet-4-5-20250929',
+  'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
   // Ollama models
   'llama3.3:70b',
@@ -59,7 +59,7 @@ export interface CuratedModel {
 const PROVIDER_DEFAULT_MODEL_IDS: Record<ProviderType, ChatModelId> = {
   openrouter: 'openai/gpt-4o-mini',
   openai: 'gpt-4o-mini',
-  anthropic: 'claude-sonnet-4-5-20250929',
+  anthropic: 'claude-sonnet-4-6',
   ollama: 'llama3.3:70b',
 };
 
@@ -110,20 +110,20 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
-  // Claude Sonnet 4.5 — OpenRouter
+  // Claude Sonnet 4.6 — OpenRouter
   {
-    id: 'anthropic/claude-sonnet-4-5',
-    name: 'Claude Sonnet 4.5',
+    id: 'anthropic/claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
     provider: 'openrouter',
     contextWindow: 200_000,
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
-  // Claude Sonnet 4.5 — Anthropic direct
+  // Claude Sonnet 4.6 — Anthropic direct
   {
-    id: 'claude-sonnet-4-5-20250929',
-    name: 'Claude Sonnet 4.5',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
     provider: 'anthropic',
     contextWindow: 200_000,
     costTier: 'moderate',
@@ -228,8 +228,8 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsVision: true,
   },
   {
-    id: 'anthropic/claude-sonnet-4-5',
-    label: 'Claude Sonnet 4.5 (OpenRouter)',
+    id: 'anthropic/claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6 (OpenRouter)',
     inputCostPerMillion: 3.0,
     outputCostPerMillion: 15.0,
     defaultSelected: false,
@@ -299,8 +299,8 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsVision: true,
   },
   {
-    id: 'claude-sonnet-4-5-20250929',
-    label: 'Claude Sonnet 4.5',
+    id: 'claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     inputCostPerMillion: 3.0,
     outputCostPerMillion: 15.0,
     defaultSelected: false,
