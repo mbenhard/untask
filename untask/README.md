@@ -1,85 +1,218 @@
-# Untask
+<p align="center">
+  <img src="assets/readme/app-icon.png" width="128" height="128" alt="Untask app icon" />
+</p>
 
-**A local-first personal task manager with an optional AI assistant**
+<h1 align="center">Untask</h1>
 
-![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
-![GitHub Release](https://img.shields.io/github/v/release/mbenhard/untask)
+<p align="center">
+  A local-first personal task manager with an optional AI assistant.<br/>
+  Your data stays on your Mac. No account required. No cloud sync.
+</p>
 
----
+<p align="center">
+  <a href="https://github.com/mbenhard/untask/releases/latest"><img src="https://img.shields.io/github/v/release/mbenhard/untask?label=download&color=black" alt="Download latest release" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform: macOS" />
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+</p>
+
+<br/>
+
+<p align="center">
+  <img src="assets/readme/screenshot.jpg" width="720" alt="Untask screenshot" />
+</p>
+
+<br/>
+
+## What is Untask?
+
+Untask is a desktop task manager that runs entirely on your Mac. Everything — your tasks, notes, and conversations — is stored in a local SQLite database on your machine. Nothing leaves your computer unless you explicitly connect an AI provider.
+
+It's designed for people who want a fast, keyboard-friendly way to manage their tasks without subscribing to yet another cloud service.
+
+### Who is it for?
+
+- Anyone who wants a simple, fast task manager that isn't a web app
+- Developers and power users who prefer keyboard shortcuts over mouse clicks
+- People who care about data privacy and want local-first software
+- Anyone curious about AI assistants but who wants to stay in control (bring your own API key, or don't use AI at all)
 
 ## Features
 
-### Core — no AI required
+### Task Management
 
-- Task management with configurable status lanes
-- Drag-and-drop task reordering
-- Rich text notes (BlockNote editor)
-- Full-text search across tasks and notes
-- Task events audit trail with undo
-- Clipboard quick-add via global shortcut
-- Backup and restore
-- Keyboard shortcuts
-- Tray icon with today count
-- Dark mode (default) + light mode
+- **Configurable status lanes** — customize your workflow columns (e.g. Todo, In Progress, Done, or whatever you want)
+- **Drag-and-drop reordering** — organize tasks the way you think
+- **Due dates** — set deadlines with natural language ("tomorrow", "next friday")
+- **Priority levels** — color-coded indicators so urgent tasks stand out
+- **Clipboard quick-add** — global shortcut (`Ctrl+Space`) to capture a task from anywhere on your Mac
+- **Full-text search** — find anything across all your tasks and notes instantly
+- **Undo support** — every task change is logged, so you can reverse mistakes
+- **Backup & restore** — export your data anytime, import it back if needed
 
-### AI Assistant — opt-in, bring your own key
+### Notes
 
-- Multi-provider support (OpenRouter, OpenAI, Anthropic, Ollama)
-- Chat panel with multi-threaded conversations
-- AI task creation and modification via chat
-- Memory system (identity, profile, patterns)
-- Proactive reminders and nudges
-- Curated model list with capability badges
+- **Rich text editor** — powered by BlockNote with formatting, headings, lists, and more
+- **File attachments** — drag and drop images and files directly into notes
+- **Linked to tasks** — attach notes to specific tasks for context
 
----
+### AI Assistant (optional)
 
-## Download
+The AI assistant is completely opt-in. Untask works perfectly fine without it. If you do want to use it:
 
-Download the latest release from [GitHub Releases](https://github.com/mbenhard/untask/releases).
+- **Bring your own key** — supports OpenRouter, OpenAI, Anthropic, and Ollama (local models)
+- **Chat panel** — multi-threaded conversations in a sidebar
+- **Task-aware** — the AI can see your tasks and help you organize, prioritize, or break them down
+- **Memory system** — builds a profile of your preferences and work patterns over time (stored locally, fully editable)
+- **Proactive nudges** — optional reminders when deadlines approach or tasks pile up
 
-### macOS Gatekeeper
+### Design
 
-Because Untask is not notarized through the Mac App Store, macOS will block the first launch. To open it:
+- **Dark mode default** with light mode support
+- **Keyboard-first** — navigate everything without touching the mouse
+- **Tray app** — lives in your menu bar with a today-count badge
+- **Dock mode** — toggle between tray-only and regular dock app
+- **Minimal and fast** — no animations, no clutter, just your tasks
 
-1. Download the `.dmg` from GitHub Releases
-2. Open the DMG and drag Untask to your Applications folder
-3. On first launch, macOS will say: *"cannot be opened because the developer cannot be verified"*
-4. Open **System Settings → Privacy & Security** and click **Open Anyway**
-5. Alternatively, run this command in Terminal:
-   ```sh
-   xattr -cr /Applications/Untask.app
-   ```
+## Install
 
----
+### Homebrew (recommended)
+
+```sh
+brew install mbenhard/untask/untask
+```
+
+### Manual download
+
+1. Go to [Releases](https://github.com/mbenhard/untask/releases/latest)
+2. Download the `.zip` file
+3. Unzip and drag **Untask.app** to your Applications folder
+
+### macOS Gatekeeper notice
+
+Untask is not notarized through the Apple Developer Program, so macOS will block the first launch. This is normal for open-source apps distributed outside the Mac App Store.
+
+**To open it:**
+
+1. Try to open Untask — macOS will show a warning
+2. Go to **System Settings > Privacy & Security** and click **Open Anyway**
+
+Or run this in Terminal:
+
+```sh
+xattr -cr /Applications/Untask.app
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| App shell | Electron 40 |
+| UI | React 19 + TypeScript |
+| Styling | Tailwind CSS v4 + Radix UI |
+| Database | SQLite (better-sqlite3 + Drizzle ORM) |
+| Editor | BlockNote |
+| State | Zustand |
+| AI | Vercel AI SDK (multi-provider) |
+| Build | Electron Forge + Vite |
+| Package manager | pnpm |
 
 ## Development
 
-```bash
+### Prerequisites
+
+- **Node.js** 20+
+- **pnpm** 9+
+- macOS (Electron builds are macOS-only for now)
+
+### Getting started
+
+```sh
 git clone https://github.com/mbenhard/untask.git
 cd untask
 pnpm install
 pnpm start
 ```
 
----
+This will launch the app in development mode with hot reload.
 
-## Tech Stack
+### Common commands
 
-- **Electron + React + TypeScript** — desktop shell and UI
-- **SQLite** (better-sqlite3 + Drizzle ORM) — local database
-- **Vercel AI SDK** — multi-provider AI support
-- **Zustand** — state management
-- **Tailwind CSS** — styling
+```sh
+pnpm start           # Run the app in dev mode
+pnpm typecheck       # Type-check all TypeScript configs
+pnpm test            # Run tests (Vitest)
+pnpm package         # Build the app (unpackaged)
+pnpm make            # Build distributable .zip/.dmg
+```
 
----
+### Database migrations
+
+```sh
+npm run db:generate  # Generate SQL from schema changes
+npm run db:migrate   # Apply pending migrations
+```
+
+### Troubleshooting
+
+**Electron binary missing after install:**
+
+```sh
+node node_modules/electron/install.js
+npx electron-rebuild -f -w better-sqlite3
+```
+
+**Native module issues:**
+
+The `.npmrc` includes `node-linker=hoisted` and `symlink=false` — both are required for Electron Forge to correctly package native modules like `better-sqlite3`. Don't change these.
+
+## Project Structure
+
+```
+untask/
+├── src/
+│   ├── main/              # Electron main process
+│   │   ├── ai/            # AI providers, chat, memory, tools
+│   │   ├── db/            # SQLite schema + migrations
+│   │   ├── services/      # Task, notes, chat, settings services
+│   │   └── window/        # Window management, tray, dock mode
+│   ├── preload/           # IPC bridge (typed APIs)
+│   ├── renderer/          # React UI
+│   │   ├── components/    # All UI components
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── stores/        # Zustand state stores
+│   │   └── styles/        # Global CSS
+│   └── types/             # Shared TypeScript types
+├── drizzle/               # SQL migration files
+├── assets/                # App icons, tray icons
+└── docs/                  # Architecture, release docs
+```
+
+### Architecture
+
+- **Main process** owns the database, filesystem, tray, shortcuts, and all AI calls
+- **Preload** exposes minimal typed IPC channels — renderer never touches Node directly
+- **Renderer** is a standard React app that communicates via IPC
+- **IPC channels** are domain-organized: `task:*`, `chat:*`, `settings:*`, `note:*`
+- **All writes** are validated with Zod before hitting the database
+- **Task mutations** are logged to an audit trail for undo support
+
+## Data & Privacy
+
+- **All data is local.** Your database lives at `~/Library/Application Support/Untask/untask.db`
+- **No telemetry.** No analytics, no tracking, no phone-home
+- **No account required.** There's no sign-up, no cloud, no sync
+- **AI is opt-in.** If you connect an AI provider, your tasks/notes are sent to that provider's API for context — but nothing is stored on our end
+- **API keys are encrypted** via macOS Keychain when available, with a local fallback for unsigned builds
+- **Backups exclude API keys** — your secrets never end up in exported files
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
----
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release history.
 
 ## License
 
-MIT
+[MIT](./LICENSE)
