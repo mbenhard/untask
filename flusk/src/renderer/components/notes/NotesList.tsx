@@ -73,10 +73,10 @@ const NoteListItem = ({ note, selected, onClick, onHover }: NoteListItemProps) =
       onMouseEnter={() => onHover(note.id)}
       onFocus={() => onHover(note.id)}
       className={cn(
-        'group flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+        'group flex w-full items-center gap-2 border-b border-border/40 px-2 py-2 text-left transition-colors duration-100 last:border-b-0',
         selected
-          ? 'bg-accent/80'
-          : 'hover:bg-accent/60',
+          ? 'bg-accent/20'
+          : 'hover:bg-accent/10',
       )}
       aria-selected={selected}
     >
@@ -86,7 +86,7 @@ const NoteListItem = ({ note, selected, onClick, onHover }: NoteListItemProps) =
             {note.title}
           </span>
           {isArchived ? (
-            <span className="inline-flex items-center gap-0.5 rounded bg-accent px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
               <Sparkles size={8} />
               processed
             </span>
@@ -96,7 +96,7 @@ const NoteListItem = ({ note, selected, onClick, onHover }: NoteListItemProps) =
           {preview}
         </p>
       </div>
-      <span className="shrink-0 pt-0.5 text-[10px] text-muted-foreground">
+      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
         {formatRelativeTime(note.createdAt)}
       </span>
     </button>
@@ -180,7 +180,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
             </p>
           </div>
         ) : (
-          <div className="space-y-0.5">
+          <div>
             {activeNotes.map((note) => (
               <NoteListItem
                 key={note.id}
@@ -215,7 +215,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
             </button>
 
             {archiveExpanded ? (
-              <div className="mt-1 space-y-0.5 opacity-70">
+              <div className="mt-1 opacity-70">
                 {archivedNotes.map((note) => (
                   <NoteListItem
                     key={note.id}

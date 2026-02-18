@@ -31,7 +31,7 @@
 }
 
 /* ──────────────────────────────────────────────
-   Dark mode (Flusk default)
+   Dark mode (Untask default)
    ────────────────────────────────────────────── */
 .dark {
   --background: #161616;
@@ -182,112 +182,115 @@
   height: 0;
 }
 
+/* ──────────────────────────────────────────────
+   Override BlockNote's blue selection outline with monochrome
+   ────────────────────────────────────────────── */
+.bn-block-content.ProseMirror-selectednode > *,
+.ProseMirror-selectednode > .bn-block-content > * {
+  outline: 2px solid var(--ring) !important;
+  border-radius: 2px !important;
+}
+
 /* Notes view: keep editor surface flush with app background */
-.flusk-notes-editor .bn-container {
+.untask-notes-editor .bn-container {
   --bn-colors-editor-background: transparent;
   background-color: transparent;
   min-height: 100%;
 }
 
-.flusk-notes-editor .bn-editor,
-.flusk-notes-editor .bn-root,
-.flusk-notes-editor .bn-default-styles {
+.untask-notes-editor .bn-editor,
+.untask-notes-editor .bn-root,
+.untask-notes-editor .bn-default-styles {
   background-color: transparent !important;
 }
 
-.flusk-notes-editor .bn-editor {
+.untask-notes-editor .bn-editor {
   min-height: 100%;
   cursor: text;
 }
 
-/* Notes view: tone down oversized markdown headings */
-.flusk-notes-editor .bn-block-content[data-content-type="heading"] {
-  font-size: 1.3rem !important;
+/* Notes view: compact heading sizes (industrial, not document-editor) */
+.untask-notes-editor .bn-block-content[data-content-type="heading"] {
+  font-size: 1.1rem !important;
   font-weight: 600 !important;
-  line-height: 1.25 !important;
+  line-height: 1.3 !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
-  font-size: 1.15rem !important;
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+  font-size: 1.0rem !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
-  font-size: 1.05rem !important;
-}
-
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"] {
-  font-size: 1rem !important;
-}
-
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"] {
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
   font-size: 0.95rem !important;
 }
 
-.flusk-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
-  font-size: 0.9rem !important;
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"],
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"],
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
+  font-size: 0.875rem !important;
 }
 
-/* Keep side menu (+ / drag handle) vertically aligned with reduced heading sizes */
-.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
-  height: 42px !important;
+/* Compact side menu icons (+ / drag handle) */
+.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:not(.mantine-Menu-item) svg {
+  height: 16px !important;
+  width: 16px !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0.4;
 }
 
-.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
-  height: 36px !important;
+.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:hover svg {
+  opacity: 0.8;
 }
 
-.flusk-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
-  height: 32px !important;
+/* Side menu heights aligned to reduced heading sizes */
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
+  height: 34px !important;
+}
+
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
+  height: 30px !important;
+}
+
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
+  height: 28px !important;
 }
 
 /* BlockNote drag preview is rendered outside the notes container.
    Override heading sizing there too so dragged headings match editor scale. */
 .bn-drag-preview [data-content-type="heading"] {
-  --level: 1.3rem !important;
+  --level: 1.1rem !important;
 }
 
 .bn-drag-preview [data-content-type="heading"][data-level="2"] {
-  --level: 1.15rem !important;
+  --level: 1.0rem !important;
 }
 
 .bn-drag-preview [data-content-type="heading"][data-level="3"] {
-  --level: 1.05rem !important;
-}
-
-.bn-drag-preview [data-content-type="heading"][data-level="4"] {
-  --level: 1rem !important;
-}
-
-.bn-drag-preview [data-content-type="heading"][data-level="5"] {
   --level: 0.95rem !important;
 }
 
+.bn-drag-preview [data-content-type="heading"][data-level="4"],
+.bn-drag-preview [data-content-type="heading"][data-level="5"],
 .bn-drag-preview [data-content-type="heading"][data-level="6"] {
-  --level: 0.9rem !important;
+  --level: 0.875rem !important;
 }
 
 .bn-drag-preview [data-prev-level="1"] {
-  --prev-level: 1.3rem !important;
+  --prev-level: 1.1rem !important;
 }
 
 .bn-drag-preview [data-prev-level="2"] {
-  --prev-level: 1.15rem !important;
+  --prev-level: 1.0rem !important;
 }
 
 .bn-drag-preview [data-prev-level="3"] {
-  --prev-level: 1.05rem !important;
-}
-
-.bn-drag-preview [data-prev-level="4"] {
-  --prev-level: 1rem !important;
-}
-
-.bn-drag-preview [data-prev-level="5"] {
   --prev-level: 0.95rem !important;
 }
 
+.bn-drag-preview [data-prev-level="4"],
+.bn-drag-preview [data-prev-level="5"],
 .bn-drag-preview [data-prev-level="6"] {
-  --prev-level: 0.9rem !important;
+  --prev-level: 0.875rem !important;
 }
 
 .bn-drag-preview .bn-block-outer[data-prev-type="heading"] > .bn-block > .bn-block-content {
@@ -299,48 +302,48 @@
 /* ──────────────────────────────────────────────
    Task body editor: compact BlockNote variant
    ────────────────────────────────────────────── */
-.flusk-task-editor .bn-container {
+.untask-task-editor .bn-container {
   --bn-colors-editor-background: transparent;
   background-color: transparent;
 }
 
-.flusk-task-editor .bn-editor,
-.flusk-task-editor .bn-root,
-.flusk-task-editor .bn-default-styles {
+.untask-task-editor .bn-editor,
+.untask-task-editor .bn-root,
+.untask-task-editor .bn-default-styles {
   background-color: transparent !important;
 }
 
-.flusk-task-editor .bn-editor {
+.untask-task-editor .bn-editor {
   cursor: text;
   font-size: 13px;
   padding: 0;
 }
 
 /* Hide drag handles in compact task context */
-.flusk-task-editor .bn-side-menu {
+.untask-task-editor .bn-side-menu {
   display: none !important;
 }
 
 /* Compact heading sizes for task notes */
-.flusk-task-editor .bn-block-content[data-content-type="heading"] {
+.untask-task-editor .bn-block-content[data-content-type="heading"] {
   font-size: 1.05rem !important;
   font-weight: 600 !important;
   line-height: 1.3 !important;
 }
 
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
   font-size: 0.95rem !important;
 }
 
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="3"],
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="4"],
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="5"],
-.flusk-task-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="3"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="4"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="5"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
   font-size: 0.9rem !important;
 }
 
 /* Reduce block outer margins for compact layout */
-.flusk-task-editor .bn-block-outer {
+.untask-task-editor .bn-block-outer {
   margin: 0 !important;
 }
 
