@@ -8,4 +8,4 @@ script = ""
 [[actions]]
 name = "Run"
 icon = "run"
-command = "cd flusk && npm run start"
+command = "cd untask && npm run start"

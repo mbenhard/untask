@@ -1,7 +1,7 @@
-# Flusk Project Instructions for Coding Agents
+# Untask — Project Instructions for Coding Agents
 
 ## Mission
-Build Flusk as a personal AI assistant for Marcus, not just a chat UI. The assistant should feel like a durable extension of the user: same priorities, stable personality, strong memory, and proactive execution support.
+Build Untask as a personal AI assistant for Marcus, not just a chat UI. The assistant should feel like a durable extension of the user: same priorities, stable personality, strong memory, and proactive execution support.
 
 ## Product Principle: Assistant First
 Chat is a transport layer, not the product. Core value is:
@@ -13,7 +13,7 @@ Chat is a transport layer, not the product. Core value is:
 Any feature that improves chat UX but weakens these four goals is not acceptable.
 
 ## Source of Truth
-- Product requirements: `docs/plans/2026-02-15-flusk-design.md`
+- Product requirements: `docs/plans/2026-02-15-flusk-design.md` (historical filename)
 - Assistant identity docs: `docs/assistant/SOUL.md`, `docs/assistant/CHARTER.md`
 - Task plan and dependencies: `.taskmaster/tasks/tasks.json`
 - Complexity guidance: `.taskmaster/reports/task-complexity-report.json`
@@ -22,7 +22,7 @@ Any feature that improves chat UX but weakens these four goals is not acceptable
 If there is a conflict, prioritize in this order:
 1. User request
 2. Assistant identity docs (`docs/assistant/*`)
-3. Product plan (`docs/plans/2026-02-15-flusk-design.md`)
+3. Product plan (`docs/plans/2026-02-15-flusk-design.md` — historical filename)
 4. Task plan (`.taskmaster/tasks/tasks.json`)
 5. Other docs
 

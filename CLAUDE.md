@@ -97,16 +97,19 @@ git subtree push --prefix=untask untask main
 ```
 
 ### 3. Tag and release
+
+Local monorepo tags don't map to the subtree remote. Create tags on GitHub directly:
+
 ```bash
-# Bump version in untask/package.json, commit, subtree push, then:
-git push untask v0.x.x
+# After subtree push lands on main, create a draft release with tag:
+gh release create v0.x.x --repo mbenhard/untask --draft --target main --title "v0.x.x"
 ```
 
 This triggers the **Release workflow** (`.github/workflows/release.yml`):
 - Runs on `macos-latest`
 - `pnpm install` → `pnpm typecheck` → `pnpm test` → `pnpm make`
-- Uploads `.zip` artifact as a **draft** GitHub release
-- Publish the draft: `gh release edit v0.x.x --repo mbenhard/untask --draft=false`
+- Uploads `.zip` artifact to the draft release
+- Publish when ready: `gh release edit v0.x.x --repo mbenhard/untask --draft=false`
 
 ### 4. Update Homebrew cask
 ```bash
@@ -138,7 +141,7 @@ Tables: `tasks`, `notes`, `conversations`, `chat_messages`, `task_events`, `ai_j
 ## AI Assistant Design
 
 - **Identity**: personality defined in `docs/assistant/SOUL.md` and `docs/assistant/CHARTER.md`
-- **Providers**: supports OpenAI and Anthropic via Vercel AI SDK (see `src/main/ai/providers/`)
+- **Providers**: supports OpenAI and Anthropic via Vercel AI SDK (see `untask/src/main/ai/providers/`)
 - **Context injection**: full task/note context injected into system prompt (no RAG — data is small)
 - **Privacy**: chat messages stored locally in SQLite, never sent to external services beyond the LLM API
 - **Memory layers**: profile, patterns, journal — all editable and auditable
