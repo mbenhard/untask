@@ -12,12 +12,70 @@ import {
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
+import os from 'node:os';
+import Database from 'better-sqlite3';
 
 import { getDbPath, getRawDb } from '../db';
 
+// ─── API key patterns to strip from exports ──────────────────
+const API_KEY_SETTING_PATTERNS: readonly string[] = [
+  'ai_openrouter_key',
+  'ai_openai_key',
+  'ai_anthropic_key',
+  'api_key_migration_done',
+];
+
+// Matches any encrypted_ai_*_key pattern
+const ENCRYPTED_KEY_PREFIX = 'encrypted_ai_';
+const ENCRYPTED_KEY_SUFFIX = '_key';
+
+function isSensitiveSetting(key: string): boolean {
+  if (API_KEY_SETTING_PATTERNS.includes(key)) return true;
+  if (key.startsWith(ENCRYPTED_KEY_PREFIX) && key.endsWith(ENCRYPTED_KEY_SUFFIX)) return true;
+  return false;
+}
+
+/**
+ * Creates a sanitized copy of the SQLite database at `sourcePath` and writes
+ * it to `destPath`. All settings rows that match API key patterns are removed
+ * from the copy so they are never included in exports.
+ */
+async function writeSanitizedDbCopy(sourcePath: string, destPath: string): Promise<void> {
+  await copyFile(sourcePath, destPath);
+
+  const tempDb = new Database(destPath);
+  try {
+    // Check whether the settings table exists before touching it
+    const tableExists = tempDb
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
+      .get();
+
+    if (tableExists) {
+      const rows = tempDb.prepare('SELECT key FROM settings').all() as { key: string }[];
+      const keysToDelete = rows.map((r) => r.key).filter(isSensitiveSetting);
+
+      if (keysToDelete.length > 0) {
+        const deleteStmt = tempDb.prepare('DELETE FROM settings WHERE key = ?');
+        const deleteAll = tempDb.transaction(() => {
+          for (const key of keysToDelete) {
+            deleteStmt.run(key);
+          }
+        });
+        deleteAll();
+        // Compact the file so the deleted data is not recoverable in the copy
+        tempDb.pragma('wal_checkpoint(TRUNCATE)');
+        tempDb.exec('VACUUM');
+      }
+    }
+  } finally {
+    tempDb.close();
+  }
+}
+
 const BACKUP_DIR_NAME = 'backups';
 const MAX_BACKUPS = 30;
-const ENCRYPTED_MAGIC = Buffer.from('FLUSK_ENC_V1');
+const ENCRYPTED_MAGIC = Buffer.from('UNTASK_ENC_V1');
+const ENCRYPTED_MAGIC_LEGACY = Buffer.from('FLUSK_ENC_V1');
 const PBKDF2_ITERATIONS = 100_000;
 const KEY_LENGTH = 32; // AES-256
 const IV_LENGTH = 12; // GCM recommended
@@ -157,28 +215,57 @@ export async function exportBackup(
 
   checkpointDatabaseWal();
 
-  if (!passphrase || passphrase.length === 0) {
-    await copyFile(dbPath, destination);
-    return;
+  // Build a sanitized (API-key-free) temporary copy of the database
+  const tempPath = path.join(os.tmpdir(), `untask-export-${formatTimestamp()}.db`);
+  try {
+    await writeSanitizedDbCopy(dbPath, tempPath);
+
+    if (!passphrase || passphrase.length === 0) {
+      await copyFile(tempPath, destination);
+      return;
+    }
+
+    // Encrypted export: magic + salt + iv + authTag + ciphertext
+    const plaintext = await readFile(tempPath);
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const key = await deriveKey(passphrase, salt);
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+
+    const output = Buffer.concat([ENCRYPTED_MAGIC, salt, iv, authTag, encrypted]);
+    await writeFile(destination, output);
+  } finally {
+    // Always clean up the temp file regardless of success or failure
+    try {
+      await unlink(tempPath);
+    } catch {
+      // Best-effort cleanup
+    }
   }
-
-  // Encrypted export: magic + salt + iv + authTag + ciphertext
-  const plaintext = await readFile(dbPath);
-  const salt = crypto.randomBytes(SALT_LENGTH);
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const key = await deriveKey(passphrase, salt);
-
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  const output = Buffer.concat([ENCRYPTED_MAGIC, salt, iv, authTag, encrypted]);
-  await writeFile(destination, output);
 }
 
 function isEncryptedBackup(data: Buffer): boolean {
-  if (data.length < ENCRYPTED_MAGIC.length) return false;
-  return data.subarray(0, ENCRYPTED_MAGIC.length).equals(ENCRYPTED_MAGIC);
+  if (data.length >= ENCRYPTED_MAGIC.length &&
+      data.subarray(0, ENCRYPTED_MAGIC.length).equals(ENCRYPTED_MAGIC)) {
+    return true;
+  }
+  // Backward compatibility: accept old FLUSK_ENC_V1 magic
+  if (data.length >= ENCRYPTED_MAGIC_LEGACY.length &&
+      data.subarray(0, ENCRYPTED_MAGIC_LEGACY.length).equals(ENCRYPTED_MAGIC_LEGACY)) {
+    return true;
+  }
+  return false;
+}
+
+function getEncryptedMagicLength(data: Buffer): number {
+  if (data.length >= ENCRYPTED_MAGIC.length &&
+      data.subarray(0, ENCRYPTED_MAGIC.length).equals(ENCRYPTED_MAGIC)) {
+    return ENCRYPTED_MAGIC.length;
+  }
+  return ENCRYPTED_MAGIC_LEGACY.length;
 }
 
 export async function importBackup(
@@ -207,7 +294,7 @@ export async function importBackup(
       throw new Error('This backup is encrypted. Please provide a passphrase.');
     }
 
-    const offset = ENCRYPTED_MAGIC.length;
+    const offset = getEncryptedMagicLength(data);
     const salt = data.subarray(offset, offset + SALT_LENGTH);
     const iv = data.subarray(offset + SALT_LENGTH, offset + SALT_LENGTH + IV_LENGTH);
     const authTag = data.subarray(
@@ -230,6 +317,47 @@ export async function importBackup(
   } else {
     assertValidSqliteDatabase(data);
     await writeFile(dbPath, data);
+  }
+
+  // Defensive cleanup: remove any API keys that may have been present in the
+  // backup file (e.g. older backups created before this guard was added).
+  // Encrypted keys from one machine cannot be decrypted on another anyway, but
+  // we remove them to avoid confusion and to keep the live DB clean.
+  stripApiKeysFromRestoredDb(dbPath);
+  // eslint-disable-next-line no-console
+  console.info(
+    '[backup] API keys are not included in backups. Please re-enter your API key in Settings.',
+  );
+}
+
+/**
+ * Opens the database at `dbPath` directly (not through the app connection) and
+ * deletes any settings rows whose keys match API key patterns. Used as a
+ * defensive post-restore cleanup.
+ */
+function stripApiKeysFromRestoredDb(dbPath: string): void {
+  const db = new Database(dbPath);
+  try {
+    const tableExists = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'")
+      .get();
+
+    if (!tableExists) return;
+
+    const rows = db.prepare('SELECT key FROM settings').all() as { key: string }[];
+    const keysToDelete = rows.map((r) => r.key).filter(isSensitiveSetting);
+
+    if (keysToDelete.length > 0) {
+      const deleteStmt = db.prepare('DELETE FROM settings WHERE key = ?');
+      const deleteAll = db.transaction(() => {
+        for (const key of keysToDelete) {
+          deleteStmt.run(key);
+        }
+      });
+      deleteAll();
+    }
+  } finally {
+    db.close();
   }
 }
 

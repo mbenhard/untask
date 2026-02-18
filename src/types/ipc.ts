@@ -113,6 +113,14 @@ export const IPC_CHANNELS = {
   API_KEYS_SET: 'api-keys:set',
   API_KEYS_DELETE: 'api-keys:delete',
   API_KEYS_VALIDATE: 'api-keys:validate',
+  // ─── Onboarding channels ──────────────────────────────────
+  SETTINGS_GET_BOOTSTRAP_COMPLETED: 'settings:get-bootstrap-completed',
+  SETTINGS_MARK_BOOTSTRAP_COMPLETED: 'settings:mark-bootstrap-completed',
+  SETTINGS_SET_USER_NAME: 'settings:set-user-name',
+  SETTINGS_SET_IDENTITY: 'settings:set-identity',
+  // ─── Update checker channels ──────────────────────────────
+  APP_CHECK_FOR_UPDATES: 'app:check-for-updates',
+  APP_GET_UPDATE_INFO: 'app:get-update-info',
   SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
@@ -128,7 +136,7 @@ export const IPC_CHANNELS = {
 } as const;
 
 export type SettingsBootstrapState = {
-  status: 'ready';
+  status: 'loading' | 'onboarding' | 'ready';
 };
 
 export type IdentityContextSnapshotRequest = IdentityContextCompileRequest;
@@ -362,6 +370,16 @@ export type ApiKeysValidateRequest = {
 export type ApiKeysValidateResult = {
   valid: boolean;
   error?: string;
+};
+
+// ─── Update checker payloads ──────────────────────────────
+
+export type UpdateInfo = {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseUrl: string;
+  releaseNotes?: string;
 };
 
 // ─── Attachment payloads ──────────────────────────────────

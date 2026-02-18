@@ -471,7 +471,7 @@ const listNotesTool = {
   execute: async () => {
     const { active, archived } = listNotes();
 
-    const formatNote = (note: { id: string; title: string; updatedAt: string }) => ({
+    const formatNote = (note: { id: string; title: string; updatedAt: string | null }) => ({
       id: note.id,
       title: note.title,
       updatedAt: note.updatedAt,

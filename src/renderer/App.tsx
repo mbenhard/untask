@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { AppShell } from './components/layout/AppShell';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 
 type AppErrorBoundaryState = {
   error: Error | null;
@@ -41,9 +42,48 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
+type BootstrapStatus = 'loading' | 'onboarding' | 'ready';
+
+const AppRoot = () => {
+  const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('loading');
+
+  useEffect(() => {
+    const untask = window.untask;
+    if (!untask) {
+      // In dev/test without preload, skip onboarding
+      setBootstrapStatus('ready');
+      return;
+    }
+
+    untask.settings
+      .getBootstrapCompleted()
+      .then((result) => {
+        setBootstrapStatus(result.completed ? 'ready' : 'onboarding');
+      })
+      .catch(() => {
+        // On error, skip onboarding to avoid blocking the app
+        setBootstrapStatus('ready');
+      });
+  }, []);
+
+  if (bootstrapStatus === 'loading') {
+    return null;
+  }
+
+  if (bootstrapStatus === 'onboarding') {
+    return (
+      <OnboardingFlow
+        onComplete={() => setBootstrapStatus('ready')}
+      />
+    );
+  }
+
+  return <AppShell />;
+};
+
 const App = () => (
   <AppErrorBoundary>
-    <AppShell />
+    <AppRoot />
   </AppErrorBoundary>
 );
 

@@ -151,7 +151,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     if (!isLoading && activeNoteId && editorRef.current) {
       // Small delay to let BlockNote finish hydration
       const timer = setTimeout(() => {
-        editorRef.current?.focus('end');
+        editorRef.current?.focus();
       }, 50);
       return () => clearTimeout(timer);
     }

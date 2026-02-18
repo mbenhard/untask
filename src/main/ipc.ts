@@ -68,6 +68,7 @@ import {
   type AttachmentSaveRequest,
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
+  type UpdateInfo,
 } from '../types/ipc';
 import type { MemoryLayer } from '../types/assistant';
 import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
@@ -118,8 +119,17 @@ import {
   listBackups,
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
-import { getSetting, setSetting, getAllSettings } from './services/settingsService';
+import { getSetting, setSetting, getAllSettings, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
 import { SETTING_KEY_AI_ENABLED } from './defaultSettings';
+import {
+  storeApiKey,
+  hasApiKey,
+  deleteApiKey as deleteStoredApiKey,
+} from './services/keyStorage';
+import {
+  checkForUpdates as runUpdateCheck,
+  getUpdateInfo as getCachedUpdateInfo,
+} from './services/updateChecker';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 
 import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
@@ -324,7 +334,7 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_STATE,
     (): SettingsBootstrapState => ({
-      status: 'ready',
+      status: isBootstrapCompleted() ? 'ready' : 'onboarding',
     }),
   );
 
@@ -1098,12 +1108,12 @@ export const registerIpcHandlers = (): void => {
       catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
     },
   );
+  // ─── Secure API key handlers ─────────────────────────────
   ipcMain.handle(
     IPC_CHANNELS.API_KEYS_HAS,
     (_event, request: ApiKeysHasRequest): ApiKeysHasResult => {
       try {
-        const key = getSetting(`api_key_${request.provider}`);
-        return { hasKey: typeof key === 'string' && key.length > 0 };
+        return { hasKey: hasApiKey(request.provider) };
       }
       catch (e) { console.error('[ipc] API_KEYS_HAS:', e); throw e; }
     },
@@ -1112,7 +1122,7 @@ export const registerIpcHandlers = (): void => {
     IPC_CHANNELS.API_KEYS_SET,
     (_event, request: ApiKeysSetRequest): void => {
       try {
-        setSetting(`api_key_${request.provider}`, request.key);
+        storeApiKey(request.provider, request.key);
       }
       catch (e) { console.error('[ipc] API_KEYS_SET:', e); throw e; }
     },
@@ -1121,7 +1131,7 @@ export const registerIpcHandlers = (): void => {
     IPC_CHANNELS.API_KEYS_DELETE,
     (_event, request: ApiKeysDeleteRequest): void => {
       try {
-        setSetting(`api_key_${request.provider}`, '');
+        deleteStoredApiKey(request.provider);
       }
       catch (e) { console.error('[ipc] API_KEYS_DELETE:', e); throw e; }
     },
@@ -1133,6 +1143,58 @@ export const registerIpcHandlers = (): void => {
         return { valid: true };
       }
       catch (e) { console.error('[ipc] API_KEYS_VALIDATE:', e); throw e; }
+    },
+  );
+
+  // ─── Onboarding handlers ─────────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_COMPLETED,
+    (): { completed: boolean } => {
+      try { return { completed: isBootstrapCompleted() }; }
+      catch (e) { console.error('[ipc] SETTINGS_GET_BOOTSTRAP_COMPLETED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_MARK_BOOTSTRAP_COMPLETED,
+    (): void => {
+      try { markBootstrapCompleted(); }
+      catch (e) { console.error('[ipc] SETTINGS_MARK_BOOTSTRAP_COMPLETED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_USER_NAME,
+    (_event, nameInput: unknown): void => {
+      try {
+        const name = z.string().min(1).max(120).parse(nameInput);
+        setSetting('user.name', name.trim());
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_USER_NAME:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_IDENTITY,
+    (_event, identityInput: unknown): void => {
+      try {
+        const identity = z.string().min(1).max(4000).parse(identityInput);
+        setIdentity(identity.trim(), 'user');
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_IDENTITY:', e); throw e; }
+    },
+  );
+
+  // ─── Update checker handlers ──────────────────────────────
+  ipcMain.handle(
+    IPC_CHANNELS.APP_CHECK_FOR_UPDATES,
+    async (): Promise<UpdateInfo> => {
+      try { return await runUpdateCheck(); }
+      catch (e) { console.error('[ipc] APP_CHECK_FOR_UPDATES:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_UPDATE_INFO,
+    (): UpdateInfo | null => {
+      try { return getCachedUpdateInfo(); }
+      catch (e) { console.error('[ipc] APP_GET_UPDATE_INFO:', e); throw e; }
     },
   );
   ipcMain.handle(

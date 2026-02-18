@@ -13,9 +13,9 @@ vi.mock('./models', () => ({
   getSelectedModelId: vi.fn(() => 'moonshotai/kimi-k2.5'),
 }));
 
-vi.mock('./openrouter', () => ({
-  createOpenRouterProviderFromEnv: vi.fn(() => ({
-    chat: vi.fn(() => ({ id: 'mock-model' })),
+vi.mock('./providers', () => ({
+  getActiveProvider: vi.fn(() => ({
+    languageModel: vi.fn(() => ({ id: 'mock-model' })),
   })),
 }));
 

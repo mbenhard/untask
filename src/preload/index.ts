@@ -66,6 +66,7 @@ import {
   type SettingsSetAiEnabledResult,
   type ApiKeysHasResult,
   type ApiKeysValidateResult,
+  type UpdateInfo,
   type AttachmentSaveRequest,
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
@@ -129,6 +130,10 @@ const untaskApi: UntaskApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_NEW_NOTE, wrapped);
       };
     },
+    checkForUpdates: (): Promise<UpdateInfo> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_CHECK_FOR_UPDATES),
+    getUpdateInfo: (): Promise<UpdateInfo | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_UPDATE_INFO),
   },
 
   getBootstrapState: (): Promise<SettingsBootstrapState> =>
@@ -320,6 +325,14 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_AI_ENABLED),
     setAiEnabled: (enabled: boolean): Promise<SettingsSetAiEnabledResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_AI_ENABLED, { enabled }),
+    getBootstrapCompleted: (): Promise<{ completed: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_COMPLETED),
+    markBootstrapCompleted: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_MARK_BOOTSTRAP_COMPLETED),
+    setUserName: (name: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_USER_NAME, name),
+    setIdentity: (identity: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_IDENTITY, identity),
   },
   apiKeys: {
     has: (provider: string): Promise<ApiKeysHasResult> =>

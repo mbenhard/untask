@@ -17,7 +17,9 @@ import {
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
-import { getSetting } from './services/settingsService';
+import { getSetting, isAiEnabled } from './services/settingsService';
+import { migrateApiKeysToSafeStorage } from './services/keyStorage';
+import { startUpdateChecker, stopUpdateChecker } from './services/updateChecker';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
@@ -110,6 +112,9 @@ const bootstrap = (): void => {
   clearStaleTodayFlags();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
+  // Migrate any plaintext API keys to encrypted safeStorage.
+  // Must run after the DB is initialised and before IPC handlers start.
+  migrateApiKeysToSafeStorage();
   initSearchFts();
   initChatSearchFts();
   registerIpcHandlers();
@@ -122,7 +127,7 @@ const bootstrap = (): void => {
 };
 
 const emitIdentityContextDebugSnapshot = (): void => {
-  if (process.env.FLUSK_DEBUG_IDENTITY_CONTEXT !== '1') {
+  if (process.env.UNTASK_DEBUG_IDENTITY_CONTEXT !== '1') {
     return;
   }
 
@@ -194,19 +199,23 @@ app.whenReady().then(() => {
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
+  startUpdateChecker();
   summonWindow();
 
 
-  // Initialize the proactive loop with chat pipeline dependency
-  initProactiveLoop({
-    startProactiveTurn: async (input) => {
-      await startProactiveTurn({
-        triggerMessage: input.triggerMessage,
-        triggerType: input.triggerType,
-        emit: input.emit,
-      });
-    },
-  });
+  // Initialize the proactive loop with chat pipeline dependency.
+  // Only start when AI is enabled.
+  if (isAiEnabled()) {
+    initProactiveLoop({
+      startProactiveTurn: async (input) => {
+        await startProactiveTurn({
+          triggerMessage: input.triggerMessage,
+          triggerType: input.triggerType,
+          emit: input.emit,
+        });
+      },
+    });
+  }
 
   const handleAppActivation = (): void => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -227,6 +236,7 @@ app.whenReady().then(() => {
 app.on('will-quit', () => {
   stopProactiveLoop();
   stopDailyBackupScheduler();
+  stopUpdateChecker();
   unregisterGlobalShortcuts();
   destroyTray();
   closeDatabase();

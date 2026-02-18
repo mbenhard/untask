@@ -63,6 +63,7 @@ import type {
   SettingsSetAiEnabledResult,
   ApiKeysHasResult,
   ApiKeysValidateResult,
+  UpdateInfo,
   AttachmentSaveRequest,
   AttachmentIdRequest,
   AttachmentPickAndSaveResult,
@@ -85,6 +86,8 @@ export type UntaskApi = {
     setDockMode: (mode: DockMode) => Promise<DockModeResult>;
     onMenuNewTask: (listener: () => void) => () => void;
     onMenuNewNote: (listener: () => void) => () => void;
+    checkForUpdates: () => Promise<UpdateInfo>;
+    getUpdateInfo: () => Promise<UpdateInfo | null>;
   };
 
   // ─── Existing kernel APIs ───────────────────────────────
@@ -185,6 +188,10 @@ export type UntaskApi = {
     readJournal: (payload?: SettingsReadJournalRequestPayload) => Promise<SettingsReadJournalResultPayload>;
     getAiEnabled: () => Promise<SettingsGetAiEnabledResult>;
     setAiEnabled: (enabled: boolean) => Promise<SettingsSetAiEnabledResult>;
+    getBootstrapCompleted: () => Promise<{ completed: boolean }>;
+    markBootstrapCompleted: () => Promise<void>;
+    setUserName: (name: string) => Promise<void>;
+    setIdentity: (identity: string) => Promise<void>;
   };
   apiKeys: {
     has: (provider: string) => Promise<ApiKeysHasResult>;

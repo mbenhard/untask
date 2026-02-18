@@ -26,7 +26,7 @@ import {
 } from '../services/chatService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { scheduleKnowledgeExtraction } from './knowledgeExtractor';
-import { createOpenRouterProviderFromEnv } from './openrouter';
+import { getActiveProvider } from './providers';
 import type { ChatModelId } from './models';
 import { getSelectedModelId, getModelWebSearchConfig, modelSupportsVision, resolveModelId } from './models';
 import { buildSystemPrompt } from './systemPrompt';
@@ -525,8 +525,8 @@ const maybeAutoTitleConversation = async (input: {
   let resolvedTitle = fallback;
 
   try {
-    const provider = createOpenRouterProviderFromEnv();
-    const model = provider.chat(AUTO_TITLE_MODEL_ID);
+    const provider = getActiveProvider();
+    const model = provider.languageModel(AUTO_TITLE_MODEL_ID);
     const titlePrompt = [
       'Generate a concise chat thread title.',
       'Rules:',
@@ -670,8 +670,8 @@ const runAssistantStream = async (
           throw new Error('Failed to build chat system prompt.');
         }
 
-        const provider = createOpenRouterProviderFromEnv();
-        const model = provider.chat(input.modelId);
+        const provider = getActiveProvider();
+        const model = provider.languageModel(input.modelId);
         const webSearchConfig = getModelWebSearchConfig(input.modelId);
         const noteContextPrompt =
           input.noteContext &&
@@ -818,10 +818,13 @@ const runAssistantStream = async (
             }, input.allowedTools);
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
-            if (webSearchConfig.supportsWebSearch && webSearchConfig.webSearchMethod) {
-              (sdkTools as Record<string, unknown>).web_search = provider.tools.webSearch({
-                searchContextSize: 'medium',
-              });
+            if (webSearchConfig.supportsWebSearch && webSearchConfig.webSearchMethod && provider.tools) {
+              const webSearch = provider.tools.webSearch as ((config: { searchContextSize: string }) => unknown) | undefined;
+              if (webSearch) {
+                (sdkTools as Record<string, unknown>).web_search = webSearch({
+                  searchContextSize: 'medium',
+                });
+              }
             }
 
             return sdkTools;

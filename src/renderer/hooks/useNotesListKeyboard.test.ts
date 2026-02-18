@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { type KeyboardEvent, type RefObject, createElement } from 'react';
+import { type RefObject, createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,16 +37,16 @@ const HookHarness = ({
 describe('useNotesListKeyboard', () => {
   let container: HTMLDivElement;
   let root: Root;
-  let onSelectRelative: ReturnType<typeof vi.fn>;
-  let onOpenSelected: ReturnType<typeof vi.fn>;
+  let onSelectRelative: ReturnType<typeof vi.fn<(delta: 1 | -1) => void>>;
+  let onOpenSelected: ReturnType<typeof vi.fn<() => void>>;
   let containerRef: RefObject<HTMLDivElement | null>;
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    onSelectRelative = vi.fn();
-    onOpenSelected = vi.fn();
+    onSelectRelative = vi.fn<(delta: 1 | -1) => void>();
+    onOpenSelected = vi.fn<() => void>();
     containerRef = { current: null };
   });
 
