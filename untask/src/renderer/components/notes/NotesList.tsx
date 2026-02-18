@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-import { Archive, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react';
 
 import type { Note } from '../../../types/models';
 import { useNotesListKeyboard } from '../../hooks/useNotesListKeyboard';
@@ -61,10 +61,11 @@ type NoteListItemProps = {
   selected: boolean;
   onClick: (id: string) => void;
   onHover: (id: string) => void;
+  onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
 };
 
-const NoteListItem = ({ note, selected, onClick, onHover, onDelete }: NoteListItemProps) => {
+const NoteListItem = ({ note, selected, onClick, onHover, onRestore, onDelete }: NoteListItemProps) => {
   const preview = getPreview(note.content);
   const isArchived = note.status === 'archived';
 
@@ -98,6 +99,26 @@ const NoteListItem = ({ note, selected, onClick, onHover, onDelete }: NoteListIt
           {preview}
         </p>
       </div>
+      {onRestore ? (
+        <span
+          role="button"
+          tabIndex={0}
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRestore(note.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              onRestore(note.id);
+            }
+          }}
+          aria-label="Restore note"
+        >
+          <ArchiveRestore size={12} />
+        </span>
+      ) : null}
       {onDelete ? (
         <span
           role="button"
@@ -137,6 +158,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
 
   const createNote = useNotesStore((s) => s.createNote);
   const openNote = useNotesStore((s) => s.openNote);
+  const restoreNote = useNotesStore((s) => s.restoreNote);
   const deleteNote = useNotesStore((s) => s.deleteNote);
   const setSelectedListNoteId = useNotesStore((s) => s.setSelectedListNoteId);
 
@@ -186,6 +208,13 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
       setSelectedListNoteId(id);
     },
     [setSelectedListNoteId],
+  );
+
+  const handleRestore = useCallback(
+    (id: string) => {
+      void restoreNote(id);
+    },
+    [restoreNote],
   );
 
   const handleDelete = useCallback(
@@ -279,6 +308,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                     selected={false}
                     onClick={handleOpen}
                     onHover={handleHover}
+                    onRestore={handleRestore}
                     onDelete={handleDelete}
                   />
                 ))}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Calendar as CalendarIcon, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 import type { ReminderOffset } from '../../stores/taskStore';
@@ -47,13 +47,13 @@ const TimeInput = ({
   onChange,
   onDone,
   inputRef,
-  autoFocus = false,
+  disabled = false,
 }: {
   value: string | null;
   onChange: (time: string | null) => void;
   onDone?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
-  autoFocus?: boolean;
+  disabled?: boolean;
 }) => {
   const [draft, setDraft] = useState(value ?? '');
   const localInputRef = useRef<HTMLInputElement>(null);
@@ -151,34 +151,37 @@ const TimeInput = ({
   };
 
   return (
-    <div className="flex items-center justify-center gap-1.5">
-      <span className="font-mono text-[10px] text-muted-foreground">Time</span>
-      <input
-        ref={resolvedInputRef}
-        autoFocus={autoFocus}
-        type="text"
-        value={draft}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onBlur={() => commit(draft)}
-        onClick={(e) => e.stopPropagation()}
-        placeholder="HH:MM"
-        className="w-14 rounded border border-border/60 bg-transparent px-1.5 py-0.5 text-center font-mono text-[11px] text-foreground outline-none focus:border-ring"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onChange(null);
-            setDraft('');
-          }}
-          className="inline-flex size-4 items-center justify-center text-muted-foreground hover:text-foreground"
-          aria-label="Clear time"
-        >
-          <X className="size-3" />
-        </button>
-      )}
+    <div className={cn('flex items-center gap-2', disabled && 'pointer-events-none opacity-40')}>
+      <Clock className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="text-xs text-muted-foreground">Time</span>
+      <div className="ml-auto flex items-center gap-1.5">
+        <input
+          ref={resolvedInputRef}
+          type="text"
+          value={draft}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onBlur={() => commit(draft)}
+          onClick={(e) => e.stopPropagation()}
+          placeholder="HH:MM"
+          disabled={disabled}
+          className="w-16 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-center font-mono text-xs text-foreground outline-none transition-colors focus:border-ring focus:bg-muted/60"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange(null);
+              setDraft('');
+            }}
+            className="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Clear time"
+          >
+            <X className="size-3" />
+          </button>
+        )}
+      </div>
     </div>
   );
 };
@@ -194,7 +197,7 @@ export const TaskDueDatePicker = ({
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
   const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
-  const timeInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
   const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
 
   const today = useMemo(() => {
@@ -210,18 +213,19 @@ export const TaskDueDatePicker = ({
         ? META_TRIGGER_BASE
         : SEGMENT_TRIGGER_BASE,
     variant !== 'segment' &&
-      (dueDate
-        ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
-        : 'border-dashed border-border text-muted-foreground hover:text-foreground'),
+    (dueDate
+      ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
+      : 'border-dashed border-border text-muted-foreground hover:text-foreground'),
     variant === 'segment' && !dueDate && 'text-muted-foreground/50',
     variant === 'meta' && dueDate && 'bg-transparent',
   );
 
   const handleDateSelect = useCallback(
     (date: Date | undefined) => {
-      if (!date) return; // Prevent accidental clear on re-click
+      if (!date) return;
       const nextValue = toISODateTime(date, currentTime);
       void onChange(nextValue);
+      // Keep popover open so user can optionally set a time
     },
     [currentTime, onChange],
   );
@@ -237,11 +241,12 @@ export const TaskDueDatePicker = ({
 
   const handleTimeChange = useCallback(
     (time: string | null) => {
-      if (!selected) return;
-      const nextValue = toISODateTime(selected, time);
+      // If no date is selected yet, default to today
+      const baseDate = selected ?? today;
+      const nextValue = toISODateTime(baseDate, time);
       void onChange(nextValue);
     },
-    [onChange, selected],
+    [onChange, selected, today],
   );
 
   const handleTimeDone = useCallback(() => {
@@ -271,19 +276,19 @@ export const TaskDueDatePicker = ({
       </Popover.Trigger>
 
       <PopoverContent
-        className="w-auto p-0"
+        className="w-64 p-0"
         align="start"
         onKeyDown={(event) => event.stopPropagation()}
       >
         {/* Quick presets */}
-        <div className="flex gap-1 border-b border-border px-3 py-2">
+        <div className="flex gap-1.5 border-b border-border px-3 py-2.5">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               handlePresetClick(new Date());
             }}
-            className="rounded border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex-1 rounded-md border border-border/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground"
           >
             Today
           </button>
@@ -295,7 +300,7 @@ export const TaskDueDatePicker = ({
               tomorrow.setDate(tomorrow.getDate() + 1);
               handlePresetClick(tomorrow);
             }}
-            className="rounded border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex-1 rounded-md border border-border/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground"
           >
             Tomorrow
           </button>
@@ -305,42 +310,49 @@ export const TaskDueDatePicker = ({
               e.stopPropagation();
               handlePresetClick(getNextMonday());
             }}
-            className="rounded border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex-1 rounded-md border border-border/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground"
           >
-            Next Week
+            Next Mon
           </button>
         </div>
 
+        {/* Calendar */}
         <Calendar
           mode="single"
           required={!!selected}
           selected={selected}
           defaultMonth={selected}
           disabled={{ before: today }}
-          className="p-2 [--cell-size:1.5rem]"
+          className="w-full p-2"
           onSelect={handleDateSelect}
         />
 
-        {selected ? (
-          <div className="border-t border-border px-3 py-2">
-            <TimeInput
-              value={currentTime}
-              onChange={handleTimeChange}
-              onDone={handleTimeDone}
-              inputRef={timeInputRef}
-            />
-          </div>
-        ) : null}
+        {/* Time input — always visible, disabled when no date */}
+        <div className="border-t border-border px-3 py-2.5">
+          <TimeInput
+            value={currentTime}
+            onChange={handleTimeChange}
+            onDone={handleTimeDone}
+            inputRef={timeInputRef}
+            disabled={false}
+          />
+        </div>
 
-        {/* Reminder offset selector */}
-        {dueDate && onReminderOffsetChange ? (
-          <div className="flex items-center gap-2 border-t border-border px-3 py-2">
-            <span className="font-mono text-[10px] text-muted-foreground">Remind me</span>
+        {/* Reminder offset selector — visible only when handler provided */}
+        {onReminderOffsetChange ? (
+          <div
+            className={cn(
+              'flex items-center gap-2 border-t border-border px-3 py-2.5',
+              !dueDate && 'pointer-events-none opacity-40',
+            )}
+          >
+            <span className="text-xs text-muted-foreground">Remind me</span>
             <select
               value={reminderOffset ?? 'at_due'}
               onChange={handleReminderOffsetChange}
               onClick={(e) => e.stopPropagation()}
-              className="rounded border border-border/60 bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-foreground outline-none focus:border-ring"
+              disabled={!dueDate}
+              className="ml-auto rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs text-foreground outline-none transition-colors focus:border-ring"
             >
               {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
                 <option key={key} value={key}>
@@ -351,22 +363,25 @@ export const TaskDueDatePicker = ({
           </div>
         ) : null}
 
-        {dueDate ? (
-          <div className="border-t border-border px-2 py-2">
-            <Button
-              variant="ghost"
-              size="xs"
-              className="w-full text-muted-foreground"
-              onClick={(event) => {
-                event.stopPropagation();
-                void onChange(null);
-                setOpen(false);
-              }}
-            >
-              Clear due date
-            </Button>
-          </div>
-        ) : null}
+        {/* Clear button — always visible, disabled when no date */}
+        <div className="border-t border-border px-3 py-2">
+          <Button
+            variant="ghost"
+            size="xs"
+            className={cn(
+              'w-full text-muted-foreground',
+              !dueDate && 'pointer-events-none opacity-40',
+            )}
+            disabled={!dueDate}
+            onClick={(event) => {
+              event.stopPropagation();
+              void onChange(null);
+              setOpen(false);
+            }}
+          >
+            Clear due date
+          </Button>
+        </div>
       </PopoverContent>
     </Popover.Root>
   );

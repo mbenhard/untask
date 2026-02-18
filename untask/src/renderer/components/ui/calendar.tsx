@@ -43,8 +43,8 @@ function Calendar({
       }}
       classNames={{
         ...defaultClassNames,
-        months: "flex flex-col gap-2 sm:flex-row sm:gap-2",
-        month: "grid grid-cols-[auto_1fr_auto] items-center gap-y-1.5",
+        months: "flex w-full flex-col gap-2 sm:flex-row sm:gap-2",
+        month: "grid w-full grid-cols-[auto_1fr_auto] items-center gap-y-1.5",
         month_caption:
           "col-start-2 flex w-full items-center justify-center",
         caption_label: "font-mono text-[11px] font-medium text-muted-foreground",
@@ -58,11 +58,11 @@ function Calendar({
           "col-start-3 justify-self-end size-6 p-0 text-muted-foreground opacity-70 hover:opacity-100 hover:bg-accent/50"
         ),
         month_grid: "col-span-3 w-full border-collapse",
-        weekdays: "flex",
-        weekday: "text-muted-foreground/60 w-[var(--cell-size)] text-center font-mono text-[9px] font-medium uppercase",
+        weekdays: "flex w-full",
+        weekday: "text-muted-foreground/60 flex-1 text-center font-mono text-[9px] font-medium uppercase",
         week: "mt-px flex w-full",
         day: cn(
-          "relative h-[var(--cell-size)] w-[var(--cell-size)] p-0 text-center focus-within:relative focus-within:z-20",
+          "relative flex-1 p-0 text-center focus-within:relative focus-within:z-20",
           "[&:has([aria-selected])]:bg-accent/60",
           "[&:has([aria-selected].day-outside)]:bg-accent/30",
           "[&:has([aria-selected])]:rounded-sm"
@@ -120,9 +120,9 @@ function CalendarDayButton({
       data-day={day.date.toLocaleDateString(locale?.code)}
       data-selected-single={
         modifiers.selected &&
-        !modifiers.range_start &&
-        !modifiers.range_middle &&
-        !modifiers.range_end
+          !modifiers.range_start &&
+          !modifiers.range_middle &&
+          !modifiers.range_end
           ? true
           : undefined
       }
