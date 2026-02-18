@@ -1,0 +1,257 @@
+---
+// TaskDetailPreview — 1:1 CSS recreation of task detail view
+// References: TaskItem.tsx, TaskBody.tsx MetadataLine, SectionGroup.tsx
+---
+
+<section class="px-6 py-24 sm:py-32">
+  <div class="mx-auto max-w-2xl">
+
+    <!-- Section label -->
+    <div class="mb-10 flex flex-col items-center text-center">
+      <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        Task Detail
+      </h2>
+      <p class="mt-3 max-w-sm text-[15px] text-muted-foreground/70">
+        Due dates, priorities, recurrence, subtasks — all inline.
+      </p>
+    </div>
+
+    <!-- Window frame -->
+    <div class="overflow-hidden rounded-xl border border-border/70 bg-background shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
+
+      <!-- ═══ TitleBar ═══ -->
+      <header class="flex items-center px-[10px] pt-[4px] pb-1">
+        <div class="traffic-lights flex w-[68px] shrink-0 items-center gap-[6px]">
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FF5F57]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#28C840]/80"></span>
+        </div>
+        <div class="flex-1"></div>
+        <nav class="flex items-center gap-0.5">
+          <span class="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-foreground">Today</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Tasks</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Inbox</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Notes</span>
+        </nav>
+      </header>
+
+      <!-- ═══ Content area ═══ -->
+      <div class="p-3">
+        <div class="mx-auto flex max-w-3xl flex-col gap-3">
+
+          <!-- SectionGroup: Today -->
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 rotate-90 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">Today</span>
+                <span class="ml-auto font-mono text-[11px] text-muted-foreground">3</span>
+              </div>
+              <span class="ml-1.5 inline-flex size-5 items-center justify-center text-muted-foreground/40">
+                <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+              </span>
+            </div>
+
+            <div class="border-t border-border/60 px-1 py-1">
+
+              <!-- ═══ Task 1: Completed ═══ -->
+              <div class="overflow-hidden border-b border-border/40">
+                <div class="flex min-h-10 items-center gap-2 px-1.5">
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-flex size-6 items-center justify-center">
+                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-solid bg-foreground" style="border-color: var(--foreground);">
+                        <svg class="size-2.5 text-background" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      </span>
+                    </span>
+                    <span class="size-[5px] rounded-full bg-foreground/15"></span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-[13px] text-muted-foreground line-through">Ship landing page</p>
+                  </div>
+                  <div class="ml-auto flex items-center gap-1">
+                    <span class="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">Feb 18</span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" />
+                        <circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ Task 2: Expanded with subtasks ═══ -->
+              <div class="overflow-hidden border-b border-border/40 bg-accent/40">
+                <!-- Row bar -->
+                <div class="flex min-h-10 items-center gap-2 px-1.5">
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-flex size-6 items-center justify-center">
+                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                        <svg class="size-2.5 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      </span>
+                    </span>
+                    <span class="size-[5px] rounded-full bg-amber-500"></span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[13px] text-foreground">Prepare client presentation</p>
+                  </div>
+                  <div class="ml-auto flex items-center gap-1">
+                    <span class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">Feb 20</span>
+                    <span class="inline-flex size-6 items-center justify-center text-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <!-- Chevron up (expanded) -->
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" />
+                        <circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Expanded body -->
+                <div class="overflow-hidden">
+                  <!-- Body text zone -->
+                  <div class="border-t border-border/30 px-3 py-3">
+                    <div class="space-y-2 text-[13px] leading-relaxed text-foreground/90">
+                      <p>Deck needs to cover Q1 results and Q2 roadmap. Check with finance for updated numbers.</p>
+                      <ul class="list-disc space-y-1 pl-5 text-foreground/80">
+                        <li>Revenue slide — pull from dashboard</li>
+                        <li>Roadmap timeline — ask product team</li>
+                        <li>Customer quotes — marketing folder</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <!-- MetadataLine -->
+                  <div class="flex flex-wrap items-center gap-1.5 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                    <span>Feb 20</span>
+                    <span class="text-border">&middot;</span>
+                    <span class="flex items-center gap-1"><span class="inline-block size-[5px] rounded-full bg-amber-500"></span>Med</span>
+                    <span class="text-border">&middot;</span>
+                    <span>weekly</span>
+                    <span class="text-border">&middot;</span>
+                    <span>Active</span>
+                    <span class="text-border">&middot;</span>
+                    <span>Acme Corp</span>
+                    <span class="text-border">&middot;</span>
+                    <span class="flex items-center gap-1">
+                      <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      1
+                    </span>
+                    <span class="text-border">&middot;</span>
+                    <span>2 subtasks</span>
+                  </div>
+                </div>
+
+                <!-- Subtask 1: Completed -->
+                <div class="overflow-hidden border-t border-border/30">
+                  <div class="flex min-h-10 items-center gap-2 px-1.5 pl-8">
+                    <div class="flex items-center gap-1.5">
+                      <span class="inline-flex size-6 items-center justify-center">
+                        <span class="inline-flex size-4 items-center justify-center rounded-full border border-solid bg-foreground" style="border-color: var(--foreground);">
+                          <svg class="size-2.5 text-background" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                        </span>
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-[13px] text-muted-foreground line-through">Draft slide outline</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Subtask 2: Active -->
+                <div class="overflow-hidden">
+                  <div class="flex min-h-10 items-center gap-2 px-1.5 pl-8">
+                    <div class="flex items-center gap-1.5">
+                      <span class="inline-flex size-6 items-center justify-center">
+                        <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                          <svg class="size-2.5 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                        </span>
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-[13px] text-foreground">Collect Q1 metrics</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ Task 3: Active, high priority ═══ -->
+              <div class="overflow-hidden">
+                <div class="flex min-h-10 items-center gap-2 px-1.5">
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-flex size-6 items-center justify-center">
+                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                        <svg class="size-2.5 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      </span>
+                    </span>
+                    <span class="size-[5px] rounded-full bg-rose-500"></span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-[13px] text-foreground">Write API documentation</p>
+                  </div>
+                  <div class="ml-auto flex items-center gap-1">
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" />
+                        <circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </section>
+        </div>
+
+        <!-- ═══ Bottom bar ═══ -->
+        <div class="mt-3 flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-1">
+            <span class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" />
+                <path d="m14.207 4.793-3.414 3.414" />
+                <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+                <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" />
+              </svg>
+            </span>
+          </div>
+          <div class="flex-1"></div>
+          <div class="flex h-8 w-14 items-center justify-center rounded-md border border-border/60 bg-background/90 text-[10px] font-medium tracking-wide text-muted-foreground shadow-lg backdrop-blur-sm">
+            Chat
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .traffic-lights:hover span:nth-child(1) { background-color: #FF5F57; }
+  .traffic-lights:hover span:nth-child(2) { background-color: #FEBC2E; }
+  .traffic-lights:hover span:nth-child(3) { background-color: #28C840; }
+</style>
