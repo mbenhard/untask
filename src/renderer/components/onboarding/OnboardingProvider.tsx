@@ -1,16 +1,20 @@
+import { useEffect } from 'react';
 import { useState } from 'react';
 
+import { Check, Lock } from 'lucide-react';
+
 import { getUntask } from '../../lib/untask';
+import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
 type Provider = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
 
-const PROVIDER_OPTIONS: { value: Provider; label: string }[] = [
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'ollama', label: 'Ollama (local)' },
+const PROVIDER_OPTIONS: { value: Provider; label: string; monogram: string }[] = [
+  { value: 'openrouter', label: 'OpenRouter', monogram: 'OR' },
+  { value: 'openai', label: 'OpenAI', monogram: 'OA' },
+  { value: 'anthropic', label: 'Anthropic', monogram: 'AN' },
+  { value: 'ollama', label: 'Ollama (local)', monogram: 'OL' },
 ];
 
 const PROVIDER_HINTS: Record<Provider, string> = {
@@ -46,6 +50,20 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   const canContinue = isOllama
     ? ollamaUrl.trim().length > 0
     : keyInput.trim().length > 0;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && canContinue) {
+        e.preventDefault();
+        onNext(provider, effectiveValue.trim());
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onSkip();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canContinue, provider, effectiveValue, onNext, onSkip]);
 
   const handleProviderChange = (next: Provider) => {
     setProvider(next);
@@ -100,18 +118,27 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
                 key={opt.value}
                 type="button"
                 onClick={() => handleProviderChange(opt.value)}
-                className={[
-                  'rounded-md border px-3 py-2 text-xs font-medium transition-colors text-left',
+                className={cn(
+                  'flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors text-left',
                   provider === opt.value
                     ? 'border-foreground/30 bg-accent text-foreground'
                     : 'border-border bg-transparent text-muted-foreground hover:text-foreground',
-                ].join(' ')}
+                )}
               >
-                {opt.label}
+                <span className="font-mono text-[10px] opacity-40">{opt.monogram}</span>
+                <span>{opt.label}</span>
+                {opt.value === 'openrouter' && (
+                  <span className="ml-auto text-[10px] text-muted-foreground/60">Recommended</span>
+                )}
               </button>
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[provider]}</p>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Lock className="size-3 shrink-0 opacity-50" />
+          <span>Your key is stored locally on this device. Never sent to our servers.</span>
         </div>
 
         {isOllama ? (
@@ -144,7 +171,11 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
                   setValidationError('');
                 }}
                 placeholder={PROVIDER_PLACEHOLDERS[provider]}
-                className="h-9 flex-1 text-sm"
+                className={cn(
+                  'h-9 flex-1 text-sm',
+                  validationState === 'valid' && 'border-green-500/50 dark:border-green-400/50',
+                  validationState === 'error' && 'border-destructive/50',
+                )}
                 autoComplete="off"
               />
               <Button
@@ -160,18 +191,15 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
             </div>
 
             {validationState === 'valid' ? (
-              <p className="text-[11px] text-green-500 dark:text-green-400">
-                Key is valid.
+              <p className="flex items-center gap-1 text-[11px] text-green-500 dark:text-green-400">
+                <Check className="size-3" />
+                Key is valid
               </p>
             ) : validationState === 'error' ? (
               <p className="text-[11px] text-destructive">
                 {validationError}
               </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                Your key is stored securely on your device.
-              </p>
-            )}
+            ) : null}
           </div>
         )}
       </div>
@@ -187,6 +215,17 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
         >
           Skip for now
         </button>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 text-muted-foreground/50">
+        <span className="flex items-center gap-1.5">
+          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
+          <span className="text-[10px]">Continue</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
+          <span className="text-[10px]">Skip</span>
+        </span>
       </div>
     </div>
   );

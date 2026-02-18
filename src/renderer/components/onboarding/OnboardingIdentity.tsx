@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useState } from 'react';
 
 import { Button } from '../ui/button';
@@ -45,7 +46,7 @@ const buildIdentityString = (
 };
 
 type OnboardingIdentityProps = {
-  onNext: (identityString: string) => void;
+  onNext: (identityString: string, roleLabel: string | null) => void;
   onSkip: () => void;
 };
 
@@ -58,8 +59,24 @@ export const OnboardingIdentity = ({ onNext, onSkip }: OnboardingIdentityProps) 
 
   const handleContinue = () => {
     const identity = buildIdentityString(role, style, focus);
-    onNext(identity);
+    const roleLabel = role ? (ROLE_OPTIONS.find((o) => o.value === role)?.label ?? null) : null;
+    onNext(identity, roleLabel);
   };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && canContinue) {
+        e.preventDefault();
+        handleContinue();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onSkip();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canContinue, role, style, focus, onSkip]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -140,6 +157,17 @@ export const OnboardingIdentity = ({ onNext, onSkip }: OnboardingIdentityProps) 
         >
           Skip
         </button>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 text-muted-foreground/50">
+        <span className="flex items-center gap-1.5">
+          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
+          <span className="text-[10px]">Continue</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
+          <span className="text-[10px]">Skip</span>
+        </span>
       </div>
     </div>
   );
