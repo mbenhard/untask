@@ -1161,20 +1161,24 @@ export const registerIpcHandlers = (): void => {
       try {
         setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
         // Re-init scheduler with or without AI callback based on new setting
+        // Pass isColdStart: false to avoid triggering overdue catch-up notifications
         initReminderScheduler(
-          request.enabled
-            ? {
-                fireAiReminder: (taskContext) =>
-                  fireAiReminder(taskContext, {
-                    startProactiveTurn: (input) =>
-                      startProactiveTurn({
-                        triggerMessage: input.triggerMessage,
-                        triggerType: input.triggerType,
-                        emit: input.emit,
-                      }),
-                  }),
-              }
-            : {},
+          {
+            isColdStart: false,
+            ...(request.enabled
+              ? {
+                  fireAiReminder: (taskContext) =>
+                    fireAiReminder(taskContext, {
+                      startProactiveTurn: (input) =>
+                        startProactiveTurn({
+                          triggerMessage: input.triggerMessage,
+                          triggerType: input.triggerType,
+                          emit: input.emit,
+                        }),
+                    }),
+                }
+              : {}),
+          },
         );
         return { enabled: request.enabled };
       }

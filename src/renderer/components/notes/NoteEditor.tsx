@@ -213,7 +213,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           value={title}
           onChange={handleTitleChange}
           onBlur={handleTitleBlur}
-          className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent pl-[9px] text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="Untitled note"
         />
 

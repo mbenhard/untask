@@ -4,19 +4,17 @@ import { cn } from '../../lib/utils';
 import { SettingsGeneral } from './SettingsGeneral';
 import { SettingsTasks } from './SettingsTasks';
 import { SettingsAI } from './SettingsAI';
-import { SettingsMemoryTab } from './SettingsMemoryTab';
 import { SettingsShortcuts } from './SettingsShortcuts';
 import { SettingsBackup } from './SettingsBackup';
 import { SettingsReminders } from './SettingsReminders';
 
-type SettingsTab = 'general' | 'tasks' | 'reminders' | 'ai' | 'memory' | 'shortcuts' | 'backup';
+type SettingsTab = 'general' | 'tasks' | 'reminders' | 'assistant' | 'shortcuts' | 'backup';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'reminders', label: 'Reminders' },
-  { id: 'ai', label: 'Assistant' },
-  { id: 'memory', label: 'Knowledge' },
+  { id: 'assistant', label: 'Assistant' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'backup', label: 'Backup' },
 ];
@@ -34,10 +32,8 @@ export const SettingsView = () => {
         return <SettingsTasks setError={setError} setNotice={setNotice} />;
       case 'reminders':
         return <SettingsReminders setError={setError} setNotice={setNotice} />;
-      case 'ai':
+      case 'assistant':
         return <SettingsAI setError={setError} setNotice={setNotice} />;
-      case 'memory':
-        return <SettingsMemoryTab setError={setError} setNotice={setNotice} />;
       case 'shortcuts':
         return <SettingsShortcuts setError={setError} />;
       case 'backup':

@@ -84,17 +84,6 @@ export const OnboardingBasics = ({ onNext }: OnboardingBasicsProps) => {
       <Button onClick={handleContinue} disabled={!isNameValid} className="w-full">
         Continue
       </Button>
-
-      <div className="flex items-center justify-center gap-4 text-muted-foreground/50">
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
-          <span className="text-[10px]">Continue</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Tab</kbd>
-          <span className="text-[10px]">Next field</span>
-        </span>
-      </div>
     </div>
   );
 };

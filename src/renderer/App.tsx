@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { AppShell } from './components/layout/AppShell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { useAppStore } from './stores/appStore';
 
 type AppErrorBoundaryState = {
   error: Error | null;
@@ -46,6 +47,7 @@ type BootstrapStatus = 'loading' | 'onboarding' | 'ready';
 
 const AppRoot = () => {
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('loading');
+  const setAiEnabled = useAppStore((state) => state.setAiEnabled);
 
   useEffect(() => {
     const untask = window.untask;
@@ -57,14 +59,26 @@ const AppRoot = () => {
 
     untask.settings
       .getBootstrapCompleted()
-      .then((result) => {
-        setBootstrapStatus(result.completed ? 'ready' : 'onboarding');
+      .then(async (result) => {
+        if (result.completed) {
+          // Load AI enabled setting from persisted storage
+          try {
+            const aiEnabledResult = await untask.settings.getAiEnabled();
+            setAiEnabled(aiEnabledResult.enabled);
+          } catch {
+            // Default to true if loading fails
+            setAiEnabled(true);
+          }
+          setBootstrapStatus('ready');
+        } else {
+          setBootstrapStatus('onboarding');
+        }
       })
       .catch(() => {
         // On error, skip onboarding to avoid blocking the app
         setBootstrapStatus('ready');
       });
-  }, []);
+  }, [setAiEnabled]);
 
   if (bootstrapStatus === 'loading') {
     return null;
@@ -73,7 +87,19 @@ const AppRoot = () => {
   if (bootstrapStatus === 'onboarding') {
     return (
       <OnboardingFlow
-        onComplete={() => setBootstrapStatus('ready')}
+        onComplete={async () => {
+          // Sync AI enabled setting from onboarding to store
+          try {
+            const untask = window.untask;
+            if (untask) {
+              const aiEnabledResult = await untask.settings.getAiEnabled();
+              setAiEnabled(aiEnabledResult.enabled);
+            }
+          } catch {
+            // Use default if loading fails
+          }
+          setBootstrapStatus('ready');
+        }}
       />
     );
   }

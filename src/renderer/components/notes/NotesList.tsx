@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-import { Archive, ArchiveRestore, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 import type { Note } from '../../../types/models';
 import { useNotesListKeyboard } from '../../hooks/useNotesListKeyboard';
@@ -67,7 +67,6 @@ type NoteListItemProps = {
 
 const NoteListItem = ({ note, selected, onClick, onHover, onRestore, onDelete }: NoteListItemProps) => {
   const preview = getPreview(note.content);
-  const isArchived = note.status === 'archived';
 
   return (
     <button
@@ -85,15 +84,9 @@ const NoteListItem = ({ note, selected, onClick, onHover, onRestore, onDelete }:
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-foreground">
+          <span className="truncate pl-0.5 text-[13px] font-medium text-foreground">
             {note.title}
           </span>
-          {isArchived ? (
-            <span className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
-              <Sparkles size={8} />
-              processed
-            </span>
-          ) : null}
         </div>
         <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
           {preview}

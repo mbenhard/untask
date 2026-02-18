@@ -69,6 +69,10 @@ export type ReminderSchedulerDeps = {
   fireAiReminder?: (taskContext: { id: string; title: string }) => Promise<void>;
 };
 
+export type InitReminderSchedulerOptions = {
+  isColdStart?: boolean;
+} & ReminderSchedulerDeps;
+
 // ─── Scheduler state ────────────────────────────────────────
 
 let scanInterval: NodeJS.Timeout | null = null;
@@ -206,15 +210,18 @@ const onTaskChange = (): void => {
 
 // ─── Public API ─────────────────────────────────────────────
 
-export const initReminderScheduler = (options: ReminderSchedulerDeps = {}): void => {
+export const initReminderScheduler = (options: InitReminderSchedulerOptions = {}): void => {
+  const { isColdStart = true, ...depsOption } = options;
   stopReminderScheduler();
-  deps = options;
+  deps = depsOption;
 
   // Subscribe to task changes for live rescheduling
   unsubscribeTaskChange = subscribeTaskChanges(onTaskChange);
 
-  // Overdue catch-up on startup
-  catchUpOverdue();
+  // Overdue catch-up only on cold start (app startup), not config changes
+  if (isColdStart) {
+    catchUpOverdue();
+  }
 
   // Immediate first scan
   scanAndSchedule();
@@ -223,7 +230,7 @@ export const initReminderScheduler = (options: ReminderSchedulerDeps = {}): void
   scanInterval = setInterval(scanAndSchedule, SCAN_INTERVAL_MS);
 
   // eslint-disable-next-line no-console
-  console.info('[reminder-scheduler] started');
+  console.info('[reminder-scheduler] started', isColdStart ? '(cold start)' : '(warm reinit)');
 };
 
 export const stopReminderScheduler = (): void => {

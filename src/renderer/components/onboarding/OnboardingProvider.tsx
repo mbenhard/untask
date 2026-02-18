@@ -216,17 +216,6 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
           Skip for now
         </button>
       </div>
-
-      <div className="flex items-center justify-center gap-4 text-muted-foreground/50">
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
-          <span className="text-[10px]">Continue</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
-          <span className="text-[10px]">Skip</span>
-        </span>
-      </div>
     </div>
   );
 };

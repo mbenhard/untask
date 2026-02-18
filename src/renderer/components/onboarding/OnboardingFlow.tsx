@@ -9,6 +9,23 @@ import { OnboardingProvider } from './OnboardingProvider';
 import { OnboardingReady } from './OnboardingReady';
 import { OnboardingWelcome } from './OnboardingWelcome';
 
+type Role = 'freelancer' | 'developer' | 'student' | 'creative' | 'other';
+type CommunicationStyle = 'direct' | 'friendly' | 'professional';
+
+const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: 'freelancer', label: 'Freelancer' },
+  { value: 'developer', label: 'Developer' },
+  { value: 'student', label: 'Student' },
+  { value: 'creative', label: 'Creative' },
+  { value: 'other', label: 'Other' },
+];
+
+const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string }[] = [
+  { value: 'direct', label: 'Direct & concise' },
+  { value: 'friendly', label: 'Friendly & casual' },
+  { value: 'professional', label: 'Professional' },
+];
+
 type Step = 1 | 2 | 3 | 4 | 5;
 
 type OnboardingFlowProps = {
@@ -73,12 +90,32 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     goTo(4);
   };
 
-  const handleIdentityNext = async (identityString: string, roleLabel: string | null) => {
+  const handleIdentityNext = async (
+    identityString: string,
+    roleValue: Role | null,
+    styleValue: CommunicationStyle | null,
+    focusValue: string,
+  ) => {
+    const roleLabel = roleValue
+      ? ROLE_OPTIONS.find((o) => o.value === roleValue)?.label ?? null
+      : null;
+    const styleLabel = styleValue
+      ? COMMUNICATION_OPTIONS.find((o) => o.value === styleValue)?.label ?? null
+      : null;
     setRoleName(roleLabel);
 
     try {
       if (identityString.trim().length > 0) {
         await getUntask().settings.setIdentity(identityString);
+      }
+      if (roleValue) {
+        await getUntask().settings.set('user.role', roleLabel ?? '');
+      }
+      if (styleValue) {
+        await getUntask().settings.set('communication.style', styleLabel ?? '');
+      }
+      if (focusValue.trim().length > 0) {
+        await getUntask().settings.set('user.focus', focusValue.trim());
       }
     } catch {
       // Non-fatal — proceed anyway
@@ -126,8 +163,9 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       case 4:
         return (
           <OnboardingIdentity
-            onNext={(identityString, roleLabel) => {
-              void handleIdentityNext(identityString, roleLabel);
+            userName={userName}
+            onNext={(identityString, roleValue, styleValue, focusValue) => {
+              void handleIdentityNext(identityString, roleValue, styleValue, focusValue);
             }}
             onSkip={handleIdentitySkip}
           />

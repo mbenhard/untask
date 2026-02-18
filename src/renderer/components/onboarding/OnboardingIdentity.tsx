@@ -22,15 +22,20 @@ const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string; hint: s
 ];
 
 const buildIdentityString = (
+  userName: string,
   role: Role | null,
   style: CommunicationStyle | null,
   focus: string,
 ): string => {
   const parts: string[] = [];
 
+  if (userName.trim().length > 0) {
+    parts.push(`The user's name is ${userName.trim()}.`);
+  }
+
   if (role) {
     const roleLabel = ROLE_OPTIONS.find((o) => o.value === role)?.label.toLowerCase() ?? role;
-    parts.push(`The user is a ${roleLabel}.`);
+    parts.push(`They are a ${roleLabel}.`);
   }
 
   if (style) {
@@ -46,11 +51,17 @@ const buildIdentityString = (
 };
 
 type OnboardingIdentityProps = {
-  onNext: (identityString: string, roleLabel: string | null) => void;
+  userName: string;
+  onNext: (
+    identityString: string,
+    roleValue: Role | null,
+    styleValue: CommunicationStyle | null,
+    focusValue: string,
+  ) => void;
   onSkip: () => void;
 };
 
-export const OnboardingIdentity = ({ onNext, onSkip }: OnboardingIdentityProps) => {
+export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdentityProps) => {
   const [role, setRole] = useState<Role | null>(null);
   const [style, setStyle] = useState<CommunicationStyle | null>(null);
   const [focus, setFocus] = useState('');
@@ -58,9 +69,8 @@ export const OnboardingIdentity = ({ onNext, onSkip }: OnboardingIdentityProps) 
   const canContinue = role !== null || style !== null || focus.trim().length > 0;
 
   const handleContinue = () => {
-    const identity = buildIdentityString(role, style, focus);
-    const roleLabel = role ? (ROLE_OPTIONS.find((o) => o.value === role)?.label ?? null) : null;
-    onNext(identity, roleLabel);
+    const identity = buildIdentityString(userName, role, style, focus);
+    onNext(identity, role, style, focus);
   };
 
   useEffect(() => {
@@ -157,17 +167,6 @@ export const OnboardingIdentity = ({ onNext, onSkip }: OnboardingIdentityProps) 
         >
           Skip
         </button>
-      </div>
-
-      <div className="flex items-center justify-center gap-4 text-muted-foreground/50">
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>
-          <span className="text-[10px]">Continue</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <kbd className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
-          <span className="text-[10px]">Skip</span>
-        </span>
       </div>
     </div>
   );
