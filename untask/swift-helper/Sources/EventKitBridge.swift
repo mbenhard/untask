@@ -26,6 +26,22 @@ final class EventKitBridge {
         return fmt
     }()
 
+    /// Local ISO formatter without timezone (yyyy-MM-dd'T'HH:mm:ss).
+    private static let localIsoFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        return fmt
+    }()
+
+    /// Local ISO formatter without seconds (yyyy-MM-dd'T'HH:mm).
+    private static let localIsoShortFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        return fmt
+    }()
+
     // MARK: - Access
 
     /// Request full access to reminders. Uses the modern API on macOS 14+, falls back on older.
@@ -281,6 +297,16 @@ final class EventKitBridge {
 
         // Try ISO 8601 without fractional seconds
         if let date = Self.isoFormatterNoFrac.date(from: dateString) {
+            return calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        }
+
+        // Try local ISO format without timezone (yyyy-MM-dd'T'HH:mm:ss)
+        if let date = Self.localIsoFormatter.date(from: dateString) {
+            return calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        }
+
+        // Try local ISO format without seconds (yyyy-MM-dd'T'HH:mm)
+        if let date = Self.localIsoShortFormatter.date(from: dateString) {
             return calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
         }
 

@@ -20,17 +20,6 @@ const config: ForgeConfig = {
       NSRemindersUsageDescription:
         'Untask syncs your tasks with due dates to Reminders so you can check them off on your phone.',
     },
-    osxSign: {
-      optionsForFile: (filePath: string) => {
-        if (filePath.endsWith('untask-helper')) {
-          return {
-            entitlements: 'entitlements.plist',
-            hardenedRuntime: true,
-          };
-        }
-        return {};
-      },
-    },
     // Override the Vite plugin's default ignore to include native modules.
     // The Vite plugin excludes everything except /.vite, but better-sqlite3
     // is a native module that can't be bundled by Vite (marked as external).
