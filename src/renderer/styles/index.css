@@ -1,0 +1,345 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────
+   Light mode (default base for shadcn compat)
+   ────────────────────────────────────────────── */
+:root {
+  --background: #F7F7F7;
+  --foreground: #171717;
+  --card: #F7F7F7;
+  --card-foreground: #171717;
+  --popover: #F7F7F7;
+  --popover-foreground: #171717;
+  --primary: #262626;
+  --primary-foreground: #F7F7F7;
+  --secondary: #F7F7F7;
+  --secondary-foreground: #262626;
+  --muted: #F7F7F7;
+  --muted-foreground: #737373;
+  --accent: #F1F1F1;
+  --accent-foreground: #262626;
+  --destructive: #DC2626;
+  --destructive-foreground: #F7F7F7;
+  --border: #E3E3E3;
+  --input: #E3E3E3;
+  --ring: #737373;
+  --radius: 0.375rem;
+  --foreground-muted: rgba(23, 23, 23, 0.25);
+}
+
+/* ──────────────────────────────────────────────
+   Dark mode (Untask default)
+   ────────────────────────────────────────────── */
+.dark {
+  --background: #161616;
+  --foreground: #F5F5F5;
+  --card: #161616;
+  --card-foreground: #F5F5F5;
+  --popover: #161616;
+  --popover-foreground: #F5F5F5;
+  --primary: #E5E5E5;
+  --primary-foreground: #161616;
+  --secondary: #161616;
+  --secondary-foreground: #F5F5F5;
+  --muted: #161616;
+  --muted-foreground: #8A8A8A;
+  --accent: #1E1E1E;
+  --accent-foreground: #F5F5F5;
+  --destructive: #7F1D1D;
+  --destructive-foreground: #F5F5F5;
+  --border: #2A2A2A;
+  --input: #2A2A2A;
+  --ring: #8A8A8A;
+  --foreground-muted: rgba(245, 245, 245, 0.35);
+}
+
+/* ──────────────────────────────────────────────
+   Bridge CSS vars to Tailwind v4 theme tokens
+   ────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-window: 0px;
+  --font-sans: var(
+    --ui-font-sans-stack,
+    "Geist", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
+  );
+  --font-mono: var(
+    --ui-font-mono-stack,
+    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace
+  );
+}
+
+/* ──────────────────────────────────────────────
+   Base styles
+   ────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-none;
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    border-radius: 0;
+    background: transparent;
+  }
+}
+
+/* Chat input placeholder in Geist Mono for terminal-prompt feel */
+[aria-label="Chat input"]::placeholder {
+  font-family: var(--font-mono);
+}
+
+/* Ensure BlockNote surfaces follow the app sans stack */
+.bn-default-styles {
+  font-family: var(--font-sans) !important;
+}
+
+/* ──────────────────────────────────────────────
+   Theme toggle: radial circle-reveal via View Transitions API.
+   The old snapshot stays put while the new theme expands
+   as a circle from the lamp icon (bottom-left).
+   ────────────────────────────────────────────── */
+::view-transition-old(root) {
+  animation: none;
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  animation: theme-circle-reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 9999;
+}
+
+@keyframes theme-circle-reveal {
+  from {
+    clip-path: circle(0% at 9% 97%);
+  }
+  to {
+    clip-path: circle(150% at 9% 97%);
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Electron window chrome
+   ────────────────────────────────────────────── */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Hide scrollbars while preserving scroll behavior */
+#root * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#root *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Notes view: keep editor surface flush with app background */
+.untask-notes-editor .bn-container {
+  --bn-colors-editor-background: transparent;
+  background-color: transparent;
+  min-height: 100%;
+}
+
+.untask-notes-editor .bn-editor,
+.untask-notes-editor .bn-root,
+.untask-notes-editor .bn-default-styles {
+  background-color: transparent !important;
+}
+
+.untask-notes-editor .bn-editor {
+  min-height: 100%;
+  cursor: text;
+}
+
+/* Notes view: tone down oversized markdown headings */
+.untask-notes-editor .bn-block-content[data-content-type="heading"] {
+  font-size: 1.3rem !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+}
+
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+  font-size: 1.15rem !important;
+}
+
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="3"] {
+  font-size: 1.05rem !important;
+}
+
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="4"] {
+  font-size: 1rem !important;
+}
+
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="5"] {
+  font-size: 0.95rem !important;
+}
+
+.untask-notes-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
+  font-size: 0.9rem !important;
+}
+
+/* Keep side menu (+ / drag handle) vertically aligned with reduced heading sizes */
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="1"] {
+  height: 42px !important;
+}
+
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="2"] {
+  height: 36px !important;
+}
+
+.untask-notes-editor .bn-side-menu[data-block-type="heading"][data-level="3"] {
+  height: 32px !important;
+}
+
+/* BlockNote drag preview is rendered outside the notes container.
+   Override heading sizing there too so dragged headings match editor scale. */
+.bn-drag-preview [data-content-type="heading"] {
+  --level: 1.3rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="2"] {
+  --level: 1.15rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="3"] {
+  --level: 1.05rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="4"] {
+  --level: 1rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="5"] {
+  --level: 0.95rem !important;
+}
+
+.bn-drag-preview [data-content-type="heading"][data-level="6"] {
+  --level: 0.9rem !important;
+}
+
+.bn-drag-preview [data-prev-level="1"] {
+  --prev-level: 1.3rem !important;
+}
+
+.bn-drag-preview [data-prev-level="2"] {
+  --prev-level: 1.15rem !important;
+}
+
+.bn-drag-preview [data-prev-level="3"] {
+  --prev-level: 1.05rem !important;
+}
+
+.bn-drag-preview [data-prev-level="4"] {
+  --prev-level: 1rem !important;
+}
+
+.bn-drag-preview [data-prev-level="5"] {
+  --prev-level: 0.95rem !important;
+}
+
+.bn-drag-preview [data-prev-level="6"] {
+  --prev-level: 0.9rem !important;
+}
+
+.bn-drag-preview .bn-block-outer[data-prev-type="heading"] > .bn-block > .bn-block-content {
+  font-size: var(--prev-level) !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+}
+
+/* ──────────────────────────────────────────────
+   Task body editor: compact BlockNote variant
+   ────────────────────────────────────────────── */
+.untask-task-editor .bn-container {
+  --bn-colors-editor-background: transparent;
+  background-color: transparent;
+}
+
+.untask-task-editor .bn-editor,
+.untask-task-editor .bn-root,
+.untask-task-editor .bn-default-styles {
+  background-color: transparent !important;
+}
+
+.untask-task-editor .bn-editor {
+  cursor: text;
+  font-size: 13px;
+  padding: 0;
+}
+
+/* Hide drag handles in compact task context */
+.untask-task-editor .bn-side-menu {
+  display: none !important;
+}
+
+/* Compact heading sizes for task notes */
+.untask-task-editor .bn-block-content[data-content-type="heading"] {
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+}
+
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="2"] {
+  font-size: 0.95rem !important;
+}
+
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="3"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="4"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="5"],
+.untask-task-editor .bn-block-content[data-content-type="heading"][data-level="6"] {
+  font-size: 0.9rem !important;
+}
+
+/* Reduce block outer margins for compact layout */
+.untask-task-editor .bn-block-outer {
+  margin: 0 !important;
+}
