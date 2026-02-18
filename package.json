@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "electron-forge start",
-    "build:helper": "cd swift-helper && swift build -c release --arch arm64 --arch x86_64 && cp .build/apple/Products/Release/UntaskHelper ../resources/bin/untask-helper",
+    "build:helper": "cd swift-helper && swift build -c release && cp .build/release/UntaskHelper ../resources/bin/untask-helper && codesign -s - ../resources/bin/untask-helper",
     "package": "npm run build:helper && electron-forge package",
     "make": "npm run build:helper && electron-forge make",
     "publish": "electron-forge publish",
