@@ -305,8 +305,8 @@ import Footer from '../components/Footer.astro';
       // Strip auto-generated "What's Changed" / "Full Changelog" sections
       cleaned = cleaned.replace(/##\s+What['']s Changed[\s\S]*/i, '');
       cleaned = cleaned.replace(/\*\*Full Changelog\*\*[^\n]*/g, '');
-      // Strip "Install" section at the bottom (brew command, download link — that's for GitHub)
-      cleaned = cleaned.replace(/###\s+Install[\s\S]*$/i, '');
+      // Strip "Install" / "Updating" section at the bottom (brew command, download link — that's for GitHub)
+      cleaned = cleaned.replace(/###\s+(Install|Updating)[\s\S]*$/i, '');
       return cleaned.trim();
     }
 
