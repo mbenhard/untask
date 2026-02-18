@@ -138,6 +138,7 @@ export const IPC_CHANNELS = {
   REMINDERS_SET_IMPORT: 'reminders:set-import',
   REMINDERS_REQUEST_ACCESS: 'reminders:request-access',
   REMINDERS_FORCE_SYNC: 'reminders:force-sync',
+  REMINDERS_PULL_ONLY: 'reminders:pull-only',
   REMINDERS_SYNC_STATUS: 'reminders:sync-status',
   // ─── Attachment channels ─────────────────────────────────
   ATTACHMENT_SAVE: 'attachment:save',

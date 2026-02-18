@@ -403,6 +403,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_REQUEST_ACCESS),
     forceSync: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_FORCE_SYNC),
+    pullOnly: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_PULL_ONLY),
     onSyncStatus: (
       listener: (payload: RemindersSyncStatusPayload) => void,
     ): (() => void) => {

@@ -225,6 +225,7 @@ export type UntaskApi = {
     setImport: (enabled: boolean) => Promise<void>;
     requestAccess: () => Promise<{ granted: boolean }>;
     forceSync: () => Promise<void>;
+    pullOnly: () => Promise<void>;
     onSyncStatus: (listener: (payload: RemindersSyncStatusPayload) => void) => () => void;
   };
 };

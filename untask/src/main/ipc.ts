@@ -131,6 +131,7 @@ import {
   setRemindersImportEnabled,
   requestRemindersAccess,
   forceRemindersSync,
+  pullRemindersOnly,
 } from './services/remindersSync';
 import { fireAiReminder } from './assistant/proactiveLoop';
 import { initReminderScheduler } from './services/reminderScheduler';
@@ -1543,6 +1544,16 @@ export const registerIpcHandlers = (): void => {
         await forceRemindersSync();
       }
       catch (e) { console.error('[ipc] REMINDERS_FORCE_SYNC:', e); throw e; }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.REMINDERS_PULL_ONLY,
+    async () => {
+      try {
+        await pullRemindersOnly();
+      }
+      catch (e) { console.error('[ipc] REMINDERS_PULL_ONLY:', e); throw e; }
     },
   );
 };

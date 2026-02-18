@@ -14,7 +14,7 @@ import {
   SETTING_KEY_REMINDERS_IMPORT_ENABLED,
 } from '../defaultSettings';
 import { getSetting, getSettingWithDefault, setSetting } from './settingsService';
-import { listTasks, getTaskById, completeTask, subscribeTaskChanges, createTask, cancelTask } from './taskService';
+import { listTasks, getTaskById, completeTask, subscribeTaskChanges, createTask, cancelTask, updateTask } from './taskService';
 import { blockNoteToMarkdown } from './notesService';
 import { TERMINAL_STATUSES, type PredefinedStatusId, type TaskStatusConfig } from '../../types/models';
 import type { Task } from '../db/schema';
@@ -23,7 +23,7 @@ import type { Task } from '../db/schema';
 
 const DEBOUNCE_MS = 2000;
 const PULL_DEBOUNCE_MS = 500;
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 const HELPER_TIMEOUT_MS = 15_000;
 const FETCH_ALL_TIMEOUT_MS = 60_000;
 const PUSH_COOLDOWN_MS = 3000;
@@ -488,6 +488,30 @@ async function pullChanges(): Promise<void> {
         continue;
       }
 
+      // Pull data changes from Reminders (title, dueDate, priority)
+      const task = getTaskById(mapping.taskId);
+      if (task && !isTerminal(task.status)) {
+        const hasChanges =
+          task.title !== reminder.title ||
+          task.dueDate !== reminder.dueDate ||
+          task.priority !== eventKitToUntaskPriority(reminder.priority);
+
+        if (hasChanges) {
+          try {
+            updateTask({
+              id: task.id,
+              title: reminder.title,
+              dueDate: reminder.dueDate,
+              priority: eventKitToUntaskPriority(reminder.priority),
+            }, 'user');
+            markAsPulled(task.id);
+            console.info(`[reminders-sync] pulled data from Reminders for task ${task.id}`);
+          } catch (e) {
+            console.warn(`[reminders-sync] pull data failed for task ${mapping.taskId}:`, e);
+          }
+        }
+      }
+
       updateMappingSyncTime(mapping.taskId);
     }
 
@@ -673,6 +697,14 @@ function schedulePull(): void {
   }, PULL_DEBOUNCE_MS);
 }
 
+// ─── External trigger for pull (e.g., on window focus) ─────────
+
+export function triggerRemindersPull(): void {
+  if (getSettingWithDefault(SETTING_KEY_REMINDERS_SYNC_ENABLED) !== 'true') return;
+  if (!listId) return;
+  schedulePull();
+}
+
 // ─── Public API ─────────────────────────────────────────────
 
 export async function initRemindersSync(): Promise<void> {
@@ -794,6 +826,13 @@ export async function forceRemindersSync(): Promise<void> {
     throw new Error('Reminders sync is not active');
   }
   await pushChanges();
+  await pullChanges();
+}
+
+export async function pullRemindersOnly(): Promise<void> {
+  if (!listId) {
+    throw new Error('Reminders sync is not active');
+  }
   await pullChanges();
 }
 

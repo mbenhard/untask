@@ -171,6 +171,22 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
     }
   }, [setError, setNotice, loadStatus]);
 
+  const handleImportFromReminders = useCallback(async () => {
+    setNotice(null);
+    setError(null);
+
+    try {
+      setIsSaving(true);
+      await getUntask().reminders.pullOnly();
+      setNotice('Import complete.');
+      void loadStatus();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import failed.');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [setError, setNotice, loadStatus]);
+
   const statusHint = (() => {
     if (!enabled) return 'Sync tasks with due dates to your Reminders app. Changes sync to all your Apple devices via iCloud.';
     if (syncStatus.status === 'syncing') return 'Syncing...';
@@ -236,7 +252,7 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
 
             <SettingsRow
               label="Manual sync"
-              hint="Force a full sync now."
+              hint="Push Untask changes to Reminders and pull changes from Reminders."
             >
               <button
                 type="button"
@@ -245,6 +261,20 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
                 disabled={isSaving || syncStatus.status === 'syncing'}
               >
                 {syncStatus.status === 'syncing' ? 'Syncing...' : 'Sync now'}
+              </button>
+            </SettingsRow>
+
+            <SettingsRow
+              label="Import from Reminders"
+              hint="Pull new reminders from Reminders app into Untask."
+            >
+              <button
+                type="button"
+                className="rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                onClick={() => void handleImportFromReminders()}
+                disabled={isSaving || !importEnabled || syncStatus.status === 'syncing'}
+              >
+                Import
               </button>
             </SettingsRow>
           </>
