@@ -1,1 +1,0 @@
-ALTER TABLE `tasks` ADD `cancelled_at` text;
