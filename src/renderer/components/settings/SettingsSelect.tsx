@@ -35,7 +35,7 @@ export const SettingsSelect = ({
       disabled={disabled}
       aria-label={ariaLabel}
       className={cn(
-        'h-8 rounded-md border border-input bg-transparent px-2 text-[12px]',
+        'h-7 rounded-md border border-border/60 bg-transparent px-2 text-[11px]',
         className,
       )}
     >

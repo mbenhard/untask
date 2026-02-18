@@ -16,19 +16,6 @@ const config: ForgeConfig = {
     extendInfo: {
       CFBundleIconName: 'icon',
     },
-    // Override the Vite plugin's default ignore to include native modules.
-    // The Vite plugin excludes everything except /.vite, but better-sqlite3
-    // is a native module that can't be bundled by Vite (marked as external).
-    ignore: (file: string) => {
-      if (!file) return false;
-      if (file.startsWith('/.vite')) return false;
-      // Allow descending into node_modules to pick up native deps
-      if (file === '/node_modules') return false;
-      if (file.startsWith('/node_modules/better-sqlite3')) return false;
-      if (file.startsWith('/node_modules/bindings')) return false;
-      if (file.startsWith('/node_modules/file-uri-to-path')) return false;
-      return true;
-    },
   },
   rebuildConfig: {},
   makers: [

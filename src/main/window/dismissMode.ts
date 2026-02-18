@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-import { SETTING_KEY_WINDOW_DISMISS_MODE } from '../defaultSettings';
-
-export const WINDOW_DISMISS_MODE_KEY = SETTING_KEY_WINDOW_DISMISS_MODE;
+export const WINDOW_DISMISS_MODE_KEY = 'app.windowDismissMode';
 export const WINDOW_DISMISS_MODE_VALUES = [
   'persistent',
   'quick-hide',

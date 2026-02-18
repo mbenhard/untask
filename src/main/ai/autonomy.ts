@@ -2,10 +2,6 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
-import {
-  SETTING_KEY_AI_AUTONOMY_MODE,
-  SETTING_KEY_AI_AUTONOMY_PENDING_ACTIONS,
-} from '../defaultSettings';
 import { getSetting, setSetting } from '../services/settingsService';
 
 // ─── Core types ──────────────────────────────────────────────
@@ -37,8 +33,8 @@ export type ResolvedAction = Omit<PendingAction, 'lifecycle'> & {
 
 // ─── Mode policy ─────────────────────────────────────────────
 
-const SETTINGS_KEY_AUTONOMY_MODE = SETTING_KEY_AI_AUTONOMY_MODE;
-const SETTINGS_KEY_PENDING_ACTIONS = SETTING_KEY_AI_AUTONOMY_PENDING_ACTIONS;
+const SETTINGS_KEY_AUTONOMY_MODE = 'ai_autonomy_mode';
+const SETTINGS_KEY_PENDING_ACTIONS = 'ai_autonomy_pending_actions';
 
 const VALID_MODES: ReadonlySet<AutonomyMode> = new Set(['auto', 'confirm']);
 
@@ -120,7 +116,7 @@ const pendingActionSchema = z.object({
   requiresHardConfirmation: z.boolean(),
   createdAt: z.string(),
   requestId: z.string().optional(),
-  modeAtCreation: z.enum(['auto', 'confirm']),
+  modeAtCreation: z.enum(['auto', 'confirm', 'manual', 'safe', 'autopilot']),
   lifecycle: z.literal('pending'),
 });
 
@@ -132,7 +128,14 @@ export const loadPendingActions = (): PendingAction[] => {
 
   try {
     const parsed = JSON.parse(raw);
-    return pendingQueueSchema.parse(parsed);
+    const actions = pendingQueueSchema.parse(parsed);
+    const MIGRATION_MAP: Record<string, AutonomyMode> = {
+      manual: 'confirm', safe: 'confirm', autopilot: 'auto',
+    };
+    return actions.map((action) => ({
+      ...action,
+      modeAtCreation: MIGRATION_MAP[action.modeAtCreation] ?? action.modeAtCreation,
+    })) as PendingAction[];
   } catch {
     return [];
   }
@@ -171,18 +174,17 @@ export const addPendingAction = (
 };
 
 export const requeuePendingAction = (action: PendingAction): PendingAction => {
-  const validatedAction = pendingActionSchema.parse(action);
   const queue = loadPendingActions();
-  const existingIndex = queue.findIndex((entry) => entry.actionId === validatedAction.actionId);
+  const existingIndex = queue.findIndex((entry) => entry.actionId === action.actionId);
 
   if (existingIndex === -1) {
-    queue.push(validatedAction);
+    queue.push(action);
   } else {
-    queue[existingIndex] = validatedAction;
+    queue[existingIndex] = action;
   }
 
   persistPendingActions(queue);
-  return validatedAction;
+  return action;
 };
 
 export const removePendingAction = (actionId: string): PendingAction | null => {

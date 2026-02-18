@@ -1,4 +1,5 @@
 import { app, BrowserWindow, nativeImage } from 'electron';
+import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -16,18 +17,26 @@ import {
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
-import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
-import { getSetting, isBootstrapCompleted, isAiEnabled } from './services/settingsService';
-import { ensureDefaultTaskStatusConfig } from './services/taskService';
+import { getSetting } from './services/settingsService';
+import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
-import { migrateApiKeysToSafeStorage } from './services/keyStorage';
 import { setupTray, destroyTray } from './tray';
-import { initSummonController, summonWindow } from './window/summonController';
-import { startUpdateChecker, stopUpdateChecker } from './services/updateChecker';
+import { applyDockMode } from './window/dockMode';
+import {
+  initSummonController,
+  summonWindow,
+  hideWindow,
+  restoreWindowBounds,
+} from './window/summonController';
 
 if (started) {
   app.quit();
 }
+
+let isQuitting = false;
+app.on('before-quit', () => {
+  isQuitting = true;
+});
 
 // ─── Single-instance lock ─────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -35,6 +44,9 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 }
+
+// Must run before app.whenReady() — declares untask-file as a privileged scheme.
+registerAttachmentScheme();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -67,8 +79,16 @@ const createMainWindow = (): BrowserWindow => {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
-      devTools: !app.isPackaged,
     },
+  });
+
+  restoreWindowBounds(window);
+
+  window.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      hideWindow();
+    }
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -83,18 +103,13 @@ const createMainWindow = (): BrowserWindow => {
 };
 
 const bootstrap = (): void => {
+  registerAttachmentProtocol();
   initDatabase();
   runMigrations();
-
-  // TODO: Gate onboarding on this flag
-  void isBootstrapCompleted();
-
   ensureDefaultTaskStatusConfig();
+  clearStaleTodayFlags();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
-  // Migrate any plaintext API keys to encrypted safeStorage.
-  // Must run after the DB is initialised and before IPC handlers start.
-  migrateApiKeysToSafeStorage();
   initSearchFts();
   initChatSearchFts();
   registerIpcHandlers();
@@ -102,11 +117,12 @@ const bootstrap = (): void => {
   mainWindow = createMainWindow();
   initSummonController(mainWindow);
   setupTray();
+  applyDockMode();
   registerGlobalShortcuts(mainWindow);
 };
 
 const emitIdentityContextDebugSnapshot = (): void => {
-  if (process.env.UNTASK_DEBUG_IDENTITY_CONTEXT !== '1') {
+  if (process.env.FLUSK_DEBUG_IDENTITY_CONTEXT !== '1') {
     return;
   }
 
@@ -131,7 +147,7 @@ app.on('second-instance', () => {
 
 const applyLaunchAtLogin = (): void => {
   try {
-    const stored = getSetting(SETTING_KEY_APP_LAUNCH_AT_LOGIN);
+    const stored = getSetting('app.launchAtLogin');
     const enabled = stored === 'true';
     if (!canApplyLaunchAtLogin()) {
       return;
@@ -178,12 +194,10 @@ app.whenReady().then(() => {
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
-  startUpdateChecker();
+  summonWindow();
 
 
-  // Initialize the proactive loop with chat pipeline dependency.
-  // Always call initProactiveLoop to register deps so the IPC toggle can
-  // restart it later — but only call start() when AI is enabled.
+  // Initialize the proactive loop with chat pipeline dependency
   initProactiveLoop({
     startProactiveTurn: async (input) => {
       await startProactiveTurn({
@@ -192,7 +206,6 @@ app.whenReady().then(() => {
         emit: input.emit,
       });
     },
-    startImmediately: isAiEnabled(),
   });
 
   const handleAppActivation = (): void => {
@@ -214,7 +227,6 @@ app.whenReady().then(() => {
 app.on('will-quit', () => {
   stopProactiveLoop();
   stopDailyBackupScheduler();
-  stopUpdateChecker();
   unregisterGlobalShortcuts();
   destroyTray();
   closeDatabase();

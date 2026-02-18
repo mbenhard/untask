@@ -26,7 +26,7 @@ const recordCooldown = (key: string): void => {
 
 const TRIGGER_TEMPLATE =
   '[PROACTIVE TRIGGER: time_reminder]\n' +
-  'The following task is due now. Remind the user briefly ' +
+  'The following task is due now. Remind Marcus briefly ' +
   'and suggest immediate action. Include chips.';
 
 const buildTriggerMessage = (
@@ -75,8 +75,6 @@ export type ProactiveLoopDeps = {
     triggerType: ProactiveTriggerType;
     emit: (event: ChatStreamEvent) => void;
   }) => Promise<void>;
-  /** When false, the loop is initialized (deps stored) but not started. Defaults to true. */
-  startImmediately?: boolean;
 };
 
 export class ProactiveLoop {
@@ -240,22 +238,11 @@ export class ProactiveLoop {
 // ─── Singleton ──────────────────────────────────────────────
 
 let instance: ProactiveLoop | null = null;
-let lastDeps: ProactiveLoopDeps | null = null;
 
-export const initProactiveLoop = (deps: ProactiveLoopDeps): ProactiveLoop | null => {
+export const initProactiveLoop = (deps: ProactiveLoopDeps): ProactiveLoop => {
   if (instance) {
     instance.stop();
-    instance = null;
   }
-  // Always store deps so the IPC toggle can restart later.
-  lastDeps = deps;
-
-  if (deps.startImmediately === false) {
-    // eslint-disable-next-line no-console
-    console.info('[proactive-loop] AI disabled — loop not started');
-    return null;
-  }
-
   instance = new ProactiveLoop(deps);
   instance.start();
   return instance;
@@ -268,17 +255,4 @@ export const stopProactiveLoop = (): void => {
     instance.stop();
     instance = null;
   }
-};
-
-/**
- * Restart the proactive loop using the last registered deps.
- * Safe to call even if the loop is already running (idempotent).
- * Returns false if no deps have been registered yet.
- */
-export const startProactiveLoopIfDepsReady = (): boolean => {
-  if (!lastDeps) return false;
-  if (instance) return true; // Already running
-  instance = new ProactiveLoop(lastDeps);
-  instance.start();
-  return true;
 };

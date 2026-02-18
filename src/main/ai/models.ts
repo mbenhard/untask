@@ -11,6 +11,8 @@ export const SUPPORTED_MODEL_IDS = [
   'anthropic/claude-sonnet-4-5',
   'anthropic/claude-haiku-4-5',
   'google/gemini-2.5-flash-preview',
+  'google/gemini-3-flash-preview',
+  'z-ai/glm-4.7-flash',
   // OpenAI direct models
   'gpt-4o-mini',
   'gpt-4o',
@@ -48,6 +50,7 @@ export interface CuratedModel {
   costTier: 'free' | 'cheap' | 'moderate' | 'premium';
   capabilities: ('tools' | 'vision' | 'reasoning')[];
   isDefault?: boolean;
+  isRecommended?: boolean;
 }
 
 // ─── Per-provider defaults ────────────────────────────────────────────────────
@@ -74,6 +77,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'cheap',
     capabilities: ['tools', 'vision'],
     isDefault: true,
+    isRecommended: true,
   },
   // GPT-4o Mini — OpenAI direct
   {
@@ -84,6 +88,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'cheap',
     capabilities: ['tools', 'vision'],
     isDefault: true,
+    isRecommended: true,
   },
   // GPT-4o — OpenRouter
   {
@@ -93,6 +98,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 128_000,
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
   },
   // GPT-4o — OpenAI direct
   {
@@ -102,6 +108,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 128_000,
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
   },
   // Claude Sonnet 4.5 — OpenRouter
   {
@@ -111,6 +118,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 200_000,
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
   },
   // Claude Sonnet 4.5 — Anthropic direct
   {
@@ -121,6 +129,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
     isDefault: true,
+    isRecommended: true,
   },
   // Claude Haiku 4.5 — OpenRouter
   {
@@ -130,6 +139,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 200_000,
     costTier: 'cheap',
     capabilities: ['tools'],
+    isRecommended: true,
   },
   // Claude Haiku 4.5 — Anthropic direct
   {
@@ -139,6 +149,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 200_000,
     costTier: 'cheap',
     capabilities: ['tools'],
+    isRecommended: true,
   },
   // Gemini 2.5 Flash — OpenRouter
   {
@@ -148,6 +159,27 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 1_048_576,
     costTier: 'free',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  // Gemini 3 Flash — OpenRouter
+  {
+    id: 'google/gemini-3-flash-preview',
+    name: 'Gemini 3 Flash',
+    provider: 'openrouter',
+    contextWindow: 1_048_576,
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  // GLM 4.7 Flash — OpenRouter
+  {
+    id: 'z-ai/glm-4.7-flash',
+    name: 'GLM 4.7 Flash',
+    provider: 'openrouter',
+    contextWindow: 128_000,
+    costTier: 'free',
+    capabilities: ['tools', 'reasoning'],
+    isRecommended: true,
   },
   // Llama 3.3 70B — Ollama
   {
@@ -158,6 +190,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'free',
     capabilities: ['tools'],
     isDefault: true,
+    isRecommended: true,
   },
   // Qwen 3 8B — Ollama
   {
@@ -167,6 +200,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 32_768,
     costTier: 'free',
     capabilities: ['tools'],
+    isRecommended: true,
   },
 ] as const;
 
@@ -223,6 +257,26 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsReasoning: true,
     supportsWebSearch: false,
     supportsVision: true,
+  },
+  {
+    id: 'google/gemini-3-flash-preview',
+    label: 'Gemini 3 Flash (OpenRouter)',
+    inputCostPerMillion: 0.5,
+    outputCostPerMillion: 3.0,
+    defaultSelected: false,
+    supportsReasoning: true,
+    supportsWebSearch: false,
+    supportsVision: true,
+  },
+  {
+    id: 'z-ai/glm-4.7-flash',
+    label: 'GLM 4.7 Flash (OpenRouter)',
+    inputCostPerMillion: null,
+    outputCostPerMillion: null,
+    defaultSelected: false,
+    supportsReasoning: true,
+    supportsWebSearch: false,
+    supportsVision: false,
   },
   {
     id: 'gpt-4o-mini',
@@ -365,7 +419,13 @@ export const resolveModelId = (value?: string | null): ChatModelId => {
     return getDefaultModelId();
   }
 
-  return assertModelId(value.trim());
+  const trimmed = value.trim();
+  if (isSupportedModelId(trimmed)) {
+    return trimmed;
+  }
+
+  // Stale or removed model ID in settings — fall back to provider default.
+  return getDefaultModelId();
 };
 
 export const getSelectedModelId = (): ChatModelId => {

@@ -3,7 +3,7 @@ import { generateText } from 'ai';
 import type { ChatStreamEvent } from '../../types/chat';
 import { getMemory, updateMemorySection } from './memory';
 import { getSelectedModelId } from './models';
-import { getActiveProvider } from './providers';
+import { createOpenRouterProviderFromEnv } from './openrouter';
 
 const EXTRACTION_DEBOUNCE_MS = 60_000; // 60s after last message
 let extractionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -99,8 +99,8 @@ const runExtraction = async (
     const knowledge = getMemory();
     const prompt = buildExtractionPrompt(knowledge, userMessage, assistantResponse);
     const modelId = getSelectedModelId();
-    const provider = getActiveProvider();
-    const model = provider.languageModel(modelId);
+    const provider = createOpenRouterProviderFromEnv();
+    const model = provider.chat(modelId);
 
     const result = await generateText({
       model,

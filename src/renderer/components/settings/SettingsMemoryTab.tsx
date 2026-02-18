@@ -138,7 +138,7 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
   }
 
   return (
-    <div role="tabpanel" id="settings-panel-memory" className="space-y-6">
+    <div role="tabpanel" id="settings-panel-memory" className="space-y-3">
       <nav className="flex items-center gap-0.5" aria-label="Memory layer tabs">
         {MEMORY_SUB_TABS.map((sub) => (
           <button
@@ -146,7 +146,7 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
             type="button"
             onClick={() => setMemorySubTab(sub)}
             className={cn(
-              'rounded-md px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] transition-colors',
+              'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
               memorySubTab === sub
                 ? 'bg-accent text-foreground'
                 : 'text-muted-foreground hover:text-foreground/80',
@@ -157,7 +157,7 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
         ))}
       </nav>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <p className="text-[11px] text-muted-foreground">
           {MEMORY_FIELD_DESCRIPTIONS[memorySubTab]}
         </p>
@@ -167,24 +167,22 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
           onChange={(event) =>
             setDraft((current) => ({ ...current, [memorySubTab]: event.target.value }))
           }
-          className="min-h-52"
+          className="min-h-40 text-[13px]"
         />
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void saveField(memorySubTab)}
-            disabled={isSaving}
-            className="h-8 text-[11px]"
-          >
-            Save {MEMORY_FIELD_LABELS[memorySubTab]}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void saveField(memorySubTab)}
+          disabled={isSaving}
+          className="h-7 text-[11px]"
+        >
+          Save {MEMORY_FIELD_LABELS[memorySubTab]}
+        </Button>
       </div>
 
       <SettingsSection title={`Recent ${MEMORY_FIELD_LABELS[memorySubTab]} changes`}>
-        <div className="flex items-center justify-end py-2">
+        <div className="flex items-center justify-end px-2 py-1">
           <button
             type="button"
             onClick={() => void undoMemoryChange()}
@@ -196,19 +194,19 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
         </div>
 
         {isLoadingMemoryHistory ? (
-          <div className="py-2.5">
-            <p className="text-[11px] text-muted-foreground">Loading memory history...</p>
+          <div className="px-2 py-2">
+            <p className="text-[11px] text-muted-foreground">Loading history...</p>
           </div>
         ) : memoryHistory.length === 0 ? (
-          <div className="py-2.5">
+          <div className="px-2 py-2">
             <p className="text-[11px] text-muted-foreground">No history yet.</p>
           </div>
         ) : (
           memoryHistory.map((event) => (
-            <div key={event.id} className="flex items-start justify-between gap-4 py-2.5">
+            <div key={event.id} className="flex items-start justify-between gap-3 px-2 py-2">
               <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="text-[11px] text-muted-foreground">
-                  {event.createdAt ?? 'unknown time'} · {event.source}
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  {event.createdAt ?? 'unknown'} · {event.source}
                 </p>
                 <p className="line-clamp-2 text-[13px] text-foreground/90">
                   {event.after.trim().length > 0 ? event.after : '(empty)'}

@@ -31,6 +31,8 @@ import type {
   LaunchAtLoginResult,
   WindowDismissMode,
   WindowDismissModeResult,
+  DockMode,
+  DockModeResult,
   MemoryPromotionConfirmRequestPayload,
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
@@ -55,11 +57,15 @@ import type {
   SettingsReadJournalRequestPayload,
   SettingsReadJournalResultPayload,
   SettingsBootstrapState,
-  SettingsHasApiKeyResult,
-  SettingsValidateApiKeyResult,
   TaskDeleteRequestPayload,
   TaskCompleteRequestPayload,
-  UpdateInfo,
+  SettingsGetAiEnabledResult,
+  SettingsSetAiEnabledResult,
+  ApiKeysHasResult,
+  ApiKeysValidateResult,
+  AttachmentSaveRequest,
+  AttachmentIdRequest,
+  AttachmentPickAndSaveResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -75,8 +81,10 @@ export type UntaskApi = {
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
     getWindowDismissMode: () => Promise<WindowDismissModeResult>;
     setWindowDismissMode: (mode: WindowDismissMode) => Promise<WindowDismissModeResult>;
-    checkForUpdates: () => Promise<UpdateInfo>;
-    getUpdateInfo: () => Promise<UpdateInfo | null>;
+    getDockMode: () => Promise<DockModeResult>;
+    setDockMode: (mode: DockMode) => Promise<DockModeResult>;
+    onMenuNewTask: (listener: () => void) => () => void;
+    onMenuNewNote: (listener: () => void) => () => void;
   };
 
   // ─── Existing kernel APIs ───────────────────────────────
@@ -163,6 +171,9 @@ export type UntaskApi = {
     archive: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;
   };
+  shortcuts: {
+    reRegister: () => Promise<void>;
+  };
   settings: {
     get: (key: string) => Promise<string | null>;
     set: (key: string, value: string) => Promise<Setting>;
@@ -172,22 +183,22 @@ export type UntaskApi = {
     getMemoryHistory: (payload?: SettingsMemoryHistoryRequestPayload) => Promise<SettingsMemoryHistoryResultPayload>;
     undoMemoryEvent: (payload?: SettingsUndoMemoryEventRequestPayload) => Promise<SettingsUndoMemoryEventResultPayload>;
     readJournal: (payload?: SettingsReadJournalRequestPayload) => Promise<SettingsReadJournalResultPayload>;
-    getAiEnabled: () => Promise<{ enabled: boolean }>;
-    setAiEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>;
-    getBootstrapCompleted: () => Promise<{ completed: boolean }>;
-    markBootstrapCompleted: () => Promise<void>;
-    setUserName: (name: string) => Promise<void>;
-    setIdentity: (identity: string) => Promise<void>;
+    getAiEnabled: () => Promise<SettingsGetAiEnabledResult>;
+    setAiEnabled: (enabled: boolean) => Promise<SettingsSetAiEnabledResult>;
   };
   apiKeys: {
-    /** Encrypt and store an API key. The key never returns to the renderer after this call. */
+    has: (provider: string) => Promise<ApiKeysHasResult>;
     set: (provider: string, key: string) => Promise<void>;
-    /** Returns true if a key is stored for the provider (does not return the key). */
-    has: (provider: string) => Promise<SettingsHasApiKeyResult>;
-    /** Delete the stored key for a provider. */
     delete: (provider: string) => Promise<void>;
-    /** Validate a key against the provider API. Returns {valid, error?}. */
-    validate: (provider: string, key: string) => Promise<SettingsValidateApiKeyResult>;
+    validate: (provider: string, key: string) => Promise<ApiKeysValidateResult>;
+  };
+  attachments: {
+    save: (request: AttachmentSaveRequest) => Promise<string>;
+    open: (request: AttachmentIdRequest) => Promise<void>;
+    reveal: (request: AttachmentIdRequest) => Promise<void>;
+    delete: (request: AttachmentIdRequest) => Promise<void>;
+    read: (request: AttachmentIdRequest) => Promise<string>;
+    pickAndSave: () => Promise<AttachmentPickAndSaveResult>;
   };
 };
 

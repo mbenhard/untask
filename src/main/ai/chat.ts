@@ -26,7 +26,7 @@ import {
 } from '../services/chatService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { scheduleKnowledgeExtraction } from './knowledgeExtractor';
-import { getActiveProvider } from './providers';
+import { createOpenRouterProviderFromEnv } from './openrouter';
 import type { ChatModelId } from './models';
 import { getSelectedModelId, getModelWebSearchConfig, modelSupportsVision, resolveModelId } from './models';
 import { buildSystemPrompt } from './systemPrompt';
@@ -40,6 +40,7 @@ const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
 const HISTORY_WINDOW_LIMIT = 20;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
+const AUTO_TITLE_MODEL_ID = 'openai/gpt-4o-mini';
 const AUTO_TITLE_TIMEOUT_MS = 5_000;
 const AUTO_TITLE_MAX_LENGTH = 80;
 type ClassifiedChatError = {
@@ -308,9 +309,43 @@ const extractChipBlockFromLines = (
   return { chipLabels, endIndex };
 };
 
+/**
+ * Try to parse an `[emit_chips:{...}]` JSON block that the model may embed
+ * inline when it cannot call the emit_chips tool (e.g., toolChoice forced to
+ * 'none' after a tool failure).
+ */
+const extractInlineEmitChipsJson = (
+  text: string,
+): { text: string; chips: ChipAction[] } | null => {
+  const pattern = /\[emit_chips:\s*(\{[\s\S]*?\})\s*\]/;
+  const match = text.match(pattern);
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(match[1]) as { chips?: Array<{ label: string; responseText?: string }> };
+    if (!Array.isArray(parsed.chips) || parsed.chips.length < 2) return null;
+
+    const chips: ChipAction[] = parsed.chips.slice(0, 4).map((c) => ({
+      label: (c.label ?? '').slice(0, 40),
+      type: 'response',
+      responseText: c.responseText?.trim() || c.label,
+    }));
+
+    const cleanedText = text.replace(pattern, '').replace(/\n{3,}/g, '\n\n').trim();
+    return { text: cleanedText.length > 0 ? cleanedText : text.trim(), chips };
+  } catch {
+    return null;
+  }
+};
+
 export const extractInlineChipBlock = (
   text: string,
 ): { text: string; chips: ChipAction[] } | null => {
+  // First try the JSON [emit_chips:...] format
+  const jsonResult = extractInlineEmitChipsJson(text);
+  if (jsonResult) return jsonResult;
+
+  // Fall back to section-heading + bullet-list format
   const lines = text.split(/\r?\n/);
   const headerIndex = lines.findIndex((line) => isChipSectionHeading(line));
 
@@ -490,9 +525,8 @@ const maybeAutoTitleConversation = async (input: {
   let resolvedTitle = fallback;
 
   try {
-    const provider = getActiveProvider();
-    const modelId = getSelectedModelId();
-    const model = provider.languageModel(modelId);
+    const provider = createOpenRouterProviderFromEnv();
+    const model = provider.chat(AUTO_TITLE_MODEL_ID);
     const titlePrompt = [
       'Generate a concise chat thread title.',
       'Rules:',
@@ -636,8 +670,8 @@ const runAssistantStream = async (
           throw new Error('Failed to build chat system prompt.');
         }
 
-        const provider = getActiveProvider();
-        const model = provider.languageModel(input.modelId);
+        const provider = createOpenRouterProviderFromEnv();
+        const model = provider.chat(input.modelId);
         const webSearchConfig = getModelWebSearchConfig(input.modelId);
         const noteContextPrompt =
           input.noteContext &&
@@ -784,16 +818,8 @@ const runAssistantStream = async (
             }, input.allowedTools);
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
-            // Only inject web search if the provider exposes a tools namespace
-            // (OpenAI-compatible providers do; Anthropic and Ollama do not).
-            if (
-              webSearchConfig.supportsWebSearch &&
-              webSearchConfig.webSearchMethod &&
-              provider.tools &&
-              typeof (provider.tools as Record<string, unknown>).webSearch === 'function'
-            ) {
-              const webSearchFn = (provider.tools as Record<string, (...args: unknown[]) => unknown>).webSearch;
-              (sdkTools as Record<string, unknown>).web_search = webSearchFn({
+            if (webSearchConfig.supportsWebSearch && webSearchConfig.webSearchMethod) {
+              (sdkTools as Record<string, unknown>).web_search = provider.tools.webSearch({
                 searchContextSize: 'medium',
               });
             }

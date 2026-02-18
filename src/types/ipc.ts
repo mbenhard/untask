@@ -45,6 +45,11 @@ export const IPC_CHANNELS = {
   APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
   APP_GET_WINDOW_DISMISS_MODE: 'app:get-window-dismiss-mode',
   APP_SET_WINDOW_DISMISS_MODE: 'app:set-window-dismiss-mode',
+  APP_MENU_NEW_TASK: 'app:menu-new-task',
+  APP_MENU_NEW_NOTE: 'app:menu-new-note',
+  APP_GET_DOCK_MODE: 'app:get-dock-mode',
+  APP_SET_DOCK_MODE: 'app:set-dock-mode',
+  SHORTCUT_UPDATE: 'shortcut:update',
 
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
   SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT:
@@ -102,26 +107,24 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_GET_ALL: 'settings:get-all',
+  SETTINGS_GET_AI_ENABLED: 'settings:get-ai-enabled',
+  SETTINGS_SET_AI_ENABLED: 'settings:set-ai-enabled',
+  API_KEYS_HAS: 'api-keys:has',
+  API_KEYS_SET: 'api-keys:set',
+  API_KEYS_DELETE: 'api-keys:delete',
+  API_KEYS_VALIDATE: 'api-keys:validate',
   SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
   SETTINGS_GET_MEMORY_HISTORY: 'settings:get-memory-history',
   SETTINGS_UNDO_MEMORY_EVENT: 'settings:undo-memory-event',
-  // ─── Secure API key channels ──────────────────────────────
-  SETTINGS_SET_API_KEY: 'settings:set-api-key',
-  SETTINGS_HAS_API_KEY: 'settings:has-api-key',
-  SETTINGS_DELETE_API_KEY: 'settings:delete-api-key',
-  SETTINGS_VALIDATE_API_KEY: 'settings:validate-api-key',
-  SETTINGS_GET_AI_ENABLED: 'settings:get-ai-enabled',
-  SETTINGS_SET_AI_ENABLED: 'settings:set-ai-enabled',
-  // ─── Onboarding channels ──────────────────────────────────
-  SETTINGS_GET_BOOTSTRAP_COMPLETED: 'settings:get-bootstrap-completed',
-  SETTINGS_MARK_BOOTSTRAP_COMPLETED: 'settings:mark-bootstrap-completed',
-  SETTINGS_SET_USER_NAME: 'settings:set-user-name',
-  SETTINGS_SET_IDENTITY: 'settings:set-identity',
-  // ─── Update checker channels ──────────────────────────────
-  APP_CHECK_FOR_UPDATES: 'app:check-for-updates',
-  APP_GET_UPDATE_INFO: 'app:get-update-info',
+  // ─── Attachment channels ─────────────────────────────────
+  ATTACHMENT_SAVE: 'attachment:save',
+  ATTACHMENT_OPEN: 'attachment:open',
+  ATTACHMENT_REVEAL: 'attachment:reveal',
+  ATTACHMENT_DELETE: 'attachment:delete',
+  ATTACHMENT_READ: 'attachment:read',
+  ATTACHMENT_PICK_AND_SAVE: 'attachment:pick-and-save',
 } as const;
 
 export type SettingsBootstrapState = {
@@ -249,6 +252,12 @@ export type WindowDismissModeResult = {
   mode: WindowDismissMode;
 };
 
+export type DockMode = 'normal' | 'dock-only' | 'menu-bar-only';
+
+export type DockModeResult = {
+  mode: DockMode;
+};
+
 // ─── Backup payloads ──────────────────────────────────────
 
 export type BackupMetadataPayload = {
@@ -291,45 +300,6 @@ export type BackupImportDialogResponse = {
   restored: boolean;
 };
 
-// ─── Secure API key payloads ──────────────────────────────
-
-export type SettingsSetApiKeyRequest = {
-  provider: string;
-  key: string;
-};
-
-export type SettingsHasApiKeyRequest = {
-  provider: string;
-};
-
-export type SettingsHasApiKeyResult = {
-  hasKey: boolean;
-};
-
-export type SettingsDeleteApiKeyRequest = {
-  provider: string;
-};
-
-export type SettingsValidateApiKeyRequest = {
-  provider: string;
-  key: string;
-};
-
-export type SettingsValidateApiKeyResult = {
-  valid: boolean;
-  error?: string;
-};
-
-// ─── Update checker payloads ──────────────────────────────
-
-export type UpdateInfo = {
-  hasUpdate: boolean;
-  currentVersion: string;
-  latestVersion: string;
-  releaseUrl: string;
-  releaseNotes?: string;
-};
-
 // ─── Search payloads ──────────────────────────────────────
 
 export type SearchQueryRequest = {
@@ -353,4 +323,59 @@ export type SearchResultItem = {
 export type SearchQueryResponse = {
   results: SearchResultItem[];
   total: number;
+};
+
+export type SettingsGetAiEnabledResult = {
+  enabled: boolean;
+};
+
+export type SettingsSetAiEnabledRequest = {
+  enabled: boolean;
+};
+
+export type SettingsSetAiEnabledResult = {
+  enabled: boolean;
+};
+
+export type ApiKeysHasRequest = {
+  provider: string;
+};
+
+export type ApiKeysHasResult = {
+  hasKey: boolean;
+};
+
+export type ApiKeysSetRequest = {
+  provider: string;
+  key: string;
+};
+
+export type ApiKeysDeleteRequest = {
+  provider: string;
+};
+
+export type ApiKeysValidateRequest = {
+  provider: string;
+  key: string;
+};
+
+export type ApiKeysValidateResult = {
+  valid: boolean;
+  error?: string;
+};
+
+// ─── Attachment payloads ──────────────────────────────────
+
+export type AttachmentSaveRequest = {
+  data: Uint8Array;
+  filename: string;
+};
+
+export type AttachmentIdRequest = {
+  id: string;
+};
+
+export type AttachmentPickAndSaveResult = {
+  canceled: boolean;
+  urls: string[];
 };

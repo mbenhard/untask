@@ -206,6 +206,36 @@ export function listTasks(filter?: {
   return limitedQuery.all();
 }
 
+/**
+ * Clear the `today` flag on terminal tasks completed/cancelled before today.
+ * Called once on app startup so "Done today" doesn't accumulate stale entries.
+ */
+export function clearStaleTodayFlags(): number {
+  const db = getDb();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayIso = todayStart.toISOString();
+
+  const result = db
+    .update(tasks)
+    .set({ today: false })
+    .where(
+      and(
+        eq(tasks.today, true),
+        inArray(tasks.status, [...TERMINAL_STATUSES]),
+        sql`coalesce(${tasks.completedAt}, ${tasks.cancelledAt}, '1970-01-01') < ${todayIso}`,
+      ),
+    )
+    .returning()
+    .all();
+
+  if (result.length > 0) {
+    emitTaskChange();
+  }
+
+  return result.length;
+}
+
 export function getTaskById(id: string): Task | null {
   const db = getDb();
   const [row] = db.select().from(tasks).where(eq(tasks.id, id)).all();

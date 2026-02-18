@@ -34,6 +34,8 @@ import {
   type LaunchAtLoginResult,
   type WindowDismissMode,
   type WindowDismissModeResult,
+  type DockMode,
+  type DockModeResult,
   type MemoryPromotionConfirmRequestPayload,
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
@@ -60,7 +62,13 @@ import {
   type SettingsReadJournalRequestPayload,
   type SettingsReadJournalResultPayload,
   type SettingsBootstrapState,
-  type UpdateInfo,
+  type SettingsGetAiEnabledResult,
+  type SettingsSetAiEnabledResult,
+  type ApiKeysHasResult,
+  type ApiKeysValidateResult,
+  type AttachmentSaveRequest,
+  type AttachmentIdRequest,
+  type AttachmentPickAndSaveResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -103,10 +111,24 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE),
     setWindowDismissMode: (mode: WindowDismissMode): Promise<WindowDismissModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE, mode),
-    checkForUpdates: (): Promise<UpdateInfo> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_CHECK_FOR_UPDATES),
-    getUpdateInfo: (): Promise<UpdateInfo | null> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_UPDATE_INFO),
+    getDockMode: (): Promise<DockModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_DOCK_MODE),
+    setDockMode: (mode: DockMode): Promise<DockModeResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_DOCK_MODE, mode),
+    onMenuNewTask: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.APP_MENU_NEW_TASK, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_NEW_TASK, wrapped);
+      };
+    },
+    onMenuNewNote: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.APP_MENU_NEW_NOTE, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_NEW_NOTE, wrapped);
+      };
+    },
   },
 
   getBootstrapState: (): Promise<SettingsBootstrapState> =>
@@ -268,6 +290,10 @@ const untaskApi: UntaskApi = {
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
   },
+  shortcuts: {
+    reRegister: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHORTCUT_UPDATE),
+  },
   settings: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
     set: (key: string, value: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, key, value),
@@ -290,28 +316,34 @@ const untaskApi: UntaskApi = {
       payload?: SettingsReadJournalRequestPayload,
     ): Promise<SettingsReadJournalResultPayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_READ_JOURNAL, payload),
-    getAiEnabled: (): Promise<{ enabled: boolean }> =>
+    getAiEnabled: (): Promise<SettingsGetAiEnabledResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_AI_ENABLED),
-    setAiEnabled: (enabled: boolean): Promise<{ enabled: boolean }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_AI_ENABLED, enabled),
-    getBootstrapCompleted: (): Promise<{ completed: boolean }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_COMPLETED),
-    markBootstrapCompleted: (): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_MARK_BOOTSTRAP_COMPLETED),
-    setUserName: (name: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_USER_NAME, name),
-    setIdentity: (identity: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_IDENTITY, identity),
+    setAiEnabled: (enabled: boolean): Promise<SettingsSetAiEnabledResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_AI_ENABLED, { enabled }),
   },
   apiKeys: {
+    has: (provider: string): Promise<ApiKeysHasResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_HAS, { provider }),
     set: (provider: string, key: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_API_KEY, { provider, key }),
-    has: (provider: string): Promise<{ hasKey: boolean }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_HAS_API_KEY, { provider }),
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_SET, { provider, key }),
     delete: (provider: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_DELETE_API_KEY, { provider }),
-    validate: (provider: string, key: string): Promise<{ valid: boolean; error?: string }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_VALIDATE_API_KEY, { provider, key }),
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_DELETE, { provider }),
+    validate: (provider: string, key: string): Promise<ApiKeysValidateResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.API_KEYS_VALIDATE, { provider, key }),
+  },
+  attachments: {
+    save: (request: AttachmentSaveRequest): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_SAVE, request),
+    open: (request: AttachmentIdRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_OPEN, request),
+    reveal: (request: AttachmentIdRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_REVEAL, request),
+    delete: (request: AttachmentIdRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_DELETE, request),
+    read: (request: AttachmentIdRequest): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_READ, request),
+    pickAndSave: (): Promise<AttachmentPickAndSaveResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE),
   },
 };
 

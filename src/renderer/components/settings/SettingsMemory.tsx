@@ -202,6 +202,8 @@ const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
   memory: '',
 };
 
+const OPENROUTER_API_KEY_SETTING_KEY = 'ai_openrouter_key';
+
 type MemorySubTab = (typeof MEMORY_SUB_TABS)[number];
 
 export const SettingsMemory = () => {
@@ -321,8 +323,8 @@ export const SettingsMemory = () => {
     try {
       setIsLoadingOpenRouterApiKey(true);
       setError(null);
-      const { hasKey } = await getUntask().apiKeys.has('openrouter');
-      setHasOpenRouterApiKey(hasKey);
+      const stored = await getUntask().settings.get(OPENROUTER_API_KEY_SETTING_KEY);
+      setHasOpenRouterApiKey(Boolean(stored && stored.trim().length > 0));
       setOpenRouterApiKeyInput('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load OpenRouter API key.');
@@ -743,7 +745,7 @@ export const SettingsMemory = () => {
       setIsSavingOpenRouterApiKey(true);
       setError(null);
       setNotice(null);
-      await getUntask().apiKeys.set('openrouter', normalized);
+      await getUntask().settings.set(OPENROUTER_API_KEY_SETTING_KEY, normalized);
       setHasOpenRouterApiKey(true);
       setOpenRouterApiKeyInput('');
       setNotice('OpenRouter API key saved.');
@@ -759,7 +761,7 @@ export const SettingsMemory = () => {
       setIsSavingOpenRouterApiKey(true);
       setError(null);
       setNotice(null);
-      await getUntask().apiKeys.delete('openrouter');
+      await getUntask().settings.set(OPENROUTER_API_KEY_SETTING_KEY, '');
       setHasOpenRouterApiKey(false);
       setOpenRouterApiKeyInput('');
       setNotice('OpenRouter API key cleared.');

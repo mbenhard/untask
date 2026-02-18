@@ -93,24 +93,3 @@ out/
 
 # SQLite Database
 dev.db
-*.db
-*.db-wal
-*.db-shm
-
-# Build output
-dist/
-
-# Environment
-.env.local
-
-# OS
-Thumbs.db
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Electron
-forge.env

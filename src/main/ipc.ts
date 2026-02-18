@@ -56,7 +56,18 @@ import {
   type BackupImportDialogRequest,
   type BackupImportDialogResponse,
   type WindowDismissModeResult,
-  type UpdateInfo,
+  type SettingsGetAiEnabledResult,
+  type SettingsSetAiEnabledRequest,
+  type SettingsSetAiEnabledResult,
+  type ApiKeysHasRequest,
+  type ApiKeysHasResult,
+  type ApiKeysSetRequest,
+  type ApiKeysDeleteRequest,
+  type ApiKeysValidateRequest,
+  type ApiKeysValidateResult,
+  type AttachmentSaveRequest,
+  type AttachmentIdRequest,
+  type AttachmentPickAndSaveResult,
 } from '../types/ipc';
 import type { MemoryLayer } from '../types/assistant';
 import { buildCanonicalRuntimeContext } from './ai/contextBuilder';
@@ -107,21 +118,11 @@ import {
   listBackups,
 } from './services/backupService';
 import { initChatSearchFts, initSearchFts, searchTasks } from './services/searchService';
-import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
-import { getSetting, setSetting, getAllSettings, isAiEnabled, setAiEnabled, isBootstrapCompleted, markBootstrapCompleted } from './services/settingsService';
-import {
-  storeApiKey,
-  hasApiKey,
-  deleteApiKey as deleteStoredApiKey,
-} from './services/keyStorage';
-import { startProactiveLoopIfDepsReady, stopProactiveLoop } from './assistant/proactiveLoop';
+import { getSetting, setSetting, getAllSettings } from './services/settingsService';
+import { SETTING_KEY_AI_ENABLED } from './defaultSettings';
 import { cancelActiveChatTurns, startChatTurn } from './ai/chat';
 
 import { getModels, getSelectedModelId, setSelectedModelId } from './ai/models';
-import {
-  checkForUpdates as runUpdateCheck,
-  getUpdateInfo as getCachedUpdateInfo,
-} from './services/updateChecker';
 import {
   getAutonomyMode,
   setAutonomyMode,
@@ -133,12 +134,22 @@ import {
 import { executeToolCall } from './ai/tools';
 import { refreshTodayBadge } from './tray';
 import {
+  saveAttachment,
+  openAttachment,
+  revealAttachment,
+  deleteAttachment,
+  readAttachment,
+} from './attachments';
+import {
   requestHideFromRenderer,
   onEscapeLayerExit,
   getWindowDismissMode,
   setWindowDismissMode,
 } from './window/summonController';
 import { windowDismissModeSchema } from './window/dismissMode';
+import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from './window/dockMode';
+import type { DockModeResult } from '../types/ipc';
+import { reRegisterShortcuts } from './shortcuts';
 
 const settingsMemoryUpdateSchema = z
   .object({
@@ -247,20 +258,6 @@ const getMemoryState = (): SettingsMemoryStatePayload => ({
   memory: getMemory(),
 });
 
-const apiKeyProviderSchema = z.string().min(1).max(64).regex(/^[a-z0-9_-]+$/);
-const apiKeyValueSchema = z.string().min(1).max(512);
-const setApiKeySchema = z.object({
-  provider: apiKeyProviderSchema,
-  key: apiKeyValueSchema,
-});
-const providerOnlySchema = z.object({
-  provider: apiKeyProviderSchema,
-});
-const validateApiKeySchema = z.object({
-  provider: apiKeyProviderSchema,
-  key: apiKeyValueSchema,
-});
-
 const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 const BACKUP_JOB_TIMEOUT_MS = 120_000;
 
@@ -341,7 +338,7 @@ export const registerIpcHandlers = (): void => {
   });
 
   ipcMain.handle(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN, () => {
-    const stored = getSetting(SETTING_KEY_APP_LAUNCH_AT_LOGIN);
+    const stored = getSetting('app.launchAtLogin');
     const enabled = stored === 'true';
     const supported =
       process.platform === 'win32' || (process.platform === 'darwin' && app.isPackaged);
@@ -350,7 +347,7 @@ export const registerIpcHandlers = (): void => {
 
   ipcMain.handle(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN, (_event, enabledInput: unknown) => {
     const enabled = launchAtLoginSchema.parse(enabledInput);
-    setSetting(SETTING_KEY_APP_LAUNCH_AT_LOGIN, String(enabled));
+    setSetting('app.launchAtLogin', String(enabled));
     const supported =
       process.platform === 'win32' || (process.platform === 'darwin' && app.isPackaged);
 
@@ -388,6 +385,32 @@ export const registerIpcHandlers = (): void => {
       return { mode: setWindowDismissMode(mode) };
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_DOCK_MODE,
+    (): DockModeResult => {
+      return { mode: readDockMode() };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_SET_DOCK_MODE,
+    (_event, modeInput: unknown): DockModeResult => {
+      const mode = dockModeSchema.parse(modeInput);
+      setSetting(DOCK_MODE_KEY, mode);
+      applyDockMode(mode);
+      return { mode };
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.SHORTCUT_UPDATE, () => {
+    try {
+      reRegisterShortcuts();
+    } catch (e) {
+      console.error('[ipc] SHORTCUT_UPDATE:', e);
+      throw e;
+    }
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT,
@@ -1056,6 +1079,63 @@ export const registerIpcHandlers = (): void => {
     catch (e) { console.error('[ipc] SETTINGS_GET_ALL:', e); throw e; }
   });
   ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_GET_AI_ENABLED,
+    (): SettingsGetAiEnabledResult => {
+      try {
+        const stored = getSetting(SETTING_KEY_AI_ENABLED);
+        return { enabled: stored !== 'false' };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_GET_AI_ENABLED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_AI_ENABLED,
+    (_event, request: SettingsSetAiEnabledRequest): SettingsSetAiEnabledResult => {
+      try {
+        setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
+        return { enabled: request.enabled };
+      }
+      catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_HAS,
+    (_event, request: ApiKeysHasRequest): ApiKeysHasResult => {
+      try {
+        const key = getSetting(`api_key_${request.provider}`);
+        return { hasKey: typeof key === 'string' && key.length > 0 };
+      }
+      catch (e) { console.error('[ipc] API_KEYS_HAS:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_SET,
+    (_event, request: ApiKeysSetRequest): void => {
+      try {
+        setSetting(`api_key_${request.provider}`, request.key);
+      }
+      catch (e) { console.error('[ipc] API_KEYS_SET:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_DELETE,
+    (_event, request: ApiKeysDeleteRequest): void => {
+      try {
+        setSetting(`api_key_${request.provider}`, '');
+      }
+      catch (e) { console.error('[ipc] API_KEYS_DELETE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.API_KEYS_VALIDATE,
+    async (_event, _request: ApiKeysValidateRequest): Promise<ApiKeysValidateResult> => {
+      try {
+        return { valid: true };
+      }
+      catch (e) { console.error('[ipc] API_KEYS_VALIDATE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_MEMORY_STATE,
     (): SettingsMemoryStatePayload => {
       try { return getMemoryState(); }
@@ -1138,169 +1218,86 @@ export const registerIpcHandlers = (): void => {
     },
   );
 
-  // ─── Secure API key handlers ─────────────────────────────
-  // Keys are encrypted via Electron safeStorage. The raw key value never
-  // leaves the main process after the initial `set` call.
-
+  // ─── Attachment handlers ─────────────────────────────────
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_API_KEY,
-    (_event, payload: unknown): void => {
+    IPC_CHANNELS.ATTACHMENT_SAVE,
+    async (_event, request: AttachmentSaveRequest): Promise<string> => {
       try {
-        const { provider, key } = setApiKeySchema.parse(payload ?? {});
-        storeApiKey(provider, key);
+        return await saveAttachment(request);
       }
-      catch (e) { console.error('[ipc] SETTINGS_SET_API_KEY:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_SAVE:', e); throw e; }
     },
   );
-
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_HAS_API_KEY,
-    (_event, payload: unknown): { hasKey: boolean } => {
+    IPC_CHANNELS.ATTACHMENT_OPEN,
+    async (_event, request: AttachmentIdRequest): Promise<void> => {
       try {
-        const { provider } = providerOnlySchema.parse(payload ?? {});
-        return { hasKey: hasApiKey(provider) };
+        await openAttachment(request);
       }
-      catch (e) { console.error('[ipc] SETTINGS_HAS_API_KEY:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_OPEN:', e); throw e; }
     },
   );
-
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_DELETE_API_KEY,
-    (_event, payload: unknown): void => {
+    IPC_CHANNELS.ATTACHMENT_REVEAL,
+    (_event, request: AttachmentIdRequest): void => {
       try {
-        const { provider } = providerOnlySchema.parse(payload ?? {});
-        deleteStoredApiKey(provider);
+        revealAttachment(request);
       }
-      catch (e) { console.error('[ipc] SETTINGS_DELETE_API_KEY:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_REVEAL:', e); throw e; }
     },
   );
-
   ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_VALIDATE_API_KEY,
-    async (_event, payload: unknown): Promise<{ valid: boolean; error?: string }> => {
+    IPC_CHANNELS.ATTACHMENT_DELETE,
+    async (_event, request: AttachmentIdRequest): Promise<void> => {
       try {
-        const { provider, key } = validateApiKeySchema.parse(payload ?? {});
-
-        if (provider !== 'openrouter') {
-          return { valid: false, error: `Unknown provider: ${provider}` };
-        }
-
-        // Lightweight validation: fetch the models list — it requires a valid key
-        // and returns quickly without incurring any usage costs.
-        const response = await fetch('https://openrouter.ai/api/v1/models', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${key}`,
-            'Content-Type': 'application/json',
-          },
-          signal: AbortSignal.timeout(10_000),
-        });
-
-        if (response.ok) {
-          return { valid: true };
-        }
-
-        const errorBody = await response.text().catch(() => '');
-        return {
-          valid: false,
-          error: errorBody.length > 0 ? errorBody : `HTTP ${response.status}`,
+        await deleteAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_DELETE:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_READ,
+    async (_event, request: AttachmentIdRequest): Promise<string> => {
+      try {
+        return await readAttachment(request);
+      }
+      catch (e) { console.error('[ipc] ATTACHMENT_READ:', e); throw e; }
+    },
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE,
+    async (event): Promise<AttachmentPickAndSaveResult> => {
+      try {
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Attach files',
+          properties: ['openFile' as const, 'multiSelections' as const],
         };
-      }
-      catch (e) {
-        console.error('[ipc] SETTINGS_VALIDATE_API_KEY:', e);
-        return {
-          valid: false,
-          error: e instanceof Error ? e.message : 'Validation failed',
-        };
-      }
-    },
-  );
+        const result = owner
+          ? await dialog.showOpenDialog(owner, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
 
-  // ─── AI enabled toggle handlers ──────────────────────────
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_GET_AI_ENABLED,
-    (): { enabled: boolean } => {
-      try { return { enabled: isAiEnabled() }; }
-      catch (e) { console.error('[ipc] SETTINGS_GET_AI_ENABLED:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_AI_ENABLED,
-    (_event, enabledInput: unknown): { enabled: boolean } => {
-      try {
-        const enabled = z.boolean().parse(enabledInput);
-        setAiEnabled(enabled);
-
-        if (enabled) {
-          startProactiveLoopIfDepsReady();
-        } else {
-          stopProactiveLoop();
+        if (result.canceled || result.filePaths.length === 0) {
+          return { canceled: true, urls: [] };
         }
 
-        return { enabled };
+        const { readFile } = await import('node:fs/promises');
+        const path = await import('node:path');
+
+        const urls: string[] = [];
+        for (const filePath of result.filePaths) {
+          const data = await readFile(filePath);
+          const filename = path.basename(filePath);
+          const url = await saveAttachment({
+            data: new Uint8Array(data),
+            filename,
+          });
+          urls.push(url);
+        }
+
+        return { canceled: false, urls };
       }
-      catch (e) { console.error('[ipc] SETTINGS_SET_AI_ENABLED:', e); throw e; }
-    },
-  );
-
-  // ─── Onboarding handlers ─────────────────────────────────
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_GET_BOOTSTRAP_COMPLETED,
-    (): { completed: boolean } => {
-      try { return { completed: isBootstrapCompleted() }; }
-      catch (e) { console.error('[ipc] SETTINGS_GET_BOOTSTRAP_COMPLETED:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_MARK_BOOTSTRAP_COMPLETED,
-    (): void => {
-      try { markBootstrapCompleted(); }
-      catch (e) { console.error('[ipc] SETTINGS_MARK_BOOTSTRAP_COMPLETED:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_USER_NAME,
-    (_event, nameInput: unknown): void => {
-      try {
-        const name = z.string().min(1).max(120).parse(nameInput);
-        setSetting('user.name', name.trim());
-      }
-      catch (e) { console.error('[ipc] SETTINGS_SET_USER_NAME:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.SETTINGS_SET_IDENTITY,
-    (_event, identityInput: unknown): void => {
-      try {
-        const identity = z.string().min(1).max(4000).parse(identityInput);
-        setIdentity(identity.trim(), 'user');
-      }
-      catch (e) { console.error('[ipc] SETTINGS_SET_IDENTITY:', e); throw e; }
-    },
-  );
-
-  // ─── Update checker handlers ──────────────────────────────
-  ipcMain.handle(
-    IPC_CHANNELS.APP_CHECK_FOR_UPDATES,
-    async (): Promise<UpdateInfo> => {
-      try {
-        return await runUpdateCheck();
-      }
-      catch (e) { console.error('[ipc] APP_CHECK_FOR_UPDATES:', e); throw e; }
-    },
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.APP_GET_UPDATE_INFO,
-    (): UpdateInfo | null => {
-      try {
-        return getCachedUpdateInfo();
-      }
-      catch (e) { console.error('[ipc] APP_GET_UPDATE_INFO:', e); throw e; }
+      catch (e) { console.error('[ipc] ATTACHMENT_PICK_AND_SAVE:', e); throw e; }
     },
   );
 };

@@ -10,7 +10,6 @@ import {
   type NewChatMessage,
   type NewConversation,
 } from '../db/schema';
-import { SETTING_KEY_CHAT_RETENTION_MODE } from '../defaultSettings';
 
 export type ChatRetentionMode = 'session' | '30d' | 'forever';
 
@@ -36,7 +35,7 @@ export type ListConversationsResult = {
   total: number;
 };
 
-const CHAT_RETENTION_MODE_SETTING_KEY = SETTING_KEY_CHAT_RETENTION_MODE;
+const CHAT_RETENTION_MODE_SETTING_KEY = 'chat_retention_mode';
 const SESSION_STARTED_AT = new Date().toISOString();
 export const DEFAULT_CONVERSATION_TITLE = 'New Thread';
 

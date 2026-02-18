@@ -22,6 +22,7 @@ type CuratedModel = {
   costTier: CostTier;
   capabilities: ('tools' | 'vision' | 'reasoning')[];
   isDefault?: boolean;
+  isRecommended?: boolean;
 };
 
 // ─── Static curated model list (mirrors main/ai/models.ts) ───────────────────
@@ -34,6 +35,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'cheap',
     capabilities: ['tools', 'vision'],
     isDefault: true,
+    isRecommended: true,
   },
   {
     id: 'gpt-4o-mini',
@@ -42,6 +44,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'cheap',
     capabilities: ['tools', 'vision'],
     isDefault: true,
+    isRecommended: true,
   },
   {
     id: 'openai/gpt-4o',
@@ -49,6 +52,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'openrouter',
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
   },
   {
     id: 'gpt-4o',
@@ -56,6 +60,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'openai',
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
   },
   {
     id: 'anthropic/claude-sonnet-4-5',
@@ -63,6 +68,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'openrouter',
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
   },
   {
     id: 'claude-sonnet-4-5-20250929',
@@ -71,6 +77,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
     isDefault: true,
+    isRecommended: true,
   },
   {
     id: 'anthropic/claude-haiku-4-5',
@@ -78,6 +85,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'openrouter',
     costTier: 'cheap',
     capabilities: ['tools'],
+    isRecommended: true,
   },
   {
     id: 'claude-haiku-4-5-20251001',
@@ -85,6 +93,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'anthropic',
     costTier: 'cheap',
     capabilities: ['tools'],
+    isRecommended: true,
   },
   {
     id: 'google/gemini-2.5-flash-preview',
@@ -92,6 +101,23 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'openrouter',
     costTier: 'free',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  {
+    id: 'google/gemini-3-flash-preview',
+    name: 'Gemini 3 Flash',
+    provider: 'openrouter',
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  {
+    id: 'z-ai/glm-4.7-flash',
+    name: 'GLM 4.7 Flash',
+    provider: 'openrouter',
+    costTier: 'free',
+    capabilities: ['tools', 'reasoning'],
+    isRecommended: true,
   },
   {
     id: 'llama3.3:70b',
@@ -100,6 +126,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     costTier: 'free',
     capabilities: ['tools'],
     isDefault: true,
+    isRecommended: true,
   },
   {
     id: 'qwen3:8b',
@@ -107,6 +134,7 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'ollama',
     costTier: 'free',
     capabilities: ['tools'],
+    isRecommended: true,
   },
 ];
 
@@ -144,7 +172,7 @@ const COST_TIER_LABEL: Record<CostTier, string> = {
 
 const SETTING_KEY_AI_PROVIDER = 'ai_provider';
 const SETTING_KEY_AI_OLLAMA_BASE_URL = 'ai_ollama_base_url';
-const SETTING_KEY_AI_SHOW_ALL_MODELS = 'ai_show_all_models';
+
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -201,8 +229,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   // Model
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
-  const [isLoadingShowAll, setIsLoadingShowAll] = useState(false);
+
 
   // Behavior
   const [autonomyMode, setAutonomyMode] = useState<'auto' | 'confirm'>('auto');
@@ -279,17 +306,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     }
   }, [setError]);
 
-  const loadShowAllModels = useCallback(async () => {
-    try {
-      setIsLoadingShowAll(true);
-      const stored = await getUntask().settings.get(SETTING_KEY_AI_SHOW_ALL_MODELS);
-      setShowAllModels(stored === 'true');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load model display preference.');
-    } finally {
-      setIsLoadingShowAll(false);
-    }
-  }, [setError]);
+
 
   const loadAutonomyMode = useCallback(async () => {
     try {
@@ -322,7 +339,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
       void loadApiKeyStatus(resolvedProvider);
       void loadOllamaBaseUrl();
       void loadSelectedModel();
-      void loadShowAllModels();
       void loadAutonomyMode();
       void loadRetentionMode();
     })();
@@ -332,7 +348,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     loadApiKeyStatus,
     loadOllamaBaseUrl,
     loadSelectedModel,
-    loadShowAllModels,
     loadAutonomyMode,
     loadRetentionMode,
   ]);
@@ -503,17 +518,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     [selectedModelId, setError, setNotice],
   );
 
-  const handleShowAllModelsToggle = useCallback(async () => {
-    const next = !showAllModels;
-    setShowAllModels(next);
 
-    try {
-      await getUntask().settings.set(SETTING_KEY_AI_SHOW_ALL_MODELS, String(next));
-    } catch (e) {
-      setShowAllModels(!next);
-      setError(e instanceof Error ? e.message : 'Failed to update model display preference.');
-    }
-  }, [showAllModels, setError]);
 
   const handleAutonomyChange = useCallback(
     async (mode: 'auto' | 'confirm') => {
@@ -556,8 +561,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   // ─── Derived values ──────────────────────────────────────────────────────────
 
   const providerModels = getCuratedModelsForProvider(provider);
-  const displayedModels = showAllModels ? providerModels : providerModels.filter((m) => m.isDefault || m.id === selectedModelId);
-  const modelOptions = displayedModels.map((m) => ({
+  const modelOptions = providerModels.map((m) => ({
     value: m.id,
     label: buildModelLabel(m),
   }));
@@ -568,7 +572,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div role="tabpanel" id="settings-panel-ai" className="space-y-6">
+    <div role="tabpanel" id="settings-panel-ai" className="space-y-3">
 
       {/* ── Assistant toggle ─────────────────────────────────────────────── */}
       <SettingsSection title="Assistant">
@@ -609,10 +613,10 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
 
           {/* ── API Key / Connection ──────────────────────────────────────── */}
           <SettingsSection title={isKeyedProvider ? 'API Key' : 'Connection'}>
-            <div className="py-2.5">
+            <div className="px-2 py-2">
               {isKeyedProvider ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
                     <Input
                       type="password"
                       value={apiKeyInput}
@@ -625,11 +629,11 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                         isLoadingApiKey
                           ? 'Checking...'
                           : hasApiKey
-                          ? 'Saved key (enter to replace)'
-                          : PROVIDER_KEY_PLACEHOLDER[provider]
+                            ? 'Saved key (enter to replace)'
+                            : PROVIDER_KEY_PLACEHOLDER[provider]
                       }
                       disabled={isLoadingApiKey || isSavingApiKey}
-                      className="h-8 flex-1 text-[12px]"
+                      className="h-7 flex-1 text-[11px]"
                       aria-label={`${PROVIDER_LABELS[provider]} API key`}
                     />
                     <Button
@@ -638,7 +642,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       variant="outline"
                       onClick={() => void handleValidateApiKey()}
                       disabled={isLoadingApiKey || isSavingApiKey || apiKeyValidating || apiKeyInput.trim().length === 0}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       {apiKeyValidating ? 'Checking...' : 'Validate'}
                     </Button>
@@ -647,7 +651,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       size="sm"
                       onClick={() => void handleSaveApiKey()}
                       disabled={isLoadingApiKey || isSavingApiKey || apiKeyInput.trim().length === 0}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       Save
                     </Button>
@@ -657,14 +661,14 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       variant="ghost"
                       onClick={() => void handleClearApiKey()}
                       disabled={isLoadingApiKey || isSavingApiKey || !hasApiKey}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       Clear
                     </Button>
                   </div>
 
                   {/* Status line */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {apiKeyValid === true ? (
                       <span className="text-[11px] text-green-600 dark:text-green-400">Key is valid.</span>
                     ) : apiKeyError ? (
@@ -674,8 +678,8 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                         {isLoadingApiKey
                           ? 'Checking key status...'
                           : hasApiKey
-                          ? 'A key is currently saved.'
-                          : 'No key saved yet.'}
+                            ? 'A key is currently saved.'
+                            : 'No key saved yet.'}
                       </p>
                     )}
                   </div>
@@ -696,15 +700,15 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 </div>
               ) : (
                 /* Ollama base URL */
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
                     <Input
                       type="text"
                       value={ollamaBaseUrl}
                       onChange={(event) => setOllamaBaseUrl(event.target.value)}
                       placeholder={DEFAULT_OLLAMA_BASE_URL}
                       disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-                      className="h-8 flex-1 text-[12px]"
+                      className="h-7 flex-1 text-[11px]"
                       aria-label="Ollama base URL"
                     />
                     <Button
@@ -712,7 +716,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                       size="sm"
                       onClick={() => void handleSaveOllamaUrl()}
                       disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-                      className="h-8 text-[11px]"
+                      className="h-7 text-[11px]"
                     >
                       Save
                     </Button>
@@ -750,16 +754,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 className="max-w-[260px]"
               />
             </SettingsRow>
-            <div className="flex items-center justify-end py-1.5">
-              <button
-                type="button"
-                onClick={() => void handleShowAllModelsToggle()}
-                disabled={isLoadingShowAll}
-                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-              >
-                {showAllModels ? 'Show fewer models' : 'Show all models'}
-              </button>
-            </div>
           </SettingsSection>
 
           {/* ── Behavior ──────────────────────────────────────────────────── */}

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import {
   type DefaultReactSuggestionItem,
   getDefaultReactSlashMenuItems,
 } from '@blocknote/react';
+import { Paperclip } from 'lucide-react';
 
 import type { Task, PredefinedStatusId } from '../../../types/models';
 import { PREDEFINED_STATUSES } from '../../../types/models';
@@ -48,13 +49,13 @@ const SEGMENT =
 
 const SEGMENT_EMPTY = 'text-muted-foreground/50';
 
-const MEDIA_SLASH_ITEMS = new Set(['Image', 'Video', 'Audio', 'File']);
+const UNSUPPORTED_MEDIA_ITEMS = new Set(['Video', 'Audio']);
 
-const getTextOnlySlashMenuItems = (
+const getAttachmentSlashMenuItems = (
   editor: BlockNoteEditor,
 ): DefaultReactSuggestionItem[] =>
   getDefaultReactSlashMenuItems(editor).filter(
-    (item) => !MEDIA_SLASH_ITEMS.has(item.title),
+    (item) => !UNSUPPORTED_MEDIA_ITEMS.has(item.title),
   );
 
 // ─── Dot Separator ──────────────────────────────────────────
@@ -467,6 +468,49 @@ const SubtasksSegment = ({
   );
 };
 
+// ─── Attachment helpers ─────────────────────────────────────
+
+function countAttachments(body: string | null): number {
+  if (!body) return 0;
+  try {
+    const blocks = JSON.parse(body) as Array<{ type?: string }>;
+    return blocks.filter(
+      (b) => b.type === 'image' || b.type === 'file',
+    ).length;
+  } catch {
+    return 0;
+  }
+}
+
+// ─── Attachment Segment ─────────────────────────────────────
+
+const AttachmentSegment = ({
+  count,
+  onAttach,
+}: {
+  count: number;
+  onAttach: () => void;
+}) => {
+  const isEmpty = count === 0;
+
+  return (
+    <button
+      type="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        onAttach();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
+      aria-label={isEmpty ? 'Attach file' : `${count} attachment${count !== 1 ? 's' : ''} — click to add more`}
+    >
+      <Paperclip className="mr-0.5 size-3" />
+      {isEmpty ? 'attach' : count}
+    </button>
+  );
+};
+
 // ─── Metadata Line ──────────────────────────────────────────
 
 const MetadataLine = ({
@@ -474,11 +518,15 @@ const MetadataLine = ({
   onUpdate,
   subtaskCount,
   onRequestAddSubtask,
+  attachmentCount,
+  onAttach,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
   subtaskCount: number;
   onRequestAddSubtask?: () => void;
+  attachmentCount: number;
+  onAttach: () => void;
 }) => {
   const isCompleted = task.status === 'done';
   const isSubtask = task.parentId !== null;
@@ -503,6 +551,11 @@ const MetadataLine = ({
           <StatusSegment task={task} onUpdate={onUpdate} />
           <MetaDot />
           <ClientSegment task={task} onUpdate={onUpdate} />
+          <MetaDot />
+          <AttachmentSegment
+            count={attachmentCount}
+            onAttach={onAttach}
+          />
           {onRequestAddSubtask && (
             <>
               <MetaDot />
@@ -512,6 +565,15 @@ const MetadataLine = ({
               />
             </>
           )}
+        </>
+      )}
+      {isSubtask && (
+        <>
+          <MetaDot />
+          <AttachmentSegment
+            count={attachmentCount}
+            onAttach={onAttach}
+          />
         </>
       )}
     </div>
@@ -544,6 +606,28 @@ export const TaskBody = ({
     : null;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBodyRef = useRef<string | null>(null);
+  const editorRef = useRef<BlockNoteEditor | null>(null);
+
+  const attachmentCount = useMemo(() => countAttachments(task.body), [task.body]);
+
+  const handleAttach = useCallback(async () => {
+    const result = await window.untask?.attachments.pickAndSave();
+    if (!result || result.canceled || result.urls.length === 0) return;
+
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const newBlocks = result.urls.map((url) => {
+      const isImage = /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
+      if (isImage) {
+        return { type: 'image' as const, props: { url } };
+      }
+      return { type: 'file' as const, props: { url } };
+    });
+
+    const lastBlock = editor.document[editor.document.length - 1];
+    editor.insertBlocks(newBlocks, lastBlock, 'after');
+  }, []);
 
   const flushSave = useCallback(() => {
     if (saveTimerRef.current) {
@@ -634,9 +718,8 @@ export const TaskBody = ({
           onFocus={handleFocus}
           onBlur={handleBlur}
           className="untask-task-editor"
-          getSlashMenuItems={
-            task.parentId !== null ? getTextOnlySlashMenuItems : undefined
-          }
+          editorRef={editorRef}
+          getSlashMenuItems={getAttachmentSlashMenuItems}
         />
       </div>
 
@@ -646,6 +729,8 @@ export const TaskBody = ({
         onUpdate={updateTask}
         subtaskCount={subtaskCount}
         onRequestAddSubtask={onRequestAddSubtask}
+        attachmentCount={attachmentCount}
+        onAttach={handleAttach}
       />
     </div>
   );

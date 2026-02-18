@@ -58,6 +58,20 @@ export const blockNoteToMarkdown = (raw: string): string => {
         lines.push('```');
         break;
       }
+      case 'image': {
+        const url = typeof block.props?.url === 'string' ? block.props.url : '';
+        const caption = typeof block.props?.caption === 'string' ? block.props.caption : '';
+        const name = typeof block.props?.name === 'string' ? block.props.name : '';
+        const label = caption || name || 'image';
+        lines.push(`![${label}](${url})`);
+        break;
+      }
+      case 'file': {
+        const fileUrl = typeof block.props?.url === 'string' ? block.props.url : '';
+        const fileName = typeof block.props?.name === 'string' ? block.props.name : 'file';
+        lines.push(`[${fileName}](${fileUrl})`);
+        break;
+      }
       case 'paragraph':
       default:
         lines.push(text);

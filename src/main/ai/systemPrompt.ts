@@ -4,10 +4,7 @@ import type {
   AssistantLiveContext,
   IdentityContextDebugSnapshot,
 } from '../../types/assistant';
-import { getIdentity, getMemory, estimateTokens, SEED_IDENTITY_DOCUMENT } from './memory';
-
-const FALLBACK_IDENTITY =
-  'You are a helpful personal assistant for task management. Be concise and direct.';
+import { getIdentity, getMemory, estimateTokens } from './memory';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -136,20 +133,9 @@ export const buildSystemPrompt = (
 
   const metaSection = buildMetaSection(now, timezone);
 
-  let identity: string;
-  try {
-    const raw = getIdentity();
-    identity = raw && raw.trim().length > 0 ? raw : SEED_IDENTITY_DOCUMENT;
-  } catch {
-    identity = FALLBACK_IDENTITY;
-  }
+  const identity = getIdentity();
 
-  let knowledge: string;
-  try {
-    knowledge = getMemory();
-  } catch {
-    knowledge = '';
-  }
+  const knowledge = getMemory();
   const knowledgeSection = knowledge.trim()
     ? `## Knowledge\n\n${knowledge.trim()}`
     : '';
