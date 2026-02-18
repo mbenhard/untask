@@ -22,7 +22,12 @@ import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts'
 import { getSetting, isAiEnabled } from './services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
 import { migrateApiKeysToSafeStorage } from './services/keyStorage';
-import { startUpdateChecker, stopUpdateChecker, setUpdateChannel } from './services/updateChecker';
+import {
+  startUpdateChecker,
+  stopUpdateChecker,
+  setUpdateChannel,
+  checkForUpdates,
+} from './services/updateChecker';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
@@ -253,6 +258,8 @@ app.whenReady().then(() => {
     } else {
       summonWindow();
     }
+    // Check for updates on activation (throttled to 15m)
+    void checkForUpdates(false);
   };
 
   app.on('activate', handleAppActivation);

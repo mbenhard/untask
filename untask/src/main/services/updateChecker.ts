@@ -12,6 +12,7 @@ const GITHUB_REPO = 'untask';
 const RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const MIN_CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes throttle
 
 export interface UpdateInfo {
   hasUpdate: boolean;
@@ -24,6 +25,7 @@ export interface UpdateInfo {
 // ─── In-memory cache ─────────────────────────────────────────
 let cachedUpdateInfo: UpdateInfo | null = null;
 let checkIntervalHandle: ReturnType<typeof setInterval> | null = null;
+let lastCheckTime = 0;
 
 // ─── Renderer notification ────────────────────────────────────
 
@@ -79,9 +81,20 @@ const isNewerVersion = (current: string, candidate: string): boolean => {
 /**
  * Fetches the latest GitHub release and compares it to the running version.
  * Uses `net.fetch` (Electron's network layer) per Electron best practice.
+ *
+ * @param force If true, ignores the 15-minute throttle interval.
  */
-export const checkForUpdates = async (): Promise<UpdateInfo> => {
+export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
   const currentVersion = app.getVersion();
+
+  // Throttle check if not forced
+  if (!force && Date.now() - lastCheckTime < MIN_CHECK_INTERVAL_MS) {
+    if (cachedUpdateInfo) {
+      if (cachedUpdateInfo.hasUpdate) notifyRenderer(cachedUpdateInfo);
+      return cachedUpdateInfo;
+    }
+  }
+  lastCheckTime = Date.now();
 
   const updateCheckEnabled = getSetting(SETTING_KEY_UPDATE_CHECK_ENABLED);
   if (updateCheckEnabled === 'false') {
