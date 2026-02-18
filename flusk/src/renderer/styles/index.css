@@ -328,6 +328,7 @@
   border: 1px solid var(--border) !important;
   border-radius: 4px !important;
   align-items: center !important;
+  cursor: pointer !important;
 }
 
 /* Shrink the file icon */

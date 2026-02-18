@@ -506,7 +506,7 @@ const AttachmentSegment = ({
       aria-label={isEmpty ? 'Attach file' : `${count} attachment${count !== 1 ? 's' : ''} — click to add more`}
     >
       <Paperclip className="mr-0.5 size-3" />
-      {isEmpty ? 'Attach' : count}
+      {isEmpty ? 'attach' : count}
     </button>
   );
 };
@@ -551,6 +551,11 @@ const MetadataLine = ({
           <StatusSegment task={task} onUpdate={onUpdate} />
           <MetaDot />
           <ClientSegment task={task} onUpdate={onUpdate} />
+          <MetaDot />
+          <AttachmentSegment
+            count={attachmentCount}
+            onAttach={onAttach}
+          />
           {onRequestAddSubtask && (
             <>
               <MetaDot />
@@ -560,11 +565,6 @@ const MetadataLine = ({
               />
             </>
           )}
-          <MetaDot />
-          <AttachmentSegment
-            count={attachmentCount}
-            onAttach={onAttach}
-          />
         </>
       )}
       {isSubtask && (

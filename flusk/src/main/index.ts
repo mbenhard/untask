@@ -21,7 +21,12 @@ import { getSetting } from './services/settingsService';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
-import { initSummonController, summonWindow } from './window/summonController';
+import {
+  initSummonController,
+  summonWindow,
+  hideWindow,
+  restoreWindowBounds,
+} from './window/summonController';
 
 if (started) {
   app.quit();
@@ -69,6 +74,13 @@ const createMainWindow = (): BrowserWindow => {
       sandbox: true,
       nodeIntegration: false,
     },
+  });
+
+  restoreWindowBounds(window);
+
+  window.on('close', (event) => {
+    event.preventDefault();
+    hideWindow();
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -173,6 +185,7 @@ app.whenReady().then(() => {
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
+  summonWindow();
 
 
   // Initialize the proactive loop with chat pipeline dependency

@@ -7,6 +7,10 @@ vi.mock('electron', () => ({
     unregister: vi.fn(),
     unregisterAll: vi.fn(),
   },
+  Menu: {
+    buildFromTemplate: vi.fn(() => ({})),
+    setApplicationMenu: vi.fn(),
+  },
 }));
 
 vi.mock('./services/settingsService', () => ({

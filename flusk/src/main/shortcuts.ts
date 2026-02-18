@@ -1,7 +1,7 @@
-import { type BrowserWindow, globalShortcut } from 'electron';
+import { type BrowserWindow, globalShortcut, Menu } from 'electron';
 
 import { getSetting } from './services/settingsService';
-import { toggleWindow, showQuickAdd } from './window/summonController';
+import { toggleWindow, showQuickAdd, hideWindow } from './window/summonController';
 
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
   'shortcut.toggleWindow': 'CommandOrControl+Shift+Space',
@@ -38,8 +38,44 @@ function registerShortcut(
   return registered;
 }
 
+function setupApplicationMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'Untask',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        {
+          label: 'Close',
+          accelerator: 'CmdOrCtrl+W',
+          click: hideWindow,
+        },
+        { role: 'minimize' },
+        { role: 'front' },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const registerGlobalShortcuts = (_mainWindow: BrowserWindow): void => {
+  setupApplicationMenu();
+
   const toggleAccelerator = resolveAccelerator('shortcut.toggleWindow');
   const quickAddAccelerator = resolveAccelerator('shortcut.quickAdd');
 

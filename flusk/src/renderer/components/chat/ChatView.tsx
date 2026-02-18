@@ -689,7 +689,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
           renderedMessages
         ) : (
           <EmptyState
-            onSuggestionClick={onSuggestionClick ?? (() => undefined)}
+            onSend={(msg) => void sendMessage(msg)}
           />
         )}
 

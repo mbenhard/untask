@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 
 import type { BlockNoteEditor, PartialBlock } from '@blocknote/core';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
@@ -11,6 +11,7 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react';
 
+import { FileContextMenu } from './FileContextMenu';
 import { UntaskFormattingToolbar } from './UntaskFormattingToolbar';
 import { UntaskSlashMenu } from './UntaskSlashMenu';
 
@@ -144,12 +145,73 @@ export const BlockEditor = ({
     [editor],
   );
 
+  // Open file attachments with system default app on click
+  const handleFileClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      const fileRow = target.closest('.bn-file-name-with-icon');
+      if (!fileRow) return;
+
+      const blockEl = target.closest('[data-id]');
+      if (!blockEl) return;
+
+      const blockId = blockEl.getAttribute('data-id');
+      if (!blockId) return;
+
+      const block = editor.getBlock(blockId);
+      const url = (block?.props as Record<string, unknown>)?.url;
+      if (typeof url !== 'string' || !url.startsWith('untask-file://')) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const id = url.slice('untask-file://'.length);
+      window.untask?.attachments.open({ id });
+    },
+    [editor],
+  );
+
+  // Right-click context menu for file attachment blocks
+  const [fileMenu, setFileMenu] = useState<{
+    x: number;
+    y: number;
+    blockId: string;
+    attachmentId: string;
+  } | null>(null);
+
+  const handleFileContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      const fileArea =
+        target.closest('.bn-file-name-with-icon') ??
+        target.closest('.bn-file-block-content-wrapper');
+      if (!fileArea) return;
+
+      const blockEl = target.closest('[data-id]');
+      if (!blockEl) return;
+
+      const blockId = blockEl.getAttribute('data-id');
+      if (!blockId) return;
+
+      const block = editor.getBlock(blockId);
+      const url = (block?.props as Record<string, unknown>)?.url;
+      if (typeof url !== 'string' || !url.startsWith('untask-file://')) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const id = url.slice('untask-file://'.length);
+      setFileMenu({ x: event.clientX, y: event.clientY, blockId, attachmentId: id });
+    },
+    [editor],
+  );
+
   const hasCustomSlashMenu = getSlashMenuItems !== undefined;
 
   return (
     <div
       className={className}
       onMouseDown={handleSurfaceMouseDown}
+      onClick={handleFileClick}
+      onContextMenu={handleFileContextMenu}
       onFocus={onFocus}
       onBlur={onBlur}
     >
@@ -175,6 +237,26 @@ export const BlockEditor = ({
           formattingToolbar={UntaskFormattingToolbar}
         />
       </BlockNoteView>
+
+      {fileMenu && (
+        <FileContextMenu
+          x={fileMenu.x}
+          y={fileMenu.y}
+          onOpen={() => {
+            window.untask?.attachments.open({ id: fileMenu.attachmentId });
+            setFileMenu(null);
+          }}
+          onReveal={() => {
+            window.untask?.attachments.reveal({ id: fileMenu.attachmentId });
+            setFileMenu(null);
+          }}
+          onDelete={() => {
+            editor.removeBlocks([fileMenu.blockId]);
+            setFileMenu(null);
+          }}
+          onClose={() => setFileMenu(null)}
+        />
+      )}
     </div>
   );
 };

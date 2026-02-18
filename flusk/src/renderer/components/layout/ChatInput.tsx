@@ -5,6 +5,7 @@ import {
   type KeyboardEvent,
   type RefObject,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from 'react';
@@ -57,6 +58,13 @@ export const ChatInput = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 128)}px`;
+  }, [value]);
 
   const showError = useCallback((message: string) => {
     if (errorTimeoutRef.current) {
@@ -264,7 +272,7 @@ export const ChatInput = ({
                 : 'Ask Untask...'
             }
             aria-label="Chat input"
-            className="h-7 max-h-32 !min-h-0 resize-none overflow-y-auto !border-0 !bg-transparent !px-0 py-1 text-[13px] leading-5 !shadow-none focus-visible:!border-0 focus-visible:!ring-0"
+            className="max-h-32 min-h-[28px] resize-none overflow-y-auto !border-0 !bg-transparent !px-0 py-1 text-[13px] leading-5 !shadow-none focus-visible:!border-0 focus-visible:!ring-0"
           />
         </div>
         <Button
