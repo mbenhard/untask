@@ -1,5 +1,5 @@
 ---
-// TaskDetailPreview — 1:1 CSS recreation of task detail view
+// TaskDetailPreview — 1:1 CSS recreation of Tasks view with status groups
 // References: TaskItem.tsx, TaskBody.tsx MetadataLine, SectionGroup.tsx
 ---
 
@@ -9,7 +9,7 @@
     <!-- Section label -->
     <div class="mb-10 flex flex-col items-center text-center">
       <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-        Task Detail
+        Tasks
       </h2>
       <p class="mt-3 max-w-sm text-[15px] text-muted-foreground/70">
         Due dates, priorities, recurrence, subtasks — all inline.
@@ -28,8 +28,8 @@
         </div>
         <div class="flex-1"></div>
         <nav class="flex items-center gap-0.5">
-          <span class="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-foreground">Today</span>
-          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Tasks</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Today</span>
+          <span class="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-foreground">Tasks</span>
           <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Inbox</span>
           <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Notes</span>
         </nav>
@@ -39,12 +39,12 @@
       <div class="p-3">
         <div class="mx-auto flex max-w-3xl flex-col gap-3">
 
-          <!-- SectionGroup: Today -->
+          <!-- ═══ SectionGroup: Active ═══ -->
           <section class="rounded-md border border-border/60">
             <div class="flex items-center px-2 py-2">
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <svg class="size-3.5 rotate-90 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-                <span class="text-[12px] font-medium text-foreground">Today</span>
+                <span class="text-[12px] font-medium text-foreground">Active</span>
                 <span class="ml-auto font-mono text-[11px] text-muted-foreground">3</span>
               </div>
               <span class="ml-1.5 inline-flex size-5 items-center justify-center text-muted-foreground/40">
@@ -54,24 +54,24 @@
 
             <div class="border-t border-border/60 px-1 py-1">
 
-              <!-- ═══ Task 1: Completed ═══ -->
+              <!-- Task 1: Active, medium priority -->
               <div class="overflow-hidden border-b border-border/40">
                 <div class="flex min-h-10 items-center gap-2 px-1.5">
                   <div class="flex items-center gap-1.5">
                     <span class="inline-flex size-6 items-center justify-center">
-                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-solid bg-foreground" style="border-color: var(--foreground);">
-                        <svg class="size-2.5 text-background" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                        <svg class="size-2.5 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                       </span>
                     </span>
-                    <span class="size-[5px] rounded-full bg-foreground/15"></span>
+                    <span class="size-[5px] rounded-full bg-amber-500"></span>
                   </div>
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-[13px] text-muted-foreground line-through">Ship landing page</p>
+                    <p class="truncate text-[13px] text-foreground">Ship landing page</p>
                   </div>
                   <div class="ml-auto flex items-center gap-1">
-                    <span class="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">Feb 18</span>
-                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
-                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+                    <span class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">Feb 18</span>
+                    <span class="inline-flex size-6 items-center justify-center text-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
                     </span>
                     <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
                       <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -86,9 +86,8 @@
                 </div>
               </div>
 
-              <!-- ═══ Task 2: Expanded with subtasks ═══ -->
+              <!-- Task 2: Expanded with subtasks, medium priority -->
               <div class="overflow-hidden border-b border-border/40 bg-accent/40">
-                <!-- Row bar -->
                 <div class="flex min-h-10 items-center gap-2 px-1.5">
                   <div class="flex items-center gap-1.5">
                     <span class="inline-flex size-6 items-center justify-center">
@@ -103,11 +102,11 @@
                   </div>
                   <div class="ml-auto flex items-center gap-1">
                     <span class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">Feb 20</span>
+                    <span class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">1/2</span>
                     <span class="inline-flex size-6 items-center justify-center text-foreground">
                       <svg class="size-3.5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
                     </span>
                     <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
-                      <!-- Chevron up (expanded) -->
                       <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg>
                     </span>
                     <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
@@ -121,7 +120,6 @@
 
                 <!-- Expanded body -->
                 <div class="overflow-hidden">
-                  <!-- Body text zone -->
                   <div class="border-t border-border/30 px-3 py-3">
                     <div class="space-y-2 text-[13px] leading-relaxed text-foreground/90">
                       <p>Deck needs to cover Q1 results and Q2 roadmap. Check with finance for updated numbers.</p>
@@ -187,7 +185,7 @@
                 </div>
               </div>
 
-              <!-- ═══ Task 3: Active, high priority ═══ -->
+              <!-- Task 3: Active, high priority -->
               <div class="overflow-hidden">
                 <div class="flex min-h-10 items-center gap-2 px-1.5">
                   <div class="flex items-center gap-1.5">
@@ -220,6 +218,29 @@
 
             </div>
           </section>
+
+          <!-- ═══ SectionGroup: Waiting (collapsed) ═══ -->
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">Waiting</span>
+                <span class="ml-auto font-mono text-[11px] text-muted-foreground">2</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ═══ SectionGroup: Done (collapsed) ═══ -->
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">Done</span>
+                <span class="ml-auto font-mono text-[11px] text-muted-foreground">5</span>
+              </div>
+            </div>
+          </section>
+
         </div>
 
         <!-- ═══ Bottom bar ═══ -->
