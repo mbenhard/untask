@@ -1165,18 +1165,45 @@ export const registerIpcHandlers = (): void => {
     async (_event, request: ApiKeysValidateRequest): Promise<ApiKeysValidateResult> => {
       try {
         const validated = validateApiKeySchema.parse(request);
-        // Validate OpenRouter keys against their API
         if (validated.provider === 'openrouter') {
+          // /api/v1/auth/key requires a valid key (unlike /models which is public)
           const { net } = await import('electron');
-          const response = await net.fetch('https://openrouter.ai/api/v1/models', {
+          const response = await net.fetch('https://openrouter.ai/api/v1/auth/key', {
             headers: { Authorization: `Bearer ${validated.key}` },
           });
           if (!response.ok) {
-            return { valid: false, error: `OpenRouter API returned ${response.status}` };
+            return { valid: false, error: `Invalid API key (HTTP ${response.status})` };
           }
           return { valid: true };
         }
-        // Other providers: accept key as valid (no public validation endpoint)
+        if (validated.provider === 'openai') {
+          const { net } = await import('electron');
+          const response = await net.fetch('https://api.openai.com/v1/models', {
+            headers: { Authorization: `Bearer ${validated.key}` },
+          });
+          if (!response.ok) {
+            return { valid: false, error: `Invalid API key (HTTP ${response.status})` };
+          }
+          return { valid: true };
+        }
+        if (validated.provider === 'anthropic') {
+          const { net } = await import('electron');
+          const response = await net.fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': validated.key,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+          });
+          // 401 = bad key, 400/200/etc = key works
+          if (response.status === 401) {
+            return { valid: false, error: 'Invalid API key' };
+          }
+          return { valid: true };
+        }
+        // Ollama and others: no key validation needed
         return { valid: true };
       }
       catch (e) { console.error('[ipc] API_KEYS_VALIDATE:', e); throw e; }

@@ -38,8 +38,17 @@ export function storeApiKey(provider: string, key: string): void {
     return;
   }
 
-  const encrypted = safeStorage.encryptString(key);
-  setSetting(encryptedKey(provider), encrypted.toString('base64'));
+  try {
+    const encrypted = safeStorage.encryptString(key);
+    setSetting(encryptedKey(provider), encrypted.toString('base64'));
+    // eslint-disable-next-line no-console
+    console.info(`[keyStorage] Stored encrypted API key for "${provider}" successfully.`);
+  } catch (err) {
+    // safeStorage.encryptString can fail on some platforms — fall back to plaintext
+    // eslint-disable-next-line no-console
+    console.error(`[keyStorage] Failed to encrypt API key for "${provider}", falling back to plaintext:`, err);
+    setSetting(plaintextKey(provider), key);
+  }
 }
 
 /**
@@ -71,12 +80,18 @@ export function getApiKey(provider: string): string | null {
         `[keyStorage] Failed to decrypt API key for "${provider}":`,
         err,
       );
-      return null;
+      // Fall through to plaintext slot as last resort
     }
   }
 
-  // Fall back to plaintext slot (covers the no-encryption-available case)
-  return getSetting(plaintextKey(provider));
+  // Fall back to plaintext slot (covers the no-encryption-available case
+  // and the decryption-failure case)
+  const plaintext = getSetting(plaintextKey(provider));
+  if (plaintext !== null) {
+    // eslint-disable-next-line no-console
+    console.info(`[keyStorage] Using plaintext API key for "${provider}" (no encrypted slot or decryption failed).`);
+  }
+  return plaintext;
 }
 
 /**
