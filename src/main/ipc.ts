@@ -109,6 +109,7 @@ import {
   getNote,
   saveNote,
   archiveNote,
+  restoreNote,
   deleteNote,
   listNotes,
 } from './services/notesService';
@@ -918,6 +919,13 @@ export const registerIpcHandlers = (): void => {
       return archiveNote(id);
     }
     catch (e) { console.error('[ipc] NOTES_ARCHIVE:', e); throw e; }
+  });
+  ipcMain.handle(IPC_CHANNELS.NOTES_RESTORE, (_event, idInput: string) => {
+    try {
+      const id = noteIdSchema.parse(idInput);
+      return restoreNote(id);
+    }
+    catch (e) { console.error('[ipc] NOTES_RESTORE:', e); throw e; }
   });
   ipcMain.handle(IPC_CHANNELS.NOTES_DELETE, (_event, idInput: string) => {
     try {

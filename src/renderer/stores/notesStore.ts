@@ -57,6 +57,7 @@ type NotesStore = {
   flushAndSave: () => Promise<boolean>;
 
   archiveNote: (id: string) => Promise<void>;
+  restoreNote: (id: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   processWithAI: (markdownOverride?: string) => Promise<ProcessWithAIResult>;
 
@@ -436,6 +437,28 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }
 
       get().setNotice({ kind: 'success', message: 'Note archived.' });
+      void get().loadList();
+    } catch (error) {
+      set({ error: toErrorMessage(error) });
+    }
+  },
+
+  restoreNote: async (id) => {
+    try {
+      await getUntask().notes.restore(id);
+
+      if (get().activeNoteId === id) {
+        set({
+          subView: 'list',
+          layoutMode: 'list',
+          activeNoteId: null,
+          activeNoteTitle: '',
+          content: '',
+          isDirty: false,
+        });
+      }
+
+      get().setNotice({ kind: 'success', message: 'Note restored.' });
       void get().loadList();
     } catch (error) {
       set({ error: toErrorMessage(error) });

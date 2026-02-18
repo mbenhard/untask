@@ -151,6 +151,17 @@ export function archiveNote(id: string): Note | undefined {
   return updated;
 }
 
+export function restoreNote(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ status: 'active', updatedAt: new Date().toISOString() })
+    .where(eq(notes.id, id))
+    .returning()
+    .all();
+  return updated;
+}
+
 export function deleteNote(id: string): void {
   const db = getDb();
   db.delete(notes).where(eq(notes.id, id)).run();

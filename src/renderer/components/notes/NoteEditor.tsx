@@ -5,7 +5,7 @@ import {
   type DefaultReactSuggestionItem,
   getDefaultReactSlashMenuItems,
 } from '@blocknote/react';
-import { Archive, ArrowLeft, CheckSquare, Sparkles, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, CheckSquare, Sparkles, Trash2 } from 'lucide-react';
 
 import {
   selectActiveNoteId,
@@ -101,6 +101,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const setTitle = useNotesStore((s) => s.setTitle);
   const backToList = useNotesStore((s) => s.backToList);
   const archiveNote = useNotesStore((s) => s.archiveNote);
+  const restoreNote = useNotesStore((s) => s.restoreNote);
   const deleteNote = useNotesStore((s) => s.deleteNote);
   const processWithAI = useNotesStore((s) => s.processWithAI);
 
@@ -136,6 +137,11 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     if (!activeNoteId) return;
     void archiveNote(activeNoteId);
   }, [activeNoteId, archiveNote]);
+
+  const handleRestore = useCallback(() => {
+    if (!activeNoteId) return;
+    void restoreNote(activeNoteId);
+  }, [activeNoteId, restoreNote]);
 
   const handleDelete = useCallback(() => {
     if (!activeNoteId) return;
@@ -237,16 +243,28 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           </Button>
 
           {isArchived ? (
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-destructive"
-              onClick={handleDelete}
-            >
-              <Trash2 size={12} />
-              delete
-            </Button>
+            <>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={handleRestore}
+              >
+                <ArchiveRestore size={12} />
+                restore
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-destructive"
+                onClick={handleDelete}
+              >
+                <Trash2 size={12} />
+                delete
+              </Button>
+            </>
           ) : (
             <Button
               type="button"
