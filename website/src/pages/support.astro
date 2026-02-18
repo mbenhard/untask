@@ -2,8 +2,6 @@
 import Base from '../layouts/Base.astro';
 import Footer from '../components/Footer.astro';
 
-const emailB64 = Buffer.from('marcus@unta.sk').toString('base64');
-
 const faqItems = [
   {
     q: 'AI not responding?',
@@ -226,7 +224,7 @@ Free to use, no strings attached.<br/><br/>
   }
 </style>
 
-<script is:inline define:vars={{ emailB64 }}>
+<script is:inline>
   function birdBounce(el) {
     if (el.classList.contains('bounce')) return;
     el.classList.add('bounce');
@@ -238,10 +236,10 @@ Free to use, no strings attached.<br/><br/>
   }
 
   function copyEmail(btn) {
-    const email = atob(emailB64);
+    var email = atob('bWFyY3VzQHVudGEuc2s=');
     navigator.clipboard.writeText(email).then(function() {
-      const copyIcon = btn.querySelector('.email-copy-icon');
-      const checkIcon = btn.querySelector('.email-check-icon');
+      var copyIcon = btn.querySelector('.email-copy-icon');
+      var checkIcon = btn.querySelector('.email-check-icon');
       copyIcon.classList.add('hidden');
       checkIcon.classList.remove('hidden');
       setTimeout(function() {
