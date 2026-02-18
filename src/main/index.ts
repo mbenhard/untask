@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeImage } from 'electron';
+import { app, BrowserWindow, nativeImage, shell } from 'electron';
 import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -87,6 +87,25 @@ const createMainWindow = (): BrowserWindow => {
   });
 
   restoreWindowBounds(window);
+
+  // Open all external links in the default system browser
+  // instead of spawning new Electron windows.
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // Prevent the main window from navigating away to external URLs.
+  window.webContents.on('will-navigate', (event, url) => {
+    const appOrigins = [
+      MAIN_WINDOW_VITE_DEV_SERVER_URL,
+      'file://',
+    ].filter(Boolean);
+    if (!appOrigins.some((origin) => url.startsWith(origin!))) {
+      event.preventDefault();
+      void shell.openExternal(url);
+    }
+  });
 
   window.on('close', (event) => {
     if (!isQuitting) {

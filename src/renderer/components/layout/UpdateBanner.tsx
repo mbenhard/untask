@@ -75,13 +75,6 @@ export const UpdateBanner = () => {
           target="_blank"
           rel="noreferrer"
           className="font-medium text-foreground underline-offset-2 hover:underline"
-          onClick={(e) => {
-            e.preventDefault();
-            // Open the URL in the system browser via Electron shell.
-            // We access it through the window object since shell is not
-            // directly available in the renderer.
-            window.open(updateInfo.releaseUrl, '_blank');
-          }}
         >
           View release
         </a>
