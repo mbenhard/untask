@@ -607,7 +607,10 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             )}
 
             {timestamp ? (
-              <time className="px-1 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80">
+              <time className={cn(
+                "px-1 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80",
+                isAssistant && "ml-6",
+              )}>
                 {timestamp}
               </time>
             ) : null}
