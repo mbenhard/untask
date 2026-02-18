@@ -3,12 +3,12 @@ import { create } from 'zustand';
 export type ToastState = {
   id: number;
   label: string;
-  onUndo?: () => void;
+  onUndo?: () => void | Promise<void>;
 };
 
 type ToastStore = {
   toast: ToastState | null;
-  showToast: (label: string, onUndo?: () => void) => void;
+  showToast: (label: string, onUndo?: () => void | Promise<void>) => void;
   clearToast: () => void;
 };
 

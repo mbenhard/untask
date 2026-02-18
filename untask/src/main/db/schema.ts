@@ -129,7 +129,7 @@ export const taskEvents = sqliteTable(
     }).notNull(),
     before: text('before'),
     after: text('after'),
-    source: text('source', { enum: ['user', 'ai'] }).notNull(),
+    source: text('source', { enum: ['user', 'ai', 'undo'] }).notNull(),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
   },
   (table) => [
