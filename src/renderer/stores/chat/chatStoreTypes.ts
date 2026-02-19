@@ -28,6 +28,7 @@ export type ChatUiMessage = {
   content: string;
   createdAt: string | null;
   isStreaming?: boolean;
+  streamPhase?: 'sending' | 'thinking';
   actionCards: ChatActionCard[];
   steps: TurnStep[];
   imageCount?: number;

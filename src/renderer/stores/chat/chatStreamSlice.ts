@@ -59,6 +59,7 @@ const bootstrapProactiveInFlight = (
     content: '',
     createdAt: new Date().toISOString(),
     isStreaming: true,
+    streamPhase: 'sending',
     actionCards: [],
     steps: [],
   };
@@ -119,7 +120,7 @@ const handleReasoning: StreamEventHandler = ({ set, event, inFlight }) => {
     },
     messages: state.messages.map((message) =>
       message.id === inFlight.placeholderId
-        ? { ...message, steps: nextSteps }
+        ? { ...message, steps: nextSteps, streamPhase: 'thinking' }
         : message,
     ),
   }));
@@ -150,6 +151,7 @@ const handleToken: StreamEventHandler = ({ set, event, inFlight }) => {
             ...message,
             content: `${message.content}${event.text}`,
             steps: nextSteps,
+            streamPhase: undefined,
           }
         : message,
     ),
@@ -175,7 +177,7 @@ const handleToolCallStarted: StreamEventHandler = ({ set, event, inFlight }) => 
     },
     messages: state.messages.map((message) =>
       message.id === inFlight.placeholderId
-        ? { ...message, steps: nextSteps }
+        ? { ...message, steps: nextSteps, streamPhase: undefined }
         : message,
     ),
   }));
@@ -383,6 +385,7 @@ const handleError: StreamEventHandler = ({ set, event }) => {
             ? {
                 ...message,
                 isStreaming: false,
+                streamPhase: undefined,
                 content:
                   message.content.trim().length > 0
                     ? message.content
@@ -486,7 +489,7 @@ export const createStreamActions = (
     const { messages } = get();
     const updatedMessages = messages.map((msg) => {
       if (msg.isStreaming) {
-        return { ...msg, isStreaming: false };
+        return { ...msg, isStreaming: false, streamPhase: undefined };
       }
       return msg;
     });
