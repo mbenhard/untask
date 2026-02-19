@@ -5,7 +5,7 @@ import type { ProviderInstance } from './types';
 export const OLLAMA_DEFAULT_BASE_URL = 'http://localhost:11434';
 
 /** Context window size used for all Ollama model instances. */
-export const OLLAMA_NUM_CTX = 16_384;
+export const OLLAMA_NUM_CTX = 4_096;
 
 /** Keep-alive duration passed to Ollama (model stays loaded this long). */
 export const OLLAMA_KEEP_ALIVE = '30m';

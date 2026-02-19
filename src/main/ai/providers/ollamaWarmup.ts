@@ -1,3 +1,5 @@
+import { app } from 'electron';
+
 import { resolveBaseUrl } from './ollamaDetection';
 import { OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from './ollama';
 
@@ -14,6 +16,12 @@ export async function warmOllamaModel(
   baseUrl?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const resolved = baseUrl?.trim() || resolveBaseUrl();
+  const isDev = !app.isPackaged;
+  const t0 = isDev ? performance.now() : 0;
+
+  if (isDev) {
+    console.log(`[ollama-warmup] starting: model=${modelId} num_ctx=${OLLAMA_NUM_CTX}`);
+  }
 
   try {
     const response = await fetch(`${resolved.replace(/\/$/, '')}/api/chat`, {
@@ -26,17 +34,28 @@ export async function warmOllamaModel(
         options: { num_ctx: OLLAMA_NUM_CTX },
         stream: false,
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(120_000),
     });
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      return { ok: false, error: `Ollama warmup failed (${response.status}): ${text}` };
+      const error = `Ollama warmup failed (${response.status}): ${text}`;
+      if (isDev) {
+        console.log(`[ollama-warmup] failed: ${(performance.now() - t0).toFixed(0)}ms — ${error}`);
+      }
+      return { ok: false, error };
     }
 
+    if (isDev) {
+      console.log(`[ollama-warmup] done: ${(performance.now() - t0).toFixed(0)}ms`);
+    }
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, error: `Ollama warmup error: ${message}` };
+    const fullError = `Ollama warmup error: ${message}`;
+    if (isDev) {
+      console.log(`[ollama-warmup] error: ${(performance.now() - t0).toFixed(0)}ms — ${fullError}`);
+    }
+    return { ok: false, error: fullError };
   }
 }

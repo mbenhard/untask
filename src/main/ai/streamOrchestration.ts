@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { app } from 'electron';
 import { generateText, stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
@@ -16,7 +17,8 @@ import {
 } from '../services/chatService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { getActiveProvider } from './providers';
-import { getModelWebSearchConfig, modelSupportsVision } from './models';
+import { warmOllamaModel } from './providers/ollamaWarmup';
+import { getModelWebSearchConfig, isOllamaProvider, modelSupportsVision } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall } from './tools';
@@ -417,6 +419,14 @@ export const runAssistantStream = async (
     attemptCount: 0,
   };
 
+  const isDev = !app.isPackaged;
+  const t0 = isDev ? performance.now() : 0;
+  let tFirstReasoning = 0;
+  let tFirstToken = 0;
+  let tFirstToolCall = 0;
+  let tokenCount = 0;
+  let reasoningTokenCount = 0;
+
   const emit = input.emit;
   let assistantText = '';
   let reasoningText = '';
@@ -468,6 +478,35 @@ export const runAssistantStream = async (
         ).filter(
           (message) => message.role === 'user' || message.role === 'assistant',
         );
+        if (isDev) {
+          const promptChars = (noteContextPrompt
+            ? `${builtPrompt.modelInputPrompt}\n\n${noteContextPrompt}`
+            : builtPrompt.modelInputPrompt
+          ).length;
+          // Rough estimate: ~4 chars per token for English text
+          const estimatedPromptTokens = Math.round(promptChars / 4);
+          console.log(
+            `[chat-stream] start: model=${input.modelId}` +
+            ` | history=${recentHistory.length}` +
+            ` | images=${input.images?.length ?? 0}` +
+            ` | ~prompt_tokens=${estimatedPromptTokens}`,
+          );
+        }
+
+        // Pre-stream warmup for Ollama: ensures model is loaded before streaming
+        if (isOllamaProvider()) {
+          const warmupT0 = isDev ? performance.now() : 0;
+          const warmupResult = await warmOllamaModel(input.modelId);
+          if (isDev) {
+            const warmupMs = (performance.now() - warmupT0).toFixed(0);
+            console.log(
+              `[chat-stream] ollama pre-stream warmup: ${warmupResult.ok ? 'ok' : 'failed'}` +
+              ` (${warmupMs}ms)` +
+              (warmupResult.error ? ` — ${warmupResult.error}` : ''),
+            );
+          }
+        }
+
         const conversationMessages = buildConversationMessages({
           history: recentHistory.map((message) => ({
             role: message.role,
@@ -648,6 +687,11 @@ export const runAssistantStream = async (
                 requestId: input.requestId,
                 text: part.text,
               });
+              if (isDev && !tFirstReasoning) {
+                tFirstReasoning = performance.now();
+                console.log(`[chat-stream] first reasoning: ${(tFirstReasoning - t0).toFixed(0)}ms`);
+              }
+              if (isDev) reasoningTokenCount++;
               break;
             }
             case 'reasoning-start':
@@ -664,6 +708,11 @@ export const runAssistantStream = async (
                 requestId: input.requestId,
                 text: part.text,
               });
+              if (isDev && !tFirstToken) {
+                tFirstToken = performance.now();
+                console.log(`[chat-stream] first token: ${(tFirstToken - t0).toFixed(0)}ms`);
+              }
+              if (isDev) tokenCount++;
               break;
             }
             case 'tool-call': {
@@ -677,6 +726,10 @@ export const runAssistantStream = async (
                 toolCallId: part.toolCallId,
                 description,
               });
+              if (isDev && !tFirstToolCall) {
+                tFirstToolCall = performance.now();
+                console.log(`[chat-stream] first tool call (${part.toolName}): ${(tFirstToolCall - t0).toFixed(0)}ms`);
+              }
               break;
             }
             case 'tool-result': {
@@ -728,6 +781,9 @@ export const runAssistantStream = async (
                 actionCard,
                 ...(toolChips ? { chips: toolChips } : {}),
               });
+              if (isDev) {
+                console.log(`[chat-stream] tool ${part.toolName} completed (${status}): ${(performance.now() - t0).toFixed(0)}ms`);
+              }
               break;
             }
             case 'tool-error': {
@@ -954,6 +1010,19 @@ export const runAssistantStream = async (
       return;
     }
 
+    if (isDev) {
+      const elapsed = performance.now() - t0;
+      console.log(
+        `[chat-stream] done: ${elapsed.toFixed(0)}ms total` +
+        ` | model=${input.modelId}` +
+        ` | tokens=${tokenCount}` +
+        ` | reasoning=${reasoningTokenCount}` +
+        ` | tools=${toolExecutions.length}` +
+        (tFirstToken ? ` | ttft=${(tFirstToken - t0).toFixed(0)}ms` : '') +
+        (tFirstReasoning ? ` | ttfr=${(tFirstReasoning - t0).toFixed(0)}ms` : ''),
+      );
+    }
+
     emit({
       type: 'assistant_done',
       requestId: input.requestId,
@@ -967,6 +1036,9 @@ export const runAssistantStream = async (
     }
 
     const classified = classifyChatError(error);
+    if (isDev) {
+      console.log(`[chat-stream] error after ${(performance.now() - t0).toFixed(0)}ms: ${classified.code} — ${classified.message}`);
+    }
     emit({
       type: 'error',
       requestId: input.requestId,
