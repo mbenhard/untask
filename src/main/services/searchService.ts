@@ -50,6 +50,12 @@ export type SearchChatQueryResult = {
   total: number;
 };
 
+export type NoteSearchResultItem = {
+  id: string;
+  title: string;
+  snippet: string;
+};
+
 const buildFtsPrefixQuery = (query: string): string =>
   query
     .replace(/"/g, '""')
@@ -152,6 +158,49 @@ export function initChatSearchFts(): void {
   rebuildChatSearchIndex();
 }
 
+export function initNotesSearchFts(): void {
+  const db = getRawDb();
+
+  db.exec('DROP TABLE IF EXISTS notes_fts;');
+
+  db.exec(`
+    CREATE VIRTUAL TABLE notes_fts USING fts5(
+      title,
+      content,
+      content='notes',
+      content_rowid='rowid'
+    );
+  `);
+
+  db.exec('DROP TRIGGER IF EXISTS notes_fts_insert;');
+  db.exec(`
+    CREATE TRIGGER notes_fts_insert AFTER INSERT ON notes BEGIN
+      INSERT INTO notes_fts(rowid, title, content)
+      VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.content, ''));
+    END;
+  `);
+
+  db.exec('DROP TRIGGER IF EXISTS notes_fts_update;');
+  db.exec(`
+    CREATE TRIGGER notes_fts_update AFTER UPDATE ON notes BEGIN
+      INSERT INTO notes_fts(notes_fts, rowid, title, content)
+      VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.content, ''));
+      INSERT INTO notes_fts(rowid, title, content)
+      VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.content, ''));
+    END;
+  `);
+
+  db.exec('DROP TRIGGER IF EXISTS notes_fts_delete;');
+  db.exec(`
+    CREATE TRIGGER notes_fts_delete AFTER DELETE ON notes BEGIN
+      INSERT INTO notes_fts(notes_fts, rowid, title, content)
+      VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.content, ''));
+    END;
+  `);
+
+  rebuildNotesSearchIndex();
+}
+
 export function rebuildSearchIndex(): void {
   const db = getRawDb();
   db.exec("INSERT INTO tasks_fts(tasks_fts) VALUES ('rebuild');");
@@ -160,6 +209,11 @@ export function rebuildSearchIndex(): void {
 export function rebuildChatSearchIndex(): void {
   const db = getRawDb();
   db.exec("INSERT INTO chat_messages_fts(chat_messages_fts) VALUES ('rebuild');");
+}
+
+export function rebuildNotesSearchIndex(): void {
+  const db = getRawDb();
+  db.exec("INSERT INTO notes_fts(notes_fts) VALUES ('rebuild');");
 }
 
 /**
@@ -180,6 +234,58 @@ export function searchTasks(input: SearchQueryInput): SearchQueryResult {
     initSearchFts();
     return executeTaskSearch(sanitized, validated.limit);
   }
+}
+
+/**
+ * Search notes using FTS5 full-text search.
+ * Returns active notes only. On corruption, drops and rebuilds FTS then retries once.
+ */
+export function searchNotes(input: SearchQueryInput): { results: NoteSearchResultItem[]; total: number } {
+  const validated = searchQuerySchema.parse(input);
+  const sanitized = buildFtsPrefixQuery(validated.query);
+
+  if (sanitized.length === 0) {
+    return { results: [], total: 0 };
+  }
+
+  try {
+    return executeNoteSearch(sanitized, validated.limit);
+  } catch {
+    initNotesSearchFts();
+    return executeNoteSearch(sanitized, validated.limit);
+  }
+}
+
+function executeNoteSearch(sanitized: string, limit: number): { results: NoteSearchResultItem[]; total: number } {
+  const db = getRawDb();
+
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        n.id, n.title,
+        snippet(notes_fts, 0, '<mark>', '</mark>', '...', 32) AS snippet
+      FROM notes_fts
+      JOIN notes n ON n.rowid = notes_fts.rowid
+      WHERE notes_fts MATCH ?
+      AND n.status = 'active'
+      ORDER BY rank
+      LIMIT ?
+      `,
+    )
+    .all(sanitized, limit) as Array<{
+    id: string;
+    title: string;
+    snippet: string;
+  }>;
+
+  const results: NoteSearchResultItem[] = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    snippet: row.snippet,
+  }));
+
+  return { results, total: results.length };
 }
 
 /**

@@ -9,6 +9,7 @@ type SearchStore = {
   query: string;
   results: SearchResultItem[];
   total: number;
+  types: ('task' | 'note')[];
   isSearching: boolean;
   selectedIndex: number;
   error: string | null;
@@ -26,6 +27,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
   query: '',
   results: [],
   total: 0,
+  types: [],
   isSearching: false,
   selectedIndex: 0,
   error: null,
@@ -36,6 +38,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       query: '',
       results: [],
       total: 0,
+      types: [],
       selectedIndex: 0,
       error: null,
     }),
@@ -52,6 +55,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({
         results: [],
         total: 0,
+        types: [],
         selectedIndex: 0,
         error: null,
       });
@@ -69,6 +73,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({
         results: result.results,
         total: result.total,
+        types: result.types,
         isSearching: false,
         selectedIndex: 0,
       });
@@ -104,3 +109,4 @@ export const selectSearchIsSearching = (state: SearchStore) => state.isSearching
 export const selectSearchTotal = (state: SearchStore) => state.total;
 export const selectSearchError = (state: SearchStore) => state.error;
 export const selectSearchSelectedIndex = (state: SearchStore) => state.selectedIndex;
+export const selectSearchTypes = (state: SearchStore) => state.types;

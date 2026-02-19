@@ -18,7 +18,7 @@ import {
   startDailyBackupScheduler,
   stopDailyBackupScheduler,
 } from './services/backupService';
-import { initChatSearchFts, initSearchFts } from './services/searchService';
+import { initChatSearchFts, initNotesSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting, isAiEnabled } from './services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
@@ -146,6 +146,7 @@ const bootstrap = (): void => {
   migrateApiKeysToSafeStorage();
   initSearchFts();
   initChatSearchFts();
+  initNotesSearchFts();
   registerIpcHandlers();
 
   mainWindow = createMainWindow();

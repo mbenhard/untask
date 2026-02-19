@@ -25,7 +25,7 @@ import {
 } from '../services/backupService';
 import { closeDatabase, initDatabase } from '../db';
 import { runMigrations } from '../db/migrate';
-import { initChatSearchFts, initSearchFts } from '../services/searchService';
+import { initChatSearchFts, initNotesSearchFts, initSearchFts } from '../services/searchService';
 import { refreshTodayBadge } from '../tray';
 
 const BACKUP_JOB_TIMEOUT_MS = 120_000;
@@ -69,6 +69,7 @@ const reinitializeDatabase = (): void => {
   runMigrations();
   initSearchFts();
   initChatSearchFts();
+  initNotesSearchFts();
   refreshTodayBadge();
 };
 

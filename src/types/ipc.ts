@@ -356,7 +356,8 @@ export type SearchQueryRequest = {
   limit?: number;
 };
 
-export type SearchResultItem = {
+export type TaskSearchResultItem = {
+  type: 'task';
   id: string;
   parentId: string | null;
   title: string;
@@ -369,9 +370,19 @@ export type SearchResultItem = {
   snippet: string;
 };
 
+export type NoteSearchResultItem = {
+  type: 'note';
+  id: string;
+  title: string;
+  snippet: string;
+};
+
+export type SearchResultItem = TaskSearchResultItem | NoteSearchResultItem;
+
 export type SearchQueryResponse = {
   results: SearchResultItem[];
   total: number;
+  types: ('task' | 'note')[];
 };
 
 export type SettingsGetAiEnabledResult = {
