@@ -148,11 +148,11 @@ const handleToken: StreamEventHandler = ({ set, event, inFlight }) => {
     messages: state.messages.map((message) =>
       message.id === inFlight.placeholderId
         ? {
-            ...message,
-            content: `${message.content}${event.text}`,
-            steps: nextSteps,
-            streamPhase: undefined,
-          }
+          ...message,
+          content: `${message.content}${event.text}`,
+          steps: nextSteps,
+          streamPhase: undefined,
+        }
         : message,
     ),
   }));
@@ -381,18 +381,18 @@ const handleError: StreamEventHandler = ({ set, event }) => {
     const placeholderId = state.inFlightByRequestId[event.requestId]?.placeholderId;
     const nextMessages = placeholderId
       ? state.messages.map((message) =>
-          message.id === placeholderId
-            ? {
-                ...message,
-                isStreaming: false,
-                streamPhase: undefined,
-                content:
-                  message.content.trim().length > 0
-                    ? message.content
-                    : `Error: ${event.message}`,
-              }
-            : message,
-        )
+        message.id === placeholderId
+          ? {
+            ...message,
+            isStreaming: false,
+            streamPhase: undefined,
+            content:
+              message.content.trim().length > 0
+                ? message.content
+                : `Error: ${event.message}`,
+          }
+          : message,
+      )
       : state.messages;
 
     const remaining = {
@@ -487,12 +487,31 @@ export const createStreamActions = (
   cancelStream: async () => {
     await getUntask().chat.cancel();
     const { messages } = get();
-    const updatedMessages = messages.map((msg) => {
-      if (msg.isStreaming) {
-        return { ...msg, isStreaming: false, streamPhase: undefined };
-      }
-      return msg;
-    });
+    const updatedMessages = messages
+      .map((msg) => {
+        if (msg.isStreaming) {
+          const hasContent = msg.content.trim().length > 0;
+          const hasVisibleSteps = msg.steps.some(
+            (step) => step.kind === 'text' || step.kind === 'tool',
+          );
+
+          if (!hasContent && !hasVisibleSteps) {
+            return null;
+          }
+
+          const cancellationNote = '\n\n*(Generation stopped)*';
+          const finalContent = msg.content + cancellationNote;
+
+          return {
+            ...msg,
+            content: finalContent.trim(),
+            isStreaming: false,
+            streamPhase: undefined,
+          };
+        }
+        return msg;
+      })
+      .filter((msg): msg is ChatUiMessage => msg !== null);
     set({
       messages: updatedMessages,
       isSending: false,
