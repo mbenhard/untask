@@ -15,7 +15,6 @@ import {
   saveChatMessage,
 } from '../services/chatService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
-import { scheduleKnowledgeExtraction } from './knowledgeExtractor';
 import { getActiveProvider } from './providers';
 import { getModelWebSearchConfig, modelSupportsVision } from './models';
 import { buildSystemPrompt } from './systemPrompt';
@@ -587,7 +586,7 @@ export const runAssistantStream = async (
 
             return {};
           },
-          experimental_repairToolCall: async ({ toolCall, tools, error, inputSchema }) => {
+          experimental_repairToolCall: async ({ toolCall, error, inputSchema }) => {
             try {
               const schema = await inputSchema({ toolName: toolCall.toolName });
               const { text: repairedArgs } = await generateText({
@@ -949,13 +948,6 @@ export const runAssistantStream = async (
     void maybeAutoTitleConversation({
       conversationId: input.conversationId,
       userMessage: input.userMessage,
-    });
-
-    scheduleKnowledgeExtraction({
-      userMessage: input.userMessage,
-      assistantResponse: outputText,
-      requestId: input.requestId,
-      emit,
     });
 
     if (chatState.isCanceled(input.requestId)) {

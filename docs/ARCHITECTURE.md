@@ -164,7 +164,6 @@ src/
 │   │   ├── providers/       # OpenRouter, OpenAI, Anthropic, Ollama adapters
 │   │   ├── chat.ts          # Chat orchestration and streaming
 │   │   ├── contextBuilder.ts # Runtime context assembly
-│   │   ├── knowledgeExtractor.ts # Post-turn pattern extraction
 │   │   ├── memory.ts        # Memory read/write operations
 │   │   ├── models.ts        # Model catalog and capability metadata
 │   │   ├── systemPrompt.ts  # System prompt construction
