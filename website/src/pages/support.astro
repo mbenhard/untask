@@ -279,15 +279,15 @@ Free to use, no strings attached.<br/><br/>
   (function() {
     var phrases = ['Hi!', 'Hello!', "'sup", 'hey!', 'me?', 'yo!', 'hmm?', 'oh!', '!', '...hi', 'ooo!', 'heyy', 'hm?', 'wat', ':)', ':o', ';)', '!'];
     var lastPhrase = -1;
+    var timeoutId;
     
     function birdBounce(el) {
-      if (el.classList.contains('bounce')) return;
+      var bubble = el.querySelector('.chirp-bubble');
       
       var idx;
       do { idx = Math.floor(Math.random() * phrases.length); } while (idx === lastPhrase && phrases.length > 1);
       lastPhrase = idx;
       
-      var bubble = el.querySelector('.chirp-bubble');
       if (bubble) {
         bubble.textContent = phrases[idx];
         var angle = Math.floor(Math.random() * 25) - 12;
@@ -296,16 +296,16 @@ Free to use, no strings attached.<br/><br/>
         bubble.style.setProperty('--chirp-offset', offsetX + 'px');
       }
       
-      el.classList.add('bounce', 'show-chirp');
-      el.addEventListener('animationend', function handler(e) {
-        if (e.animationName === 'bird-snap') {
-          el.classList.remove('bounce');
-          el.removeEventListener('animationend', handler);
-        }
-      }, { once: false });
-      setTimeout(function() {
+      if (el.classList.contains('bounce')) {
         el.classList.remove('bounce', 'show-chirp');
-      }, 1100);
+        void (bubble && bubble.offsetWidth);
+      }
+      
+      el.classList.add('bounce', 'show-chirp');
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(function() {
+        el.classList.remove('bounce', 'show-chirp');
+      }, 600);
     }
     
     window.birdBounce = birdBounce;
