@@ -50,6 +50,7 @@ export const createSendPreparedMessage = (
         content: '',
         createdAt: new Date().toISOString(),
         isStreaming: true,
+        streamPhase: 'sending',
         actionCards: [],
         steps: [],
       };

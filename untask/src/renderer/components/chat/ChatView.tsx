@@ -246,21 +246,50 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
 
 type StreamingIndicatorProps = {
   prefersReducedMotion: boolean;
+  phase?: 'sending' | 'thinking';
+  isOllama?: boolean;
 };
 
-const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) => (
-  <div className="py-0.5 pl-1" role="status" aria-label="Untask is thinking">
-    <span
-      className={cn(
-        'font-mono text-[11px] tracking-normal',
-        prefersReducedMotion ? 'text-muted-foreground/40' : 'thinking-shimmer',
-      )}
-    >
-      Thinking&hellip;
-    </span>
-    <span className="sr-only">Untask is thinking</span>
-  </div>
-);
+const StreamingIndicator = ({ prefersReducedMotion, phase, isOllama }: StreamingIndicatorProps) => {
+  const [showLoadingModel, setShowLoadingModel] = useState(false);
+
+  useEffect(() => {
+    if (phase !== 'sending' || !isOllama) {
+      setShowLoadingModel(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setShowLoadingModel(true), 2000);
+    return () => clearTimeout(timer);
+  }, [phase, isOllama]);
+
+  let label: string;
+  let ariaLabel: string;
+  if (phase === 'sending' && showLoadingModel) {
+    label = 'Loading model\u2026';
+    ariaLabel = 'Loading model';
+  } else if (phase === 'sending') {
+    label = 'Sending\u2026';
+    ariaLabel = 'Sending message';
+  } else {
+    label = 'Thinking\u2026';
+    ariaLabel = 'Untask is thinking';
+  }
+
+  return (
+    <div className="py-0.5 pl-1" role="status" aria-label={ariaLabel}>
+      <span
+        className={cn(
+          'font-mono text-[11px] tracking-normal',
+          prefersReducedMotion ? 'text-muted-foreground/40' : 'thinking-shimmer',
+        )}
+      >
+        {label}
+      </span>
+      <span className="sr-only">{ariaLabel}</span>
+    </div>
+  );
+};
 
 type ChipBarProps = {
   chips: ChipAction[];
@@ -374,6 +403,8 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
     scrollToBottom();
   }, [scrollToBottom]);
 
+  const [isOllama, setIsOllama] = useState(false);
+
   // Preload Ollama model when chat view opens (eliminates cold-start latency)
   useEffect(() => {
     if (!selectedModelId) return;
@@ -383,7 +414,10 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
     const maybeWarmup = async () => {
       try {
         const provider = await getUntask().settings.get('ai_provider');
-        if (cancelled || provider !== 'ollama') return;
+        if (cancelled) return;
+        const ollamaProvider = provider === 'ollama';
+        setIsOllama(ollamaProvider);
+        if (!ollamaProvider) return;
         void getUntask().chat.warmupOllama({ modelId: selectedModelId });
       } catch {
         // Warmup is best-effort — don't surface errors
@@ -578,7 +612,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                 })}
 
                 {Boolean(message.isStreaming) && (
-                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
                 )}
 
                 {message.chips && message.chips.length > 0 ? (
@@ -593,7 +627,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             ) : isAssistant && isPendingAssistantPlaceholder ? (
               <div className="flex w-full max-w-[88%] items-center gap-2">
                 <AvatarIcon size={16} className="shrink-0 text-muted-foreground/40" />
-                <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+                <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
               </div>
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
@@ -644,7 +678,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         );
       });
     },
-    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion],
+    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion, isOllama],
   );
 
   return (
