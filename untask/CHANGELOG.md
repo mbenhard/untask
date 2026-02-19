@@ -5,6 +5,20 @@ All notable changes to Untask will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.8] - 2026-02-19
+
+### Changed
+
+- **AI Chat refactor** — Major overhaul of chat orchestration with modular tools architecture (task, note, context helpers), error classification system, and improved stream handling
+- New settings UI: API key manager, model catalog, and provider selector
+- Added auto-titling for conversations
+- Chat store refactored into modular slices
+
+### Website
+
+- Added Reminders sync callout to landing page
+- Updated preview sections
+
 ## [0.1.7] - 2026-02-19
 
 ### Added
