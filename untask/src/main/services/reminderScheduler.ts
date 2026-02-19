@@ -1,13 +1,19 @@
 import { BrowserWindow, Notification } from 'electron';
 
 import { IPC_CHANNELS } from '../../types/ipc';
+import {
+  SETTING_KEY_NOTIFICATIONS_ENABLED,
+  SETTING_KEY_NOTIFICATIONS_SOUND,
+} from '../defaultSettings';
+import { observePermission } from '../ipc/notifications';
 import { resolveDueDateTargetMs } from './dueDateParser';
-import { listTasks, subscribeTaskChanges } from './taskService';
+import { getSettingWithDefault } from './settingsService';
+import { listTasks, getTaskById, subscribeTaskChanges, type TaskChangeEvent } from './taskService';
 
 // ─── Constants ──────────────────────────────────────────────
 
 const SCAN_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const DEBOUNCE_MS = 2000;
+const MAX_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours — setTimeout max safe delay
 
 /** Reminder offset values → milliseconds before due time. */
 const OFFSET_MS: Record<string, number> = {
@@ -34,6 +40,14 @@ const recordCooldown = (key: string): void => {
   cooldownMap.set(key, Date.now());
 };
 
+// ─── Settings helpers ───────────────────────────────────────
+
+const isNotificationsEnabled = (): boolean =>
+  getSettingWithDefault(SETTING_KEY_NOTIFICATIONS_ENABLED) !== 'false';
+
+const isSoundEnabled = (): boolean =>
+  getSettingWithDefault(SETTING_KEY_NOTIFICATIONS_SOUND) !== 'false';
+
 // ─── Native notification helper ─────────────────────────────
 
 const showNativeNotification = (
@@ -41,9 +55,15 @@ const showNativeNotification = (
   body: string,
   onClick?: () => void,
 ): void => {
+  if (!isNotificationsEnabled()) return;
   if (!Notification.isSupported()) return;
 
-  const notification = new Notification({ title, body, silent: false });
+  const notification = new Notification({
+    title,
+    body,
+    silent: !isSoundEnabled(),
+  });
+  observePermission(notification);
   notification.on('click', () => {
     const windows = BrowserWindow.getAllWindows();
     if (windows.length > 0 && !windows[0].isDestroyed()) {
@@ -76,8 +96,7 @@ export type InitReminderSchedulerOptions = {
 // ─── Scheduler state ────────────────────────────────────────
 
 let scanInterval: NodeJS.Timeout | null = null;
-let debounceTimer: NodeJS.Timeout | null = null;
-let taskTimers = new Map<string, NodeJS.Timeout>();
+const taskTimers = new Map<string, NodeJS.Timeout>();
 let unsubscribeTaskChange: (() => void) | null = null;
 let deps: ReminderSchedulerDeps = {};
 
@@ -92,19 +111,65 @@ const parseOffsetMs = (offset: string | null | undefined): number => {
 };
 
 /**
- * Scan tasks and schedule timers for any due within the next hour.
- * Always sends native notifications. Optionally fires AI callback.
+ * Schedule (or reschedule) a timer for a single task.
+ * Clears any existing timer for the task first.
+ */
+const scheduleTaskTimer = (taskId: string): void => {
+  // Clear existing timer for this task
+  const existing = taskTimers.get(taskId);
+  if (existing) {
+    clearTimeout(existing);
+    taskTimers.delete(taskId);
+  }
+
+  const task = getTaskById(taskId);
+  if (!task) return;
+  if (task.status === 'done' || task.status === 'cancelled') return;
+
+  const targetMs = resolveDueDateTargetMs(task.dueDate);
+  if (targetMs === null) return;
+
+  const offsetMs = parseOffsetMs(task.reminderOffset);
+  const reminderMs = targetMs - offsetMs;
+  const nowMs = Date.now();
+
+  if (reminderMs <= nowMs) return; // Already past
+
+  const delay = reminderMs - nowMs;
+  if (delay > MAX_TIMEOUT_MS) return; // Too far out — safety scan will pick it up later
+
+  const offsetKey = task.reminderOffset ?? 'at_due';
+  const cooldownKey = `${task.id}:${offsetKey}`;
+  if (isCooldownActive(cooldownKey)) return;
+
+  const taskContext = { id: task.id, title: task.title };
+
+  const timer = setTimeout(() => {
+    taskTimers.delete(task.id);
+    recordCooldown(cooldownKey);
+    fireReminder(taskContext, offsetKey);
+  }, delay);
+
+  taskTimers.set(task.id, timer);
+};
+
+/**
+ * Clear the timer for a specific task.
+ */
+const clearTaskTimer = (taskId: string): void => {
+  const timer = taskTimers.get(taskId);
+  if (timer) {
+    clearTimeout(timer);
+    taskTimers.delete(taskId);
+  }
+};
+
+/**
+ * Safety scan: schedule timers for ALL future tasks with due dates.
+ * Acts as a fallback to catch tasks that may not have timers.
  */
 const scanAndSchedule = (): void => {
-  // Clear existing task-level timers
-  for (const timer of taskTimers.values()) {
-    clearTimeout(timer);
-  }
-  taskTimers.clear();
-
   const allTasks = listTasks();
-  const nowMs = Date.now();
-  const windowEnd = nowMs + SCAN_INTERVAL_MS;
 
   for (const task of allTasks) {
     if (task.status === 'done' || task.status === 'cancelled') continue;
@@ -112,26 +177,10 @@ const scanAndSchedule = (): void => {
     const targetMs = resolveDueDateTargetMs(task.dueDate);
     if (targetMs === null) continue;
 
-    const offsetMs = parseOffsetMs(task.reminderOffset);
-    const reminderMs = targetMs - offsetMs;
-
-    // Only schedule tasks firing within the next hour
-    if (reminderMs <= nowMs || reminderMs > windowEnd) continue;
-
-    const cooldownKey = `${task.id}:${task.reminderOffset ?? 'at_due'}`;
-    if (isCooldownActive(cooldownKey)) continue;
-
-    const delay = reminderMs - nowMs;
-    const taskContext = { id: task.id, title: task.title };
-
-    const offsetKey = task.reminderOffset ?? 'at_due';
-    const timer = setTimeout(() => {
-      taskTimers.delete(task.id);
-      recordCooldown(cooldownKey);
-      fireReminder(taskContext, offsetKey);
-    }, delay);
-
-    taskTimers.set(task.id, timer);
+    // Only schedule if no timer exists yet (don't override precise timers)
+    if (!taskTimers.has(task.id)) {
+      scheduleTaskTimer(task.id);
+    }
   }
 
   if (taskTimers.size > 0) {
@@ -141,7 +190,7 @@ const scanAndSchedule = (): void => {
 };
 
 /**
- * Fire a reminder for a single task: always native notification, optionally AI.
+ * Fire a reminder for a single task: native notification + optional AI.
  */
 const fireReminder = (
   taskContext: { id: string; title: string },
@@ -191,21 +240,26 @@ const catchUpOverdue = (): void => {
       .slice(0, 3)
       .map((t) => t.title)
       .join(', ');
-    // Summary click just focuses the app (overdue tasks already highlighted).
-    // showNativeNotification already brings the window to front.
     showNativeNotification(`${overdue.length} tasks overdue`, body);
   }
 };
 
 /**
- * Debounced rescan triggered by task changes.
+ * React to individual task changes for precise scheduling.
  */
-const onTaskChange = (): void => {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null;
-    scanAndSchedule();
-  }, DEBOUNCE_MS);
+const onTaskChange = (event: TaskChangeEvent): void => {
+  switch (event.action) {
+    case 'create':
+    case 'update':
+    case 'reopen':
+      scheduleTaskTimer(event.taskId);
+      break;
+    case 'complete':
+    case 'cancel':
+    case 'delete':
+      clearTaskTimer(event.taskId);
+      break;
+  }
 };
 
 // ─── Public API ─────────────────────────────────────────────
@@ -215,7 +269,7 @@ export const initReminderScheduler = (options: InitReminderSchedulerOptions = {}
   stopReminderScheduler();
   deps = depsOption;
 
-  // Subscribe to task changes for live rescheduling
+  // Subscribe to task changes for immediate rescheduling
   unsubscribeTaskChange = subscribeTaskChanges(onTaskChange);
 
   // Overdue catch-up only on cold start (app startup), not config changes
@@ -223,10 +277,10 @@ export const initReminderScheduler = (options: InitReminderSchedulerOptions = {}
     catchUpOverdue();
   }
 
-  // Immediate first scan
+  // Immediate first scan — schedules all future tasks
   scanAndSchedule();
 
-  // Recurring scan every hour
+  // Recurring safety scan every hour (fallback for edge cases)
   scanInterval = setInterval(scanAndSchedule, SCAN_INTERVAL_MS);
 
   // eslint-disable-next-line no-console
@@ -237,11 +291,6 @@ export const stopReminderScheduler = (): void => {
   if (scanInterval) {
     clearInterval(scanInterval);
     scanInterval = null;
-  }
-
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
   }
 
   for (const timer of taskTimers.values()) {

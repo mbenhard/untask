@@ -179,6 +179,13 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     containerRef,
   });
 
+  const effectiveSelectedId = useMemo(() => {
+    if (selectedListNoteId && activeNotes.some((note) => note.id === selectedListNoteId)) {
+      return selectedListNoteId;
+    }
+    return activeNotes[0]?.id ?? null;
+  }, [activeNotes, selectedListNoteId]);
+
   const selectedIndex = activeNotes.findIndex((n) => n.id === effectiveSelectedId);
 
   useAutoFocusList({
@@ -188,13 +195,6 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     containerRef,
     itemSelector: 'data-note-id',
   });
-
-  const effectiveSelectedId = useMemo(() => {
-    if (selectedListNoteId && activeNotes.some((note) => note.id === selectedListNoteId)) {
-      return selectedListNoteId;
-    }
-    return activeNotes[0]?.id ?? null;
-  }, [activeNotes, selectedListNoteId]);
 
   const handleCreate = useCallback(() => {
     void createNote();

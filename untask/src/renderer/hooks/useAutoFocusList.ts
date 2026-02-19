@@ -22,7 +22,7 @@ export function useAutoFocusList<T>({
     const container = containerRef.current;
     if (!container) return;
     const firstItemId = getItemId(items[0]);
-    const el = container.querySelector<HTMLElement>(`${itemSelector}="${firstItemId}"`);
+    const el = container.querySelector<HTMLElement>(`[${itemSelector}="${firstItemId}"]`);
     el?.focus();
   }, [isPrimary, items, getItemId, containerRef, itemSelector]);
 
@@ -31,7 +31,7 @@ export function useAutoFocusList<T>({
     const itemId = getItemId(items[selectedIndex]);
     const container = containerRef.current;
     if (!container) return;
-    const el = container.querySelector<HTMLElement>(`${itemSelector}="${itemId}"`);
+    const el = container.querySelector<HTMLElement>(`[${itemSelector}="${itemId}"]`);
     if (!el) return;
     if (el === document.activeElement || el.contains(document.activeElement)) return;
     el.focus();
