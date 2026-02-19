@@ -405,6 +405,29 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
 
   const [isOllama, setIsOllama] = useState(false);
 
+  // Refresh selected model when provider changes (handles switching from OpenRouter to Ollama)
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshModel = async () => {
+      try {
+        const selected = await getUntask().chat.getSelectedModel();
+        if (cancelled) return;
+        if (selected?.modelId) {
+          useChatStore.setState({ selectedModelId: selected.modelId });
+        }
+      } catch {
+        // Best-effort refresh
+      }
+    };
+
+    void refreshModel();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Preload Ollama model when chat view opens (eliminates cold-start latency)
   useEffect(() => {
     if (!selectedModelId) return;
@@ -418,6 +441,21 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         const ollamaProvider = provider === 'ollama';
         setIsOllama(ollamaProvider);
         if (!ollamaProvider) return;
+
+        // Validate model exists in Ollama before warming up
+        const ollamaStatus = await getUntask().chat.getOllamaStatus();
+        if (cancelled) return;
+
+        const availableModels = ollamaStatus.models.map((m) => m.name);
+        const modelExists = availableModels.some(
+          (name) => name === selectedModelId || name.startsWith(`${selectedModelId}:`),
+        );
+
+        if (!modelExists) {
+          console.log(`[ollama-warmup] skip: model=${selectedModelId} not found in Ollama`);
+          return;
+        }
+
         void getUntask().chat.warmupOllama({ modelId: selectedModelId });
       } catch {
         // Warmup is best-effort — don't surface errors
