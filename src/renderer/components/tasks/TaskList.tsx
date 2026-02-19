@@ -48,6 +48,12 @@ export interface TaskListProps {
   indentPx?: number;
   dndMode?: 'local' | 'shared';
   sharedActiveDragId?: string | null;
+  autoFocus?: boolean;
+  isPrimaryList?: boolean;
+  focusedIndex?: number;
+  onFocusedIndexChange?: (index: number) => void;
+  onNavigateNextGroup?: () => void;
+  onNavigatePrevGroup?: () => void;
 }
 
 export const TaskList = ({
@@ -60,6 +66,11 @@ export const TaskList = ({
   indentPx = 0,
   dndMode = 'local',
   sharedActiveDragId = null,
+  isPrimaryList = false,
+  focusedIndex: controlledFocusedIndex,
+  onFocusedIndexChange: controlledOnFocusedIndexChange,
+  onNavigateNextGroup,
+  onNavigatePrevGroup,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
   const reopenTask = useTaskStore((state) => state.reopenTask);
@@ -74,12 +85,17 @@ export const TaskList = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
-  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [internalFocusedIndex, setInternalFocusedIndex] = useState(() => 
+    isPrimaryList ? 0 : -1
+  );
   const [isAnyBodyEditing, setIsAnyBodyEditing] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
   const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
+  const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
 
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const effectiveActiveDragId = dndMode === 'shared' ? sharedActiveDragId : activeDragId;
@@ -89,13 +105,36 @@ export const TaskList = ({
   );
 
   useEffect(() => {
-    setFocusedIndex((previous) => {
-      if (tasks.length === 0) {
-        return 0;
-      }
-      return Math.min(previous, tasks.length - 1);
-    });
-  }, [tasks.length]);
+    if (controlledFocusedIndex !== undefined) {
+      return;
+    }
+    const newIndex = tasks.length === 0 
+      ? 0 
+      : Math.min(internalFocusedIndex, tasks.length - 1);
+    if (newIndex !== internalFocusedIndex) {
+      setInternalFocusedIndex(newIndex);
+    }
+  }, [tasks.length, controlledFocusedIndex]);
+
+  // Focus first task on initial mount (e.g., when switching views via keyboard shortcut)
+  useEffect(() => {
+    if (!isPrimaryList || tasks.length === 0) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const focusedTaskId = tasks[0]?.id;
+    if (!focusedTaskId) return;
+
+    const nextFocused = container.querySelector<HTMLElement>(
+      `[data-task-id="${focusedTaskId}"]`,
+    );
+    if (nextFocused) {
+      nextFocused.focus();
+    }
+  }, [isPrimaryList, tasks]);
 
   useEffect(() => {
     if (expandedTaskId && !taskIds.includes(expandedTaskId)) {
@@ -104,30 +143,26 @@ export const TaskList = ({
     }
   }, [expandedTaskId, taskIds]);
 
+  // Apply focus when focusedIndex changes
   useEffect(() => {
     const focusedTaskId = tasks[focusedIndex]?.id;
     if (!focusedTaskId) {
       return;
     }
 
-    const activeElement = document.activeElement;
     const container = containerRef.current;
-    if (!container || !activeElement || !container.contains(activeElement)) {
-      return;
-    }
+    if (!container) return;
 
     const nextFocused = container.querySelector<HTMLElement>(
       `[data-task-id="${focusedTaskId}"]`,
     );
-    if (!nextFocused || nextFocused === activeElement) {
-      return;
-    }
+    if (!nextFocused) return;
 
-    // Don't steal focus from interactive elements inside the focused task
-    // (e.g. metadata selects, inputs, date pickers in the expanded body).
-    if (nextFocused.contains(activeElement)) {
-      return;
-    }
+    // If focus is already on the target, do nothing
+    if (nextFocused === document.activeElement) return;
+
+    // If focus is inside the target, don't steal it (e.g., user clicked a button in the task)
+    if (nextFocused.contains(document.activeElement)) return;
 
     nextFocused.focus();
   }, [focusedIndex, tasks]);
@@ -304,6 +339,8 @@ export const TaskList = ({
     containerRef,
     onStartTitleEdit: setEditingTitleTaskId,
     isEditingTitle: editingTitleTaskId !== null,
+    onNavigateNextGroup,
+    onNavigatePrevGroup,
   });
 
   if (tasks.length === 0) {

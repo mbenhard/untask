@@ -65,6 +65,7 @@ export const InboxView = ({
               emptyMessage="Inbox is empty."
               ariaLabel="Inbox tasks"
               scopeId="inbox"
+              isPrimaryList
             />
           </SectionGroup>
         ) : null}
