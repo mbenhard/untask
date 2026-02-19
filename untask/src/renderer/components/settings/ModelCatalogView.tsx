@@ -1,3 +1,4 @@
+import type { OllamaPullProgressPayload } from '../../../types/ipc';
 import type { OllamaConnectionStatus } from './ApiKeyManager';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSelect } from './SettingsSelect';
@@ -153,9 +154,28 @@ export const buildModelOptions = (
 export type OllamaModelOption = {
   name: string;
   parameterSize: string;
+  supportsTools?: boolean;
 };
 
 type OllamaStatus = OllamaConnectionStatus;
+
+// ─── Recommended Ollama models ───────────────────────────────────────────────
+
+const RECOMMENDED_OLLAMA_MODELS: readonly { name: string; size: string }[] = [
+  { name: 'qwen3', size: '8B' },
+  { name: 'qwen3:4b', size: '4B' },
+  { name: 'llama3.1:8b', size: '8B' },
+  { name: 'mistral', size: '7B' },
+  { name: 'granite4-dense', size: '8B' },
+  { name: 'lfm2.5-thinking', size: '1.2B' },
+];
+
+const PULL_PREFIX = 'pull:';
+
+const isModelInstalled = (modelName: string, installedModels: OllamaModelOption[]): boolean =>
+  installedModels.some(
+    (m) => m.name === modelName || m.name === `${modelName}:latest` || m.name.startsWith(`${modelName}:`),
+  );
 
 // ─── Ollama model view ───────────────────────────────────────────────────────
 
@@ -164,11 +184,17 @@ const OllamaModelView = ({
   ollamaModels,
   selectedModelId,
   onChange,
+  pullProgress,
+  onPullModel,
+  onCancelPull,
 }: {
   ollamaStatus: OllamaStatus;
   ollamaModels: OllamaModelOption[];
   selectedModelId: string | null;
   onChange: (modelId: string) => void;
+  pullProgress: OllamaPullProgressPayload | null;
+  onPullModel: (model: string) => void;
+  onCancelPull: () => void;
 }) => {
   if (ollamaStatus === 'loading') {
     return (
@@ -202,29 +228,96 @@ const OllamaModelView = ({
     );
   }
 
-  if (ollamaModels.length === 0) {
-    return (
-      <p className="text-[11px] text-muted-foreground">
-        No models installed. Run{' '}
-        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">ollama pull &lt;model&gt;</code>{' '}
-        to get started.
-      </p>
-    );
-  }
+  const isPulling = pullProgress !== null && pullProgress.status !== 'success' && pullProgress.status !== 'error';
 
-  const options = ollamaModels.map((m) => ({
-    value: m.name,
-    label: m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name,
-  }));
+  const uninstalledRecommended = RECOMMENDED_OLLAMA_MODELS.filter(
+    (r) => !isModelInstalled(r.name, ollamaModels),
+  );
+
+  const handleChange = (value: string) => {
+    if (value.startsWith(PULL_PREFIX)) {
+      onPullModel(value.slice(PULL_PREFIX.length));
+    } else {
+      onChange(value);
+    }
+  };
 
   return (
-    <SettingsSelect
-      options={options}
-      value={selectedModelId ?? ''}
-      onChange={onChange}
-      aria-label="Ollama model"
-      className="max-w-[260px]"
-    />
+    <div>
+      <select
+        value={selectedModelId ?? ''}
+        onChange={(e) => handleChange(e.target.value)}
+        disabled={isPulling}
+        aria-label="Ollama model"
+        className="h-7 rounded-md border border-border/60 bg-transparent px-2 text-[11px] max-w-[260px] disabled:opacity-60"
+      >
+        {ollamaModels.length === 0 && (
+          <option value="" disabled>
+            Select a model to pull…
+          </option>
+        )}
+        {ollamaModels.length > 0 && (
+          <optgroup label="Installed">
+            {ollamaModels.map((m) => {
+              const noTools = m.supportsTools === false;
+              const label = m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name;
+              return (
+                <option key={m.name} value={m.name}>
+                  {noTools ? `⚠ ${label} — no tool support` : label}
+                </option>
+              );
+            })}
+          </optgroup>
+        )}
+        {uninstalledRecommended.length > 0 && (
+          <optgroup label="Recommended — select to pull">
+            {uninstalledRecommended.map((r) => (
+              <option key={r.name} value={`${PULL_PREFIX}${r.name}`}>
+                ↓ {r.name} · {r.size}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+      {selectedModelId &&
+        ollamaModels.some((m) => m.name === selectedModelId && m.supportsTools === false) && (
+          <p className="mt-1 max-w-[260px] text-[10px] leading-relaxed text-amber-400/80">
+            This model can&apos;t manage tasks directly. Try qwen3 or llama3.1 for full features.
+          </p>
+        )}
+      {pullProgress && (
+        <div className="mt-1">
+          {typeof pullProgress.percent === 'number' && (
+            <div className="h-1 max-w-[260px] rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-foreground/60 transition-all duration-300"
+                style={{ width: `${pullProgress.percent}%` }}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] text-muted-foreground/60">
+              {pullProgress.status === 'success'
+                ? `${pullProgress.model} pulled`
+                : pullProgress.status === 'error'
+                  ? pullProgress.error ?? 'Pull failed'
+                  : pullProgress.percent != null
+                    ? `Pulling ${pullProgress.model}… ${pullProgress.percent}%`
+                    : `${pullProgress.status}…`}
+            </span>
+            {isPulling && (
+              <button
+                type="button"
+                onClick={onCancelPull}
+                className="text-[10px] text-muted-foreground/50 hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -237,6 +330,9 @@ type ModelCatalogViewProps = {
   onChange: (modelId: string) => void;
   ollamaModels?: OllamaModelOption[];
   ollamaStatus?: OllamaStatus;
+  pullProgress?: OllamaPullProgressPayload | null;
+  onPullModel?: (model: string) => void;
+  onCancelPull?: () => void;
 };
 
 export const ModelCatalogView = ({
@@ -246,6 +342,9 @@ export const ModelCatalogView = ({
   onChange,
   ollamaModels,
   ollamaStatus,
+  pullProgress,
+  onPullModel,
+  onCancelPull,
 }: ModelCatalogViewProps) => {
   if (provider === 'ollama') {
     return (
@@ -255,6 +354,9 @@ export const ModelCatalogView = ({
           ollamaModels={ollamaModels ?? []}
           selectedModelId={selectedModelId}
           onChange={onChange}
+          pullProgress={pullProgress ?? null}
+          onPullModel={onPullModel ?? (() => {})}
+          onCancelPull={onCancelPull ?? (() => {})}
         />
       </SettingsRow>
     );

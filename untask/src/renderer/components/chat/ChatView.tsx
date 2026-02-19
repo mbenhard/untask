@@ -7,6 +7,7 @@ import remarkBreaks from 'remark-breaks';
 
 import type { ChipAction, TurnStep } from '../../../types/chat';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
 import { BirdMascot } from './BirdMascot';
 
 const AvatarIcon = ({ size, className }: { size: number; className?: string }) => (
@@ -31,6 +32,7 @@ import {
   selectChatIsSending,
   selectChatLastStreamError,
   selectChatMessages,
+  selectChatSelectedModelId,
   selectFocusMessageId,
   selectPendingNoteContext,
   useChatStore,
@@ -335,6 +337,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const lastStreamError = useChatStore(selectChatLastStreamError);
   const focusMessageId = useChatStore(selectFocusMessageId);
   const pendingNoteContext = useChatStore(selectPendingNoteContext);
+  const selectedModelId = useChatStore(selectChatSelectedModelId);
 
   const undoAction = useChatStore((state) => state.undoAction);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
@@ -370,6 +373,29 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   useLayoutEffect(() => {
     scrollToBottom();
   }, [scrollToBottom]);
+
+  // Preload Ollama model when chat view opens (eliminates cold-start latency)
+  useEffect(() => {
+    if (!selectedModelId) return;
+
+    let cancelled = false;
+
+    const maybeWarmup = async () => {
+      try {
+        const provider = await getUntask().settings.get('ai_provider');
+        if (cancelled || provider !== 'ollama') return;
+        void getUntask().chat.warmupOllama({ modelId: selectedModelId });
+      } catch {
+        // Warmup is best-effort — don't surface errors
+      }
+    };
+
+    void maybeWarmup();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModelId]);
 
   // Auto-scroll when messages change (new messages or streaming tokens)
   useEffect(() => {

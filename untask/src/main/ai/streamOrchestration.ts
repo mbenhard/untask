@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { stepCountIs, streamText, type ModelMessage } from 'ai';
+import { generateText, stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
   ChipAction,
@@ -586,6 +586,29 @@ export const runAssistantStream = async (
             }
 
             return {};
+          },
+          experimental_repairToolCall: async ({ toolCall, tools, error, inputSchema }) => {
+            try {
+              const schema = await inputSchema({ toolName: toolCall.toolName });
+              const { text: repairedArgs } = await generateText({
+                model,
+                system: [
+                  'You are a JSON repair assistant. The previous tool call had an error.',
+                  `Tool: ${toolCall.toolName}`,
+                  `Error: ${error.message}`,
+                  `Schema: ${JSON.stringify(schema)}`,
+                  'Respond ONLY with a valid JSON object matching the schema. No explanation.',
+                ].join('\n'),
+                messages: [
+                  { role: 'user', content: `Fix this tool call input: ${toolCall.input}` },
+                ],
+              });
+
+              const parsed = JSON.parse(repairedArgs.trim());
+              return { ...toolCall, input: JSON.stringify(parsed) };
+            } catch {
+              return null;
+            }
           },
           tools: (() => {
             const sdkTools = createSdkTools({

@@ -78,6 +78,8 @@ import type {
   OllamaPullRequest,
   OllamaPullResult,
   OllamaPullProgressPayload,
+  OllamaWarmupRequest,
+  OllamaWarmupResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -172,6 +174,7 @@ export type UntaskApi = {
     getOllamaStatus: () => Promise<OllamaStatusResult>;
     pullOllamaModel: (request: OllamaPullRequest) => Promise<OllamaPullResult>;
     cancelOllamaPull: () => Promise<void>;
+    warmupOllama: (request: OllamaWarmupRequest) => Promise<OllamaWarmupResult>;
     onOllamaPullProgress: (listener: (event: OllamaPullProgressPayload) => void) => () => void;
   };
   backup: {
