@@ -69,7 +69,7 @@ export const UpdateBanner = () => {
           <>
             Run{' '}
             <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
-              brew upgrade untask
+              brew update && brew upgrade untask
             </code>
             {' · '}
             <a

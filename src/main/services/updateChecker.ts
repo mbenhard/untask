@@ -184,7 +184,7 @@ export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
         const isHomebrew = installMethod === 'homebrew';
         const n = new Notification({
           title: 'Untask update available',
-          body: `v${info.latestVersion} is ready. ${isHomebrew ? 'Run brew upgrade untask.' : 'Click to view release.'}`,
+          body: `v${info.latestVersion} is ready. ${isHomebrew ? 'Run brew update && brew upgrade untask.' : 'Click to view release.'}`,
           silent: true,
         });
         n.on('click', () => {
