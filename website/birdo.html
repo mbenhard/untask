@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Dancing Minimal Bird</title>
+        <style>
+            /* Base styling to match the provided image's dark, flat aesthetic */
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #161616; /* Matches the dark background */
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            /* Container to keep the SVG responsive but bounded */
+            .bird-container {
+                width: 80vmin;
+                height: 80vmin;
+                max-width: 400px;
+                max-height: 400px;
+            }
+
+            /* Animation Variables */
+            :root {
+                --step-dur: 1.1s; /* Speed of the walk/dance cycle */
+            }
+
+            /* Ground shadow that pulses as the bird bobs */
+            #shadow {
+                transform-origin: 130px 265px;
+                animation: shadow-pulse var(--step-dur) ease-in-out infinite;
+            }
+
+            /* The main body rocks back and forth and squashes/stretches */
+            #body-group {
+                transform-origin: 130px 228px; /* Pivot from the base of the body */
+                animation: body-dance var(--step-dur) ease-in-out infinite;
+            }
+
+            /* Legs step in a funky, high-knee strut. Offset by 50% for alternating steps */
+            .leg {
+                animation: leg-step var(--step-dur) ease-in-out infinite;
+            }
+            #left-leg {
+                transform-origin: 120px 228px;
+            }
+            /* Right Leg (Front) - Now identically shaped to the left leg */
+            #right-leg {
+                transform-origin: 140px 228px;
+                animation-delay: calc(var(--step-dur) / -2);
+            }
+
+            /* Eye blink for extra life */
+            #eye {
+                transform-origin: 132px 105px; /* Pivot reverted to previous eye height */
+                animation: blink 3.5s infinite;
+            }
+
+            /* Keyframes */
+            @keyframes body-dance {
+                0% {
+                    transform: translateY(4px) rotate(-3deg) scaleY(0.95);
+                } /* Squash */
+                25% {
+                    transform: translateY(-10px) rotate(4deg) scaleY(1.02);
+                } /* Stretch & lean forward */
+                50% {
+                    transform: translateY(4px) rotate(-3deg) scaleY(0.95);
+                } /* Squash */
+                75% {
+                    transform: translateY(-10px) rotate(-6deg) scaleY(1.02);
+                } /* Stretch & lean backward (swagger) */
+                100% {
+                    transform: translateY(4px) rotate(-3deg) scaleY(0.95);
+                }
+            }
+
+            @keyframes leg-step {
+                0% {
+                    transform: rotate(40deg) translateY(0);
+                } /* Leg reaching far backward */
+                25% {
+                    transform: rotate(0deg) translateY(-28px);
+                } /* High knee lift */
+                50% {
+                    transform: rotate(-40deg) translateY(0);
+                } /* Leg reaching far forward */
+                75% {
+                    transform: rotate(0deg) translateY(0);
+                } /* Leg planted, body passing over */
+                100% {
+                    transform: rotate(40deg) translateY(0);
+                }
+            }
+
+            @keyframes shadow-pulse {
+                0%,
+                50%,
+                100% {
+                    transform: scaleX(1);
+                    opacity: 0.6;
+                }
+                25%,
+                75% {
+                    transform: scaleX(0.7);
+                    opacity: 0.2;
+                }
+            }
+
+            @keyframes blink {
+                0%,
+                46%,
+                50%,
+                100% {
+                    transform: scaleY(1);
+                }
+                48% {
+                    transform: scaleY(0);
+                } /* A fast wink */
+            }
+        </style>
+    </head>
+    <body>
+        <div class="bird-container">
+            <!-- SVG Canvas -->
+            <svg
+                viewBox="0 0 300 300"
+                width="100%"
+                height="100%"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <!-- Shadow on the floor -->
+                <ellipse
+                    cx="130"
+                    cy="265"
+                    rx="35"
+                    ry="4"
+                    fill="#000"
+                    id="shadow"
+                />
+
+                <g id="bird-all">
+                    <!-- Left Leg (Back) - Flattened 3-toe perspective with longer front toes -->
+                    <g id="left-leg" class="leg">
+                        <path
+                            d="M 120 228 L 120 260 L 136 260 M 120 260 L 132 255 M 120 260 L 113 260"
+                            fill="none"
+                            stroke="#8a8a8a"
+                            stroke-width="3.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </g>
+
+                    <!-- Right Leg (Front) - Flattened 3-toe perspective with longer front toes -->
+                    <g id="right-leg" class="leg">
+                        <path
+                            d="M 140 228 L 140 260 L 156 260 M 140 260 L 152 255 M 140 260 L 133 260"
+                            fill="none"
+                            stroke="#8a8a8a"
+                            stroke-width="3.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </g>
+
+                    <!-- Body, Beak, and Eye (Drawn last so they overlay the leg joints) -->
+                    <g id="body-group">
+                        <!-- Beak - Moved slightly higher -->
+                        <path
+                            d="M 154 99 L 192 105 L 156 119 Z"
+                            fill="#8a8a8a"
+                        />
+
+                        <!-- Main Body - Adjusted bottom corners to be rounder -->
+                        <path
+                            d="
+                        M 91 212
+                        Q 87 228 102 228
+                        L 158 228
+                        Q 173 228 169 212
+                        L 155 110
+                        Q 153 80 130 80
+                        Q 107 80 105 110
+                        Z
+                    "
+                            fill="#8a8a8a"
+                        />
+
+                        <!-- Eye - Reverted to previous position -->
+                        <circle
+                            cx="132"
+                            cy="105"
+                            r="6.5"
+                            fill="#161616"
+                            id="eye"
+                        />
+                    </g>
+                </g>
+            </svg>
+        </div>
+    </body>
+</html>
