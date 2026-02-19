@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { SearchResultItem } from '../../types/ipc';
+import { toErrorMessage } from '../lib/errors';
 import { getUntask } from '../lib/untask';
 
 type SearchStore = {
@@ -74,7 +75,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     } catch (error) {
       set({
         isSearching: false,
-        error: error instanceof Error ? error.message : 'Search failed.',
+        error: toErrorMessage(error, 'Search failed.'),
       });
     }
   },

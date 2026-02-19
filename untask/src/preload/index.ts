@@ -122,6 +122,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_DOCK_MODE),
     setDockMode: (mode: DockMode): Promise<DockModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_DOCK_MODE, mode),
+    getVersion: (): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     onMenuNewTask: (listener: () => void): (() => void) => {
       const wrapped = () => listener();
       ipcRenderer.on(IPC_CHANNELS.APP_MENU_NEW_TASK, wrapped);

@@ -49,6 +49,7 @@ export const IPC_CHANNELS = {
   APP_MENU_NEW_NOTE: 'app:menu-new-note',
   APP_GET_DOCK_MODE: 'app:get-dock-mode',
   APP_SET_DOCK_MODE: 'app:set-dock-mode',
+  APP_GET_VERSION: 'app:get-version',
   SHORTCUT_UPDATE: 'shortcut:update',
   SHORTCUT_GET_REGISTRATION_STATUS: 'shortcut:get-registration-status',
 
@@ -411,6 +412,7 @@ export type UpdateInfo = {
   latestVersion: string;
   releaseUrl: string;
   releaseNotes?: string;
+  installMethod: 'homebrew' | 'direct';
 };
 
 // ─── Attachment payloads ──────────────────────────────────

@@ -6,8 +6,9 @@ import {
   type MemoryEvent,
 } from '../db/schema';
 import { getSetting, setSetting } from './settingsService';
+import type { MemoryLayer } from '../../types/assistant';
 
-export type MemoryLayer = 'identity' | 'memory';
+export type { MemoryLayer };
 export type MemoryEventSource = 'user' | 'ai' | 'system';
 
 export const MEMORY_LAYER_SETTINGS_KEYS: Record<MemoryLayer, string> = {

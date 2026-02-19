@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import type { Note } from '../../types/models';
 import { isBlockNoteJson } from '../components/editor/editorUtils';
+import { toErrorMessage } from '../lib/errors';
 import { getUntask } from '../lib/untask';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
@@ -70,9 +71,6 @@ type NotesStore = {
   clearNotice: () => void;
   clearError: () => void;
 };
-
-const toErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Notes operation failed.';
 
 const getInitialIsWideViewport = (): boolean =>
   typeof window !== 'undefined' && window.innerWidth >= 1100;
@@ -203,6 +201,16 @@ const clampIndex = (index: number, length: number): number => {
   return Math.min(Math.max(index, 0), length - 1);
 };
 
+/** Shared state fragment that resets the editor to list mode. */
+const NOTES_LIST_RESET_STATE = {
+  subView: 'list' as const,
+  layoutMode: 'list' as const,
+  activeNoteId: null,
+  activeNoteTitle: '',
+  content: '',
+  isDirty: false,
+} as const;
+
 export const useNotesStore = create<NotesStore>((set, get) => ({
   activeNotes: [],
   archivedNotes: [],
@@ -242,7 +250,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         };
       });
     } catch (error) {
-      set({ isListLoading: false, error: toErrorMessage(error) });
+      set({ isListLoading: false, error: toErrorMessage(error, 'Notes operation failed.') });
     }
   },
 
@@ -269,7 +277,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         error: null,
       });
     } catch (error) {
-      set({ error: toErrorMessage(error) });
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
   },
 
@@ -305,7 +313,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         error: null,
       });
     } catch (error) {
-      set({ isLoading: false, error: toErrorMessage(error) });
+      set({ isLoading: false, error: toErrorMessage(error, 'Notes operation failed.') });
     }
   },
 
@@ -351,12 +359,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
 
     set((state) => ({
-      subView: 'list',
-      layoutMode: 'list',
-      activeNoteId: null,
-      activeNoteTitle: '',
-      content: '',
-      isDirty: false,
+      ...NOTES_LIST_RESET_STATE,
       selectedListNoteId: state.selectedListNoteId ?? state.activeNotes[0]?.id ?? null,
     }));
 
@@ -407,7 +410,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       });
       return persisted;
     } catch (error) {
-      set({ isSaving: false, error: toErrorMessage(error) });
+      set({ isSaving: false, error: toErrorMessage(error, 'Notes operation failed.') });
       return false;
     }
   },
@@ -426,20 +429,13 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       // If we archived the currently open note, go back to list.
       if (get().activeNoteId === id) {
-        set({
-          subView: 'list',
-          layoutMode: 'list',
-          activeNoteId: null,
-          activeNoteTitle: '',
-          content: '',
-          isDirty: false,
-        });
+        set(NOTES_LIST_RESET_STATE);
       }
 
       get().setNotice({ kind: 'success', message: 'Note archived.' });
       void get().loadList();
     } catch (error) {
-      set({ error: toErrorMessage(error) });
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
   },
 
@@ -448,20 +444,13 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       await getUntask().notes.restore(id);
 
       if (get().activeNoteId === id) {
-        set({
-          subView: 'list',
-          layoutMode: 'list',
-          activeNoteId: null,
-          activeNoteTitle: '',
-          content: '',
-          isDirty: false,
-        });
+        set(NOTES_LIST_RESET_STATE);
       }
 
       get().setNotice({ kind: 'success', message: 'Note restored.' });
       void get().loadList();
     } catch (error) {
-      set({ error: toErrorMessage(error) });
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
   },
 
@@ -470,20 +459,13 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       await getUntask().notes.delete(id);
 
       if (get().activeNoteId === id) {
-        set({
-          subView: 'list',
-          layoutMode: 'list',
-          activeNoteId: null,
-          activeNoteTitle: '',
-          content: '',
-          isDirty: false,
-        });
+        set(NOTES_LIST_RESET_STATE);
       }
 
       get().setNotice({ kind: 'success', message: 'Note deleted.' });
       void get().loadList();
     } catch (error) {
-      set({ error: toErrorMessage(error) });
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
   },
 
@@ -545,7 +527,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }, 5000);
       return { ok: true, reason: 'staged' };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to process with AI.';
+      const message = toErrorMessage(error, 'Failed to process with AI.');
       set({
         isProcessing: false,
         error: message,

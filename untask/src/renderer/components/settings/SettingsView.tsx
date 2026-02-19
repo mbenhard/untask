@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { cn } from '../../lib/utils';
 import { SettingsGeneral } from './SettingsGeneral';
@@ -23,6 +23,11 @@ export const SettingsView = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [version, setVersion] = useState<string>('');
+
+  useEffect(() => {
+    window.untask?.app.getVersion().then(setVersion);
+  }, []);
 
   const tabContent = (() => {
     switch (activeTab) {
@@ -95,27 +100,52 @@ export const SettingsView = () => {
         {tabContent}
 
         {/* Footer / Credits */}
-        <footer className="mt-12 mb-6 flex flex-col items-center gap-2 border-t border-border/40 pt-6 text-center">
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>Signed by</span>
-            <span className="font-medium text-foreground">Marcus</span>
+        <footer className="mt-12 mb-6 flex flex-col items-center gap-2 pt-6 text-center">
+          <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="text-muted-foreground">Love from</span>
+            <a
+              href="https://unta.sk/support"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-foreground transition-colors hover:underline"
+            >
+              Marcus
+            </a>
+            {version && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="text-muted-foreground/60">{version}</span>
+              </>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              const email = atob('bWFyY3VzQG9mZmJyYW5kLmRlc2lnbg==');
-              void navigator.clipboard.writeText(email);
-              setNotice('Email copied to clipboard');
-              setTimeout(() => setNotice(null), 2000);
-            }}
-            className="font-mono text-[10px] text-muted-foreground/60 transition-colors hover:text-foreground"
-          >
-            marcus@offbrand.design
-          </button>
-
-          <div className="mt-2 font-mono text-[10px] text-muted-foreground/40">
-            untask v0.1.6 • MIT Licensed
+          <div className="flex items-center gap-3 font-mono text-[10px] text-muted-foreground/60">
+            <a
+              href="https://unta.sk/support"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-foreground"
+            >
+              Support
+            </a>
+            <span className="text-muted-foreground/30">·</span>
+            <a
+              href="https://unta.sk/changelog"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-foreground"
+            >
+              Changelog
+            </a>
+            <span className="text-muted-foreground/30">·</span>
+            <a
+              href="https://github.com/mbenhard/untask"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-foreground"
+            >
+              GitHub
+            </a>
           </div>
         </footer>
       </div>
