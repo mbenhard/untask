@@ -9,6 +9,7 @@ import { registerSettingsHandlers } from './settings';
 import { registerApiKeyHandlers } from './apiKeys';
 import { registerAttachmentHandlers } from './attachments';
 import { registerReminderHandlers } from './reminders';
+import { registerNotificationHandlers } from './notifications';
 import { registerSearchHandlers } from './search';
 
 export const registerIpcHandlers = (): void => {
@@ -25,5 +26,6 @@ export const registerIpcHandlers = (): void => {
   registerApiKeyHandlers();
   registerAttachmentHandlers();
   registerReminderHandlers();
+  registerNotificationHandlers();
   registerSearchHandlers();
 };

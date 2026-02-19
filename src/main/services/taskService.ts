@@ -45,14 +45,19 @@ export type CompleteTaskOptions = {
   completeChildren?: boolean;
 };
 
-export type TaskChangeListener = () => void;
+export type TaskChangeEvent = {
+  taskId: string;
+  action: 'create' | 'update' | 'complete' | 'cancel' | 'delete' | 'reopen';
+};
+
+export type TaskChangeListener = (event: TaskChangeEvent) => void;
 
 const taskChangeListeners = new Set<TaskChangeListener>();
 
-const emitTaskChange = (): void => {
+const emitTaskChange = (event: TaskChangeEvent): void => {
   for (const listener of [...taskChangeListeners]) {
     try {
-      listener();
+      listener(event);
     } catch {
       // Ignore listener failures so task mutations always complete.
     }
@@ -251,8 +256,8 @@ export function clearStaleTodayFlags(): number {
     .returning()
     .all();
 
-  if (result.length > 0) {
-    emitTaskChange();
+  for (const task of result) {
+    emitTaskChange({ taskId: task.id, action: 'update' });
   }
 
   return result.length;
@@ -334,7 +339,7 @@ export function undoTaskEvent(
       null,
     );
 
-    emitTaskChange();
+    emitTaskChange({ taskId: targetEvent.taskId, action: 'delete' });
     return {
       undone: true,
       targetTaskId: targetEvent.taskId,
@@ -366,7 +371,7 @@ export function undoTaskEvent(
       restored,
     );
 
-    emitTaskChange();
+    emitTaskChange({ taskId: targetEvent.taskId, action: 'create' });
     return {
       undone: true,
       targetTaskId: targetEvent.taskId,
@@ -397,7 +402,7 @@ export function undoTaskEvent(
     restored,
   );
 
-  emitTaskChange();
+  emitTaskChange({ taskId: targetEvent.taskId, action: 'update' });
   return {
     undone: true,
     targetTaskId: targetEvent.taskId,
@@ -458,7 +463,7 @@ export function createTask(
     logTaskEvent(parentTask.id, 'update', source, parentTask, promotedParent);
   }
 
-  emitTaskChange();
+  emitTaskChange({ taskId: created.id, action: 'create' });
   return created;
 }
 
@@ -509,7 +514,7 @@ export function updateTask(
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'update' });
   return updated;
 }
 
@@ -572,7 +577,7 @@ export function deleteTask(
   options?: DeleteTaskOptions,
 ): void {
   deleteTaskRecursive(id, source, options?.cascade === true, new Set<string>());
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'delete' });
 }
 
 const completeTaskRecursive = (
@@ -640,7 +645,7 @@ export function completeTask(
   // Spawn next recurring instance if applicable
   const recurredTask = spawnRecurringInstance(completed, source);
 
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'complete' });
   return { completed, recurredTask };
 }
 
@@ -686,7 +691,7 @@ export function toggleToday(id: string, source: TaskEventSource = 'user'): Task 
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'update' });
   return updated;
 }
 
@@ -708,7 +713,7 @@ export function cancelTask(
     .all();
 
   logTaskEvent(id, 'cancel', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'cancel' });
   return updated;
 }
 
@@ -733,7 +738,7 @@ export function reopenTask(
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'reopen' });
   return updated;
 }
 
@@ -824,5 +829,8 @@ export function reorderTasks(
         .run();
     }
   });
-  emitTaskChange();
+  // Reorder is a bulk operation — emit update for the first task to trigger rescan
+  if (validatedIds.length > 0) {
+    emitTaskChange({ taskId: validatedIds[0], action: 'update' });
+  }
 }

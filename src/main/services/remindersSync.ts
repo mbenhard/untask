@@ -679,7 +679,7 @@ function stopWatcher(): void {
 
 // ─── Debounced push handler ─────────────────────────────────
 
-function onTaskChange(): void {
+function onTaskChange(_event: import('./taskService').TaskChangeEvent): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;

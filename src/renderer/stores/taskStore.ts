@@ -53,6 +53,7 @@ type TaskStore = {
 
   // ── Actions ─────────────────────────────────────────────
   fetchTasks: () => Promise<void>;
+  refreshTasks: () => Promise<void>;
   createTask: (input: TaskCreateInput) => Promise<Task | null>;
   updateTask: (input: TaskUpdateInput) => Promise<Task | null>;
   deleteTask: (id: string, cascade?: boolean) => Promise<boolean>;
@@ -109,8 +110,31 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
 
+  refreshTasks: async () => {
+    try {
+      const tasks = await getUntask().tasks.list();
+      set({ tasks: [...tasks].sort(byOrderThenCreatedAt), error: null });
+    } catch (e) {
+      set({ error: toErrorMessage(e, 'Unknown task operation error.') });
+    }
+  },
+
   // ── Create (optimistic) ─────────────────────────────────
   createTask: async (input) => {
+    // Auto-populate reminderOffset from default setting when dueDate is set
+    if (input.dueDate && input.reminderOffset === undefined) {
+      try {
+        const defaultOffset = await getUntask().settings.get('notifications.default_offset');
+        if (defaultOffset && ['at_due', '15m', '1h', '1d'].includes(defaultOffset)) {
+          input.reminderOffset = defaultOffset as ReminderOffset;
+        } else {
+          input.reminderOffset = 'at_due';
+        }
+      } catch {
+        input.reminderOffset = 'at_due';
+      }
+    }
+
     const nextOrder = input.order ?? getNextOrder(get().tasks);
     const tempId = `_temp_${Date.now()}`;
     const tempTask: Task = {
@@ -160,6 +184,23 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const prev = get().tasks.find((t) => t.id === id);
     if (!prev) return null;
 
+    // Auto-populate reminderOffset when adding a due date to a task that had none
+    if (updates.dueDate && !prev.dueDate && updates.reminderOffset === undefined) {
+      try {
+        const defaultOffset = await getUntask().settings.get('notifications.default_offset');
+        if (defaultOffset && ['at_due', '15m', '1h', '1d'].includes(defaultOffset)) {
+          updates.reminderOffset = defaultOffset as ReminderOffset;
+          input.reminderOffset = updates.reminderOffset;
+        } else {
+          updates.reminderOffset = 'at_due';
+          input.reminderOffset = 'at_due';
+        }
+      } catch {
+        updates.reminderOffset = 'at_due';
+        input.reminderOffset = 'at_due';
+      }
+    }
+
     // Optimistic patch
     set((s) => ({
       tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
@@ -207,7 +248,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       await getUntask().tasks.delete(cascade ? { id, cascade: true } : id);
       useToastStore.getState().showToast('Task deleted', async () => {
         await getUntask().tasks.undoLastUserAction();
-        await get().fetchTasks();
+        await get().refreshTasks();
       });
       return true;
     } catch (e) {
@@ -284,7 +325,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }));
       useToastStore.getState().showToast('Task completed', async () => {
         await getUntask().tasks.undoLastUserAction();
-        await get().fetchTasks();
+        await get().refreshTasks();
       });
       return completed;
     } catch (e) {
@@ -319,7 +360,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }));
       useToastStore.getState().showToast('Task cancelled', async () => {
         await getUntask().tasks.undoLastUserAction();
-        await get().fetchTasks();
+        await get().refreshTasks();
       });
       return cancelled;
     } catch (e) {
@@ -354,7 +395,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }));
       useToastStore.getState().showToast('Task reopened', async () => {
         await getUntask().tasks.undoLastUserAction();
-        await get().fetchTasks();
+        await get().refreshTasks();
       });
       return reopened;
     } catch (e) {

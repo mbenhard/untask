@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar as CalendarIcon, Clock, X } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
 import type { ReminderOffset } from '../../stores/taskStore';
 import { Button, Calendar, Popover, PopoverContent } from '../ui';
 import { formatDueDateDisplay, parseDueDate, parseDueTime, toISODate, toISODateTime } from './dueDate';
@@ -195,6 +196,18 @@ export const TaskDueDatePicker = ({
   onReminderOffsetChange,
 }: TaskDueDatePickerProps) => {
   const [open, setOpen] = useState(false);
+  const [notifBlocked, setNotifBlocked] = useState(false);
+
+  // Probe notification permission once on mount
+  useEffect(() => {
+    if (!onReminderOffsetChange) return;
+    let cancelled = false;
+    getUntask().notifications.probePermission().then((result) => {
+      if (!cancelled) setNotifBlocked(result.status === 'denied');
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [onReminderOffsetChange]);
+
   const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
   const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
   const timeInputRef = useRef<HTMLInputElement | null>(null);
@@ -342,24 +355,41 @@ export const TaskDueDatePicker = ({
         {onReminderOffsetChange ? (
           <div
             className={cn(
-              'flex items-center gap-2 border-t border-border px-3 py-2.5',
+              'border-t border-border px-3 py-2.5',
               !dueDate && 'pointer-events-none opacity-40',
             )}
           >
-            <span className="text-xs text-muted-foreground">Remind me</span>
-            <select
-              value={reminderOffset ?? 'at_due'}
-              onChange={handleReminderOffsetChange}
-              onClick={(e) => e.stopPropagation()}
-              disabled={!dueDate}
-              className="ml-auto rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs text-foreground outline-none transition-colors focus:border-ring"
-            >
-              {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
-                <option key={key} value={key}>
-                  {REMINDER_OFFSET_LABELS[key]}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Remind me</span>
+              <select
+                value={reminderOffset ?? 'at_due'}
+                onChange={handleReminderOffsetChange}
+                onClick={(e) => e.stopPropagation()}
+                disabled={!dueDate}
+                className="ml-auto rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs text-foreground outline-none transition-colors focus:border-ring"
+              >
+                {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
+                  <option key={key} value={key}>
+                    {REMINDER_OFFSET_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {notifBlocked && dueDate ? (
+              <p className="mt-1.5 text-[10px] text-amber-500 leading-relaxed">
+                Reminders won&apos;t work &mdash; notifications are blocked.{' '}
+                <button
+                  type="button"
+                  className="underline hover:text-amber-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void getUntask().notifications.openSettings();
+                  }}
+                >
+                  Fix in Settings
+                </button>
+              </p>
+            ) : null}
           </div>
         ) : null}
 
