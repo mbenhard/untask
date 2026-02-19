@@ -76,7 +76,7 @@ const createMainWindow = (): BrowserWindow => {
     width: 680,
     height: 720,
     minWidth: 580,
-    minHeight: 520,
+    minHeight: 600,
     maxWidth: 800,
     maxHeight: 800,
     frame: false,
