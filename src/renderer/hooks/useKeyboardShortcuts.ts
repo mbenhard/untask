@@ -195,6 +195,15 @@ export const useKeyboardShortcuts = ({
 
       // Escape layers: search → notes editor back-to-list → clear chat input → leave settings → close chat overlay
       if (event.key === 'Escape') {
+        const quickAddOpen = useAppStore.getState().quickAddOpen;
+        const closeQuickAdd = useAppStore.getState().closeQuickAdd;
+
+        if (quickAddOpen) {
+          event.preventDefault();
+          closeQuickAdd();
+          return;
+        }
+
         if (isSearchOpenRef.current) {
           event.preventDefault();
           closeSearch();

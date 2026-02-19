@@ -13,12 +13,18 @@ export function useQuickAddListener({
   onPrefill,
 }: UseQuickAddListenerOptions): void {
   const openChatOverlay = useAppStore((state) => state.openChatOverlay);
+  const aiEnabled = useAppStore((state) => state.aiEnabled);
+  const openQuickAdd = useAppStore((state) => state.openQuickAdd);
 
   useEffect(() => {
     const unsubscribe = window.untask?.app.onQuickAddPayload(
       (payload: QuickAddPayload) => {
-        openChatOverlay();
-        onPrefill(payload.text);
+        if (aiEnabled) {
+          openChatOverlay();
+          onPrefill(payload.text);
+        } else {
+          openQuickAdd(payload.text);
+        }
 
         requestAnimationFrame(() => {
           inputRef.current?.focus();
@@ -29,5 +35,5 @@ export function useQuickAddListener({
     return () => {
       unsubscribe?.();
     };
-  }, [inputRef, onPrefill, openChatOverlay]);
+  }, [inputRef, onPrefill, openChatOverlay, openQuickAdd, aiEnabled]);
 }
