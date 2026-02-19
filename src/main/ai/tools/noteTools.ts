@@ -12,26 +12,13 @@ export const readNoteToolInputSchema = z.object({
   noteId: z.string().optional().describe('ID of the note to read. If omitted, reads the most recent active note.'),
 });
 
-export const editNoteToolInputSchema = z.intersection(
-  z.object({
-    noteId: z.string().optional().describe('ID of the note to edit. If omitted, edits the most recent active note.'),
-  }),
-  z.discriminatedUnion('action', [
-    z.object({
-      action: z.literal('append'),
-      content: z.string().trim().min(1),
-    }),
-    z.object({
-      action: z.literal('replace'),
-      target: z.string().trim().min(1),
-      replacement: z.string(),
-    }),
-    z.object({
-      action: z.literal('rewrite'),
-      content: z.string().trim().min(1),
-    }),
-  ]),
-);
+export const editNoteToolInputSchema = z.object({
+  action: z.enum(['append', 'replace', 'rewrite']).describe('Type of edit. Append to add to the end, replace to change a specific target string, rewrite to clear and set entirely new content.'),
+  noteId: z.string().optional().describe('ID of the note to edit. If omitted, edits the most recent active note.'),
+  content: z.string().optional().describe('The content to append or rewrite. Required if action is append or rewrite.'),
+  target: z.string().optional().describe('The exact string to replace. Required if action is replace.'),
+  replacement: z.string().optional().describe('The text to replace the target with. Required if action is replace.'),
+});
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -101,6 +88,7 @@ export const editNoteTool = {
     const beforeContent = current.content;
 
     if (input.action === 'append') {
+      if (!input.content) throw new Error('Content is required for append action.');
       const separator =
         beforeContent.length === 0 || beforeContent.endsWith('\n') ? '' : '\n\n';
       const nextContent = `${beforeContent}${separator}${input.content}`;
@@ -121,6 +109,7 @@ export const editNoteTool = {
     }
 
     if (input.action === 'replace') {
+      if (!input.target || typeof input.replacement !== 'string') throw new Error('Target and replacement are required for replace action.');
       const startIndex = beforeContent.indexOf(input.target);
       if (startIndex === -1) {
         throw new Error('Note replace target was not found.');
@@ -154,6 +143,7 @@ export const editNoteTool = {
       );
     }
 
+    if (!input.content) throw new Error('Content is required for rewrite action.');
     const nextContent = input.content;
     const saved = saveNote(id, nextContent);
 

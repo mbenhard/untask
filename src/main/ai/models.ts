@@ -6,13 +6,14 @@ import type { ProviderType } from './providers/types';
 
 export const SUPPORTED_MODEL_IDS = [
   // OpenRouter models
-  'openai/gpt-4o-mini',
-  'openai/gpt-4o',
+  'openai/gpt-5-mini',
+  'openai/gpt-4.1-mini',
   'anthropic/claude-sonnet-4-6',
   'anthropic/claude-haiku-4-5',
-  'google/gemini-2.5-flash-preview',
   'google/gemini-3-flash-preview',
-  'z-ai/glm-4.7-flash',
+  'minimax/minimax-m2.5',
+  'z-ai/glm-5',
+  'moonshotai/kimi-k2.5',
   // OpenAI direct models
   'gpt-4o-mini',
   'gpt-4o',
@@ -54,7 +55,7 @@ export interface CuratedModel {
 
 /** Per-provider default model IDs. Ollama is empty — resolved dynamically. */
 const PROVIDER_DEFAULT_MODEL_IDS: Record<ProviderType, string> = {
-  openrouter: 'openai/gpt-4o-mini',
+  openrouter: 'openai/gpt-5-mini',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-6',
   ollama: '',
@@ -65,10 +66,10 @@ const MODEL_SETTING_KEY = SETTING_KEY_AI_MODEL;
 // ─── Curated model list ───────────────────────────────────────────────────────
 
 const CURATED_MODELS: readonly CuratedModel[] = [
-  // GPT-4o Mini — OpenRouter
+  // GPT-5 Mini — OpenRouter
   {
-    id: 'openai/gpt-4o-mini',
-    name: 'GPT-4o Mini',
+    id: 'openai/gpt-5-mini',
+    name: 'GPT-5 Mini',
     provider: 'openrouter',
     contextWindow: 128_000,
     costTier: 'cheap',
@@ -87,10 +88,10 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isDefault: true,
     isRecommended: true,
   },
-  // GPT-4o — OpenRouter
+  // GPT-4.1 Mini — OpenRouter
   {
-    id: 'openai/gpt-4o',
-    name: 'GPT-4o',
+    id: 'openai/gpt-4.1-mini',
+    name: 'GPT-4.1 Mini',
     provider: 'openrouter',
     contextWindow: 128_000,
     costTier: 'moderate',
@@ -148,16 +149,6 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools'],
     isRecommended: true,
   },
-  // Gemini 2.5 Flash — OpenRouter
-  {
-    id: 'google/gemini-2.5-flash-preview',
-    name: 'Gemini 2.5 Flash',
-    provider: 'openrouter',
-    contextWindow: 1_048_576,
-    costTier: 'free',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
   // Gemini 3 Flash — OpenRouter
   {
     id: 'google/gemini-3-flash-preview',
@@ -168,14 +159,34 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
-  // GLM 4.7 Flash — OpenRouter
+  // MiniMax m2.5 — OpenRouter
   {
-    id: 'z-ai/glm-4.7-flash',
-    name: 'GLM 4.7 Flash',
+    id: 'minimax/minimax-m2.5',
+    name: 'MiniMax m2.5',
+    provider: 'openrouter',
+    contextWindow: 196_608,
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  // GLM-5 — OpenRouter
+  {
+    id: 'z-ai/glm-5',
+    name: 'GLM-5',
     provider: 'openrouter',
     contextWindow: 128_000,
-    costTier: 'free',
+    costTier: 'cheap',
     capabilities: ['tools', 'reasoning'],
+    isRecommended: true,
+  },
+  // Kimi k2.5 — OpenRouter
+  {
+    id: 'moonshotai/kimi-k2.5',
+    name: 'Kimi k2.5',
+    provider: 'openrouter',
+    contextWindow: 262_144,
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
 ] as const;
@@ -184,8 +195,8 @@ const CURATED_MODELS: readonly CuratedModel[] = [
 
 const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
   {
-    id: 'openai/gpt-4o-mini',
-    label: 'GPT-4o Mini (OpenRouter)',
+    id: 'openai/gpt-5-mini',
+    label: 'GPT-5 Mini (OpenRouter)',
     inputCostPerMillion: 0.15,
     outputCostPerMillion: 0.6,
     defaultSelected: true,
@@ -194,8 +205,8 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsVision: true,
   },
   {
-    id: 'openai/gpt-4o',
-    label: 'GPT-4o (OpenRouter)',
+    id: 'openai/gpt-4.1-mini',
+    label: 'GPT-4.1 Mini (OpenRouter)',
     inputCostPerMillion: 2.5,
     outputCostPerMillion: 10.0,
     defaultSelected: false,
@@ -225,16 +236,6 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     webSearchMethod: 'claude_native',
   },
   {
-    id: 'google/gemini-2.5-flash-preview',
-    label: 'Gemini 2.5 Flash (OpenRouter)',
-    inputCostPerMillion: null,
-    outputCostPerMillion: null,
-    defaultSelected: false,
-    supportsReasoning: true,
-    supportsWebSearch: false,
-    supportsVision: true,
-  },
-  {
     id: 'google/gemini-3-flash-preview',
     label: 'Gemini 3 Flash (OpenRouter)',
     inputCostPerMillion: 0.5,
@@ -245,14 +246,35 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsVision: true,
   },
   {
-    id: 'z-ai/glm-4.7-flash',
-    label: 'GLM 4.7 Flash (OpenRouter)',
-    inputCostPerMillion: null,
-    outputCostPerMillion: null,
+    id: 'minimax/minimax-m2.5',
+    label: 'MiniMax m2.5 (OpenRouter)',
+    inputCostPerMillion: 0.3,
+    outputCostPerMillion: 1.1,
+    defaultSelected: false,
+    supportsReasoning: true,
+    supportsWebSearch: false,
+    supportsVision: true,
+  },
+  {
+    id: 'z-ai/glm-5',
+    label: 'GLM-5 (OpenRouter)',
+    inputCostPerMillion: 0.8,
+    outputCostPerMillion: 2.56,
     defaultSelected: false,
     supportsReasoning: true,
     supportsWebSearch: false,
     supportsVision: false,
+  },
+  {
+    id: 'moonshotai/kimi-k2.5',
+    label: 'Kimi k2.5 (OpenRouter)',
+    inputCostPerMillion: 0.5,
+    outputCostPerMillion: 2.8,
+    defaultSelected: false,
+    supportsReasoning: true,
+    supportsWebSearch: true,
+    supportsVision: true,
+    webSearchMethod: 'kimi_builtin',
   },
   {
     id: 'gpt-4o-mini',

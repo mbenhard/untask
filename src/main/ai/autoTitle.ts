@@ -8,7 +8,7 @@ import {
 } from '../services/chatService';
 import { getActiveProvider } from './providers';
 
-const AUTO_TITLE_MODEL_ID = 'openai/gpt-4o-mini';
+const AUTO_TITLE_MODEL_ID = 'openai/gpt-5-mini';
 const AUTO_TITLE_TIMEOUT_MS = 5_000;
 const AUTO_TITLE_MAX_LENGTH = 80;
 

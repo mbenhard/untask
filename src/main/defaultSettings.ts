@@ -42,7 +42,7 @@ export const SETTING_KEY_NOTIFICATIONS_SOUND = 'notifications.sound' as const;
 // accessor in memory.ts handles the fallback.
 
 export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
-  [SETTING_KEY_AI_MODEL]: 'openai/gpt-4o-mini',
+  [SETTING_KEY_AI_MODEL]: 'openai/gpt-5-mini',
   [SETTING_KEY_AI_IDENTITY]: '',
   [SETTING_KEY_AI_MEMORY]: '',
   [SETTING_KEY_AI_AUTONOMY_MODE]: 'auto',

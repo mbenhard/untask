@@ -21,8 +21,8 @@ type CuratedModel = {
 
 const CURATED_MODELS: readonly CuratedModel[] = [
   {
-    id: 'openai/gpt-4o-mini',
-    name: 'GPT-4o Mini',
+    id: 'openai/gpt-5-mini',
+    name: 'GPT-5 Mini',
     provider: 'openrouter',
     costTier: 'cheap',
     capabilities: ['tools', 'vision'],
@@ -39,8 +39,8 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isRecommended: true,
   },
   {
-    id: 'openai/gpt-4o',
-    name: 'GPT-4o',
+    id: 'openai/gpt-4.1-mini',
+    name: 'GPT-4.1 Mini',
     provider: 'openrouter',
     costTier: 'moderate',
     capabilities: ['tools', 'vision', 'reasoning'],
@@ -88,14 +88,6 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isRecommended: true,
   },
   {
-    id: 'google/gemini-2.5-flash-preview',
-    name: 'Gemini 2.5 Flash',
-    provider: 'openrouter',
-    costTier: 'free',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
-  {
     id: 'google/gemini-3-flash-preview',
     name: 'Gemini 3 Flash',
     provider: 'openrouter',
@@ -104,11 +96,27 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isRecommended: true,
   },
   {
-    id: 'z-ai/glm-4.7-flash',
-    name: 'GLM 4.7 Flash',
+    id: 'minimax/minimax-m2.5',
+    name: 'MiniMax m2.5',
     provider: 'openrouter',
-    costTier: 'free',
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  {
+    id: 'z-ai/glm-5',
+    name: 'GLM-5',
+    provider: 'openrouter',
+    costTier: 'cheap',
     capabilities: ['tools', 'reasoning'],
+    isRecommended: true,
+  },
+  {
+    id: 'moonshotai/kimi-k2.5',
+    name: 'Kimi k2.5',
+    provider: 'openrouter',
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
 ];
@@ -138,9 +146,33 @@ const buildModelLabel = (model: CuratedModel): string => {
 export const buildModelOptions = (
   provider: ProviderType,
   selectedModelId: string | null,
-): { value: string; label: string }[] => {
+) => {
   const providerModels = getCuratedModelsForProvider(provider);
   if (providerModels.length > 0) {
+    if (provider === 'openrouter') {
+      const topIds = [
+        'anthropic/claude-haiku-4-5',
+        'google/gemini-3-flash-preview',
+        'openai/gpt-4.1-mini',
+      ];
+
+      const recommendedModels = providerModels.filter(m => topIds.includes(m.id));
+      const recommendedSorted = recommendedModels.sort((a, b) => topIds.indexOf(a.id) - topIds.indexOf(b.id));
+
+      const otherModels = providerModels.filter(m => !topIds.includes(m.id));
+
+      return [
+        {
+          label: 'Recommended',
+          options: recommendedSorted.map(m => ({ value: m.id, label: buildModelLabel(m) }))
+        },
+        {
+          label: 'Other',
+          options: otherModels.map(m => ({ value: m.id, label: buildModelLabel(m) }))
+        }
+      ];
+    }
+
     return providerModels.map((m) => ({
       value: m.id,
       label: buildModelLabel(m),
