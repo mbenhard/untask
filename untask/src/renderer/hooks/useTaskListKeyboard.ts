@@ -17,6 +17,8 @@ type UseTaskListKeyboardOptions = {
   isEditingTitle: boolean;
   isDragActive: boolean;
   containerRef: RefObject<HTMLDivElement | null>;
+  onNavigateNextGroup?: () => void;
+  onNavigatePrevGroup?: () => void;
 };
 
 const isTextInputElement = (element: Element | null): boolean => {
@@ -46,6 +48,8 @@ export const useTaskListKeyboard = ({
   isEditingTitle,
   isDragActive,
   containerRef,
+  onNavigateNextGroup,
+  onNavigatePrevGroup,
 }: UseTaskListKeyboardOptions) =>
   useCallback(
     (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -67,13 +71,23 @@ export const useTaskListKeyboard = ({
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        onFocusedIndexChange(Math.min(focusedIndex + 1, tasks.length - 1));
+        const isAtLastItem = tasks.length === 0 || focusedIndex >= tasks.length - 1;
+        if (isAtLastItem && onNavigateNextGroup) {
+          onNavigateNextGroup();
+        } else {
+          onFocusedIndexChange(Math.min(focusedIndex + 1, tasks.length - 1));
+        }
         return;
       }
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        onFocusedIndexChange(Math.max(focusedIndex - 1, 0));
+        const isAtFirstItem = focusedIndex <= 0;
+        if (isAtFirstItem && onNavigatePrevGroup) {
+          onNavigatePrevGroup();
+        } else {
+          onFocusedIndexChange(Math.max(focusedIndex - 1, 0));
+        }
         return;
       }
 
@@ -143,5 +157,7 @@ export const useTaskListKeyboard = ({
       onStartTitleEdit,
       expandedTaskId,
       containerRef,
+      onNavigateNextGroup,
+      onNavigatePrevGroup,
     ],
   );

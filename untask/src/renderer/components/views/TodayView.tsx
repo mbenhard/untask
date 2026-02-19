@@ -89,6 +89,7 @@ export const TodayView = ({
                 emptyMessage="Nothing planned for today."
                 ariaLabel="Today tasks"
                 scopeId="today"
+                isPrimaryList
               />
             </SectionGroup>
 
