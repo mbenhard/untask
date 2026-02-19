@@ -100,7 +100,7 @@ export const SearchModal = () => {
 
   return (
     <div
-      className="no-drag absolute inset-0 z-50 flex justify-center"
+      className="no-drag fixed inset-0 z-50 flex items-start justify-center bg-background/40 pt-[18vh] backdrop-blur-[2px]"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       onKeyDown={handleKeyDown}
     >
@@ -109,10 +109,10 @@ export const SearchModal = () => {
         role="dialog"
         aria-modal="true"
         aria-label="Search tasks"
-        className="mt-24 h-fit w-full max-w-sm rounded-md border border-border bg-background shadow-[0_8px_40px_-4px_rgba(0,0,0,0.35)]"
+        className="h-fit w-full max-w-sm rounded-xl border border-border/70 bg-card shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
       >
         {/* Input */}
-        <div className="flex h-9 items-center gap-2 px-2.5">
+        <div className="flex items-center gap-2 px-3 py-2.5">
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
           <input
             ref={inputRef}
@@ -135,7 +135,7 @@ export const SearchModal = () => {
         {(hasQuery || error) && (
           <div
             ref={listRef}
-            className="max-h-64 overflow-y-auto border-t border-border py-0.5"
+            className="max-h-64 overflow-y-auto border-t border-border/30 py-0.5"
           >
             {error ? (
               <p className="px-2.5 py-1.5 text-[11px] text-destructive">{error}</p>

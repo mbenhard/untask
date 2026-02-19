@@ -96,7 +96,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setUnreadProactive: (value) => set({ unreadProactive: value }),
   triggerNewTask: () =>
     set((state) => ({ newTaskTrigger: state.newTaskTrigger + 1 })),
-  setAiEnabled: (enabled) => set({ aiEnabled: enabled }),
+  setAiEnabled: (enabled) => set({ aiEnabled: enabled, quickAddOpen: false, quickAddText: '' }),
   openQuickAdd: (text) => set({ quickAddOpen: true, quickAddText: text }),
   closeQuickAdd: () => set({ quickAddOpen: false, quickAddText: '' }),
 }));
@@ -114,4 +114,3 @@ export const selectNewTaskTrigger = (state: AppStore) =>
   state.newTaskTrigger;
 export const selectAiEnabled = (state: AppStore) => state.aiEnabled;
 export const selectQuickAddOpen = (state: AppStore) => state.quickAddOpen;
-export const selectQuickAddText = (state: AppStore) => state.quickAddText;

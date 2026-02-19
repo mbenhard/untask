@@ -32,7 +32,6 @@ type InlineTaskInputProps = {
   parentId?: string | null;
   defaultStatus?: Exclude<TaskStatus, 'done'>;
   defaultToday?: boolean;
-  defaultTitle?: string;
   placeholder?: string;
   label?: string;
   alwaysOpen?: boolean;
@@ -47,7 +46,6 @@ export const InlineTaskInput = ({
   parentId = null,
   defaultStatus = 'active',
   defaultToday,
-  defaultTitle,
   placeholder,
   label = parentId ? 'Add subtask' : 'Add task',
   alwaysOpen = false,
@@ -59,7 +57,7 @@ export const InlineTaskInput = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSeenTriggerRef = useRef<number | undefined>(triggerOpen);
   const [isOpen, setIsOpen] = useState(alwaysOpen || onDismiss !== undefined);
-  const [title, setTitle] = useState(defaultTitle ?? '');
+  const [title, setTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   // Metadata state
