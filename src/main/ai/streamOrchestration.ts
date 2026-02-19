@@ -17,8 +17,7 @@ import {
 } from '../services/chatService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { getActiveProvider } from './providers';
-import { warmOllamaModel } from './providers/ollamaWarmup';
-import { getModelWebSearchConfig, isOllamaProvider, modelSupportsVision } from './models';
+import { getModelWebSearchConfig, modelSupportsVision } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall } from './tools';
@@ -214,12 +213,44 @@ const extractInlineEmitChipsJson = (
   }
 };
 
+/**
+ * Try to parse an `<emit_chips>...</emit_chips>` XML block that small models
+ * may produce when they can't reliably format tool calls.
+ */
+const extractInlineEmitChipsXml = (
+  text: string,
+): { text: string; chips: ChipAction[] } | null => {
+  const xmlPattern = /<emit_chips>\s*(\{[\s\S]*?\})\s*<\/emit_chips>/;
+  const match = text.match(xmlPattern);
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(match[1]) as { chips?: Array<{ label: string; responseText?: string }> };
+    if (!Array.isArray(parsed.chips) || parsed.chips.length < 2) return null;
+
+    const chips: ChipAction[] = parsed.chips.slice(0, 4).map((c) => ({
+      label: (c.label ?? '').slice(0, 40),
+      type: 'response',
+      responseText: c.responseText?.trim() || c.label,
+    }));
+
+    const cleanedText = text.replace(xmlPattern, '').replace(/\n{3,}/g, '\n\n').trim();
+    return { text: cleanedText.length > 0 ? cleanedText : text.trim(), chips };
+  } catch {
+    return null;
+  }
+};
+
 export const extractInlineChipBlock = (
   text: string,
 ): { text: string; chips: ChipAction[] } | null => {
   // First try the JSON [emit_chips:...] format
   const jsonResult = extractInlineEmitChipsJson(text);
   if (jsonResult) return jsonResult;
+
+  // Then try the XML <emit_chips>...</emit_chips> format
+  const xmlResult = extractInlineEmitChipsXml(text);
+  if (xmlResult) return xmlResult;
 
   // Fall back to section-heading + bullet-list format
   const lines = text.split(/\r?\n/);
@@ -483,28 +514,19 @@ export const runAssistantStream = async (
             ? `${builtPrompt.modelInputPrompt}\n\n${noteContextPrompt}`
             : builtPrompt.modelInputPrompt
           ).length;
-          // Rough estimate: ~4 chars per token for English text
           const estimatedPromptTokens = Math.round(promptChars / 4);
+          const estimatedHistoryTokens = Math.round(
+            recentHistory.reduce((acc, m) => acc + m.content.length, 0) / 4,
+          );
+          const estimatedToolSchemaTokens = 1100;
+          const totalEstimatedTokens =
+            estimatedPromptTokens + estimatedHistoryTokens + estimatedToolSchemaTokens;
           console.log(
             `[chat-stream] start: model=${input.modelId}` +
             ` | history=${recentHistory.length}` +
             ` | images=${input.images?.length ?? 0}` +
-            ` | ~prompt_tokens=${estimatedPromptTokens}`,
+            ` | ~tokens=${totalEstimatedTokens} (sys=${estimatedPromptTokens} tools=${estimatedToolSchemaTokens} hist=${estimatedHistoryTokens})`,
           );
-        }
-
-        // Pre-stream warmup for Ollama: ensures model is loaded before streaming
-        if (isOllamaProvider()) {
-          const warmupT0 = isDev ? performance.now() : 0;
-          const warmupResult = await warmOllamaModel(input.modelId);
-          if (isDev) {
-            const warmupMs = (performance.now() - warmupT0).toFixed(0);
-            console.log(
-              `[chat-stream] ollama pre-stream warmup: ${warmupResult.ok ? 'ok' : 'failed'}` +
-              ` (${warmupMs}ms)` +
-              (warmupResult.error ? ` — ${warmupResult.error}` : ''),
-            );
-          }
         }
 
         const conversationMessages = buildConversationMessages({
@@ -671,6 +693,127 @@ export const runAssistantStream = async (
           })() as Parameters<typeof streamText>[0]['tools'],
         });
 
+        // ── <think> tag parser state machine ──────────────────────
+        // Reclassifies text containing <think>...</think> tags into
+        // reasoning events. Handles partial tags split across chunks.
+        let thinkState: 'normal' | 'inThinking' = 'normal';
+        let thinkBuffer = '';
+
+        const flushThinkBuffer = (forceState?: 'normal' | 'inThinking'): void => {
+          const state = forceState ?? thinkState;
+          if (thinkBuffer.length === 0) return;
+          if (state === 'inThinking') {
+            reasoningText += thinkBuffer;
+            emit({ type: 'reasoning', requestId: input.requestId, text: thinkBuffer });
+            if (isDev && !tFirstReasoning) {
+              tFirstReasoning = performance.now();
+              console.log(`[chat-stream] first reasoning: ${(tFirstReasoning - t0).toFixed(0)}ms`);
+            }
+            if (isDev) reasoningTokenCount++;
+          } else {
+            assistantText += thinkBuffer;
+            emit({ type: 'token', requestId: input.requestId, text: thinkBuffer });
+            if (isDev && !tFirstToken) {
+              tFirstToken = performance.now();
+              console.log(`[chat-stream] first token: ${(tFirstToken - t0).toFixed(0)}ms`);
+            }
+            if (isDev) tokenCount++;
+          }
+          thinkBuffer = '';
+        };
+
+        const processThinkText = (text: string): void => {
+          thinkBuffer += text;
+
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            if (thinkState === 'normal') {
+              const openIdx = thinkBuffer.indexOf('<think>');
+              if (openIdx !== -1) {
+                // Flush text before <think> as normal token
+                const before = thinkBuffer.slice(0, openIdx);
+                if (before.length > 0) {
+                  assistantText += before;
+                  emit({ type: 'token', requestId: input.requestId, text: before });
+                  if (isDev && !tFirstToken) {
+                    tFirstToken = performance.now();
+                    console.log(`[chat-stream] first token: ${(tFirstToken - t0).toFixed(0)}ms`);
+                  }
+                  if (isDev) tokenCount++;
+                }
+                thinkBuffer = thinkBuffer.slice(openIdx + 7); // skip '<think>'
+                thinkState = 'inThinking';
+                continue;
+              }
+              // Check for potential partial '<think>' at end of buffer
+              // Keep last 6 chars (length of '<think' minus 1) if they start with '<'
+              const partialCheckLen = Math.min(thinkBuffer.length, 6);
+              const tail = thinkBuffer.slice(-partialCheckLen);
+              const ltIdx = tail.lastIndexOf('<');
+              if (ltIdx !== -1 && '<think>'.startsWith(tail.slice(ltIdx))) {
+                // Potential partial tag — flush everything before it
+                const safeEnd = thinkBuffer.length - partialCheckLen + ltIdx;
+                if (safeEnd > 0) {
+                  const safe = thinkBuffer.slice(0, safeEnd);
+                  assistantText += safe;
+                  emit({ type: 'token', requestId: input.requestId, text: safe });
+                  if (isDev && !tFirstToken) {
+                    tFirstToken = performance.now();
+                    console.log(`[chat-stream] first token: ${(tFirstToken - t0).toFixed(0)}ms`);
+                  }
+                  if (isDev) tokenCount++;
+                }
+                thinkBuffer = thinkBuffer.slice(safeEnd);
+              } else {
+                // No partial tag — flush entire buffer
+                flushThinkBuffer();
+              }
+              break;
+            } else {
+              // inThinking
+              const closeIdx = thinkBuffer.indexOf('</think>');
+              if (closeIdx !== -1) {
+                // Flush text before </think> as reasoning
+                const before = thinkBuffer.slice(0, closeIdx);
+                if (before.length > 0) {
+                  reasoningText += before;
+                  emit({ type: 'reasoning', requestId: input.requestId, text: before });
+                  if (isDev && !tFirstReasoning) {
+                    tFirstReasoning = performance.now();
+                    console.log(`[chat-stream] first reasoning: ${(tFirstReasoning - t0).toFixed(0)}ms`);
+                  }
+                  if (isDev) reasoningTokenCount++;
+                }
+                thinkBuffer = thinkBuffer.slice(closeIdx + 9); // skip '</think>'
+                thinkState = 'normal';
+                continue;
+              }
+              // Check for potential partial '</think>' at end
+              const partialCheckLen = Math.min(thinkBuffer.length, 8);
+              const tail = thinkBuffer.slice(-partialCheckLen);
+              const ltIdx = tail.lastIndexOf('<');
+              if (ltIdx !== -1 && '</think>'.startsWith(tail.slice(ltIdx))) {
+                const safeEnd = thinkBuffer.length - partialCheckLen + ltIdx;
+                if (safeEnd > 0) {
+                  const safe = thinkBuffer.slice(0, safeEnd);
+                  reasoningText += safe;
+                  emit({ type: 'reasoning', requestId: input.requestId, text: safe });
+                  if (isDev && !tFirstReasoning) {
+                    tFirstReasoning = performance.now();
+                    console.log(`[chat-stream] first reasoning: ${(tFirstReasoning - t0).toFixed(0)}ms`);
+                  }
+                  if (isDev) reasoningTokenCount++;
+                }
+                thinkBuffer = thinkBuffer.slice(safeEnd);
+              } else {
+                // No partial tag — flush entire buffer as reasoning
+                flushThinkBuffer();
+              }
+              break;
+            }
+          }
+        };
+
         for await (const part of result.fullStream) {
           resetInactivityTimer();
 
@@ -702,17 +845,7 @@ export const runAssistantStream = async (
                 telemetry.firstTokenAt = new Date().toISOString();
               }
 
-              assistantText += part.text;
-              emit({
-                type: 'token',
-                requestId: input.requestId,
-                text: part.text,
-              });
-              if (isDev && !tFirstToken) {
-                tFirstToken = performance.now();
-                console.log(`[chat-stream] first token: ${(tFirstToken - t0).toFixed(0)}ms`);
-              }
-              if (isDev) tokenCount++;
+              processThinkText(part.text);
               break;
             }
             case 'tool-call': {
@@ -820,6 +953,10 @@ export const runAssistantStream = async (
         }
 
         clearInactivityTimer();
+
+        // Flush any remaining content in the think tag buffer
+        // If still inThinking, treat remaining as reasoning (unclosed tag)
+        flushThinkBuffer();
 
         if (chatState.isCanceled(input.requestId)) {
           return;

@@ -232,4 +232,5 @@ export const registerSettingsHandlers = (): void => {
       },
     ),
   );
+
 };
