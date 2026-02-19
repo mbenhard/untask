@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
 import { ApiKeyManager, type OllamaConnectionStatus } from './ApiKeyManager';
+import type { OllamaPullProgressPayload } from '../../../types/ipc';
 import { ModelCatalogView, getCuratedModelsForProvider, type OllamaModelOption } from './ModelCatalogView';
 import { ProviderSelector } from './ProviderSelector';
 import { SegmentedControl } from './SegmentedControl';
@@ -68,6 +69,9 @@ const useAITabState = (
   const [ollamaStatus, setOllamaStatus] = useState<OllamaConnectionStatus>('loading');
   const [ollamaModels, setOllamaModels] = useState<OllamaModelOption[]>([]);
   const [detectedBaseUrl, setDetectedBaseUrl] = useState<string>(DEFAULT_OLLAMA_BASE_URL);
+
+  // Ollama pull
+  const [pullProgress, setPullProgress] = useState<OllamaPullProgressPayload | null>(null);
 
   // Model
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -150,6 +154,7 @@ const useAITabState = (
         result.models.map((m) => ({
           name: m.name,
           parameterSize: m.parameterSize,
+          supportsTools: m.supportsTools,
         })),
       );
       return result;
@@ -219,6 +224,21 @@ const useAITabState = (
     loadAutonomyMode,
     loadRetentionMode,
   ]);
+
+  // ─── Ollama pull progress listener ────────────────────────────────────────
+
+  useEffect(() => {
+    const unsub = getUntask().chat.onOllamaPullProgress((progress) => {
+      setPullProgress(progress);
+      if (progress.status === 'success') {
+        void loadOllamaStatus();
+        setTimeout(() => setPullProgress(null), 2000);
+      } else if (progress.status === 'error') {
+        setTimeout(() => setPullProgress(null), 5000);
+      }
+    });
+    return unsub;
+  }, [loadOllamaStatus]);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -354,11 +374,11 @@ const useAITabState = (
     }
   }, [provider, setError, setNotice]);
 
-  const handleSaveOllamaUrl = useCallback(async () => {
+  const handleSaveOllamaUrl = useCallback(async (): Promise<boolean> => {
     const normalized = ollamaBaseUrl.trim();
     if (normalized.length === 0) {
       setError('Enter a valid Ollama base URL.');
-      return;
+      return false;
     }
 
     try {
@@ -369,8 +389,10 @@ const useAITabState = (
       setNotice('Ollama base URL saved.');
       // Re-run detection with new URL
       void loadOllamaStatus();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save Ollama base URL.');
+      return false;
     } finally {
       setIsSavingOllamaUrl(false);
     }
@@ -439,6 +461,37 @@ const useAITabState = (
     setApiKeyError(null);
   }, []);
 
+  const handlePullModel = useCallback(
+    async (model: string) => {
+      setError(null);
+      setNotice(null);
+      try {
+        const result = await getUntask().chat.pullOllamaModel({ model });
+        if (result.ok) {
+          // Auto-select the newly pulled model after list refresh
+          const status = await getUntask().chat.getOllamaStatus();
+          const matchedModel = status.models.find(
+            (m) => m.name === model || m.name === `${model}:latest` || m.name.startsWith(`${model}:`),
+          );
+          if (matchedModel) {
+            const selectResult = await getUntask().chat.setSelectedModel({ modelId: matchedModel.name });
+            setSelectedModelId(selectResult.modelId);
+          }
+        } else if (result.error) {
+          setError(result.error);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to pull model.');
+      }
+    },
+    [setError, setNotice],
+  );
+
+  const handleCancelPull = useCallback(() => {
+    void getUntask().chat.cancelOllamaPull();
+    setPullProgress(null);
+  }, []);
+
   return {
     // AI enabled
     aiEnabled,
@@ -469,6 +522,9 @@ const useAITabState = (
     ollamaStatus,
     ollamaModels,
     detectedBaseUrl,
+    pullProgress,
+    handlePullModel,
+    handleCancelPull,
     // Model
     selectedModelId,
     isLoadingModel,
@@ -537,7 +593,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 isLoadingOllamaUrl={state.isLoadingOllamaUrl}
                 isSavingOllamaUrl={state.isSavingOllamaUrl}
                 defaultOllamaBaseUrl={DEFAULT_OLLAMA_BASE_URL}
-                onSaveOllamaUrl={() => void state.handleSaveOllamaUrl()}
+                onSaveOllamaUrl={() => state.handleSaveOllamaUrl()}
                 ollamaStatus={state.ollamaStatus}
                 detectedBaseUrl={state.detectedBaseUrl}
               />
@@ -552,6 +608,9 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 onChange={(v) => void state.handleModelChange(v)}
                 ollamaModels={state.ollamaModels}
                 ollamaStatus={state.ollamaStatus}
+                pullProgress={state.pullProgress}
+                onPullModel={(m) => void state.handlePullModel(m)}
+                onCancelPull={state.handleCancelPull}
               />
             </SettingsSection>
 

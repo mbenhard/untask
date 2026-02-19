@@ -81,6 +81,8 @@ import {
   type OllamaPullRequest,
   type OllamaPullResult,
   type OllamaPullProgressPayload,
+  type OllamaWarmupRequest,
+  type OllamaWarmupResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -305,6 +307,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL, request),
     cancelOllamaPull: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL_CANCEL),
+    warmupOllama: (request: OllamaWarmupRequest): Promise<OllamaWarmupResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_WARMUP, request),
     onOllamaPullProgress: (
       listener: (event: OllamaPullProgressPayload) => void,
     ): (() => void) => {

@@ -36,6 +36,42 @@ export const classifyChatError = (error: unknown): ClassifiedChatError => {
     };
   }
 
+  if (normalized.includes('does not support tools')) {
+    return {
+      code: 'model_incompatible',
+      retryable: false,
+      message:
+        "This model doesn't support tool calling, which Untask needs to manage your tasks. Switch to a compatible model like qwen3, llama3.1, or mistral in Settings \u2192 AI \u2192 Model.",
+    };
+  }
+
+  // Ollama: model not pulled / not found
+  if (
+    normalized.includes('not found') &&
+    (normalized.includes('model') || normalized.includes('pull'))
+  ) {
+    return {
+      code: 'model_not_found',
+      retryable: false,
+      message:
+        'This model is not installed on Ollama. Pull it in Settings \u2192 AI \u2192 Model.',
+    };
+  }
+
+  // Ollama: context window exceeded
+  if (
+    normalized.includes('context length') ||
+    normalized.includes('num_ctx') ||
+    normalized.includes('context window')
+  ) {
+    return {
+      code: 'model_incompatible',
+      retryable: false,
+      message:
+        'The conversation exceeded this model\u2019s context window. Try starting a new conversation or switching to a model with a larger context.',
+    };
+  }
+
   if (
     normalized.includes('tool ') ||
     normalized.includes('invalid payload for') ||
@@ -45,6 +81,19 @@ export const classifyChatError = (error: unknown): ClassifiedChatError => {
       code: 'tool_error',
       retryable: false,
       message,
+    };
+  }
+
+  // Ollama: connection refused / not running (more specific than generic network)
+  if (
+    normalized.includes('econnrefused') &&
+    (normalized.includes('11434') || normalized.includes('ollama'))
+  ) {
+    return {
+      code: 'network_error',
+      retryable: false,
+      message:
+        'Cannot connect to Ollama. Make sure the Ollama app is running.',
     };
   }
 

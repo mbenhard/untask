@@ -6,6 +6,8 @@ export type ChatStreamErrorCode =
   | 'provider_error'
   | 'network_error'
   | 'tool_error'
+  | 'model_incompatible'
+  | 'model_not_found'
   | 'unknown_error';
 
 export type ChatNoteContext = {

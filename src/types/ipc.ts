@@ -96,6 +96,10 @@ export const IPC_CHANNELS = {
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
   CHAT_FOCUS_MESSAGE: 'chat:focus-message',
   OLLAMA_STATUS: 'ollama:status',
+  OLLAMA_PULL: 'ollama:pull',
+  OLLAMA_PULL_PROGRESS: 'ollama:pull-progress',
+  OLLAMA_PULL_CANCEL: 'ollama:pull-cancel',
+  OLLAMA_WARMUP: 'ollama:warmup',
   BACKUP_LIST: 'backup:list',
   BACKUP_CREATE: 'backup:create',
   BACKUP_EXPORT: 'backup:export',
@@ -142,6 +146,10 @@ export const IPC_CHANNELS = {
   REMINDERS_FORCE_SYNC: 'reminders:force-sync',
   REMINDERS_PULL_ONLY: 'reminders:pull-only',
   REMINDERS_SYNC_STATUS: 'reminders:sync-status',
+  // ─── Notification channels ──────────────────────────────
+  NOTIFICATIONS_FIRE_TEST: 'notifications:fire-test',
+  NOTIFICATIONS_PROBE_PERMISSION: 'notifications:probe-permission',
+  NOTIFICATIONS_OPEN_SETTINGS: 'notifications:open-settings',
   // ─── Attachment channels ─────────────────────────────────
   ATTACHMENT_SAVE: 'attachment:save',
   ATTACHMENT_OPEN: 'attachment:open',
@@ -432,6 +440,12 @@ export type AttachmentPickAndSaveResult = {
   urls: string[];
 };
 
+// ─── Notification payloads ────────────────────────────────
+
+export type NotificationPermissionResult = {
+  status: 'granted' | 'denied';
+};
+
 // ─── Reminders sync payloads ─────────────────────────────
 
 export type RemindersSyncFilter = 'due_date_only' | 'today' | 'all';
@@ -461,6 +475,22 @@ export type OllamaStatusResult = {
     parameterSize: string;
     family: string;
     quantization: string;
+    supportsTools: boolean;
   }>;
   defaultModelName: string | null;
 };
+
+export type OllamaPullRequest = { model: string };
+export type OllamaPullResult = { ok: boolean; model: string; error?: string };
+export type OllamaPullProgressPayload = {
+  model: string;
+  status: string;
+  digest?: string;
+  total?: number;
+  completed?: number;
+  percent?: number;
+  error?: string;
+};
+
+export type OllamaWarmupRequest = { modelId: string; baseUrl?: string };
+export type OllamaWarmupResult = { ok: boolean; error?: string };

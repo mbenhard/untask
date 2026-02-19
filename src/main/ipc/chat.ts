@@ -22,6 +22,10 @@ import {
   type ChatResolvePendingActionRequest,
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
+  type OllamaPullRequest,
+  type OllamaPullResult,
+  type OllamaWarmupRequest,
+  type OllamaWarmupResult,
 } from '../../types/ipc';
 import { withIpcLogging } from './helpers';
 import {
@@ -47,6 +51,8 @@ import { cancelActiveChatTurns, startChatTurn } from '../ai/chat';
 import { undoLastAiTaskEvent, undoTaskEvent } from '../services/taskService';
 import { getModels, getSelectedModelId, setSelectedModelId } from '../ai/models';
 import { clearOllamaDetectionCache, detectOllama } from '../ai/providers/ollamaDetection';
+import { pullOllamaModel, cancelOllamaPull } from '../ai/providers/ollamaPull';
+import { warmOllamaModel } from '../ai/providers/ollamaWarmup';
 import {
   getAutonomyMode,
   setAutonomyMode,
@@ -395,6 +401,46 @@ export const registerChatHandlers = (): void => {
       async () => {
         clearOllamaDetectionCache();
         return detectOllama();
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.OLLAMA_PULL,
+    withIpcLogging(
+      'OLLAMA_PULL',
+      async (event: Electron.IpcMainInvokeEvent, request: OllamaPullRequest): Promise<OllamaPullResult> => {
+        if (!request?.model || typeof request.model !== 'string') {
+          throw new Error('Invalid pull request: model is required.');
+        }
+
+        const result = await pullOllamaModel(request.model, (progress) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, progress);
+          }
+        });
+
+        return { ok: result.ok, model: request.model, error: result.error };
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.OLLAMA_PULL_CANCEL,
+    withIpcLogging('OLLAMA_PULL_CANCEL', () => {
+      cancelOllamaPull();
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.OLLAMA_WARMUP,
+    withIpcLogging(
+      'OLLAMA_WARMUP',
+      async (_event: Electron.IpcMainInvokeEvent, request: OllamaWarmupRequest): Promise<OllamaWarmupResult> => {
+        if (!request?.modelId || typeof request.modelId !== 'string') {
+          return { ok: false, error: 'Invalid warmup request: modelId is required.' };
+        }
+        return warmOllamaModel(request.modelId, request.baseUrl);
       },
     ),
   );
