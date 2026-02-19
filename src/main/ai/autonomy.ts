@@ -99,14 +99,14 @@ export const evaluateGate = (
   _risk: RiskLevel,
   hardOverride: boolean,
 ): GateDecision => {
+  if (mode === 'auto') {
+    return { action: 'execute' };
+  }
   if (hardOverride) {
     return { action: 'pending', reason: 'Confirm delete?' };
   }
-  if (mode === 'confirm') {
-    return { action: 'pending', reason: 'Approval needed.' };
-  }
-  // mode === 'auto'
-  return { action: 'execute' };
+  // mode === 'confirm'
+  return { action: 'pending', reason: 'Approval needed.' };
 };
 
 // ─── Pending action queue persistence ────────────────────────

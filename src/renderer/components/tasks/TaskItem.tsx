@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
 
-import { defaultAnimateLayoutChanges, useSortable } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
@@ -83,11 +83,19 @@ export const TaskItem = ({
   } = useSortable({
     id: task.id,
     transition: SORTABLE_TRANSITION,
-    animateLayoutChanges: (args) =>
-      defaultAnimateLayoutChanges({
-        ...args,
-        wasDragging: true,
-      }),
+    animateLayoutChanges: (args) => {
+      // If sorting or dragging, use standard dnd-kit behavior (which animates moves and container changes)
+      if (args.isSorting || args.wasDragging) {
+        return true;
+      }
+      // If moving between containers without dragging (e.g., button click to Complete),
+      // DO NOT animate, otherwise the item visually flies across the screen.
+      if (args.previousContainerId && args.containerId !== args.previousContainerId) {
+        return false;
+      }
+      // Animate sibling items shifting up/down
+      return true;
+    },
   });
 
   const style: CSSProperties = {
@@ -144,11 +152,11 @@ export const TaskItem = ({
     () =>
       canMoveToProject
         ? allTasks.filter(
-            (t) =>
-              t.parentId === null &&
-              t.id !== task.id &&
-              !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
-          )
+          (t) =>
+            t.parentId === null &&
+            t.id !== task.id &&
+            !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
+        )
         : [],
     [allTasks, canMoveToProject, task.id],
   );

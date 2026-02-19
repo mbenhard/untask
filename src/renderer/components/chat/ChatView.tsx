@@ -161,9 +161,9 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
     <div className={cn(
       'flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs',
       step.status === 'error' ? 'border-destructive/30 bg-destructive/5' :
-      (step.status === 'confirmation_required' && !resolving) ? 'border-border/60 bg-card/40' :
-      isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
-      'border-border/60 bg-card/40',
+        (step.status === 'confirmation_required' && !resolving) ? 'border-border/60 bg-card/40' :
+          isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
+            'border-border/60 bg-card/40',
     )}>
       <div className="mt-0.5 shrink-0">
         {toolStatusIcon(isUndone ? 'success' : resolving ? 'success' : step.status)}
@@ -501,42 +501,12 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
     clearFocusMessageId();
   }, [focusMessageId, messages, prefersReducedMotion, clearFocusMessageId]);
 
-  const [confirmationTarget, setConfirmationTarget] = useState<{
-    actionId: string;
-    rationale: string;
-    riskLevel: string;
-  } | null>(null);
-
   const handleApprove = useCallback(
     (actionId: string) => {
-      const card = messages
-        .flatMap((m) => m.actionCards)
-        .find((c) => c.actionId === actionId);
-
-      if (card?.riskLevel === 'high' || card?.riskLevel === 'critical') {
-        // Use task title and action detail for human-readable rationale
-        const readableRationale = card.title
-          ? card.title
-          : card.detail ?? 'This action requires confirmation.';
-        setConfirmationTarget({
-          actionId,
-          rationale: readableRationale,
-          riskLevel: card.riskLevel,
-        });
-        return;
-      }
-
       void approvePendingAction(actionId);
     },
-    [messages, approvePendingAction],
+    [approvePendingAction],
   );
-
-  const handleConfirmApprove = useCallback(() => {
-    if (confirmationTarget) {
-      void approvePendingAction(confirmationTarget.actionId);
-      setConfirmationTarget(null);
-    }
-  }, [confirmationTarget, approvePendingAction]);
 
   const sendMessage = useChatStore((state) => state.sendMessage);
   const triggerNotePrompt = useCallback(
@@ -600,67 +570,67 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             {isAssistant && hasSteps ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
                 <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                {message.steps.map((step, index) => {
-                  if (step.kind === 'thinking') {
-                    // Only show reasoning disclosure after streaming is done
-                    if (message.isStreaming) return null;
-                    return (
-                      <ThinkingStep
-                        key={`thinking-${index}`}
-                        content={step.content}
-                      />
-                    );
-                  }
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  {message.steps.map((step, index) => {
+                    if (step.kind === 'thinking') {
+                      // Only show reasoning disclosure after streaming is done
+                      if (message.isStreaming) return null;
+                      return (
+                        <ThinkingStep
+                          key={`thinking-${index}`}
+                          content={step.content}
+                        />
+                      );
+                    }
 
-                  if (step.kind === 'text') {
-                    return (
-                      <div
-                        key={`text-${index}`}
-                        className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm"
-                      >
-                        <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                          <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
+                    if (step.kind === 'text') {
+                      return (
+                        <div
+                          key={`text-${index}`}
+                          className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm"
+                        >
+                          <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  }
+                      );
+                    }
 
-                  if (step.kind === 'tool') {
-                    // Hide emit_chips and read-only tool steps
-                    if (step.toolName === 'emit_chips') return null;
-                    if (!isVisibleToolStep(step)) return null;
+                    if (step.kind === 'tool') {
+                      // Hide emit_chips and read-only tool steps
+                      if (step.toolName === 'emit_chips') return null;
+                      if (!isVisibleToolStep(step)) return null;
 
-                    return (
-                      <ToolStep
-                        key={step.toolCallId || `tool-${index}`}
-                        step={step}
-                        onUndo={(taskEventId) => {
-                          void undoAction(taskEventId);
-                        }}
-                        onApprove={handleApprove}
-                        onReject={(actionId) => {
-                          void rejectPendingAction(actionId);
-                        }}
-                      />
-                    );
-                  }
+                      return (
+                        <ToolStep
+                          key={step.toolCallId || `tool-${index}`}
+                          step={step}
+                          onUndo={(taskEventId) => {
+                            void undoAction(taskEventId);
+                          }}
+                          onApprove={handleApprove}
+                          onReject={(actionId) => {
+                            void rejectPendingAction(actionId);
+                          }}
+                        />
+                      );
+                    }
 
-                  return null;
-                })}
+                    return null;
+                  })}
 
-                {Boolean(message.isStreaming) && (
-                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
-                )}
+                  {Boolean(message.isStreaming) && (
+                    <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
+                  )}
 
-                {message.chips && message.chips.length > 0 ? (
-                  <ChipBar
-                    chips={message.chips}
-                    disabled={message.id !== lastAssistantMessageId || isSending}
-                    onChipClick={(chip) => handleChipClick(message.id, chip)}
-                  />
-                ) : null}
-              </div>
+                  {message.chips && message.chips.length > 0 ? (
+                    <ChipBar
+                      chips={message.chips}
+                      disabled={message.id !== lastAssistantMessageId || isSending}
+                      onChipClick={(chip) => handleChipClick(message.id, chip)}
+                    />
+                  ) : null}
+                </div>
               </div>
             ) : isAssistant && isPendingAssistantPlaceholder ? (
               <div className="flex w-full max-w-[88%] items-center gap-2">
@@ -670,25 +640,25 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
                 <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div
-                  className={cn(
-                    'rounded-xl border px-3 py-2 text-sm',
-                    'border-border bg-card/80 text-foreground',
-                  )}
-                >
-                  <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                    <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div
+                    className={cn(
+                      'rounded-xl border px-3 py-2 text-sm',
+                      'border-border bg-card/80 text-foreground',
+                    )}
+                  >
+                    <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
+                    </div>
                   </div>
+                  {message.chips && message.chips.length > 0 ? (
+                    <ChipBar
+                      chips={message.chips}
+                      disabled={message.id !== lastAssistantMessageId || isSending}
+                      onChipClick={(chip) => handleChipClick(message.id, chip)}
+                    />
+                  ) : null}
                 </div>
-                {message.chips && message.chips.length > 0 ? (
-                  <ChipBar
-                    chips={message.chips}
-                    disabled={message.id !== lastAssistantMessageId || isSending}
-                    onChipClick={(chip) => handleChipClick(message.id, chip)}
-                  />
-                ) : null}
-              </div>
               </div>
             ) : (
               <div className="max-w-[88%] rounded-xl border border-border/70 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
@@ -796,44 +766,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
 
       </div>
 
-      <AnimatePresence>
-        {confirmationTarget ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0.05 : 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-            aria-describedby="confirm-dialog-desc"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
-              className="w-full max-w-xs rounded-xl border border-border bg-card p-4 shadow-lg"
-            >
-              <h3 id="confirm-dialog-title" className="text-sm font-medium text-foreground">
-                Confirm action
-              </h3>
-              <p id="confirm-dialog-desc" className="mt-2 text-sm text-muted-foreground">
-                {confirmationTarget.rationale}
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmationTarget(null)}>
-                  Cancel
-                </Button>
-                <Button type="button" variant="default" size="sm" onClick={handleConfirmApprove}>
-                  Do it
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+
     </div>
   );
 };
