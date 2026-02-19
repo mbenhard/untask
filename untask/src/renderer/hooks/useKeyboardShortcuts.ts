@@ -99,7 +99,12 @@ export const useKeyboardShortcuts = ({
 
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
-        triggerNewTask();
+        if (activeViewRef.current === 'notes') {
+          setView('notes');
+          void useNotesStore.getState().createNote();
+        } else {
+          triggerNewTask();
+        }
         return;
       }
 

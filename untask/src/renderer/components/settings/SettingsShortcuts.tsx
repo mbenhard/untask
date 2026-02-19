@@ -44,7 +44,7 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
     entries: [
       { keys: '⌘ K', action: 'Toggle chat overlay' },
       { keys: '⌘ F', action: 'Search' },
-      { keys: '⌘ N', action: 'New task' },
+      { keys: '⌘ N', action: 'New task (or note in Notes view)' },
       { keys: '⌘ ⇧ N', action: 'New note' },
       { keys: '⌘ 1', action: 'Today view' },
       { keys: '⌘ 2', action: 'Tasks view' },

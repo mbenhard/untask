@@ -254,7 +254,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           <div className="flex flex-col items-center justify-center px-4 pt-16 text-center">
             <p className="text-sm text-muted-foreground">No active notes</p>
             <p className="mt-1 text-[11px] text-muted-foreground/70">
-              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Cmd+Shift+N</kbd> to create one
+              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Cmd+N</kbd> to create one
             </p>
           </div>
         ) : (
