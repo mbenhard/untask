@@ -336,7 +336,7 @@ export const isOllamaProvider = (): boolean => {
   return stored === 'ollama';
 };
 
-// ─── Legacy accessors (used by IPC, chat.ts, knowledgeExtractor.ts) ───────────
+// ─── Legacy accessors (used by IPC, chat.ts) ───────────
 
 export const getDefaultModelId = (): string => {
   const storedProvider = getSetting(SETTING_KEY_AI_PROVIDER)?.trim() ?? '';
