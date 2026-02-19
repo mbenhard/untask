@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
+import { AlignLeft, ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/models';
@@ -306,6 +306,15 @@ export const TaskItem = ({
         </div>
 
         <div className="ml-auto flex items-center gap-1">
+          {task.body && task.body.trim() !== '' && task.body !== '<p></p>' ? (
+            <span
+              className="inline-flex h-5 items-center justify-center rounded border border-border/70 bg-muted/40 px-1 text-muted-foreground"
+              title="Has description"
+            >
+              <AlignLeft className="size-3" />
+            </span>
+          ) : null}
+
           {task.recurrence ? (
             <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
               {task.recurrence}
