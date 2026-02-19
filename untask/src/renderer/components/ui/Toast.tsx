@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -11,12 +11,12 @@ const UNDONE_DISPLAY_MS = 1500;
 export const ToastContainer = () => {
   const toast = useToastStore((s) => s.toast);
   const clearToast = useToastStore((s) => s.clearToast);
-  const [undoing, setUndoing] = useState(false);
+  const undoing = useToastStore((s) => s.isUndoing);
+  const markUndoing = useToastStore((s) => s.markUndoing);
   const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!toast) {
-      setUndoing(false);
       return;
     }
 
@@ -40,7 +40,7 @@ export const ToastContainer = () => {
 
   const handleUndo = () => {
     if (!toast.onUndo || undoing) return;
-    setUndoing(true);
+    markUndoing();
     void toast.onUndo();
   };
 

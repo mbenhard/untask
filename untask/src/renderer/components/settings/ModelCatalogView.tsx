@@ -254,13 +254,60 @@ const OllamaModelView = ({
   };
 
   return (
-    <div>
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 text-right">
+        {selectedModelId &&
+          ollamaModels.some((m) => m.name === selectedModelId && !isModelLargeEnough(m.name)) && (
+            <span className="text-[10px] leading-tight text-amber-400/80">
+              Too small for reliable tool use.<br />Try llama3.1:8b
+            </span>
+          )}
+        {selectedModelId &&
+          ollamaModels.some((m) => m.name === selectedModelId && isModelLargeEnough(m.name) && m.supportsTools === false) && (
+            <span className="text-[10px] leading-tight text-amber-400/80">
+              Doesn&apos;t support tools.<br />Try llama3.1:8b
+            </span>
+          )}
+        {pullProgress && (
+          <div className="flex flex-col items-end gap-1 min-w-[140px]">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap">
+                {pullProgress.status === 'success'
+                  ? `${pullProgress.model} pulled`
+                  : pullProgress.status === 'error'
+                    ? pullProgress.error ?? 'Pull failed'
+                    : pullProgress.percent != null
+                      ? `Pulling ${pullProgress.model}… ${pullProgress.percent}%`
+                      : `${pullProgress.status}…`}
+              </span>
+              {isPulling && (
+                <button
+                  type="button"
+                  onClick={onCancelPull}
+                  className="text-[10px] text-muted-foreground/50 hover:text-foreground transition-colors underline underline-offset-2"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            {typeof pullProgress.percent === 'number' && (
+              <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-foreground/60 transition-all duration-300"
+                  style={{ width: `${pullProgress.percent}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <select
         value={selectedModelId ?? ''}
         onChange={(e) => handleChange(e.target.value)}
         disabled={isPulling}
         aria-label="Ollama model"
-        className="h-7 rounded-md border border-border/60 bg-transparent px-2 text-[11px] max-w-[260px] disabled:opacity-60"
+        className="h-7 rounded-md border border-border/60 bg-transparent px-2 text-[11px] max-w-[280px] disabled:opacity-60"
       >
         {ollamaModels.length === 0 && (
           <option value="" disabled>
@@ -292,50 +339,6 @@ const OllamaModelView = ({
           </optgroup>
         )}
       </select>
-      {selectedModelId &&
-        ollamaModels.some((m) => m.name === selectedModelId && !isModelLargeEnough(m.name)) && (
-          <p className="mt-1 max-w-[260px] text-[10px] leading-relaxed text-amber-400/80">
-            This model is too small for reliable tool use. Try llama3.1:8b or qwen3:8b for full features.
-          </p>
-        )}
-      {selectedModelId &&
-        ollamaModels.some((m) => m.name === selectedModelId && isModelLargeEnough(m.name) && m.supportsTools === false) && (
-          <p className="mt-1 max-w-[260px] text-[10px] leading-relaxed text-amber-400/80">
-            This model can&apos;t manage tasks directly. Try llama3.1:8b or qwen3:8b for full features.
-          </p>
-        )}
-      {pullProgress && (
-        <div className="mt-1">
-          {typeof pullProgress.percent === 'number' && (
-            <div className="h-1 max-w-[260px] rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-foreground/60 transition-all duration-300"
-                style={{ width: `${pullProgress.percent}%` }}
-              />
-            </div>
-          )}
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] text-muted-foreground/60">
-              {pullProgress.status === 'success'
-                ? `${pullProgress.model} pulled`
-                : pullProgress.status === 'error'
-                  ? pullProgress.error ?? 'Pull failed'
-                  : pullProgress.percent != null
-                    ? `Pulling ${pullProgress.model}… ${pullProgress.percent}%`
-                    : `${pullProgress.status}…`}
-            </span>
-            {isPulling && (
-              <button
-                type="button"
-                onClick={onCancelPull}
-                className="text-[10px] text-muted-foreground/50 hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -374,8 +377,8 @@ export const ModelCatalogView = ({
           selectedModelId={selectedModelId}
           onChange={onChange}
           pullProgress={pullProgress ?? null}
-          onPullModel={onPullModel ?? (() => {})}
-          onCancelPull={onCancelPull ?? (() => {})}
+          onPullModel={onPullModel ?? (() => { })}
+          onCancelPull={onCancelPull ?? (() => { })}
         />
       </SettingsRow>
     );

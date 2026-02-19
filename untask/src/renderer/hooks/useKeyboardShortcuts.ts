@@ -6,6 +6,7 @@ import { useChatStore } from '../stores/chatStore';
 import { useNotesStore } from '../stores/notesStore';
 import { useSearchStore } from '../stores/searchStore';
 import { useTaskStore } from '../stores/taskStore';
+import { useToastStore } from '../stores/toastStore';
 
 type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -185,10 +186,16 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        void (async () => {
-          await getUntask().tasks.undoLastUserAction();
-          await useTaskStore.getState().refreshTasks();
-        })();
+        const toastStore = useToastStore.getState();
+        if (toastStore.toast && toastStore.toast.onUndo && !toastStore.isUndoing) {
+          toastStore.markUndoing();
+          void toastStore.toast.onUndo();
+        } else {
+          void (async () => {
+            await getUntask().tasks.undoLastUserAction();
+            await useTaskStore.getState().refreshTasks();
+          })();
+        }
         return;
       }
 
