@@ -130,7 +130,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end ? true : undefined}
       className={cn(
         "h-[var(--cell-size)] w-[var(--cell-size)] rounded-[3px] p-0 font-mono text-[11px] font-normal aria-selected:opacity-100",
-        "hover:bg-accent/50",
+        "hover:bg-accent/50 focus:bg-accent/50",
         "data-[selected-single=true]:rounded-[3px]",
         "data-[range-start=true]:rounded-s-[3px]",
         "data-[range-end=true]:rounded-e-[3px]",
