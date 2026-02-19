@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { getUntask } from '../../lib/untask';
 import { OnboardingBasics } from './OnboardingBasics';
 import { OnboardingIdentity } from './OnboardingIdentity';
+import { OnboardingNotifications } from './OnboardingNotifications';
 import { OnboardingProvider } from './OnboardingProvider';
 import { OnboardingReady } from './OnboardingReady';
 import { OnboardingWelcome } from './OnboardingWelcome';
@@ -26,7 +27,7 @@ const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string }[] = [
   { value: 'professional', label: 'Professional' },
 ];
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 type OnboardingFlowProps = {
   onComplete: () => void;
@@ -62,10 +63,15 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       // Non-fatal — proceed anyway
     }
 
-    if (ai) {
-      goTo(3);
+    // Always go to notifications step next
+    goTo(3);
+  };
+
+  const handleNotificationsNext = () => {
+    if (aiEnabled) {
+      goTo(4);
     } else {
-      goTo(5);
+      goTo(6);
     }
   };
 
@@ -83,11 +89,11 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     } catch {
       // Non-fatal — proceed anyway
     }
-    goTo(4);
+    goTo(5);
   };
 
   const handleProviderSkip = () => {
-    goTo(4);
+    goTo(5);
   };
 
   const handleIdentityNext = async (
@@ -120,11 +126,11 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     } catch {
       // Non-fatal — proceed anyway
     }
-    goTo(5);
+    goTo(6);
   };
 
   const handleIdentitySkip = () => {
-    goTo(5);
+    goTo(6);
   };
 
   const handleFinish = async () => {
@@ -153,6 +159,10 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
         );
       case 3:
         return (
+          <OnboardingNotifications onNext={handleNotificationsNext} />
+        );
+      case 4:
+        return (
           <OnboardingProvider
             onNext={(provider, keyOrUrl) => {
               void handleProviderNext(provider, keyOrUrl);
@@ -160,7 +170,7 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             onSkip={handleProviderSkip}
           />
         );
-      case 4:
+      case 5:
         return (
           <OnboardingIdentity
             userName={userName}
@@ -170,7 +180,7 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             onSkip={handleIdentitySkip}
           />
         );
-      case 5:
+      case 6:
         return (
           <OnboardingReady
             onFinish={() => void handleFinish()}
@@ -184,9 +194,9 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-6">
       <div className="w-full max-w-[480px]">
-        {step > 1 && step < 5 ? (
+        {step > 1 && step < 6 ? (
           <div className="mb-6 flex gap-1">
-            {([2, 3, 4] as Step[]).map((s) => (
+            {([2, 3, 4, 5] as Step[]).map((s) => (
               <div
                 key={s}
                 className={[

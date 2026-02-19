@@ -29,6 +29,9 @@ export const SETTING_KEY_REMINDERS_SYNC_ENABLED = 'reminders.sync_enabled' as co
 export const SETTING_KEY_REMINDERS_LIST_ID = 'reminders.list_id' as const;
 export const SETTING_KEY_REMINDERS_SYNC_FILTER = 'reminders.sync_filter' as const;
 export const SETTING_KEY_REMINDERS_IMPORT_ENABLED = 'reminders.import_enabled' as const;
+export const SETTING_KEY_NOTIFICATIONS_ENABLED = 'notifications.enabled' as const;
+export const SETTING_KEY_NOTIFICATIONS_DEFAULT_OFFSET = 'notifications.default_offset' as const;
+export const SETTING_KEY_NOTIFICATIONS_SOUND = 'notifications.sound' as const;
 
 // ─── Default values ───────────────────────────────────────────────────────────
 // Single source of truth for all persisted setting defaults.
@@ -62,4 +65,7 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_REMINDERS_SYNC_ENABLED]: 'false',
   [SETTING_KEY_REMINDERS_SYNC_FILTER]: 'due_date_only',
   [SETTING_KEY_REMINDERS_IMPORT_ENABLED]: 'true',
+  [SETTING_KEY_NOTIFICATIONS_ENABLED]: 'true',
+  [SETTING_KEY_NOTIFICATIONS_DEFAULT_OFFSET]: 'at_due',
+  [SETTING_KEY_NOTIFICATIONS_SOUND]: 'true',
 };
