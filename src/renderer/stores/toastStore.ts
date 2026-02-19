@@ -8,14 +8,17 @@ export type ToastState = {
 
 type ToastStore = {
   toast: ToastState | null;
+  isUndoing: boolean;
   showToast: (label: string, onUndo?: () => void | Promise<void>) => void;
   clearToast: () => void;
+  markUndoing: () => void;
 };
 
 let toastIdCounter = 0;
 
 export const useToastStore = create<ToastStore>((set) => ({
   toast: null,
+  isUndoing: false,
   showToast: (label, onUndo) => {
     toastIdCounter += 1;
     set({
@@ -24,9 +27,13 @@ export const useToastStore = create<ToastStore>((set) => ({
         label,
         onUndo,
       },
+      isUndoing: false,
     });
   },
   clearToast: () => {
-    set({ toast: null });
+    set({ toast: null, isUndoing: false });
+  },
+  markUndoing: () => {
+    set({ isUndoing: true });
   },
 }));
