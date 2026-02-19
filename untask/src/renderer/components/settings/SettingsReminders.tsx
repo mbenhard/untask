@@ -383,8 +383,8 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
         {enabled && (
           <>
             <SettingsRow
-              label="Sync filter"
-              hint="Choose which tasks sync to Reminders."
+              label="Which tasks sync"
+              hint="Choose which Untask tasks appear in Reminders."
             >
               <SegmentedControl
                 options={[
@@ -399,8 +399,8 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
             </SettingsRow>
 
             <SettingsRow
-              label="Import from Reminders"
-              hint="Import reminders added to the Untask list as new tasks."
+              label="Auto-import"
+              hint="Pull reminders added to Untask list in Apple Reminders."
             >
               <SegmentedControl
                 options={[
@@ -414,8 +414,8 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
             </SettingsRow>
 
             <SettingsRow
-              label="Manual sync"
-              hint="Push Untask changes to Reminders and pull changes from Reminders."
+              label="Sync now"
+              hint="Push Untask changes to Reminders and pull any changes back."
             >
               <button
                 type="button"
@@ -423,19 +423,19 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
                 onClick={() => void handleForceSync()}
                 disabled={isSaving || syncStatus.status === 'syncing'}
               >
-                {syncStatus.status === 'syncing' ? 'Syncing...' : 'Sync now'}
+                {syncStatus.status === 'syncing' ? 'Syncing...' : 'Sync'}
               </button>
             </SettingsRow>
 
             <SettingsRow
-              label="Import from Reminders"
-              hint="Pull new reminders from Reminders app into Untask."
+              label="Import now"
+              hint="Pull reminders from Apple Reminders without pushing changes."
             >
               <button
                 type="button"
                 className="rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                 onClick={() => void handleImportFromReminders()}
-                disabled={isSaving || !importEnabled || syncStatus.status === 'syncing'}
+                disabled={isSaving || syncStatus.status === 'syncing'}
               >
                 Import
               </button>
