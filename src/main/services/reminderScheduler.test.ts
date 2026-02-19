@@ -16,6 +16,7 @@ const {
   type MockNotification = {
     title: string;
     body: string;
+    silent: boolean;
     handlers: Record<string, () => void>;
     on: (event: string, handler: () => void) => void;
     show: () => void;
@@ -25,9 +26,10 @@ const {
 
   // Must be a regular function (not arrow) so it works with `new`
   const MockNotificationClass = vi.fn().mockImplementation(
-    function (this: MockNotification, { title, body }: { title: string; body: string }) {
+    function (this: MockNotification, { title, body, silent }: { title: string; body: string; silent?: boolean }) {
       this.title = title;
       this.body = body;
+      this.silent = silent ?? false;
       this.handlers = {};
       this.on = (event: string, handler: () => void) => {
         this.handlers[event] = handler;
@@ -74,10 +76,23 @@ vi.mock('electron', () => ({
 
 vi.mock('./taskService', () => ({
   listTasks: () => mockTaskListRef.current,
-  subscribeTaskChanges: (cb: () => void) => {
+  getTaskById: (id: string) => mockTaskListRef.current.find((t: Task) => t.id === id) ?? null,
+  subscribeTaskChanges: (cb: (event: { taskId: string; action: string }) => void) => {
     mockSubscribeCallback(cb);
     return vi.fn();
   },
+}));
+
+vi.mock('./settingsService', () => ({
+  getSettingWithDefault: (key: string) => {
+    if (key === 'notifications.enabled') return 'true';
+    if (key === 'notifications.sound') return 'true';
+    return null;
+  },
+}));
+
+vi.mock('../ipc/notifications', () => ({
+  observePermission: vi.fn(),
 }));
 
 // Import AFTER mocks are set up
@@ -246,7 +261,7 @@ describe('reminderScheduler', () => {
       expect(dueNowNotification).toBeDefined();
     });
 
-    it('does not schedule tasks due beyond 1 hour', () => {
+    it('does not fire notification before the scheduled time', () => {
       vi.setSystemTime(new Date('2026-02-18T14:00'));
       mockTaskListRef.current = [
         makeTask({
@@ -555,6 +570,130 @@ describe('reminderScheduler', () => {
     it('subscribes to task changes', () => {
       initReminderScheduler();
       expect(mockSubscribeCallback).toHaveBeenCalled();
+    });
+  });
+
+  // ─── Task change handler ──────────────────────────────────
+
+  describe('onTaskChange handler', () => {
+    const getSubscribedCallback = () => {
+      initReminderScheduler();
+      return mockSubscribeCallback.mock.calls[0][0] as (
+        event: { taskId: string; action: string },
+      ) => void;
+    };
+
+    it('schedules a timer when a task is created via change event', () => {
+      vi.setSystemTime(new Date('2026-02-18T14:00'));
+      mockTaskListRef.current = [];
+
+      const onTaskChange = getSubscribedCallback();
+
+      // Add the task to the list so getTaskById can find it
+      mockTaskListRef.current = [
+        makeTask({
+          id: 'new-task',
+          title: 'New Task',
+          dueDate: '2026-02-18T14:30',
+          reminderOffset: 'at_due',
+        }),
+      ];
+      onTaskChange({ taskId: 'new-task', action: 'create' });
+
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(
+        mockNotifications.find(
+          (n) => n.title === 'Task due now' && n.body === 'New Task',
+        ),
+      ).toBeDefined();
+    });
+
+    it('clears timer when a task is completed via change event', () => {
+      vi.setSystemTime(new Date('2026-02-18T14:00'));
+      mockTaskListRef.current = [
+        makeTask({
+          id: 'complete-me',
+          title: 'Complete Me',
+          dueDate: '2026-02-18T14:30',
+          reminderOffset: 'at_due',
+        }),
+      ];
+
+      const onTaskChange = getSubscribedCallback();
+
+      // Complete the task
+      onTaskChange({ taskId: 'complete-me', action: 'complete' });
+
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(
+        mockNotifications.find(
+          (n) => n.title === 'Task due now' && n.body === 'Complete Me',
+        ),
+      ).toBeUndefined();
+    });
+
+    it('clears timer when a task is deleted via change event', () => {
+      vi.setSystemTime(new Date('2026-02-18T14:00'));
+      mockTaskListRef.current = [
+        makeTask({
+          id: 'delete-me',
+          title: 'Delete Me',
+          dueDate: '2026-02-18T14:30',
+          reminderOffset: 'at_due',
+        }),
+      ];
+
+      const onTaskChange = getSubscribedCallback();
+
+      onTaskChange({ taskId: 'delete-me', action: 'delete' });
+
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(
+        mockNotifications.find(
+          (n) => n.title === 'Task due now' && n.body === 'Delete Me',
+        ),
+      ).toBeUndefined();
+    });
+
+    it('reschedules timer when a task is updated via change event', () => {
+      vi.setSystemTime(new Date('2026-02-18T14:00'));
+      mockTaskListRef.current = [
+        makeTask({
+          id: 'update-me',
+          title: 'Update Me',
+          dueDate: '2026-02-18T14:30',
+          reminderOffset: 'at_due',
+        }),
+      ];
+
+      const onTaskChange = getSubscribedCallback();
+
+      // Update the task to a later due date
+      mockTaskListRef.current = [
+        makeTask({
+          id: 'update-me',
+          title: 'Update Me',
+          dueDate: '2026-02-18T15:00',
+          reminderOffset: 'at_due',
+        }),
+      ];
+      onTaskChange({ taskId: 'update-me', action: 'update' });
+
+      // At 14:30 — original time — should NOT fire
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(
+        mockNotifications.find(
+          (n) => n.title === 'Task due now' && n.body === 'Update Me',
+        ),
+      ).toBeUndefined();
+
+      // At 15:00 — updated time — should fire
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      expect(
+        mockNotifications.find(
+          (n) => n.title === 'Task due now' && n.body === 'Update Me',
+        ),
+      ).toBeDefined();
     });
   });
 });

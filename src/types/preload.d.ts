@@ -69,11 +69,15 @@ import type {
   AttachmentSaveRequest,
   AttachmentIdRequest,
   AttachmentPickAndSaveResult,
+  NotificationPermissionResult,
   RemindersStatusResult,
   RemindersSyncStatusPayload,
   RemindersSyncFilter,
   ShortcutRegistrationStatusResult,
   OllamaStatusResult,
+  OllamaPullRequest,
+  OllamaPullResult,
+  OllamaPullProgressPayload,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -166,6 +170,9 @@ export type UntaskApi = {
     resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
     listPendingActions: () => Promise<ChatListPendingActionsResponse>;
     getOllamaStatus: () => Promise<OllamaStatusResult>;
+    pullOllamaModel: (request: OllamaPullRequest) => Promise<OllamaPullResult>;
+    cancelOllamaPull: () => Promise<void>;
+    onOllamaPullProgress: (listener: (event: OllamaPullProgressPayload) => void) => () => void;
   };
   backup: {
     list: () => Promise<BackupListResponse>;
@@ -220,6 +227,11 @@ export type UntaskApi = {
     delete: (request: AttachmentIdRequest) => Promise<void>;
     read: (request: AttachmentIdRequest) => Promise<string>;
     pickAndSave: () => Promise<AttachmentPickAndSaveResult>;
+  };
+  notifications: {
+    fireTest: () => Promise<NotificationPermissionResult>;
+    probePermission: () => Promise<NotificationPermissionResult>;
+    openSettings: () => Promise<void>;
   };
   reminders: {
     getStatus: () => Promise<RemindersStatusResult>;

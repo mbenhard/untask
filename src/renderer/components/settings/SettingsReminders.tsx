@@ -6,6 +6,8 @@ import { SegmentedControl } from './SegmentedControl';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
+type ReminderOffset = 'at_due' | '15m' | '1h' | '1d';
+
 type SettingsRemindersProps = {
   setError: (error: string | null) => void;
   setNotice: (notice: string | null) => void;
@@ -23,7 +25,102 @@ function formatRelativeTime(isoString: string): string {
   return `${days}d ago`;
 }
 
+// ─── Notification settings keys (must match defaultSettings.ts) ───
+const NOTIFICATIONS_ENABLED_KEY = 'notifications.enabled';
+const NOTIFICATIONS_DEFAULT_OFFSET_KEY = 'notifications.default_offset';
+const NOTIFICATIONS_SOUND_KEY = 'notifications.sound';
+
+const OFFSET_LABELS: Record<ReminderOffset, string> = {
+  at_due: 'At due time',
+  '15m': '15 min before',
+  '1h': '1 hour before',
+  '1d': '1 day before',
+};
+
 export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProps) => {
+  // ─── Notification state ─────────────────────────────────────
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [notifDefaultOffset, setNotifDefaultOffset] = useState<ReminderOffset>('at_due');
+  const [notifSound, setNotifSound] = useState(true);
+  const [notifPermission, setNotifPermission] = useState<'granted' | 'denied' | 'unknown'>('unknown');
+  const [notifLoading, setNotifLoading] = useState(true);
+
+  // Load notification settings on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const api = getUntask();
+        const [enabledVal, offsetVal, soundVal] = await Promise.all([
+          api.settings.get(NOTIFICATIONS_ENABLED_KEY),
+          api.settings.get(NOTIFICATIONS_DEFAULT_OFFSET_KEY),
+          api.settings.get(NOTIFICATIONS_SOUND_KEY),
+        ]);
+        setNotifEnabled(enabledVal !== 'false');
+        if (offsetVal && offsetVal in OFFSET_LABELS) {
+          setNotifDefaultOffset(offsetVal as ReminderOffset);
+        }
+        setNotifSound(soundVal !== 'false');
+
+        // Probe permission
+        const result = await api.notifications.probePermission();
+        setNotifPermission(result.status);
+      } catch {
+        // Silently fail — settings will use defaults
+      } finally {
+        setNotifLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  const handleNotifToggle = useCallback(async (value: 'on' | 'off') => {
+    const next = value === 'on';
+    setNotifEnabled(next);
+    setNotice(null);
+    setError(null);
+
+    try {
+      await getUntask().settings.set(NOTIFICATIONS_ENABLED_KEY, String(next));
+      if (next) {
+        // Fire test notification to trigger macOS permission dialog.
+        // fireTest returns the permission result directly (no separate probe needed).
+        const result = await getUntask().notifications.fireTest();
+        setNotifPermission(result.status);
+        setNotice('Notifications enabled.');
+      } else {
+        setNotice('Notifications disabled.');
+      }
+    } catch (e) {
+      setNotifEnabled(!next);
+      setError(e instanceof Error ? e.message : 'Failed to toggle notifications.');
+    }
+  }, [setError, setNotice]);
+
+  const handleNotifOffsetChange = useCallback(async (offset: ReminderOffset) => {
+    const prev = notifDefaultOffset;
+    setNotifDefaultOffset(offset);
+    try {
+      await getUntask().settings.set(NOTIFICATIONS_DEFAULT_OFFSET_KEY, offset);
+    } catch {
+      setNotifDefaultOffset(prev);
+    }
+  }, [notifDefaultOffset]);
+
+  const handleNotifSoundToggle = useCallback(async (value: 'on' | 'off') => {
+    const next = value === 'on';
+    setNotifSound(next);
+    try {
+      await getUntask().settings.set(NOTIFICATIONS_SOUND_KEY, String(next));
+    } catch {
+      setNotifSound(!next);
+    }
+  }, []);
+
+  const handleOpenNotifSettings = useCallback(() => {
+    void getUntask().notifications.openSettings();
+  }, []);
+
+  // ─── Apple Reminders state ──────────────────────────────────
   const [enabled, setEnabled] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [syncFilter, setSyncFilter] = useState<RemindersSyncFilter>('due_date_only');
@@ -200,6 +297,72 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
 
   return (
     <div role="tabpanel" id="settings-panel-reminders" className="space-y-3">
+      <SettingsSection title="Notifications">
+        <SettingsRow
+          label="Notifications"
+          hint={
+            notifPermission === 'denied' && notifEnabled
+              ? (
+                <span className="text-amber-500">
+                  Notifications are blocked by macOS.{' '}
+                  <button
+                    type="button"
+                    className="underline hover:text-amber-400"
+                    onClick={handleOpenNotifSettings}
+                  >
+                    Open System Settings
+                  </button>
+                </span>
+              )
+              : 'Get reminders when tasks are due.'
+          }
+          loading={notifLoading}
+        >
+          <SegmentedControl
+            options={[
+              { value: 'on' as const, label: 'On' },
+              { value: 'off' as const, label: 'Off' },
+            ]}
+            value={notifEnabled ? 'on' : 'off'}
+            onChange={(v) => void handleNotifToggle(v as 'on' | 'off')}
+          />
+        </SettingsRow>
+
+        {notifEnabled && (
+          <>
+            <SettingsRow
+              label="Default reminder"
+              hint="New tasks with a due date will use this reminder."
+            >
+              <SegmentedControl
+                options={[
+                  { value: 'at_due' as const, label: 'At due' },
+                  { value: '15m' as const, label: '15m' },
+                  { value: '1h' as const, label: '1h' },
+                  { value: '1d' as const, label: '1d' },
+                ]}
+                value={notifDefaultOffset}
+                onChange={(v) => void handleNotifOffsetChange(v as ReminderOffset)}
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              label="Sound"
+              hint="Play a sound with notifications."
+            >
+              <SegmentedControl
+                options={[
+                  { value: 'on' as const, label: 'On' },
+                  { value: 'off' as const, label: 'Off' },
+                ]}
+                value={notifSound ? 'on' : 'off'}
+                onChange={(v) => void handleNotifSoundToggle(v as 'on' | 'off')}
+              />
+            </SettingsRow>
+          </>
+        )}
+      </SettingsSection>
+
       <SettingsSection title="Apple Reminders">
         <SettingsRow
           label="Sync to Reminders"

@@ -72,11 +72,15 @@ import {
   type AttachmentSaveRequest,
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
+  type NotificationPermissionResult,
   type RemindersStatusResult,
   type RemindersSyncStatusPayload,
   type RemindersSyncFilter,
   type ShortcutRegistrationStatusResult,
   type OllamaStatusResult,
+  type OllamaPullRequest,
+  type OllamaPullResult,
+  type OllamaPullProgressPayload,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -297,6 +301,22 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
     getOllamaStatus: (): Promise<OllamaStatusResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_STATUS),
+    pullOllamaModel: (request: OllamaPullRequest): Promise<OllamaPullResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL, request),
+    cancelOllamaPull: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL_CANCEL),
+    onOllamaPullProgress: (
+      listener: (event: OllamaPullProgressPayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: OllamaPullProgressPayload,
+      ) => listener(payload);
+      ipcRenderer.on(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, wrapped);
+      };
+    },
   },
   backup: {
     list: (): Promise<BackupListResponse> =>
@@ -394,6 +414,14 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_READ, request),
     pickAndSave: (): Promise<AttachmentPickAndSaveResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE),
+  },
+  notifications: {
+    fireTest: (): Promise<NotificationPermissionResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATIONS_FIRE_TEST),
+    probePermission: (): Promise<NotificationPermissionResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATIONS_PROBE_PERMISSION),
+    openSettings: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATIONS_OPEN_SETTINGS),
   },
   reminders: {
     getStatus: (): Promise<RemindersStatusResult> =>
