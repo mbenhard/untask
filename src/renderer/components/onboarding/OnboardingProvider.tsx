@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useState } from 'react';
 
-import { Check, Lock } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 import { getUntask } from '../../lib/untask';
 import { cn } from '../../lib/utils';
@@ -55,7 +55,7 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
 
   useEffect(() => {
     const models = getCuratedModelsForProvider(provider);
-    const defaultModel = models.find((m) => m.isDefault) ?? models[0];
+    const defaultModel = models.find((m) => m.id === 'anthropic/claude-haiku-4-5') ?? models[0];
     setSelectedModelId(defaultModel?.id ?? '');
   }, [provider]);
 
@@ -79,7 +79,7 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
     setValidationState('idle');
     setValidationError('');
     const models = getCuratedModelsForProvider(next);
-    const defaultModel = models.find((m) => m.isDefault) ?? models[0];
+    const defaultModel = models.find((m) => m.id === 'anthropic/claude-haiku-4-5') ?? models[0];
     setSelectedModelId(defaultModel?.id ?? '');
   };
 
@@ -112,11 +112,11 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">Connect AI provider</h2>
         <p className="text-xs text-muted-foreground">
-          Choose where the AI assistant gets its intelligence.
+          Choose where the AI assistant gets its intelligence. Key stored locally.
         </p>
       </div>
 
@@ -147,123 +147,113 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
           <p className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[provider]}</p>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Lock className="size-3 shrink-0 opacity-50" />
-          <span>Your key is stored locally on this device. Never sent to our servers.</span>
-        </div>
-
-        {isOllama ? (
-          <div className="flex flex-col gap-2">
-            <label htmlFor="onboarding-ollama-url" className="text-xs font-medium text-foreground">
-              Ollama base URL
-            </label>
-            <Input
-              id="onboarding-ollama-url"
-              type="text"
-              value={ollamaUrl}
-              onChange={(e) => setOllamaUrl(e.target.value)}
-              placeholder="http://localhost:11434"
-              className="h-9 text-sm"
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <label htmlFor="onboarding-api-key" className="text-xs font-medium text-foreground">
-              API key
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id="onboarding-api-key"
-                type="password"
-                value={keyInput}
-                onChange={(e) => {
-                  setKeyInput(e.target.value);
-                  setValidationState('idle');
-                  setValidationError('');
-                }}
-                placeholder={PROVIDER_PLACEHOLDERS[provider]}
-                className={cn(
-                  'h-9 flex-1 text-sm',
-                  validationState === 'valid' && 'border-green-500/50 dark:border-green-400/50',
-                  validationState === 'error' && 'border-destructive/50',
-                )}
-                autoComplete="off"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void handleValidate()}
-                disabled={!canValidate || isValidating}
-                className="h-9 shrink-0 text-xs"
-              >
-                {isValidating ? 'Checking...' : 'Validate'}
-              </Button>
-            </div>
-
-            {validationState === 'valid' ? (
-              <p className="flex items-center gap-1 text-[11px] text-green-500 dark:text-green-400">
-                <Check className="size-3" />
-                Key is valid
-              </p>
-            ) : validationState === 'error' ? (
-              <p className="text-[11px] text-destructive">
-                {validationError}
-              </p>
-            ) : null}
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <label htmlFor="onboarding-model" className="text-xs font-medium text-foreground">
-            Model
-          </label>
+        <div className="grid grid-cols-2 gap-4">
           {isOllama ? (
-            <select
-              id="onboarding-model"
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-            >
-              <option value="" disabled>
-                Select a model
-              </option>
-              <optgroup label="Recommended">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="onboarding-ollama-url" className="text-xs font-medium text-foreground">
+                Ollama URL
+              </label>
+              <Input
+                id="onboarding-ollama-url"
+                type="text"
+                value={ollamaUrl}
+                onChange={(e) => setOllamaUrl(e.target.value)}
+                placeholder="http://localhost:11434"
+                className="h-9 text-sm"
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="onboarding-api-key" className="text-xs font-medium text-foreground">
+                API key
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="onboarding-api-key"
+                  type="password"
+                  value={keyInput}
+                  onChange={(e) => {
+                    setKeyInput(e.target.value);
+                    setValidationState('idle');
+                    setValidationError('');
+                  }}
+                  placeholder={PROVIDER_PLACEHOLDERS[provider]}
+                  className={cn(
+                    'h-9 flex-1 text-sm',
+                    validationState === 'valid' && 'border-green-500/50 dark:border-green-400/50',
+                    validationState === 'error' && 'border-destructive/50',
+                  )}
+                  autoComplete="off"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleValidate()}
+                  disabled={!canValidate || isValidating}
+                  className="h-9 shrink-0 text-xs"
+                >
+                  {isValidating ? 'Checking...' : 'Validate'}
+                </Button>
+              </div>
+
+              {validationState === 'valid' ? (
+                <p className="flex items-center gap-1 text-[11px] text-green-500 dark:text-green-400">
+                  <Check className="size-3" />
+                  Key is valid
+                </p>
+              ) : validationState === 'error' ? (
+                <p className="text-[11px] text-destructive">
+                  {validationError}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="onboarding-model" className="text-xs font-medium text-foreground">
+              Model
+            </label>
+            {isOllama ? (
+              <select
+                id="onboarding-model"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              >
+                <option value="" disabled>
+                  Select a model
+                </option>
                 <option value="llama3.1:8b">llama3.1:8b · 8B</option>
                 <option value="mistral:7b">mistral:7b · 7B</option>
                 <option value="qwen3:8b">qwen3:8b · 8B</option>
                 <option value="qwen3:14b">qwen3:14b · 14B</option>
-              </optgroup>
-            </select>
-          ) : (
-            <select
-              id="onboarding-model"
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-            >
-              {buildModelOptions(provider, selectedModelId).map((group, idx) => (
-                'options' in group ? (
-                  <optgroup key={idx} label={group.label}>
-                    {group.options.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : (
-                  <option key={group.value} value={group.value}>
-                    {group.label}
-                  </option>
-                )
-              ))}
-            </select>
-          )}
-          <p className="text-[11px] text-muted-foreground">
-            {isOllama
-              ? 'Select a model to use. You can change this later.'
-              : 'You can change this later in Settings.'}
-          </p>
+              </select>
+            ) : (
+              <select
+                id="onboarding-model"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              >
+                {buildModelOptions(provider, selectedModelId).map((group, idx) => (
+                  'options' in group ? (
+                    <optgroup key={idx} label={group.label}>
+                      {group.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    <option key={group.value} value={group.value}>
+                      {group.label}
+                    </option>
+                  )
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       </div>
 
