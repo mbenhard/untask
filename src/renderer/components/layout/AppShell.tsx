@@ -16,7 +16,6 @@ import {
   selectChatOverlayState,
   selectChatView,
   selectQuickAddOpen,
-  selectQuickAddText,
   selectUnreadProactive,
   useAppStore,
 } from '../../stores/appStore';
@@ -43,7 +42,7 @@ import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
 import { ToastContainer } from '../ui/Toast';
-import { InlineTaskInput } from '../tasks/InlineTaskInput';
+import { QuickAddOverlay } from '../tasks/QuickAddOverlay';
 
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
@@ -82,12 +81,10 @@ export const AppShell = () => {
   const chatView = useAppStore(selectChatView);
   const unreadProactive = useAppStore(selectUnreadProactive);
   const quickAddOpen = useAppStore(selectQuickAddOpen);
-  const quickAddText = useAppStore(selectQuickAddText);
   const setView = useAppStore((state) => state.setView);
   const openChatOverlay = useAppStore((state) => state.openChatOverlay);
   const peekChatOverlay = useAppStore((state) => state.peekChatOverlay);
   const setChatView = useAppStore((state) => state.setChatView);
-  const closeQuickAdd = useAppStore((state) => state.closeQuickAdd);
 
   const fetchTasks = useTaskStore((state) => state.fetchTasks);
   const fetchStatusConfig = useTaskStatusConfigStore((s) => s.fetchConfig);
@@ -320,18 +317,6 @@ export const AppShell = () => {
               {activeViewComponent}
             </motion.section>
           </AnimatePresence>
-
-          {!aiEnabled && quickAddOpen && (
-            <div className="absolute left-0 right-0 top-0 z-10">
-              <InlineTaskInput
-                defaultStatus="inbox"
-                defaultTitle={quickAddText}
-                placeholder="Add task..."
-                alwaysOpen
-                onDismiss={closeQuickAdd}
-              />
-            </div>
-          )}
         </motion.section>
 
         {aiEnabled ? (
@@ -491,6 +476,7 @@ export const AppShell = () => {
       </div>
 
       <SearchModal />
+      {quickAddOpen && <QuickAddOverlay />}
       <ToastContainer />
     </div>
   );

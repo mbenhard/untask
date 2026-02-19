@@ -22,13 +22,12 @@ export function useQuickAddListener({
         if (aiEnabled) {
           openChatOverlay();
           onPrefill(payload.text);
+          requestAnimationFrame(() => {
+            inputRef.current?.focus();
+          });
         } else {
           openQuickAdd(payload.text);
         }
-
-        requestAnimationFrame(() => {
-          inputRef.current?.focus();
-        });
       },
     );
 
