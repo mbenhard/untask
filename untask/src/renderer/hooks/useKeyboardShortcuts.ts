@@ -187,7 +187,7 @@ export const useKeyboardShortcuts = ({
 
         void (async () => {
           await getUntask().tasks.undoLastUserAction();
-          await useTaskStore.getState().fetchTasks();
+          await useTaskStore.getState().refreshTasks();
         })();
         return;
       }

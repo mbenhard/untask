@@ -41,6 +41,7 @@ type MockUntask = {
   app: {
     getLaunchAtLogin: ReturnType<typeof vi.fn<() => Promise<{ enabled: boolean; applied: boolean }>>>;
     getWindowDismissMode: ReturnType<typeof vi.fn<() => Promise<{ mode: 'persistent' | 'quick-hide' }>>>;
+    getVersion: ReturnType<typeof vi.fn<() => Promise<string>>>;
   };
 };
 
@@ -74,6 +75,9 @@ const buildUntaskMock = (): MockUntask => {
       getWindowDismissMode: vi
         .fn<() => Promise<{ mode: 'persistent' | 'quick-hide' }>>()
         .mockResolvedValue({ mode: 'persistent' }),
+      getVersion: vi
+        .fn<() => Promise<string>>()
+        .mockResolvedValue('0.1.8'),
     },
   };
 };

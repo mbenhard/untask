@@ -17,11 +17,7 @@ export const BirdMascot = ({
   return (
     <div
       className={cn('inline-flex flex-col items-center', className)}
-      style={{
-        transform: `scale(${scale})`,
-        transformOrigin: 'center bottom',
-        width: 95,
-      }}
+      style={{ zoom: scale, width: 95 }}
     >
       <div
         className={animated ? 'bird-wobble' : ''}

@@ -152,7 +152,7 @@ type OllamaConnectionManagerProps = {
   isLoadingOllamaUrl: boolean;
   isSavingOllamaUrl: boolean;
   defaultOllamaBaseUrl: string;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
   ollamaStatus?: OllamaConnectionStatus;
   detectedBaseUrl?: string;
 };
@@ -169,6 +169,11 @@ const OllamaConnectionManager = ({
 }: OllamaConnectionManagerProps) => {
   const [showCustomUrl, setShowCustomUrl] = useState(false);
   const displayUrl = detectedBaseUrl ?? defaultOllamaBaseUrl;
+
+  const handleSave = async () => {
+    const ok = await onSave();
+    if (ok) setShowCustomUrl(false);
+  };
 
   const renderStatusIndicator = () => {
     switch (ollamaStatus) {
@@ -247,7 +252,7 @@ const OllamaConnectionManager = ({
           <Button
             type="button"
             size="sm"
-            onClick={onSave}
+            onClick={() => void handleSave()}
             disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
             className="h-7 text-[11px]"
           >
@@ -281,7 +286,7 @@ export type ApiKeyManagerProps = {
   isLoadingOllamaUrl: boolean;
   isSavingOllamaUrl: boolean;
   defaultOllamaBaseUrl: string;
-  onSaveOllamaUrl: () => void;
+  onSaveOllamaUrl: () => Promise<boolean>;
   // Ollama detection props
   ollamaStatus?: OllamaConnectionStatus;
   detectedBaseUrl?: string;
