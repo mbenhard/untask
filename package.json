@@ -74,6 +74,7 @@
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "ai": "^6.0.91",
     "ai-sdk-ollama": "^3.7.1",
     "better-sqlite3": "^12.6.2",

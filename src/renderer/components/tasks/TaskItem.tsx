@@ -10,7 +10,7 @@ import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/model
 import { cn } from '../../lib/utils';
 import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
-import { Popover, PopoverContent } from '../ui';
+import { Popover, PopoverContent, Tooltip, TooltipContent, TooltipTrigger } from '../ui';
 import { formatDueDateDisplay, isDueDateOverdue } from './dueDate';
 import { getNextPriority } from './taskInteraction';
 
@@ -194,7 +194,10 @@ export const TaskItem = ({
       role="option"
       aria-selected={isExpanded}
       tabIndex={isFocused ? 0 : -1}
-      onFocus={onFocus}
+      onFocus={(event) => {
+        event.stopPropagation();
+        onFocus?.();
+      }}
       className={cn(
         'overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
         isFocused && 'bg-accent/40',
@@ -203,57 +206,59 @@ export const TaskItem = ({
     >
       <div onClick={() => onToggleExpand(task.id)} className="flex min-h-10 items-center gap-2 px-1.5">
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onComplete(task.id);
-            }}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const nextPriority = getNextPriority(task.priority);
-              void updateTask({ id: task.id, priority: nextPriority });
-            }}
-            aria-label={
-              isCompleted
-                ? `Reopen "${task.title}"`
-                : `Mark "${task.title}" complete`
-            }
-            title={
-              priority === 'none'
-                ? 'Right-click to set priority'
-                : `Priority: ${priority} · Right-click to change`
-            }
-            className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <motion.span
-              initial={false}
-              animate={{
-                scale: isCompleted ? 1 : 0.96,
-                backgroundColor: isCompleted
-                  ? 'var(--foreground)'
-                  : 'transparent',
-                borderColor: isCompleted
-                  ? 'var(--foreground)'
-                  : 'var(--foreground-muted, rgba(255,255,255,0.35))',
-              }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className={cn(
-                'inline-flex size-4 items-center justify-center rounded-full border transition-[border-style] duration-200',
-                isCompleted ? 'border-solid' : 'border-dashed group-hover:border-solid',
-              )}
-            >
-              <Check
-                className={cn(
-                  'size-2.5 transition-opacity duration-200',
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onComplete(task.id);
+                }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const nextPriority = getNextPriority(task.priority);
+                  void updateTask({ id: task.id, priority: nextPriority });
+                }}
+                aria-label={
                   isCompleted
-                    ? 'opacity-100 text-background'
-                    : 'opacity-0 group-hover:opacity-25',
-                )}
-              />
-            </motion.span>
-          </button>
+                    ? `Reopen "${task.title}"`
+                    : `Mark "${task.title}" complete`
+                }
+                className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <motion.span
+                  initial={false}
+                  animate={{
+                    scale: isCompleted ? 1 : 0.96,
+                    backgroundColor: isCompleted
+                      ? 'var(--foreground)'
+                      : 'transparent',
+                    borderColor: isCompleted
+                      ? 'var(--foreground)'
+                      : 'var(--foreground-muted, rgba(255,255,255,0.35))',
+                  }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className={cn(
+                    'inline-flex size-4 items-center justify-center rounded-full border transition-[border-style] duration-200',
+                    isCompleted ? 'border-solid' : 'border-dashed group-hover:border-solid',
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      'size-2.5 transition-opacity duration-200',
+                      isCompleted
+                        ? 'opacity-100 text-background'
+                        : 'opacity-0 group-hover:opacity-25',
+                    )}
+                  />
+                </motion.span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isCompleted ? 'Reopen' : 'Complete'}
+            </TooltipContent>
+          </Tooltip>
           <span
             className={cn(
               'size-[5px] rounded-full transition-colors duration-200',
@@ -307,12 +312,16 @@ export const TaskItem = ({
 
         <div className="ml-auto flex items-center gap-1">
           {task.body && task.body.trim() !== '' && task.body !== '<p></p>' ? (
-            <span
-              className="inline-flex h-5 items-center justify-center rounded border border-border/70 bg-muted/40 px-1 text-muted-foreground"
-              title="Has description"
-            >
-              <AlignLeft className="size-3" />
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex h-5 items-center justify-center rounded border border-border/70 bg-muted/40 px-1 text-muted-foreground"
+                >
+                  <AlignLeft className="size-3" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Has notes</TooltipContent>
+            </Tooltip>
           ) : null}
 
           {task.recurrence ? (
@@ -342,22 +351,29 @@ export const TaskItem = ({
             </span>
           ) : null}
 
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleToday(task.id);
-            }}
-            aria-label={`Toggle today for "${task.title}"`}
-            className={cn(
-              'inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
-              isToday
-                ? 'text-foreground'
-                : 'hover:text-foreground',
-            )}
-          >
-            <Bookmark className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleToday(task.id);
+                }}
+                aria-label={`Toggle today for "${task.title}"`}
+                className={cn(
+                  'inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring',
+                  isToday
+                    ? 'text-foreground'
+                    : 'hover:text-foreground',
+                )}
+              >
+                <Bookmark className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isToday ? 'Remove from Today' : 'Add to Today'}
+            </TooltipContent>
+          </Tooltip>
 
           <Popover.Root
             open={menuOpen}
@@ -366,16 +382,21 @@ export const TaskItem = ({
               if (!open) setMenuView('main');
             }}
           >
-            <Popover.Trigger asChild>
-              <button
-                type="button"
-                onClick={(event) => event.stopPropagation()}
-                aria-label={`More actions for "${task.title}"`}
-                className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <ChevronDown className="size-3.5" />
-              </button>
-            </Popover.Trigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Popover.Trigger asChild>
+                  <button
+                    type="button"
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`More actions for "${task.title}"`}
+                    className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <ChevronDown className="size-3.5" />
+                  </button>
+                </Popover.Trigger>
+              </TooltipTrigger>
+              <TooltipContent>More actions</TooltipContent>
+            </Tooltip>
             <PopoverContent
               className="w-auto min-w-[160px] p-1"
               align="end"
@@ -509,18 +530,23 @@ export const TaskItem = ({
             </PopoverContent>
           </Popover.Root>
 
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-            aria-label={`Reorder "${task.title}"`}
-            className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <GripVertical className="size-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                {...attributes}
+                {...listeners}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                aria-label={`Reorder "${task.title}"`}
+                className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <GripVertical className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Drag to reorder</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

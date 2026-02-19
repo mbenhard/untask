@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { AppShell } from './components/layout/AppShell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { TooltipProvider } from './components/ui/tooltip';
 import { useAppStore } from './stores/appStore';
 
 type AppErrorBoundaryState = {
@@ -109,7 +110,9 @@ const AppRoot = () => {
 
 const App = () => (
   <AppErrorBoundary>
-    <AppRoot />
+    <TooltipProvider delayDuration={75}>
+      <AppRoot />
+    </TooltipProvider>
   </AppErrorBoundary>
 );
 

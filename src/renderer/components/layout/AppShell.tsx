@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui';
 import { useTheme } from '../providers/ThemeProvider';
 
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -443,33 +444,45 @@ export const AppShell = () => {
 
         <div className="no-drag pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
           <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setView(isSettingsActive ? 'today' : 'settings')}
-              className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                isSettingsActive
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-              )}
-              aria-label="Settings"
-            >
-              <Settings className="size-[15px]" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setView(isSettingsActive ? 'today' : 'settings')}
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                    isSettingsActive
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )}
+                  aria-label="Settings"
+                >
+                  <Settings className="size-[15px]" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Settings</TooltipContent>
+            </Tooltip>
 
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                resolvedTheme === 'light'
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-              )}
-              aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              <LampDesk className="size-[15px]" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                    resolvedTheme === 'light'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )}
+                  aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+                >
+                  <LampDesk className="size-[15px]" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </TooltipContent>
+            </Tooltip>
           </div>
 
         </div>
