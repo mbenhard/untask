@@ -19,6 +19,7 @@ export interface TaskItemProps {
   isExpanded: boolean;
   isFocused: boolean;
   isEditingTitle: boolean;
+  isNavigatedTo: boolean;
   hasChildren: boolean;
   childrenCount: number;
   childrenDoneCount: number;
@@ -48,6 +49,7 @@ export const TaskItem = ({
   isExpanded,
   isFocused,
   isEditingTitle,
+  isNavigatedTo,
   hasChildren,
   childrenCount,
   childrenDoneCount,
@@ -201,6 +203,7 @@ export const TaskItem = ({
       className={cn(
         'overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
         isFocused && 'bg-accent/40',
+        isNavigatedTo && 'task-navigated',
         isDragging && 'z-10 opacity-80',
       )}
     >

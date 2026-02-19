@@ -94,6 +94,7 @@ export const TaskList = ({
   const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
   const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
@@ -182,6 +183,10 @@ export const TaskList = ({
       setExpandedTaskId(selectedTaskId);
       setIsAnyBodyEditing(false);
 
+      // Trigger navigation pulse. Clear first to restart animation if same task.
+      setNavigatedTaskId(null);
+      requestAnimationFrame(() => setNavigatedTaskId(selectedTaskId));
+
       requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
@@ -207,6 +212,13 @@ export const TaskList = ({
     setExpandedTaskId(subtask.parentId);
     setIsAnyBodyEditing(false);
   }, [allTasks, selectTask, selectedTaskId, tasks]);
+
+  // Clear navigated highlight after animation completes
+  useEffect(() => {
+    if (!navigatedTaskId) return;
+    const timer = setTimeout(() => setNavigatedTaskId(null), 1200);
+    return () => clearTimeout(timer);
+  }, [navigatedTaskId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -403,6 +415,7 @@ export const TaskList = ({
               isExpanded={isExpanded}
               isFocused={focusedIndex === index}
               isEditingTitle={editingTitleTaskId === task.id}
+              isNavigatedTo={task.id === navigatedTaskId}
               hasChildren={subtasks.length > 0}
               childrenCount={subtasks.length}
               childrenDoneCount={subtasks.filter((s) => s.status === 'done').length}
