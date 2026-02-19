@@ -13,6 +13,7 @@ type UseTaskListKeyboardOptions = {
   onCyclePriority: (id: string) => void;
   onCycleStatus: (id: string) => void;
   onStartTitleEdit: (id: string) => void;
+  onDelete: (id: string) => void;
   isAnyBodyEditing: boolean;
   isEditingTitle: boolean;
   isDragActive: boolean;
@@ -44,6 +45,7 @@ export const useTaskListKeyboard = ({
   onCyclePriority,
   onCycleStatus,
   onStartTitleEdit,
+  onDelete,
   isAnyBodyEditing,
   isEditingTitle,
   isDragActive,
@@ -61,6 +63,17 @@ export const useTaskListKeyboard = ({
         return;
       }
 
+      // Cmd+Backspace → delete focused task
+      if (event.key === 'Backspace' && event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        const focusedTask = tasks[focusedIndex];
+        if (focusedTask) {
+          onDelete(focusedTask.id);
+        }
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
@@ -69,71 +82,82 @@ export const useTaskListKeyboard = ({
         return;
       }
 
-      if (event.key === 'ArrowDown') {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
-        const isAtLastItem = tasks.length === 0 || focusedIndex >= tasks.length - 1;
-        if (isAtLastItem && onNavigateNextGroup) {
-          onNavigateNextGroup();
+        event.stopPropagation();
+
+        if (event.key === 'ArrowDown') {
+          const isAtLastItem = tasks.length === 0 || focusedIndex >= tasks.length - 1;
+          if (isAtLastItem && onNavigateNextGroup) {
+            onNavigateNextGroup();
+          } else {
+            onFocusedIndexChange(Math.min(focusedIndex + 1, tasks.length - 1));
+          }
         } else {
-          onFocusedIndexChange(Math.min(focusedIndex + 1, tasks.length - 1));
+          const isAtFirstItem = focusedIndex <= 0;
+          if (isAtFirstItem && onNavigatePrevGroup) {
+            onNavigatePrevGroup();
+          } else {
+            onFocusedIndexChange(Math.max(focusedIndex - 1, 0));
+          }
         }
         return;
       }
 
-      if (event.key === 'ArrowUp') {
+      const isTaskKey = [
+        'enter',
+        't',
+        ' ',
+        'p',
+        's',
+        'e',
+        'escape'
+      ].includes(event.key.toLowerCase());
+
+      if (isTaskKey) {
         event.preventDefault();
-        const isAtFirstItem = focusedIndex <= 0;
-        if (isAtFirstItem && onNavigatePrevGroup) {
-          onNavigatePrevGroup();
-        } else {
-          onFocusedIndexChange(Math.max(focusedIndex - 1, 0));
-        }
-        return;
+        event.stopPropagation();
       }
 
       const focusedTask = tasks[focusedIndex];
       if (!focusedTask) {
+        if (event.key === 'Escape') {
+          containerRef.current?.blur();
+        }
         return;
       }
 
       if (event.key === 'Enter') {
-        event.preventDefault();
         onToggleExpand(focusedTask.id);
         return;
       }
 
       if (event.key.toLowerCase() === 't') {
-        event.preventDefault();
         onToggleToday(focusedTask.id);
         return;
       }
 
       if (event.key === ' ') {
-        event.preventDefault();
         onToggleComplete(focusedTask.id);
         return;
       }
 
       if (event.key.toLowerCase() === 'p') {
-        event.preventDefault();
         onCyclePriority(focusedTask.id);
         return;
       }
 
       if (event.key.toLowerCase() === 's') {
-        event.preventDefault();
         onCycleStatus(focusedTask.id);
         return;
       }
 
       if (event.key.toLowerCase() === 'e') {
-        event.preventDefault();
         onStartTitleEdit(focusedTask.id);
         return;
       }
 
       if (event.key === 'Escape') {
-        event.preventDefault();
         if (expandedTaskId) {
           onToggleExpand(expandedTaskId);
           return;
@@ -155,6 +179,7 @@ export const useTaskListKeyboard = ({
       onCyclePriority,
       onCycleStatus,
       onStartTitleEdit,
+      onDelete,
       expandedTaskId,
       containerRef,
       onNavigateNextGroup,

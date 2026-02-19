@@ -76,6 +76,7 @@ export const TaskList = ({
   const reopenTask = useTaskStore((state) => state.reopenTask);
   const createTask = useTaskStore((state) => state.createTask);
   const updateTask = useTaskStore((state) => state.updateTask);
+  const deleteTask = useTaskStore((state) => state.deleteTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
@@ -247,6 +248,19 @@ export const TaskList = ({
     [completeTask, expandedTaskId, firstEnabledNonTerminal, reopenTask, tasks, updateTask],
   );
 
+  const handleDelete = useCallback(
+    (taskId: string): void => {
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) return;
+      const subtasks = allTasks.filter((t) => t.parentId === taskId);
+      const activeChildren = subtasks.filter(
+        (t) => !isTerminalStatus(t.status as never),
+      ).length;
+      void deleteTask(taskId, activeChildren > 0);
+    },
+    [allTasks, deleteTask, tasks],
+  );
+
   const handleToggleToday = useCallback(
     (taskId: string): void => {
       void toggleToday(taskId);
@@ -338,6 +352,7 @@ export const TaskList = ({
     isDragActive: effectiveActiveDragId !== null,
     containerRef,
     onStartTitleEdit: setEditingTitleTaskId,
+    onDelete: handleDelete,
     isEditingTitle: editingTitleTaskId !== null,
     onNavigateNextGroup,
     onNavigatePrevGroup,
@@ -372,7 +387,7 @@ export const TaskList = ({
           Press Space to complete or reopen. Press T to toggle today.
           Press P to cycle priority. Press S to cycle status.
           In Tasks view, drag tasks between status groups or drop onto tasks for exact placement.
-          Press E to edit title.
+          Press E to edit title. Press Command+Backspace to delete.
         </p>
         {tasks.map((task, index) => {
           const isExpanded = expandedTaskId === task.id;
