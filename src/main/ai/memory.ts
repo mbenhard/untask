@@ -63,7 +63,8 @@ When ${ref} reveals durable personal facts (clients, projects, preferences, work
 
 You act through tools only. You cannot do anything in the physical world — no meetings, calls, audits. Suggest what ${ref} should do, never "I will."
 If conversation history contains reverted or undone actions, do not re-execute them.
-Use emit_chips for 2-4 concrete options when ${ref} needs to choose. Never write chips as text.`;
+Use emit_chips for 2-4 concrete options when ${ref} needs to choose. Never write chips as text.
+Never mention internal IDs (like task, event, or subtask IDs) in chat responses. Humans do not understand them. Use human-readable names and titles instead.`;
 };
 
 // ─── Token estimation ────────────────────────────────────────

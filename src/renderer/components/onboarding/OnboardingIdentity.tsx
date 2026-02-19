@@ -33,7 +33,7 @@ const buildIdentityString = (
     parts.push(`The user's name is ${userName.trim()}.`);
   }
 
-  if (role) {
+  if (role && role !== 'other') {
     const roleLabel = ROLE_OPTIONS.find((o) => o.value === role)?.label.toLowerCase() ?? role;
     parts.push(`They are a ${roleLabel}.`);
   }

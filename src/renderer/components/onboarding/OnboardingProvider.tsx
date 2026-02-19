@@ -7,6 +7,7 @@ import { getUntask } from '../../lib/untask';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { getCuratedModelsForProvider, buildModelOptions } from '../settings/ModelCatalogView';
 
 type Provider = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
 
@@ -32,7 +33,7 @@ const PROVIDER_PLACEHOLDERS: Record<Provider, string> = {
 };
 
 type OnboardingProviderProps = {
-  onNext: (provider: Provider, keyOrUrl: string) => void;
+  onNext: (provider: Provider, keyOrUrl: string, modelId: string) => void;
   onSkip: () => void;
 };
 
@@ -40,6 +41,7 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   const [provider, setProvider] = useState<Provider>('openrouter');
   const [keyInput, setKeyInput] = useState('');
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+  const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [isValidating, setIsValidating] = useState(false);
   const [validationState, setValidationState] = useState<'idle' | 'valid' | 'error'>('idle');
   const [validationError, setValidationError] = useState('');
@@ -48,14 +50,20 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   const effectiveValue = isOllama ? ollamaUrl : keyInput;
   const canValidate = !isOllama && keyInput.trim().length > 0;
   const canContinue = isOllama
-    ? ollamaUrl.trim().length > 0
-    : keyInput.trim().length > 0;
+    ? ollamaUrl.trim().length > 0 && selectedModelId.trim().length > 0
+    : keyInput.trim().length > 0 && selectedModelId.trim().length > 0;
+
+  useEffect(() => {
+    const models = getCuratedModelsForProvider(provider);
+    const defaultModel = models.find((m) => m.isDefault) ?? models[0];
+    setSelectedModelId(defaultModel?.id ?? '');
+  }, [provider]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && canContinue) {
         e.preventDefault();
-        onNext(provider, effectiveValue.trim());
+        onNext(provider, effectiveValue.trim(), selectedModelId);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onSkip();
@@ -63,13 +71,16 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [canContinue, provider, effectiveValue, onNext, onSkip]);
+  }, [canContinue, provider, effectiveValue, selectedModelId, onNext, onSkip]);
 
   const handleProviderChange = (next: Provider) => {
     setProvider(next);
     setKeyInput('');
     setValidationState('idle');
     setValidationError('');
+    const models = getCuratedModelsForProvider(next);
+    const defaultModel = models.find((m) => m.isDefault) ?? models[0];
+    setSelectedModelId(defaultModel?.id ?? '');
   };
 
   const handleValidate = async () => {
@@ -97,7 +108,7 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   };
 
   const handleContinue = () => {
-    onNext(provider, effectiveValue.trim());
+    onNext(provider, effectiveValue.trim(), selectedModelId);
   };
 
   return (
@@ -202,6 +213,58 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
             ) : null}
           </div>
         )}
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="onboarding-model" className="text-xs font-medium text-foreground">
+            Model
+          </label>
+          {isOllama ? (
+            <select
+              id="onboarding-model"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+            >
+              <option value="" disabled>
+                Select a model
+              </option>
+              <optgroup label="Recommended">
+                <option value="llama3.1:8b">llama3.1:8b · 8B</option>
+                <option value="mistral:7b">mistral:7b · 7B</option>
+                <option value="qwen3:8b">qwen3:8b · 8B</option>
+                <option value="qwen3:14b">qwen3:14b · 14B</option>
+              </optgroup>
+            </select>
+          ) : (
+            <select
+              id="onboarding-model"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+            >
+              {buildModelOptions(provider, selectedModelId).map((group, idx) => (
+                'options' in group ? (
+                  <optgroup key={idx} label={group.label}>
+                    {group.options.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={group.value} value={group.value}>
+                    {group.label}
+                  </option>
+                )
+              ))}
+            </select>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            {isOllama
+              ? 'Select a model to use. You can change this later.'
+              : 'You can change this later in Settings.'}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

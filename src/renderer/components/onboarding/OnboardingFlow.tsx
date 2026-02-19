@@ -75,7 +75,7 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     }
   };
 
-  const handleProviderNext = async (provider: string, keyOrUrl: string) => {
+  const handleProviderNext = async (provider: string, keyOrUrl: string, modelId: string) => {
     setProviderName(provider);
 
     try {
@@ -86,6 +86,7 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
         await getUntask().apiKeys.set(provider, keyOrUrl);
         await getUntask().settings.set('ai_provider', provider);
       }
+      await getUntask().chat.setSelectedModel({ modelId });
     } catch {
       // Non-fatal — proceed anyway
     }
@@ -164,8 +165,8 @@ export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       case 4:
         return (
           <OnboardingProvider
-            onNext={(provider, keyOrUrl) => {
-              void handleProviderNext(provider, keyOrUrl);
+            onNext={(provider, keyOrUrl, modelId) => {
+              void handleProviderNext(provider, keyOrUrl, modelId);
             }}
             onSkip={handleProviderSkip}
           />

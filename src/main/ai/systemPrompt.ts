@@ -132,7 +132,8 @@ const buildSlimIdentity = (): string => {
 Clear intent -> act via tools. No narration, just do it.
 Ambiguous -> one short clarifying question.
 After tool calls -> action cards show results. Add text only if it adds value. Zero text is often ideal.
-Use emit_chips for 2-4 quick-action options when useful.`;
+Use emit_chips for 2-4 quick-action options when useful.
+Never mention internal IDs (like task, event, or subtask IDs) in chat responses. Humans do not understand them. Use human-readable names and titles instead.`;
 };
 
 // ─── Main builder ───────────────────────────────────────────
@@ -159,6 +160,8 @@ export const buildSystemPrompt = (
 
   const todaySection = buildTodaySection(input.liveContext, now, slim ? 5 : 10);
 
+  const formatRules = '## Formatting Rules\nNever mention internal IDs (like task, event, or subtask IDs) in chat responses. Humans do not understand them. Use human-readable names and titles instead.';
+
   const compiledSections = [
     metaSection,
     '---',
@@ -166,6 +169,8 @@ export const buildSystemPrompt = (
     ...(knowledgeSection ? ['---', knowledgeSection] : []),
     '---',
     todaySection,
+    '---',
+    formatRules,
   ].join('\n\n');
 
   const estimatedTotalTokens = estimateTokens(compiledSections);
@@ -175,7 +180,7 @@ export const buildSystemPrompt = (
     timezone,
     tokenBudget: estimatedTotalTokens,
     estimatedTotalTokens,
-    sectionOrder: ['now', 'identity', 'knowledge', 'today'],
+    sectionOrder: ['now', 'identity', 'knowledge', 'today', 'formatting'],
     sections: [
       {
         id: 'now',
@@ -205,6 +210,14 @@ export const buildSystemPrompt = (
         id: 'today',
         title: 'Today',
         estimatedTokens: estimateTokens(todaySection),
+        included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+      {
+        id: 'formatting',
+        title: 'Formatting Rules',
+        estimatedTokens: estimateTokens(formatRules),
         included: true,
         truncated: false,
         snippetIds: [],
