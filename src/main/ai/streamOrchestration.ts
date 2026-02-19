@@ -20,7 +20,8 @@ import { getActiveProvider } from './providers';
 import { getModelWebSearchConfig, modelSupportsVision } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
-import { createSdkTools, executeToolCall } from './tools';
+import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
+import { isOllamaProvider } from './models';
 import { loadPendingActions } from './autonomy';
 import { classifyChatError, shouldRetryStreamAttempt } from './errorClassification';
 import { maybeAutoTitleConversation } from './autoTitle';
@@ -29,6 +30,13 @@ export const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
 const HISTORY_WINDOW_LIMIT = 20;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
+
+// ─── Ollama slim mode ───────────────────────────────────────
+// When true, Ollama gets fewer tools, shorter prompt, reduced history.
+// Set to false to revert Ollama to full cloud-equivalent behavior.
+const OLLAMA_SLIM_MODE = true;
+const OLLAMA_HISTORY_WINDOW_LIMIT = 10;
+const OLLAMA_TOOL_LOOP_MAX_STEPS = 5;
 
 export type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -474,6 +482,8 @@ export const runAssistantStream = async (
       let attemptHadToolExecution = false;
 
       try {
+        const ollamaSlim = OLLAMA_SLIM_MODE && isOllamaProvider();
+
         let builtPrompt: ReturnType<typeof buildSystemPrompt> | null = cachedPrompt;
         if (!builtPrompt) {
           const { liveContext } = buildCanonicalRuntimeContext();
@@ -481,6 +491,7 @@ export const runAssistantStream = async (
             userMessage: input.userMessage,
             liveContext,
             modelId: input.modelId,
+            isSlimMode: ollamaSlim,
           });
           cachedPrompt = builtPrompt;
         }
@@ -503,9 +514,10 @@ export const runAssistantStream = async (
                 input.noteContext.markdown,
               ].join('\n')
             : null;
+        const historyLimit = ollamaSlim ? OLLAMA_HISTORY_WINDOW_LIMIT : HISTORY_WINDOW_LIMIT;
         const recentHistory = getRecentConversationMessages(
           input.conversationId,
-          HISTORY_WINDOW_LIMIT,
+          historyLimit,
         ).filter(
           (message) => message.role === 'user' || message.role === 'assistant',
         );
@@ -605,7 +617,7 @@ export const runAssistantStream = async (
             : builtPrompt.modelInputPrompt,
           messages: sdkMessages,
           toolChoice: requireToolChoice ? 'required' : 'auto',
-          stopWhen: stepCountIs(STREAM_TOOL_LOOP_MAX_STEPS),
+          stopWhen: stepCountIs(ollamaSlim ? OLLAMA_TOOL_LOOP_MAX_STEPS : STREAM_TOOL_LOOP_MAX_STEPS),
           prepareStep: async ({ steps }) => {
             const failedTools = new Set<string>();
             const toolCallsByStep: string[][] = [];
@@ -671,13 +683,18 @@ export const runAssistantStream = async (
             }
           },
           tools: (() => {
+            const effectiveAllowedTools =
+              ollamaSlim && !input.allowedTools
+                ? OLLAMA_ALLOWED_TOOLS
+                : input.allowedTools;
+
             const sdkTools = createSdkTools({
               onActionCard: (card) => {
                 actionCards.push(card);
               },
               activeNoteId: input.noteContext?.noteId,
               mutationSignatures,
-            }, input.allowedTools);
+            }, effectiveAllowedTools);
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
             if (webSearchConfig.supportsWebSearch && webSearchConfig.webSearchMethod && provider.tools) {

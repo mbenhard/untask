@@ -4,7 +4,7 @@ import type {
   AssistantLiveContext,
   IdentityContextDebugSnapshot,
 } from '../../types/assistant';
-import { getIdentity, getMemory, estimateTokens } from './memory';
+import { getIdentity, getMemory, getUserName, estimateTokens } from './memory';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -12,6 +12,7 @@ export type BuildSystemPromptInput = {
   userMessage: string;
   liveContext: AssistantLiveContext;
   modelId?: string;
+  isSlimMode?: boolean;
 };
 
 export type BuiltSystemPrompt = {
@@ -81,6 +82,7 @@ const buildMetaSection = (now: Date, timezone: string): string =>
 const buildTodaySection = (
   liveContext: AssistantLiveContext,
   now: Date,
+  taskLimit: number = 10,
 ): string => {
   const activeTasks = sortTasks(
     liveContext.tasks.filter(
@@ -99,7 +101,7 @@ const buildTodaySection = (
     return hoursUntilDue > 0 && hoursUntilDue <= 24;
   });
 
-  const todayLines = todayTasks.slice(0, 10).map((task) => {
+  const todayLines = todayTasks.slice(0, taskLimit).map((task) => {
     const tags = [
       task.priority && task.priority !== 'none' ? task.priority : null,
       task.dueDate ? `due:${task.dueDate}` : null,
@@ -119,6 +121,20 @@ const buildTodaySection = (
   ].join('\n');
 };
 
+// ─── Slim identity for local models ─────────────────────────
+
+const buildSlimIdentity = (): string => {
+  const name = getUserName();
+  const possessive = name ? `${name}'s` : "the user's";
+
+  return `You are ${possessive} task assistant in Untask. Terse, direct.
+
+Clear intent -> act via tools. No narration, just do it.
+Ambiguous -> one short clarifying question.
+After tool calls -> action cards show results. Add text only if it adds value. Zero text is often ideal.
+Use emit_chips for 2-4 quick-action options when useful.`;
+};
+
 // ─── Main builder ───────────────────────────────────────────
 
 export const buildSystemPrompt = (
@@ -133,14 +149,15 @@ export const buildSystemPrompt = (
 
   const metaSection = buildMetaSection(now, timezone);
 
-  const identity = getIdentity();
+  const slim = input.isSlimMode === true;
+  const identity = slim ? buildSlimIdentity() : getIdentity();
 
-  const knowledge = getMemory();
+  const knowledge = slim ? '' : getMemory();
   const knowledgeSection = knowledge.trim()
     ? `## Knowledge\n\n${knowledge.trim()}`
     : '';
 
-  const todaySection = buildTodaySection(input.liveContext, now);
+  const todaySection = buildTodaySection(input.liveContext, now, slim ? 5 : 10);
 
   const compiledSections = [
     metaSection,

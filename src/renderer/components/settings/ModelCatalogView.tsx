@@ -162,11 +162,14 @@ type OllamaStatus = OllamaConnectionStatus;
 // ─── Recommended Ollama models ───────────────────────────────────────────────
 
 const RECOMMENDED_OLLAMA_MODELS: readonly { name: string; size: string }[] = [
-  { name: 'lfm2.5-thinking', size: '1.2B' },
-  { name: 'phi4-mini', size: '3.8B' },
-  { name: 'qwen3:4b-instruct', size: '4B' },
+  { name: 'llama3.1:8b', size: '8B' },
+  { name: 'llama3-groq-tool-use:8b', size: '8B' },
+  { name: 'mistral:7b', size: '7B' },
   { name: 'qwen3:8b', size: '8B' },
-  { name: 'qwen3:30b-instruct', size: '30B MoE' },
+  { name: 'qwen3:14b', size: '14B' },
+  { name: 'mistral-small3:24b', size: '24B' },
+  { name: 'qwen3:30b-a3b', size: '30B MoE' },
+  { name: 'mixtral:8x7b', size: '47B MoE' },
 ];
 
 const PULL_PREFIX = 'pull:';
@@ -281,7 +284,7 @@ const OllamaModelView = ({
       {selectedModelId &&
         ollamaModels.some((m) => m.name === selectedModelId && m.supportsTools === false) && (
           <p className="mt-1 max-w-[260px] text-[10px] leading-relaxed text-amber-400/80">
-            This model can&apos;t manage tasks directly. Try phi4-mini or qwen3 for full features.
+            This model can&apos;t manage tasks directly. Try llama3.1:8b or qwen3:8b for full features.
           </p>
         )}
       {pullProgress && (

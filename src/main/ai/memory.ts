@@ -6,7 +6,7 @@ import {
 } from '../services/memoryService';
 import { getSetting, setSetting, deleteSetting } from '../services/settingsService';
 
-const getUserName = (): string => getSetting('user.name')?.trim() || '';
+export const getUserName = (): string => getSetting('user.name')?.trim() || '';
 
 const hasContent = (value: string | null): value is string =>
   typeof value === 'string' && value.trim().length > 0;

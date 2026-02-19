@@ -320,6 +320,17 @@ export const PROACTIVE_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
   'emit_chips',
 ]);
 
+// ─── OLLAMA_ALLOWED_TOOLS ──────────────────────────────────────
+// Slim tool set for small local models — keeps context pressure low.
+
+export const OLLAMA_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
+  'create_task',
+  'list_tasks',
+  'update_task',
+  'complete_task',
+  'emit_chips',
+]);
+
 // ─── SDK tools factory ──────────────────────────────────────────
 
 export const createSdkTools = (
