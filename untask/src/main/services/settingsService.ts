@@ -86,3 +86,4 @@ export function isAiEnabled(): boolean {
 export function setAiEnabled(enabled: boolean): void {
   setSetting(SETTING_KEY_AI_ENABLED, String(enabled));
 }
+
