@@ -5,6 +5,44 @@ All notable changes to Untask will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.7] - 2026-02-19
+
+### Added
+
+- **Apple Reminders sync** — Two-way sync with the macOS Reminders app via EventKit, with import, pull debounce, and race prevention
+- **Global undo system** — Undo task actions with toast notifications (Cmd+Z)
+- **Quick Add when AI is disabled** — Quick Add overlay works without AI enabled
+- **Update notifications** — In-app update banner via Cloudflare Worker
+
+### Improved
+
+- Onboarding flow data persistence and polish
+- Quick Add overlay redesigned with unified popup styling
+- Reminders sync reliability (debounced pulls, race condition prevention)
+
+### Fixed
+
+- Chat hidden when AI is disabled; notification spam on AI toggle eliminated
+- BlockNote body correctly converted to markdown for Reminders notes
+- Swift helper date parsing and unsigned distribution build
+- Undo stack pollution prevented
+
+## [0.1.6] - 2026-02-18
+
+Throttled update checks to 15-minute intervals; trigger on app activation.
+
+## [0.1.5] - 2026-02-18
+
+Redesigned due date picker UI and calendar styling; added note restore.
+
+## [0.1.4] - 2026-02-18
+
+Fixed update banner: push notification from main process instead of renderer polling.
+
+## [0.1.3] - 2026-02-18
+
+Standalone ReminderScheduler (no longer AI-gated); AI personalization with user's name; external links open in system browser.
+
 ## [0.1.2] - 2026-02-18
 
 ### Added
@@ -74,6 +112,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - macOS app with Electron Forge packaging
 - Homebrew cask distribution
 
+[0.1.7]: https://github.com/mbenhard/untask/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/mbenhard/untask/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/mbenhard/untask/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/mbenhard/untask/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/mbenhard/untask/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/mbenhard/untask/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/mbenhard/untask/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mbenhard/untask/releases/tag/v0.1.0
