@@ -1,3 +1,4 @@
+import type { OllamaConnectionStatus } from './ApiKeyManager';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSelect } from './SettingsSelect';
 
@@ -109,23 +110,6 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'reasoning'],
     isRecommended: true,
   },
-  {
-    id: 'llama3.3:70b',
-    name: 'Llama 3.3 70B',
-    provider: 'ollama',
-    costTier: 'free',
-    capabilities: ['tools'],
-    isDefault: true,
-    isRecommended: true,
-  },
-  {
-    id: 'qwen3:8b',
-    name: 'Qwen 3 8B',
-    provider: 'ollama',
-    costTier: 'free',
-    capabilities: ['tools'],
-    isRecommended: true,
-  },
 ];
 
 const COST_TIER_LABEL: Record<CostTier, string> = {
@@ -164,6 +148,86 @@ export const buildModelOptions = (
   return [{ value: selectedModelId ?? '', label: selectedModelId ?? '' }];
 };
 
+// ─── Ollama model types ───────────────────────────────────────────────────────
+
+export type OllamaModelOption = {
+  name: string;
+  parameterSize: string;
+};
+
+type OllamaStatus = OllamaConnectionStatus;
+
+// ─── Ollama model view ───────────────────────────────────────────────────────
+
+const OllamaModelView = ({
+  ollamaStatus,
+  ollamaModels,
+  selectedModelId,
+  onChange,
+}: {
+  ollamaStatus: OllamaStatus;
+  ollamaModels: OllamaModelOption[];
+  selectedModelId: string | null;
+  onChange: (modelId: string) => void;
+}) => {
+  if (ollamaStatus === 'loading') {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        Detecting Ollama...
+      </p>
+    );
+  }
+
+  if (ollamaStatus === 'not_installed') {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        Ollama is not installed.{' '}
+        <a
+          href="https://ollama.com/download"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Download Ollama
+        </a>
+      </p>
+    );
+  }
+
+  if (ollamaStatus === 'not_running') {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        Ollama is installed but not running. Start it to continue.
+      </p>
+    );
+  }
+
+  if (ollamaModels.length === 0) {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        No models installed. Run{' '}
+        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">ollama pull &lt;model&gt;</code>{' '}
+        to get started.
+      </p>
+    );
+  }
+
+  const options = ollamaModels.map((m) => ({
+    value: m.name,
+    label: m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name,
+  }));
+
+  return (
+    <SettingsSelect
+      options={options}
+      value={selectedModelId ?? ''}
+      onChange={onChange}
+      aria-label="Ollama model"
+      className="max-w-[260px]"
+    />
+  );
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type ModelCatalogViewProps = {
@@ -171,6 +235,8 @@ type ModelCatalogViewProps = {
   selectedModelId: string | null;
   loading: boolean;
   onChange: (modelId: string) => void;
+  ollamaModels?: OllamaModelOption[];
+  ollamaStatus?: OllamaStatus;
 };
 
 export const ModelCatalogView = ({
@@ -178,7 +244,22 @@ export const ModelCatalogView = ({
   selectedModelId,
   loading,
   onChange,
+  ollamaModels,
+  ollamaStatus,
 }: ModelCatalogViewProps) => {
+  if (provider === 'ollama') {
+    return (
+      <SettingsRow label="Active model" loading={loading}>
+        <OllamaModelView
+          ollamaStatus={ollamaStatus ?? 'loading'}
+          ollamaModels={ollamaModels ?? []}
+          selectedModelId={selectedModelId}
+          onChange={onChange}
+        />
+      </SettingsRow>
+    );
+  }
+
   const modelOptions = buildModelOptions(provider, selectedModelId);
 
   return (

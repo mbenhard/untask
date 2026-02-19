@@ -95,6 +95,7 @@ export const IPC_CHANNELS = {
   CHAT_CANCEL: 'chat:cancel',
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
   CHAT_FOCUS_MESSAGE: 'chat:focus-message',
+  OLLAMA_STATUS: 'ollama:status',
   BACKUP_LIST: 'backup:list',
   BACKUP_CREATE: 'backup:create',
   BACKUP_EXPORT: 'backup:export',
@@ -447,4 +448,19 @@ export type RemindersStatusResult = {
 export type RemindersSyncStatusPayload = {
   status: 'syncing' | 'idle' | 'error';
   message?: string;
+};
+
+// ─── Ollama detection payloads ────────────────────────────────
+
+export type OllamaStatusResult = {
+  status: 'not_installed' | 'not_running' | 'ready';
+  baseUrl: string;
+  models: Array<{
+    name: string;
+    size: number;
+    parameterSize: string;
+    family: string;
+    quantization: string;
+  }>;
+  defaultModelName: string | null;
 };

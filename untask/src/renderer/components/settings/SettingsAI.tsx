@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
-import { ApiKeyManager } from './ApiKeyManager';
-import { ModelCatalogView, getCuratedModelsForProvider } from './ModelCatalogView';
+import { ApiKeyManager, type OllamaConnectionStatus } from './ApiKeyManager';
+import { ModelCatalogView, getCuratedModelsForProvider, type OllamaModelOption } from './ModelCatalogView';
 import { ProviderSelector } from './ProviderSelector';
 import { SegmentedControl } from './SegmentedControl';
 import { SettingsMemoryTab } from './SettingsMemoryTab';
@@ -63,6 +63,11 @@ const useAITabState = (
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState(DEFAULT_OLLAMA_BASE_URL);
   const [isLoadingOllamaUrl, setIsLoadingOllamaUrl] = useState(false);
   const [isSavingOllamaUrl, setIsSavingOllamaUrl] = useState(false);
+
+  // Ollama detection
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaConnectionStatus>('loading');
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelOption[]>([]);
+  const [detectedBaseUrl, setDetectedBaseUrl] = useState<string>(DEFAULT_OLLAMA_BASE_URL);
 
   // Model
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -134,6 +139,26 @@ const useAITabState = (
     }
   }, [setError]);
 
+  const loadOllamaStatus = useCallback(async () => {
+    try {
+      setOllamaStatus('loading');
+      const result = await getUntask().chat.getOllamaStatus();
+      setOllamaStatus(result.status);
+      setDetectedBaseUrl(result.baseUrl);
+      setOllamaBaseUrl(result.baseUrl);
+      setOllamaModels(
+        result.models.map((m) => ({
+          name: m.name,
+          parameterSize: m.parameterSize,
+        })),
+      );
+      return result;
+    } catch {
+      setOllamaStatus('not_running');
+      return null;
+    }
+  }, []);
+
   const loadSelectedModel = useCallback(async () => {
     try {
       setIsLoadingModel(true);
@@ -179,12 +204,17 @@ const useAITabState = (
       void loadSelectedModel();
       void loadAutonomyMode();
       void loadRetentionMode();
+
+      if (resolvedProvider === 'ollama') {
+        void loadOllamaStatus();
+      }
     })();
   }, [
     loadAiEnabled,
     loadProvider,
     loadApiKeyStatus,
     loadOllamaBaseUrl,
+    loadOllamaStatus,
     loadSelectedModel,
     loadAutonomyMode,
     loadRetentionMode,
@@ -225,17 +255,24 @@ const useAITabState = (
       try {
         await getUntask().settings.set(SETTING_KEY_AI_PROVIDER, value);
 
-        // Load key status for new provider
-        if (value !== 'ollama') {
+        if (value === 'ollama') {
+          // Run detection and auto-select first model
+          const detection = await loadOllamaStatus();
+          if (detection?.defaultModelName) {
+            const result = await getUntask().chat.setSelectedModel({ modelId: detection.defaultModelName });
+            setSelectedModelId(result.modelId);
+          }
+        } else {
+          // Load key status for new provider
           await loadApiKeyStatus(value);
-        }
 
-        // Reset selected model to provider default
-        const providerModels = getCuratedModelsForProvider(value);
-        const defaultModel = providerModels.find((m) => m.isDefault) ?? providerModels[0];
-        if (defaultModel) {
-          const result = await getUntask().chat.setSelectedModel({ modelId: defaultModel.id });
-          setSelectedModelId(result.modelId);
+          // Reset selected model to provider default
+          const providerModels = getCuratedModelsForProvider(value);
+          const defaultModel = providerModels.find((m) => m.isDefault) ?? providerModels[0];
+          if (defaultModel) {
+            const result = await getUntask().chat.setSelectedModel({ modelId: defaultModel.id });
+            setSelectedModelId(result.modelId);
+          }
         }
 
         setNotice(`Provider changed to ${PROVIDER_LABELS[value]}.`);
@@ -244,7 +281,7 @@ const useAITabState = (
         setError(e instanceof Error ? e.message : 'Failed to update provider.');
       }
     },
-    [provider, setError, setNotice, loadApiKeyStatus],
+    [provider, setError, setNotice, loadApiKeyStatus, loadOllamaStatus],
   );
 
   const handleSaveApiKey = useCallback(async () => {
@@ -330,12 +367,14 @@ const useAITabState = (
       setNotice(null);
       await getUntask().settings.set(SETTING_KEY_AI_OLLAMA_BASE_URL, normalized);
       setNotice('Ollama base URL saved.');
+      // Re-run detection with new URL
+      void loadOllamaStatus();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save Ollama base URL.');
     } finally {
       setIsSavingOllamaUrl(false);
     }
-  }, [ollamaBaseUrl, setError, setNotice]);
+  }, [ollamaBaseUrl, setError, setNotice, loadOllamaStatus]);
 
   const handleModelChange = useCallback(
     async (modelId: string) => {
@@ -427,6 +466,9 @@ const useAITabState = (
     isLoadingOllamaUrl,
     isSavingOllamaUrl,
     handleSaveOllamaUrl,
+    ollamaStatus,
+    ollamaModels,
+    detectedBaseUrl,
     // Model
     selectedModelId,
     isLoadingModel,
@@ -496,6 +538,8 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 isSavingOllamaUrl={state.isSavingOllamaUrl}
                 defaultOllamaBaseUrl={DEFAULT_OLLAMA_BASE_URL}
                 onSaveOllamaUrl={() => void state.handleSaveOllamaUrl()}
+                ollamaStatus={state.ollamaStatus}
+                detectedBaseUrl={state.detectedBaseUrl}
               />
             </SettingsSection>
 
@@ -506,6 +550,8 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 selectedModelId={state.selectedModelId}
                 loading={state.isLoadingModel}
                 onChange={(v) => void state.handleModelChange(v)}
+                ollamaModels={state.ollamaModels}
+                ollamaStatus={state.ollamaStatus}
               />
             </SettingsSection>
 

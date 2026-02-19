@@ -46,6 +46,7 @@ import {
 import { cancelActiveChatTurns, startChatTurn } from '../ai/chat';
 import { undoLastAiTaskEvent, undoTaskEvent } from '../services/taskService';
 import { getModels, getSelectedModelId, setSelectedModelId } from '../ai/models';
+import { clearOllamaDetectionCache, detectOllama } from '../ai/providers/ollamaDetection';
 import {
   getAutonomyMode,
   setAutonomyMode,
@@ -383,6 +384,17 @@ export const registerChatHandlers = (): void => {
           lifecycle: 'pending',
           message: result.error.message,
         };
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.OLLAMA_STATUS,
+    withIpcLogging(
+      'OLLAMA_STATUS',
+      async () => {
+        clearOllamaDetectionCache();
+        return detectOllama();
       },
     ),
   );

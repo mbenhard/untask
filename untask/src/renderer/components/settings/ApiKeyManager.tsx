@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -142,6 +144,8 @@ const KeyedApiKeyManager = ({
 
 // ─── Ollama Connection ───────────────────────────────────────────────────────
 
+export type OllamaConnectionStatus = 'not_installed' | 'not_running' | 'ready' | 'loading';
+
 type OllamaConnectionManagerProps = {
   ollamaBaseUrl: string;
   onOllamaBaseUrlChange: (value: string) => void;
@@ -149,6 +153,8 @@ type OllamaConnectionManagerProps = {
   isSavingOllamaUrl: boolean;
   defaultOllamaBaseUrl: string;
   onSave: () => void;
+  ollamaStatus?: OllamaConnectionStatus;
+  detectedBaseUrl?: string;
 };
 
 const OllamaConnectionManager = ({
@@ -158,44 +164,97 @@ const OllamaConnectionManager = ({
   isSavingOllamaUrl,
   defaultOllamaBaseUrl,
   onSave,
+  ollamaStatus,
+  detectedBaseUrl,
 }: OllamaConnectionManagerProps) => {
-  const keyLink = PROVIDER_KEY_LINKS.ollama;
+  const [showCustomUrl, setShowCustomUrl] = useState(false);
+  const displayUrl = detectedBaseUrl ?? defaultOllamaBaseUrl;
+
+  const renderStatusIndicator = () => {
+    switch (ollamaStatus) {
+      case 'loading':
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-muted-foreground" />
+            <span className="text-[11px] text-muted-foreground">Detecting Ollama...</span>
+          </div>
+        );
+      case 'ready':
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+            <span className="text-[11px] text-green-600 dark:text-green-400">
+              Connected to {displayUrl}
+            </span>
+          </div>
+        );
+      case 'not_running':
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+            <span className="text-[11px] text-yellow-600 dark:text-yellow-400">
+              Ollama not running
+            </span>
+          </div>
+        );
+      case 'not_installed':
+        return (
+          <p className="text-[11px] text-muted-foreground">
+            Ollama not found.{' '}
+            <a
+              href="https://ollama.com/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Install Ollama
+            </a>
+          </p>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5">
-        <Input
-          type="text"
-          value={ollamaBaseUrl}
-          onChange={(event) => onOllamaBaseUrlChange(event.target.value)}
-          placeholder={defaultOllamaBaseUrl}
-          disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-          className="h-7 flex-1 text-[11px]"
-          aria-label="Ollama base URL"
-        />
-        <Button
-          type="button"
-          size="sm"
-          onClick={onSave}
-          disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-          className="h-7 text-[11px]"
-        >
-          Save
-        </Button>
-      </div>
-      <p className="text-[11px] text-muted-foreground">
-        Ollama runs locally. No API key required.{' '}
-        {keyLink ? (
-          <a
-            href={keyLink}
-            target="_blank"
-            rel="noopener noreferrer"
+      {renderStatusIndicator()}
+
+      {!showCustomUrl && ollamaStatus !== 'loading' && (
+        <p className="text-[11px] text-muted-foreground">
+          Ollama runs locally. No API key required.{' '}
+          <button
+            type="button"
+            onClick={() => setShowCustomUrl(true)}
             className="underline underline-offset-2 hover:text-foreground"
           >
-            Install Ollama
-          </a>
-        ) : null}
-      </p>
+            Custom URL
+          </button>
+        </p>
+      )}
+
+      {showCustomUrl && (
+        <div className="flex items-center gap-1.5">
+          <Input
+            type="text"
+            value={ollamaBaseUrl}
+            onChange={(event) => onOllamaBaseUrlChange(event.target.value)}
+            placeholder={defaultOllamaBaseUrl}
+            disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
+            className="h-7 flex-1 text-[11px]"
+            aria-label="Ollama base URL"
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={onSave}
+            disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
+            className="h-7 text-[11px]"
+          >
+            Save
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
@@ -223,6 +282,9 @@ export type ApiKeyManagerProps = {
   isSavingOllamaUrl: boolean;
   defaultOllamaBaseUrl: string;
   onSaveOllamaUrl: () => void;
+  // Ollama detection props
+  ollamaStatus?: OllamaConnectionStatus;
+  detectedBaseUrl?: string;
 };
 
 export const ApiKeyManager = (props: ApiKeyManagerProps) => {
@@ -253,6 +315,8 @@ export const ApiKeyManager = (props: ApiKeyManagerProps) => {
           isSavingOllamaUrl={props.isSavingOllamaUrl}
           defaultOllamaBaseUrl={props.defaultOllamaBaseUrl}
           onSave={props.onSaveOllamaUrl}
+          ollamaStatus={props.ollamaStatus}
+          detectedBaseUrl={props.detectedBaseUrl}
         />
       )}
     </div>

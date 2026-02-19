@@ -73,6 +73,7 @@ import type {
   RemindersSyncStatusPayload,
   RemindersSyncFilter,
   ShortcutRegistrationStatusResult,
+  OllamaStatusResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -164,6 +165,7 @@ export type UntaskApi = {
     setAutonomyMode: (payload: ChatSetAutonomyModeRequest) => Promise<ChatAutonomyModeResult>;
     resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
     listPendingActions: () => Promise<ChatListPendingActionsResponse>;
+    getOllamaStatus: () => Promise<OllamaStatusResult>;
   };
   backup: {
     list: () => Promise<BackupListResponse>;

@@ -19,9 +19,6 @@ export const SUPPORTED_MODEL_IDS = [
   // Anthropic direct models
   'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
-  // Ollama models
-  'llama3.3:70b',
-  'qwen3:8b',
 ] as const;
 
 export type ChatModelId = (typeof SUPPORTED_MODEL_IDS)[number];
@@ -55,12 +52,12 @@ export interface CuratedModel {
 
 // ─── Per-provider defaults ────────────────────────────────────────────────────
 
-/** Per-provider default model IDs. */
-const PROVIDER_DEFAULT_MODEL_IDS: Record<ProviderType, ChatModelId> = {
+/** Per-provider default model IDs. Ollama is empty — resolved dynamically. */
+const PROVIDER_DEFAULT_MODEL_IDS: Record<ProviderType, string> = {
   openrouter: 'openai/gpt-4o-mini',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-6',
-  ollama: 'llama3.3:70b',
+  ollama: '',
 };
 
 const MODEL_SETTING_KEY = SETTING_KEY_AI_MODEL;
@@ -181,27 +178,6 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'reasoning'],
     isRecommended: true,
   },
-  // Llama 3.3 70B — Ollama
-  {
-    id: 'llama3.3:70b',
-    name: 'Llama 3.3 70B',
-    provider: 'ollama',
-    contextWindow: 128_000,
-    costTier: 'free',
-    capabilities: ['tools'],
-    isDefault: true,
-    isRecommended: true,
-  },
-  // Qwen 3 8B — Ollama
-  {
-    id: 'qwen3:8b',
-    name: 'Qwen 3 8B',
-    provider: 'ollama',
-    contextWindow: 32_768,
-    costTier: 'free',
-    capabilities: ['tools'],
-    isRecommended: true,
-  },
 ] as const;
 
 // ─── Legacy catalog (used by IPC / renderer) ──────────────────────────────────
@@ -319,26 +295,6 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsVision: true,
     webSearchMethod: 'claude_native',
   },
-  {
-    id: 'llama3.3:70b',
-    label: 'Llama 3.3 70B',
-    inputCostPerMillion: null,
-    outputCostPerMillion: null,
-    defaultSelected: false,
-    supportsReasoning: false,
-    supportsWebSearch: false,
-    supportsVision: false,
-  },
-  {
-    id: 'qwen3:8b',
-    label: 'Qwen 3 8B',
-    inputCostPerMillion: null,
-    outputCostPerMillion: null,
-    defaultSelected: false,
-    supportsReasoning: false,
-    supportsWebSearch: false,
-    supportsVision: false,
-  },
 ] as const;
 
 // ─── Error class ──────────────────────────────────────────────────────────────
@@ -373,26 +329,38 @@ export const getCuratedModels = (provider?: ProviderType): CuratedModel[] =>
 export const getCuratedModelById = (id: string): CuratedModel | undefined =>
   CURATED_MODELS.find((m) => m.id === id);
 
+// ─── Ollama provider check ────────────────────────────────────────────────────
+
+export const isOllamaProvider = (): boolean => {
+  const stored = getSetting(SETTING_KEY_AI_PROVIDER)?.trim() ?? '';
+  return stored === 'ollama';
+};
+
 // ─── Legacy accessors (used by IPC, chat.ts, knowledgeExtractor.ts) ───────────
 
-export const getDefaultModelId = (): ChatModelId => {
+export const getDefaultModelId = (): string => {
   const storedProvider = getSetting(SETTING_KEY_AI_PROVIDER)?.trim() ?? '';
   const validProviders: ProviderType[] = ['openrouter', 'openai', 'anthropic', 'ollama'];
   const provider = validProviders.includes(storedProvider as ProviderType)
     ? (storedProvider as ProviderType)
     : 'openrouter';
-  return PROVIDER_DEFAULT_MODEL_IDS[provider];
+  if (provider === 'ollama') {
+    // For Ollama, return stored model or empty string (resolved dynamically)
+    const stored = getSetting(SETTING_KEY_AI_MODEL)?.trim() ?? '';
+    return stored.length > 0 ? stored : '';
+  }
+  return PROVIDER_DEFAULT_MODEL_IDS[provider] as ChatModelId;
 };
 
 export const getModels = (): ModelCatalogEntry[] => [...MODEL_CATALOG];
 
-export const modelSupportsReasoning = (modelId: ChatModelId): boolean =>
+export const modelSupportsReasoning = (modelId: string): boolean =>
   MODEL_CATALOG.find((entry) => entry.id === modelId)?.supportsReasoning ?? false;
 
-export const modelSupportsVision = (modelId: ChatModelId): boolean =>
+export const modelSupportsVision = (modelId: string): boolean =>
   MODEL_CATALOG.find((entry) => entry.id === modelId)?.supportsVision ?? false;
 
-export const getModelWebSearchConfig = (modelId: ChatModelId): {
+export const getModelWebSearchConfig = (modelId: string): {
   supportsWebSearch: boolean;
   webSearchMethod?: 'kimi_builtin' | 'claude_native';
 } => {
@@ -414,12 +382,18 @@ export const assertModelId = (value: string): ChatModelId => {
   return value;
 };
 
-export const resolveModelId = (value?: string | null): ChatModelId => {
+export const resolveModelId = (value?: string | null): string => {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return getDefaultModelId();
   }
 
   const trimmed = value.trim();
+
+  // Ollama: accept any non-empty model string
+  if (isOllamaProvider()) {
+    return trimmed;
+  }
+
   if (isSupportedModelId(trimmed)) {
     return trimmed;
   }
@@ -428,13 +402,24 @@ export const resolveModelId = (value?: string | null): ChatModelId => {
   return getDefaultModelId();
 };
 
-export const getSelectedModelId = (): ChatModelId => {
+export const getSelectedModelId = (): string => {
   const stored = getSetting(MODEL_SETTING_KEY);
   return resolveModelId(stored);
 };
 
-export const setSelectedModelId = (value: string): ChatModelId => {
-  const selected = assertModelId(value.trim());
+export const setSelectedModelId = (value: string): string => {
+  const trimmed = value.trim();
+
+  // Ollama: skip validation, store any non-empty model string
+  if (isOllamaProvider()) {
+    if (trimmed.length === 0) {
+      throw new Error('Model ID cannot be empty.');
+    }
+    setSetting(MODEL_SETTING_KEY, trimmed);
+    return trimmed;
+  }
+
+  const selected = assertModelId(trimmed);
   setSetting(MODEL_SETTING_KEY, selected);
   return selected;
 };
