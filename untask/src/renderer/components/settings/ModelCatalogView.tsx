@@ -176,13 +176,10 @@ const PULL_PREFIX = 'pull:';
 
 const MIN_PARAMETER_SIZE_BILLIONS = 7;
 
-const isModelLargeEnough = (parameterSize: string): boolean => {
-  if (!parameterSize) return true;
-  const match = parameterSize.toUpperCase().match(/^(\d+)(B|M)$/);
+const isModelLargeEnough = (modelName: string): boolean => {
+  const match = modelName.match(/:?(\d+)[bB](?:\s|$|:)/);
   if (!match) return true;
-  const value = parseInt(match[1], 10);
-  const unit = match[2];
-  const billions = unit === 'M' ? value / 1000 : value;
+  const billions = parseInt(match[1], 10);
   return billions >= MIN_PARAMETER_SIZE_BILLIONS;
 };
 
@@ -274,7 +271,7 @@ const OllamaModelView = ({
           <optgroup label="Installed">
             {ollamaModels.map((m) => {
               const noTools = m.supportsTools === false;
-              const isTooSmall = !isModelLargeEnough(m.parameterSize);
+              const isTooSmall = !isModelLargeEnough(m.name);
               const label = m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name;
               const warningText = isTooSmall ? ' — too small' : noTools ? ' — no tool support' : '';
               return (
@@ -296,13 +293,13 @@ const OllamaModelView = ({
         )}
       </select>
       {selectedModelId &&
-        ollamaModels.some((m) => m.name === selectedModelId && !isModelLargeEnough(m.parameterSize)) && (
+        ollamaModels.some((m) => m.name === selectedModelId && !isModelLargeEnough(m.name)) && (
           <p className="mt-1 max-w-[260px] text-[10px] leading-relaxed text-amber-400/80">
             This model is too small for reliable tool use. Try llama3.1:8b or qwen3:8b for full features.
           </p>
         )}
       {selectedModelId &&
-        ollamaModels.some((m) => m.name === selectedModelId && isModelLargeEnough(m.parameterSize) && m.supportsTools === false) && (
+        ollamaModels.some((m) => m.name === selectedModelId && isModelLargeEnough(m.name) && m.supportsTools === false) && (
           <p className="mt-1 max-w-[260px] text-[10px] leading-relaxed text-amber-400/80">
             This model can&apos;t manage tasks directly. Try llama3.1:8b or qwen3:8b for full features.
           </p>
