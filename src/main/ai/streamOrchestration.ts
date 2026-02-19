@@ -17,7 +17,6 @@ import {
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { scheduleKnowledgeExtraction } from './knowledgeExtractor';
 import { getActiveProvider } from './providers';
-import type { ChatModelId } from './models';
 import { getModelWebSearchConfig, modelSupportsVision } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
@@ -398,7 +397,7 @@ export const runAssistantStream = async (
     requestId: string;
     conversationId: string;
     userMessage: string;
-    modelId: ChatModelId;
+    modelId: string;
     images?: string[];
     noteContext?: ChatNoteContext;
     tokenBudget?: number;

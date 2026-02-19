@@ -76,6 +76,7 @@ import {
   type RemindersSyncStatusPayload,
   type RemindersSyncFilter,
   type ShortcutRegistrationStatusResult,
+  type OllamaStatusResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -294,6 +295,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION, payload),
     listPendingActions: (): Promise<ChatListPendingActionsResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
+    getOllamaStatus: (): Promise<OllamaStatusResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_STATUS),
   },
   backup: {
     list: (): Promise<BackupListResponse> =>
