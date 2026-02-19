@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Archive, ArchiveRestore, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 import type { Note } from '../../../types/models';
+import { useAutoFocusList } from '../../hooks/useAutoFocusList';
 import { useNotesListKeyboard } from '../../hooks/useNotesListKeyboard';
 import { cn } from '../../lib/utils';
 import {
@@ -71,6 +72,7 @@ const NoteListItem = ({ note, selected, onClick, onHover, onRestore, onDelete }:
   return (
     <button
       type="button"
+      data-note-id={note.id}
       onClick={() => onClick(note.id)}
       onMouseEnter={() => onHover(note.id)}
       onFocus={() => onHover(note.id)}
@@ -175,6 +177,16 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     onSelectRelative: handleSelectRelative,
     onOpenSelected: handleOpenSelected,
     containerRef,
+  });
+
+  const selectedIndex = activeNotes.findIndex((n) => n.id === effectiveSelectedId);
+
+  useAutoFocusList({
+    items: activeNotes,
+    selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
+    getItemId: (n) => n.id,
+    containerRef,
+    itemSelector: 'data-note-id',
   });
 
   const effectiveSelectedId = useMemo(() => {
