@@ -1,4 +1,7 @@
-import { app, BrowserWindow, net } from 'electron';
+import { app, BrowserWindow, net, Notification, shell } from 'electron';
+
+import { setUpdateTooltip } from '../tray';
+import { toggleWindow } from '../window/summonController';
 
 import { getSetting, setSetting } from './settingsService';
 
@@ -23,12 +26,29 @@ export interface UpdateInfo {
   latestVersion: string;
   releaseUrl: string;
   releaseNotes?: string;
+  installMethod: 'homebrew' | 'direct';
 }
 
 // ─── In-memory cache ─────────────────────────────────────────
 let cachedUpdateInfo: UpdateInfo | null = null;
 let checkIntervalHandle: ReturnType<typeof setInterval> | null = null;
 let lastCheckTime = 0;
+
+// ─── Retry state ─────────────────────────────────────────────
+const RETRY_DELAYS = [2 * 60_000, 5 * 60_000, 10 * 60_000]; // 2min, 5min, 10min
+let retryCount = 0;
+let retryTimeouts: ReturnType<typeof setTimeout>[] = [];
+
+// ─── Native notification state ───────────────────────────────
+let hasShownNativeNotification = false;
+
+// ─── Install method detection ────────────────────────────────
+const detectInstallMethod = (): 'homebrew' | 'direct' => {
+  const execPath = process.execPath.toLowerCase();
+  return execPath.includes('/homebrew/') || execPath.includes('/cellar/')
+    ? 'homebrew'
+    : 'direct';
+};
 
 // ─── Renderer notification ────────────────────────────────────
 
@@ -106,6 +126,7 @@ export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
       currentVersion,
       latestVersion: currentVersion,
       releaseUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
+      installMethod: detectInstallMethod(),
     };
     cachedUpdateInfo = info;
     return info;
@@ -140,19 +161,39 @@ export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
 
     const hasUpdate = latestVersion.length > 0 && isNewerVersion(currentVersion, latestVersion);
 
+    const installMethod = detectInstallMethod();
+
     const info: UpdateInfo = {
       hasUpdate,
       currentVersion,
       latestVersion: latestVersion || currentVersion,
       releaseUrl,
       releaseNotes,
+      installMethod,
     };
 
     cachedUpdateInfo = info;
+    retryCount = 0;
     setSetting(SETTING_KEY_LAST_UPDATE_CHECK, new Date().toISOString());
 
     if (info.hasUpdate) {
       notifyRenderer(info);
+      setUpdateTooltip(info.latestVersion);
+
+      if (!hasShownNativeNotification && Notification.isSupported()) {
+        const isHomebrew = installMethod === 'homebrew';
+        const n = new Notification({
+          title: 'Untask update available',
+          body: `v${info.latestVersion} is ready. ${isHomebrew ? 'Run brew upgrade untask.' : 'Click to view release.'}`,
+          silent: true,
+        });
+        n.on('click', () => {
+          toggleWindow();
+          void shell.openExternal(info.releaseUrl);
+        });
+        n.show();
+        hasShownNativeNotification = true;
+      }
     }
 
     return info;
@@ -161,11 +202,20 @@ export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
     // Do not update the cache so a stale positive result is preserved.
     console.warn('[update-checker] Failed to check for updates:', error);
 
+    // Schedule automatic retry with backoff
+    if (retryCount < RETRY_DELAYS.length) {
+      const delay = RETRY_DELAYS[retryCount]!;
+      retryCount++;
+      const timeout = setTimeout(() => void checkForUpdates(true), delay);
+      retryTimeouts.push(timeout);
+    }
+
     const fallback: UpdateInfo = {
       hasUpdate: false,
       currentVersion,
       latestVersion: currentVersion,
       releaseUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
+      installMethod: detectInstallMethod(),
     };
 
     if (!cachedUpdateInfo) {
@@ -206,4 +256,6 @@ export const stopUpdateChecker = (): void => {
     clearInterval(checkIntervalHandle);
     checkIntervalHandle = null;
   }
+  for (const t of retryTimeouts) clearTimeout(t);
+  retryTimeouts = [];
 };

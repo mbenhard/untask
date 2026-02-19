@@ -65,14 +65,32 @@ export const UpdateBanner = () => {
         Untask{' '}
         <span className="font-medium text-foreground">v{updateInfo.latestVersion}</span>{' '}
         available.{' '}
-        <a
-          href={updateInfo.releaseUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="font-medium text-foreground underline-offset-2 hover:underline"
-        >
-          View release
-        </a>
+        {updateInfo.installMethod === 'homebrew' ? (
+          <>
+            Run{' '}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
+              brew upgrade untask
+            </code>
+            {' · '}
+            <a
+              href={updateInfo.releaseUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground underline-offset-2 hover:underline"
+            >
+              View release
+            </a>
+          </>
+        ) : (
+          <a
+            href={updateInfo.releaseUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            View release
+          </a>
+        )}
       </span>
       <button
         type="button"

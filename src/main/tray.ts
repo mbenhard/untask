@@ -56,6 +56,14 @@ export function refreshTodayBadge(): void {
   }
 }
 
+export function setUpdateTooltip(version: string): void {
+  tray?.setToolTip(`Untask — v${version} available`);
+}
+
+export function clearUpdateTooltip(): void {
+  tray?.setToolTip('Untask');
+}
+
 export function destroyTray(): void {
   if (tray) {
     tray.destroy();

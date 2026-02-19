@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { Task } from '../../types/models';
+import { toErrorMessage } from '../lib/errors';
 import { getUntask } from '../lib/untask';
 import { useToastStore } from './toastStore';
 
@@ -67,9 +68,6 @@ type TaskStore = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────
-const toErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unknown task operation error.';
-
 const getNextOrder = (tasks: Task[]): number => {
   const currentMax = tasks.reduce((max, task) => {
     if (typeof task.order !== 'number') {
@@ -107,7 +105,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       const tasks = await getUntask().tasks.list();
       set({ tasks: [...tasks].sort(byOrderThenCreatedAt), isLoading: false });
     } catch (e) {
-      set({ isLoading: false, error: toErrorMessage(e) });
+      set({ isLoading: false, error: toErrorMessage(e, 'Unknown task operation error.') });
     }
   },
 
@@ -150,7 +148,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       // Rollback: remove temp task
       set((s) => ({
         tasks: s.tasks.filter((t) => t.id !== tempId),
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
     }
@@ -180,7 +178,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       // Rollback to previous state
       set((s) => ({
         tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
     }
@@ -215,7 +213,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     } catch (e) {
       set(() => ({
         tasks: previousTasks,
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return false;
     }
@@ -258,7 +256,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       return true;
     } catch (e) {
       // Rollback to previous order
-      set({ tasks: prevTasks, error: toErrorMessage(e) });
+      set({ tasks: prevTasks, error: toErrorMessage(e, 'Unknown task operation error.') });
       return false;
     }
   },
@@ -292,7 +290,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     } catch (e) {
       set((s) => ({
         tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
     }
@@ -327,7 +325,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     } catch (e) {
       set((s) => ({
         tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
     }
@@ -362,7 +360,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     } catch (e) {
       set((s) => ({
         tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
     }
@@ -391,7 +389,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     } catch (e) {
       set((s) => ({
         tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
-        error: toErrorMessage(e),
+        error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
     }

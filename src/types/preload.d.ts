@@ -90,6 +90,7 @@ export type UntaskApi = {
     setWindowDismissMode: (mode: WindowDismissMode) => Promise<WindowDismissModeResult>;
     getDockMode: () => Promise<DockModeResult>;
     setDockMode: (mode: DockMode) => Promise<DockModeResult>;
+    getVersion: () => Promise<string>;
     onMenuNewTask: (listener: () => void) => () => void;
     onMenuNewNote: (listener: () => void) => () => void;
     checkForUpdates: () => Promise<UpdateInfo>;
