@@ -21,6 +21,7 @@ export const InboxView = ({
   const activeView = useAppStore((state) => state.activeView);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
   const inboxTasks = useMemo(
     () =>
@@ -54,6 +55,7 @@ export const InboxView = ({
               placeholder: 'Type to capture...',
             }}
             triggerAdd={activeView === 'inbox' ? newTaskTrigger : undefined}
+            onRequestFocus={() => setFocusedIndex(0)}
           >
             <TaskList
               tasks={inboxTasks}
@@ -62,6 +64,8 @@ export const InboxView = ({
               ariaLabel="Inbox tasks"
               scopeId="inbox"
               isPrimaryList
+              focusedIndex={focusedIndex}
+              onFocusedIndexChange={setFocusedIndex}
             />
           </SectionGroup>
         ) : null}

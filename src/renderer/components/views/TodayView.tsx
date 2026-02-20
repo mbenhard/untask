@@ -24,6 +24,7 @@ export const TodayView = ({
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
   const [isTodayCollapsed, setIsTodayCollapsed] = useState(false);
   const [isDoneCollapsed, setIsDoneCollapsed] = useState(true);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
   const activeTodayTasks = useMemo(
     () => allTasks.filter(
@@ -78,6 +79,7 @@ export const TodayView = ({
                 placeholder: 'Add to today...',
               }}
               triggerAdd={activeView === 'today' ? newTaskTrigger : undefined}
+              onRequestFocus={() => setFocusedIndex(0)}
             >
               <TaskList
                 tasks={activeTodayTasks}
@@ -86,6 +88,8 @@ export const TodayView = ({
                 ariaLabel="Today tasks"
                 scopeId="today"
                 isPrimaryList
+                focusedIndex={focusedIndex}
+                onFocusedIndexChange={setFocusedIndex}
               />
             </SectionGroup>
 

@@ -117,11 +117,22 @@ export const AppShell = () => {
     };
   }, []);
 
-  // Listen for notification-driven task navigation
+  // Listen for notification-driven task navigation (also used by quick-add)
   useEffect(() => {
-    const unsubscribe = window.untask?.tasks.onTaskNavigate((payload) => {
+    const unsubscribe = window.untask?.tasks.onTaskNavigate(async (payload) => {
       if (!payload?.taskId) return;
-      setView('tasks');
+
+      // Refresh so newly created tasks are in the store
+      await useTaskStore.getState().refreshTasks();
+
+      const task = useTaskStore.getState().tasks.find((t) => t.id === payload.taskId);
+      const resolvedView = task?.status === 'inbox'
+        ? 'inbox'
+        : task?.today
+          ? 'today'
+          : 'tasks';
+
+      setView(resolvedView);
       useTaskStore.getState().selectTask(payload.taskId);
     });
 

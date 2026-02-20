@@ -69,6 +69,7 @@ type StatusGroupSectionProps = {
   onFocusedIndexChange?: (index: number) => void;
   onNavigateNextGroup?: () => void;
   onNavigatePrevGroup?: () => void;
+  onRequestFocus?: () => void;
 };
 
 const StatusGroupSection = ({
@@ -86,6 +87,7 @@ const StatusGroupSection = ({
   onFocusedIndexChange,
   onNavigateNextGroup,
   onNavigatePrevGroup,
+  onRequestFocus,
 }: StatusGroupSectionProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: getStatusLaneId(laneKey),
@@ -102,6 +104,7 @@ const StatusGroupSection = ({
       dropRef={setNodeRef}
       addTaskConfig={addTaskConfig}
       triggerAdd={triggerAdd}
+      onRequestFocus={onRequestFocus}
     >
       <TaskList
         tasks={tasks}
@@ -401,6 +404,10 @@ export const TasksView = ({
                     onFocusedIndexChange={handleFocusedIndexChange}
                     onNavigateNextGroup={() => handleNavigateNextGroup(key)}
                     onNavigatePrevGroup={() => handleNavigatePrevGroup(key)}
+                    onRequestFocus={() => {
+                      setFocusedLane(key);
+                      setFocusedIndex(0);
+                    }}
                     onToggle={() => {
                       setCollapsedGroups((current) => ({
                         ...current,
