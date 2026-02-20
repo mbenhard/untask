@@ -515,6 +515,7 @@ export const TaskList = ({
                 task={task}
                 isExpanded={isExpanded}
                 subtaskCount={subtasks.length}
+                indentPx={indentPx}
                 onRequestAddSubtask={
                   canOwnSubtasks
                     ? () => setAddingSubtaskForId(task.id)

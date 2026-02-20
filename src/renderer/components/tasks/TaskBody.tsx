@@ -590,6 +590,7 @@ export type TaskBodyProps = {
   task: Task;
   isExpanded: boolean;
   subtaskCount: number;
+  indentPx?: number;
   onRequestAddSubtask?: () => void;
   onBodyEditModeChange?: (editing: boolean) => void;
 };
@@ -598,6 +599,7 @@ export const TaskBody = ({
   task,
   isExpanded,
   subtaskCount,
+  indentPx = 0,
   onRequestAddSubtask,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
@@ -691,7 +693,7 @@ export const TaskBody = ({
   return (
     <div className="overflow-hidden">
       {/* Part-of reference — subtask context */}
-      {parentTask && (
+      {parentTask && indentPx === 0 && (
         <div className="border-t border-border/30 px-3 pt-2">
           <button
             type="button"
