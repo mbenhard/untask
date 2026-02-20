@@ -95,6 +95,7 @@ export const TaskList = ({
   const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
+  const [completeConfirmTriggerId, setCompleteConfirmTriggerId] = useState<string | null>(null);
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
@@ -260,6 +261,50 @@ export const TaskList = ({
     [completeTask, expandedTaskId, firstEnabledNonTerminal, reopenTask, tasks, updateTask],
   );
 
+  const handleRequestCompleteConfirm = useCallback(
+    (taskId: string): void => {
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) {
+        return;
+      }
+
+      const nextStatus = getStatusAfterToggleComplete(
+        currentTask.status,
+        firstEnabledNonTerminal,
+      );
+      if (nextStatus === 'done') {
+        const subtasks = allTasks.filter((t) => t.parentId === taskId);
+        const activeChildren = subtasks.filter(
+          (t) => !isTerminalStatus(t.status as never),
+        ).length;
+        if (activeChildren > 0) {
+          setCompleteConfirmTriggerId(taskId);
+          return;
+        }
+        void completeTask(taskId);
+      } else if (isTerminalStatus(currentTask.status as never)) {
+        void reopenTask(taskId);
+      } else {
+        void updateTask({ id: taskId, status: nextStatus });
+      }
+
+      if (expandedTaskId === taskId) {
+        setExpandedTaskId(null);
+      }
+    },
+    [allTasks, completeTask, expandedTaskId, firstEnabledNonTerminal, reopenTask, tasks, updateTask],
+  );
+
+  const handleCompleteWithChildren = useCallback(
+    (taskId: string): void => {
+      void completeTask(taskId, { completeChildren: true });
+      if (expandedTaskId === taskId) {
+        setExpandedTaskId(null);
+      }
+    },
+    [completeTask, expandedTaskId],
+  );
+
   const handleDelete = useCallback(
     (taskId: string): void => {
       const currentTask = tasks.find((candidate) => candidate.id === taskId);
@@ -392,7 +437,7 @@ export const TaskList = ({
     onFocusedIndexChange: setFocusedIndex,
     expandedTaskId,
     onToggleExpand: handleToggleExpand,
-    onToggleComplete: handleComplete,
+    onToggleComplete: handleRequestCompleteConfirm,
     onToggleToday: handleToggleToday,
     onCyclePriority: handleCyclePriority,
     onCycleStatus: handleCycleStatus,
@@ -461,8 +506,10 @@ export const TaskList = ({
               onEndTitleEdit={() => setEditingTitleTaskId(null)}
               onToggleExpand={handleToggleExpand}
               onComplete={handleComplete}
+              onCompleteWithChildren={handleCompleteWithChildren}
               onToggleToday={handleToggleToday}
               onFocus={() => setFocusedIndex(index)}
+              completeConfirmTriggerId={completeConfirmTriggerId}
             >
               <TaskBody
                 task={task}

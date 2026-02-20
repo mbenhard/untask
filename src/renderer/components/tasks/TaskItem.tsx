@@ -27,8 +27,10 @@ export interface TaskItemProps {
   onEndTitleEdit: () => void;
   onToggleExpand: (id: string) => void;
   onComplete: (id: string) => void;
+  onCompleteWithChildren: (id: string) => void;
   onToggleToday: (id: string) => void;
   onFocus?: () => void;
+  completeConfirmTriggerId?: string | null;
   children?: ReactNode;
 }
 
@@ -57,8 +59,10 @@ export const TaskItem = ({
   onEndTitleEdit,
   onToggleExpand,
   onComplete,
+  onCompleteWithChildren,
   onToggleToday,
   onFocus,
+  completeConfirmTriggerId,
   children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -70,10 +74,17 @@ export const TaskItem = ({
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<'main' | 'projects' | 'delete-confirm'>('main');
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     setTitleDraft(task.title);
   }, [task.title]);
+
+  useEffect(() => {
+    if (completeConfirmTriggerId === task.id && hasChildren && childrenDoneCount < childrenCount) {
+      setCompleteConfirmOpen(true);
+    }
+  }, [completeConfirmTriggerId, task.id, hasChildren, childrenCount, childrenDoneCount]);
 
   const {
     attributes,
@@ -218,59 +229,155 @@ export const TaskItem = ({
     >
       <div onClick={() => onToggleExpand(task.id)} className="flex min-h-10 items-center gap-2 px-1.5">
         <div className="flex items-center gap-1.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onComplete(task.id);
-                }}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  const nextPriority = getNextPriority(task.priority);
-                  void updateTask({ id: task.id, priority: nextPriority });
-                }}
-                aria-label={
-                  isCompleted
-                    ? `Reopen "${task.title}"`
-                    : `Mark "${task.title}" complete`
+          {hasChildren && childrenDoneCount < childrenCount ? (
+            <Popover.Root
+              open={completeConfirmOpen}
+              onOpenChange={(open) => {
+                setCompleteConfirmOpen(open);
+                if (!open) {
+                  setTimeout(() => {
+                    setCompleteConfirmOpen(false);
+                  }, 100);
                 }
-                className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              }}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Popover.Trigger asChild>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setCompleteConfirmOpen(true);
+                      }}
+                      aria-label={`Mark "${task.title}" complete`}
+                      className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <motion.span
+                        initial={false}
+                        animate={{
+                          scale: isCompleted ? 1 : 0.96,
+                          backgroundColor: isCompleted
+                            ? 'var(--foreground)'
+                            : 'transparent',
+                          borderColor: isCompleted
+                            ? 'var(--foreground)'
+                            : 'var(--foreground-muted, rgba(255,255,255,0.35))',
+                        }}
+                        transition={{ duration: 0.3, ease: 'easeOut' }}
+                        className={cn(
+                          'inline-flex size-4 items-center justify-center rounded-full border transition-[border-style] duration-200',
+                          isCompleted ? 'border-solid' : 'border-dashed group-hover:border-solid',
+                        )}
+                      >
+                        <Check
+                          className={cn(
+                            'size-2.5 transition-opacity duration-200',
+                            isCompleted
+                              ? 'opacity-100 text-background'
+                              : 'opacity-0 group-hover:opacity-25',
+                          )}
+                        />
+                      </motion.span>
+                    </button>
+                  </Popover.Trigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isCompleted ? 'Reopen' : 'Complete'}
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent
+                className="w-auto min-w-[200px] p-2"
+                align="start"
+                sideOffset={4}
+                onClick={(event) => event.stopPropagation()}
               >
-                <motion.span
-                  initial={false}
-                  animate={{
-                    scale: isCompleted ? 1 : 0.96,
-                    backgroundColor: isCompleted
-                      ? 'var(--foreground)'
-                      : 'transparent',
-                    borderColor: isCompleted
-                      ? 'var(--foreground)'
-                      : 'var(--foreground-muted, rgba(255,255,255,0.35))',
+                <div className="flex flex-col gap-1.5 px-1 py-1.5">
+                  <p className="text-xs text-muted-foreground">
+                    Complete with {childrenCount - childrenDoneCount} active subtask{childrenCount - childrenDoneCount > 1 ? 's' : ''}?
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onComplete(task.id);
+                        setCompleteConfirmOpen(false);
+                      }}
+                      className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      Only this
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onCompleteWithChildren(task.id);
+                        setCompleteConfirmOpen(false);
+                      }}
+                      className="flex flex-1 items-center justify-center rounded-sm bg-emerald-500/10 px-2 py-1 text-xs text-emerald-500 transition-colors hover:bg-emerald-500/20"
+                    >
+                      All
+                    </button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover.Root>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onComplete(task.id);
                   }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  className={cn(
-                    'inline-flex size-4 items-center justify-center rounded-full border transition-[border-style] duration-200',
-                    isCompleted ? 'border-solid' : 'border-dashed group-hover:border-solid',
-                  )}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const nextPriority = getNextPriority(task.priority);
+                    void updateTask({ id: task.id, priority: nextPriority });
+                  }}
+                  aria-label={
+                    isCompleted
+                      ? `Reopen "${task.title}"`
+                      : `Mark "${task.title}" complete`
+                  }
+                  className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <Check
+                  <motion.span
+                    initial={false}
+                    animate={{
+                      scale: isCompleted ? 1 : 0.96,
+                      backgroundColor: isCompleted
+                        ? 'var(--foreground)'
+                        : 'transparent',
+                      borderColor: isCompleted
+                        ? 'var(--foreground)'
+                        : 'var(--foreground-muted, rgba(255,255,255,0.35))',
+                    }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
                     className={cn(
-                      'size-2.5 transition-opacity duration-200',
-                      isCompleted
-                        ? 'opacity-100 text-background'
-                        : 'opacity-0 group-hover:opacity-25',
+                      'inline-flex size-4 items-center justify-center rounded-full border transition-[border-style] duration-200',
+                      isCompleted ? 'border-solid' : 'border-dashed group-hover:border-solid',
                     )}
-                  />
-                </motion.span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isCompleted ? 'Reopen' : 'Complete'}
-            </TooltipContent>
-          </Tooltip>
+                  >
+                    <Check
+                      className={cn(
+                        'size-2.5 transition-opacity duration-200',
+                        isCompleted
+                          ? 'opacity-100 text-background'
+                          : 'opacity-0 group-hover:opacity-25',
+                      )}
+                    />
+                  </motion.span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isCompleted ? 'Reopen' : 'Complete'}
+              </TooltipContent>
+            </Tooltip>
+          )}
           <span
             className={cn(
               'size-[5px] rounded-full transition-colors duration-200',

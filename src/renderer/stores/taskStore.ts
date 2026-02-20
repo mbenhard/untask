@@ -58,7 +58,7 @@ type TaskStore = {
   updateTask: (input: TaskUpdateInput) => Promise<Task | null>;
   deleteTask: (id: string, cascade?: boolean) => Promise<boolean>;
   reorderTasks: (ids: string[]) => Promise<boolean>;
-  completeTask: (id: string) => Promise<Task | null>;
+  completeTask: (id: string, options?: { completeChildren?: boolean }) => Promise<Task | null>;
   cancelTask: (id: string) => Promise<Task | null>;
   reopenTask: (id: string) => Promise<Task | null>;
   toggleToday: (id: string) => Promise<Task | null>;
@@ -303,7 +303,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   // ── Complete (optimistic) ───────────────────────────────
-  completeTask: async (id) => {
+  completeTask: async (id, options?: { completeChildren?: boolean }) => {
     const prev = get().tasks.find((t) => t.id === id);
     if (!prev) return null;
 
@@ -317,7 +317,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }));
 
     try {
-      const completed = await getUntask().tasks.complete(id);
+      const completed = await getUntask().tasks.complete(
+        options?.completeChildren ? { id, completeChildren: true } : id,
+      );
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === id ? completed : t))
