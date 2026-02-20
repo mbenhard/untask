@@ -153,10 +153,7 @@ export const AppShell = () => {
     onToggleTheme: toggleTheme,
   });
 
-  useQuickAddListener({
-    inputRef,
-    onPrefill: setChatInputValue,
-  });
+  useQuickAddListener();
 
   useMenuActions();
 

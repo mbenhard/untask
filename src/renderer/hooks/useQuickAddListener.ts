@@ -1,38 +1,20 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect } from 'react';
 
 import type { QuickAddPayload } from '../../types/ipc';
 import { useAppStore } from '../stores/appStore';
 
-type UseQuickAddListenerOptions = {
-  inputRef: RefObject<HTMLTextAreaElement | null>;
-  onPrefill: (text: string) => void;
-};
-
-export function useQuickAddListener({
-  inputRef,
-  onPrefill,
-}: UseQuickAddListenerOptions): void {
-  const openChatOverlay = useAppStore((state) => state.openChatOverlay);
-  const aiEnabled = useAppStore((state) => state.aiEnabled);
+export function useQuickAddListener(): void {
   const openQuickAdd = useAppStore((state) => state.openQuickAdd);
 
   useEffect(() => {
     const unsubscribe = window.untask?.app.onQuickAddPayload(
       (payload: QuickAddPayload) => {
-        if (aiEnabled) {
-          openChatOverlay();
-          onPrefill(payload.text);
-          requestAnimationFrame(() => {
-            inputRef.current?.focus();
-          });
-        } else {
-          openQuickAdd(payload.text);
-        }
+        openQuickAdd(payload.text);
       },
     );
 
     return () => {
       unsubscribe?.();
     };
-  }, [inputRef, onPrefill, openChatOverlay, openQuickAdd, aiEnabled]);
+  }, [openQuickAdd]);
 }
