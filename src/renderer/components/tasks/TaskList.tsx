@@ -392,7 +392,7 @@ export const TaskList = ({
         aria-describedby={`${scopeId}-hint`}
         tabIndex={0}
         onKeyDown={onKeyDown}
-        className="space-y-1 pb-1 outline-none"
+        className="outline-none"
       >
         <p id={`${scopeId}-hint`} className="sr-only">
           Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
