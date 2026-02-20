@@ -5,6 +5,34 @@ All notable changes to Untask will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.10] - 2026-02-20
+
+### Added
+
+- **Standalone quick add window** — New floating window for rapid task entry
+- **Redesigned quick add UI** — Slash commands & metadata row for richer task creation
+- **Option+Arrow keyboard shortcuts** — Reorder tasks with Option+Up/Down
+- **macOS Focus Mode integration** — Notifications onboarding now includes Focus Mode setup
+- **Website interactive previews** — Auto-playing demos on marketing site
+
+### Improved
+
+- **Font presets** — Replaced Classic/Plex with Warm and Focus options
+- **Task component refactor** — Better keyboard navigation support
+
+### Fixed
+
+- Duplicate task now recursively copies all subtasks
+- Duplicate task preserves effort, dueType, and reminderOffset
+- Focus management and subtask ordering
+- Confirmation dialog for completing tasks with active subtasks
+- Hide parent reference in nested subtask display
+- Settings notice banner replaced with floating toast
+- Eliminated startup flash and empty task list flicker
+- Fixed bundle ID for macOS notification registration
+- Assets.car tracking for CI packaging
+- AI gate evaluation now checks hard override before auto mode
+
 ## [0.1.9] - 2026-02-20
 
 ### Added
@@ -159,6 +187,7 @@ Standalone ReminderScheduler (no longer AI-gated); AI personalization with user'
 - macOS app with Electron Forge packaging
 - Homebrew cask distribution
 
+[0.1.10]: https://github.com/mbenhard/untask/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/mbenhard/untask/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/mbenhard/untask/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/mbenhard/untask/compare/v0.1.6...v0.1.7
