@@ -195,6 +195,9 @@ export const TaskItem = ({
       today: task.today ?? undefined,
       client: task.client,
       dueDate: task.dueDate,
+      dueType: task.dueType,
+      effort: task.effort,
+      reminderOffset: task.reminderOffset as any, // Cast to any since TaskCreateInput expects ReminderOffset | null, while Task has string | null
       recurrence: task.recurrence,
     });
     setMenuOpen(false);
