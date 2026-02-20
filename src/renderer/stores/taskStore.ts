@@ -68,15 +68,34 @@ type TaskStore = {
   clearError: () => void;
 };
 
+// ─── Stable key map for optimistic creates ──────────────────
+// Maps realId → tempId so React keys survive the temp→real ID swap,
+// preventing unmount/remount flash. Cleared on every full refresh.
+const _stableKeyMap = new Map<string, string>();
+
+/** Returns a stable React key for a task, bridging optimistic temp IDs to real IDs. */
+export const getStableKey = (taskId: string): string =>
+  _stableKeyMap.get(taskId) ?? taskId;
+
 // ─── Helpers ────────────────────────────────────────────────
-const getNextOrder = (tasks: Task[]): number => {
+const getMinOrder = (tasks: Task[]): number => {
+  const currentMin = tasks.reduce((min, task) => {
+    if (typeof task.order !== 'number') {
+      return min;
+    }
+    return Math.min(min, task.order);
+  }, Number.MAX_SAFE_INTEGER);
+  return currentMin === Number.MAX_SAFE_INTEGER ? 0 : currentMin - 1;
+};
+
+const getMaxOrder = (tasks: Task[]): number => {
   const currentMax = tasks.reduce((max, task) => {
     if (typeof task.order !== 'number') {
       return max;
     }
     return Math.max(max, task.order);
-  }, -1);
-  return currentMax + 1;
+  }, Number.MIN_SAFE_INTEGER);
+  return currentMax === Number.MIN_SAFE_INTEGER ? 0 : currentMax + 1;
 };
 
 const byOrderThenCreatedAt = (left: Task, right: Task): number => {
@@ -104,6 +123,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const tasks = await getUntask().tasks.list();
+      _stableKeyMap.clear();
       set({ tasks: [...tasks].sort(byOrderThenCreatedAt), isLoading: false });
     } catch (e) {
       set({ isLoading: false, error: toErrorMessage(e, 'Unknown task operation error.') });
@@ -113,6 +133,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   refreshTasks: async () => {
     try {
       const tasks = await getUntask().tasks.list();
+      _stableKeyMap.clear();
       set({ tasks: [...tasks].sort(byOrderThenCreatedAt), error: null });
     } catch (e) {
       set({ error: toErrorMessage(e, 'Unknown task operation error.') });
@@ -135,7 +156,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
     }
 
-    const nextOrder = input.order ?? getNextOrder(get().tasks);
+    const nextOrder = input.order ?? (input.parentId ? getMaxOrder(get().tasks) : getMinOrder(get().tasks));
     const tempId = `_temp_${Date.now()}`;
     const tempTask: Task = {
       id: tempId,
@@ -161,7 +182,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set((s) => ({ tasks: [...s.tasks, tempTask].sort(byOrderThenCreatedAt), error: null }));
 
     try {
-      const created = await getUntask().tasks.create(input as Record<string, unknown>);
+      const created = await getUntask().tasks.create({ ...input, order: nextOrder } as Record<string, unknown>);
+      // Bridge the temp→real ID so React keys stay stable (no unmount/remount flash).
+      _stableKeyMap.set(created.id, tempId);
       set((s) => ({
         tasks: s.tasks
           .map((t) => (t.id === tempId ? created : t))

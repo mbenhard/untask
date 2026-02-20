@@ -447,10 +447,27 @@ export function createTask(
 ): Task {
   const validated = createTaskSchema.parse(input);
   const db = getDb();
-  let parentTask: Task | null = null;
-
   if (validated.parentId) {
-    parentTask = assertTopLevelParentExists(db, validated.parentId);
+    assertTopLevelParentExists(db, validated.parentId);
+  }
+
+  // When no order is provided, choose a position automatically:
+  // - Subtasks: append to bottom (max + 1) so new items appear next to the input
+  // - Top-level tasks: prepend to top (min - 1) so they appear first in the list
+  if (validated.order === undefined || validated.order === null) {
+    if (validated.parentId) {
+      const [row] = db
+        .select({ maxOrder: sql<number>`MAX(${tasks.order})` })
+        .from(tasks)
+        .all();
+      validated.order = row?.maxOrder != null ? row.maxOrder + 1 : 0;
+    } else {
+      const [row] = db
+        .select({ minOrder: sql<number>`MIN(${tasks.order})` })
+        .from(tasks)
+        .all();
+      validated.order = row?.minOrder != null ? row.minOrder - 1 : 0;
+    }
   }
 
   const [created] = db
@@ -460,17 +477,6 @@ export function createTask(
     .all();
 
   logTaskEvent(created.id, 'create', source, null, created);
-
-  if (parentTask && parentTask.status === 'inbox') {
-    const [promotedParent] = db
-      .update(tasks)
-      .set({ status: 'active' })
-      .where(eq(tasks.id, parentTask.id))
-      .returning()
-      .all();
-
-    logTaskEvent(parentTask.id, 'update', source, parentTask, promotedParent);
-  }
 
   emitTaskChange({ taskId: created.id, action: 'create' });
   return created;
@@ -510,9 +516,6 @@ export function updateTask(
       );
     }
 
-    if (nextParentId !== null && updates.status === undefined && before.status === 'inbox') {
-      updates.status = 'active';
-    }
   }
 
   const [updated] = db

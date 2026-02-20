@@ -23,7 +23,7 @@ import { isTerminalStatus } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
-import { useTaskStore } from '../../stores/taskStore';
+import { useTaskStore, getStableKey } from '../../stores/taskStore';
 import {
   useTaskStatusConfigStore,
   selectEnabledNonTerminal,
@@ -96,8 +96,6 @@ export const TaskList = ({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
   const [completeConfirmTriggerId, setCompleteConfirmTriggerId] = useState<string | null>(null);
-  const suppressFocusRef = useRef(false);
-  const prevTasksLengthForFocusRef = useRef(tasks.length);
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
@@ -109,37 +107,23 @@ export const TaskList = ({
     [effectiveActiveDragId, tasks],
   );
 
+  const prevTasksLengthRef = useRef(tasks.length);
+
   useEffect(() => {
-    if (controlledFocusedIndex !== undefined) {
-      return;
-    }
-    const newIndex = tasks.length === 0 
-      ? 0 
-      : Math.min(internalFocusedIndex, tasks.length - 1);
-    if (newIndex !== internalFocusedIndex) {
-      setInternalFocusedIndex(newIndex);
-    }
-  }, [tasks.length, controlledFocusedIndex]);
+    const prevLength = prevTasksLengthRef.current;
+    const currentLength = tasks.length;
 
-  // Focus first task on initial mount (e.g., when switching views via keyboard shortcut)
-  useEffect(() => {
-    if (!isPrimaryList || tasks.length === 0) {
-      return;
+    // Only adjust focusedIndex when tasks are removed, not when added
+    // This prevents focusing the newly added task
+    if (currentLength < prevLength && controlledFocusedIndex === undefined) {
+      const newIndex = Math.min(internalFocusedIndex, currentLength > 0 ? currentLength - 1 : 0);
+      if (newIndex !== internalFocusedIndex) {
+        setInternalFocusedIndex(newIndex);
+      }
     }
 
-    const container = containerRef.current;
-    if (!container) return;
-
-    const focusedTaskId = tasks[0]?.id;
-    if (!focusedTaskId) return;
-
-    const nextFocused = container.querySelector<HTMLElement>(
-      `[data-task-id="${focusedTaskId}"]`,
-    );
-    if (nextFocused) {
-      nextFocused.focus();
-    }
-  }, [isPrimaryList, tasks]);
+    prevTasksLengthRef.current = currentLength;
+  }, [tasks.length, controlledFocusedIndex, internalFocusedIndex]);
 
   useEffect(() => {
     if (expandedTaskId && !taskIds.includes(expandedTaskId)) {
@@ -148,19 +132,8 @@ export const TaskList = ({
     }
   }, [expandedTaskId, taskIds]);
 
-  // Apply focus when focusedIndex changes
+  // Focus task when focusedIndex changes (user navigation)
   useEffect(() => {
-    const taskWasAdded = tasks.length > prevTasksLengthForFocusRef.current;
-    if (taskWasAdded) {
-      prevTasksLengthForFocusRef.current = tasks.length;
-      return;
-    }
-
-    if (suppressFocusRef.current) {
-      suppressFocusRef.current = false;
-      return;
-    }
-
     const focusedTaskId = tasks[focusedIndex]?.id;
     if (!focusedTaskId) {
       return;
@@ -177,11 +150,29 @@ export const TaskList = ({
     // If focus is already on the target, do nothing
     if (nextFocused === document.activeElement) return;
 
-    // If focus is inside the target, don't steal it (e.g., user clicked a button in the task)
-    if (nextFocused.contains(document.activeElement)) return;
+    const activeEl = document.activeElement;
 
-    nextFocused.focus();
-  }, [focusedIndex, tasks]);
+    // Don't steal focus from a nested TaskList (subtask list).
+    // Check if the focused element belongs to a deeper [role="listbox"]
+    // container — if so, this parent should not interfere.
+    if (
+      activeEl instanceof HTMLElement &&
+      container.contains(activeEl) &&
+      activeEl.closest('[role="listbox"]') !== container
+    ) {
+      return;
+    }
+
+    // Primary lists can claim focus when nothing meaningful owns it
+    // (e.g. after view switch or inline input dismiss).
+    const focusIsUnowned = isPrimaryList && (!activeEl || activeEl === document.body);
+    if (!focusIsUnowned && !container.contains(activeEl)) return;
+
+    // Use setTimeout to ensure any pending state updates or DOM changes complete first
+    setTimeout(() => {
+      nextFocused.focus();
+    }, 10);
+  }, [focusedIndex, isPrimaryList, tasks]);
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -506,7 +497,7 @@ export const TaskList = ({
 
           return (
             <TaskItem
-              key={task.id}
+              key={getStableKey(task.id)}
               task={task}
               isExpanded={isExpanded}
               isFocused={focusedIndex === index}
