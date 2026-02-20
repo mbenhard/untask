@@ -46,8 +46,12 @@ class AppErrorBoundary extends React.Component<
 
 type BootstrapStatus = 'loading' | 'onboarding' | 'ready';
 
+const BOOTSTRAP_DONE_KEY = 'untask-bootstrap-done';
+
 const AppRoot = () => {
-  const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('loading');
+  const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>(() =>
+    localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1' ? 'ready' : 'loading',
+  );
   const setAiEnabled = useAppStore((state) => state.setAiEnabled);
 
   useEffect(() => {
@@ -58,18 +62,22 @@ const AppRoot = () => {
       return;
     }
 
+    // Load AI enabled setting (runs even when bootstrap is cached)
+    untask.settings
+      .getAiEnabled()
+      .then((result) => setAiEnabled(result.enabled))
+      .catch(() => setAiEnabled(true));
+
+    // Skip IPC round-trip if we already know onboarding completed
+    if (localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1') {
+      return;
+    }
+
     untask.settings
       .getBootstrapCompleted()
-      .then(async (result) => {
+      .then((result) => {
         if (result.completed) {
-          // Load AI enabled setting from persisted storage
-          try {
-            const aiEnabledResult = await untask.settings.getAiEnabled();
-            setAiEnabled(aiEnabledResult.enabled);
-          } catch {
-            // Default to true if loading fails
-            setAiEnabled(true);
-          }
+          localStorage.setItem(BOOTSTRAP_DONE_KEY, '1');
           setBootstrapStatus('ready');
         } else {
           setBootstrapStatus('onboarding');
@@ -99,6 +107,7 @@ const AppRoot = () => {
           } catch {
             // Use default if loading fails
           }
+          localStorage.setItem(BOOTSTRAP_DONE_KEY, '1');
           setBootstrapStatus('ready');
         }}
       />

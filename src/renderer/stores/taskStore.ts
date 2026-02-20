@@ -96,7 +96,7 @@ const byOrderThenCreatedAt = (left: Task, right: Task): number => {
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   selectedTaskId: null,
-  isLoading: false,
+  isLoading: true,
   error: null,
 
   // ── Fetch ───────────────────────────────────────────────

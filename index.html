@@ -8,6 +8,21 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Untask</title>
+    <script>
+      // Apply theme class synchronously to prevent light→dark flash
+      (function () {
+        var theme = localStorage.getItem('untask-theme');
+        var resolved =
+          theme === 'light'
+            ? 'light'
+            : theme === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+              : 'dark';
+        document.documentElement.classList.add(resolved);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

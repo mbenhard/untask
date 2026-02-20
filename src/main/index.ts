@@ -38,6 +38,7 @@ import {
   summonWindow,
   hideWindow,
   restoreWindowBounds,
+  getMainWindow,
 } from './window/summonController';
 
 if (started) {
@@ -120,6 +121,11 @@ const createMainWindow = (): BrowserWindow => {
       event.preventDefault();
       hideWindow();
     }
+  });
+
+  window.once('ready-to-show', () => {
+    window.show();
+    window.focus();
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -231,8 +237,6 @@ app.whenReady().then(() => {
   startDailyBackupScheduler();
   setUpdateChannel(IPC_CHANNELS.APP_UPDATE_AVAILABLE);
   startUpdateChecker();
-  summonWindow();
-
 
   // Initialize reminder scheduler — always runs for native notifications.
   // Wire AI callback only when AI is enabled.
@@ -256,10 +260,11 @@ app.whenReady().then(() => {
   void initRemindersSync();
 
   const handleAppActivation = (): void => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    const existingMain = getMainWindow();
+    if (!existingMain || existingMain.isDestroyed()) {
       mainWindow = createMainWindow();
       initSummonController(mainWindow);
-      summonWindow();
+      // ready-to-show handler in createMainWindow() will show the window
     } else {
       summonWindow();
     }

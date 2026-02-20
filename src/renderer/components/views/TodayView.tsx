@@ -57,10 +57,6 @@ export const TodayView = ({
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading today list...</p>
-        ) : null}
-
         {error ? (
           <p className="text-[11px] text-destructive">
             {error}
