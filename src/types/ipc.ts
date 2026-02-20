@@ -155,6 +155,7 @@ export const IPC_CHANNELS = {
   QUICK_ADD_HIDE: 'quick-add:hide',
   QUICK_ADD_RESIZE: 'quick-add:resize',
   QUICK_ADD_PAYLOAD: 'quick-add:payload',
+  QUICK_ADD_NAVIGATE_TASK: 'quick-add:navigate-task',
   // ─── Attachment channels ─────────────────────────────────
   ATTACHMENT_SAVE: 'attachment:save',
   ATTACHMENT_OPEN: 'attachment:open',
