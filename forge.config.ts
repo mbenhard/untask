@@ -7,9 +7,12 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { execSync } from 'child_process';
+import path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
+    appBundleId: 'com.untask.app',
     asar: true,
     icon: './assets/icons/icon',
     extraResource: ['./drizzle', './assets/tray', './assets/icons/Assets.car', './resources/bin/untask-helper'],
@@ -32,6 +35,22 @@ const config: ForgeConfig = {
       if (file.startsWith('/node_modules/bindings')) return false;
       if (file.startsWith('/node_modules/file-uri-to-path')) return false;
       return true;
+    },
+  },
+  hooks: {
+    postPackage: async (_config, result) => {
+      if (result.platform !== 'darwin') return;
+      for (const outputPath of result.outputPaths) {
+        const appPath = outputPath.endsWith('.app')
+          ? outputPath
+          : path.join(outputPath, 'Untask.app');
+        // Re-sign with ad-hoc signature after FusesPlugin modifies the binary.
+        // This ensures the app has a valid signature with the correct bundle
+        // identifier, which macOS requires for notification registration.
+        console.log(`[postPackage] Ad-hoc signing: ${appPath}`);
+        execSync(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
+        execSync(`codesign --verify "${appPath}"`, { stdio: 'inherit' });
+      }
     },
   },
   rebuildConfig: {},

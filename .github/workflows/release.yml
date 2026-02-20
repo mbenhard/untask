@@ -28,6 +28,13 @@ jobs:
           swift build -c release --arch arm64 --arch x86_64
           cp .build/apple/Products/Release/UntaskHelper ../resources/bin/untask-helper
       - run: pnpm make
+      - name: Verify code signature
+        run: |
+          APP_PATH=$(find out -name "Untask.app" -maxdepth 3 | head -1)
+          echo "Checking signature of: $APP_PATH"
+          codesign -dvvv "$APP_PATH" 2>&1 | grep -E 'Identifier|Info.plist|Signature|flags'
+          codesign --verify --strict "$APP_PATH"
+          echo "Signature OK"
       - name: Upload artifacts
         uses: softprops/action-gh-release@v2
         with:
