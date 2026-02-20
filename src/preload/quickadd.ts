@@ -6,6 +6,7 @@ export type QuickAddApi = {
   createTask: (input: Record<string, unknown>) => Promise<unknown>;
   hide: () => void;
   resize: (height: number) => void;
+  navigateToTask: (taskId: string) => void;
   onPayload: (listener: (payload: QuickAddWindowPayload) => void) => () => void;
   getSetting: (key: string) => Promise<string | null>;
 };
@@ -20,6 +21,10 @@ const quickAddApi: QuickAddApi = {
 
   resize: (height: number) => {
     ipcRenderer.send(IPC_CHANNELS.QUICK_ADD_RESIZE, height);
+  },
+
+  navigateToTask: (taskId: string) => {
+    ipcRenderer.send(IPC_CHANNELS.QUICK_ADD_NAVIGATE_TASK, taskId);
   },
 
   onPayload: (listener) => {

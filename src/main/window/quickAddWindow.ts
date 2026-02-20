@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { IPC_CHANNELS, type QuickAddWindowPayload } from '../../types/ipc';
 import { getSetting } from '../services/settingsService';
+import { summonWindow, getMainWindow } from './summonController';
 
 const WINDOW_WIDTH = 600;
 const COLLAPSED_HEIGHT = 60;
@@ -11,6 +12,7 @@ const BLUR_SUPPRESSION_MS = 150;
 let quickAddWin: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let activationSuppressedUntil = 0;
+let mainWasVisibleBeforeQuickAdd = false;
 
 function resolveTheme(): 'dark' | 'light' {
   // Theme is stored in localStorage as 'untask-theme' in the renderer,
@@ -38,7 +40,7 @@ export function createQuickAddWindow(): void {
     resizable: false,
     movable: false,
     fullscreenable: false,
-    hasShadow: true,
+    hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload-quickadd.js'),
       contextIsolation: true,
@@ -65,14 +67,20 @@ export function createQuickAddWindow(): void {
   // Blur handler: dismiss on blur (Spotlight-style)
   quickAddWin.on('blur', () => {
     if (Date.now() < blurSuppressedUntil) return;
-    if (quickAddWin && quickAddWin.isVisible() && !quickAddWin.isDestroyed()) {
-      quickAddWin.hide();
-    }
+    hideQuickAdd();
   });
 
-  // Register IPC handlers for quick-add-specific channels
+  // Register IPC handlers for quick-add-specific channels.
+  // Blur the window instead of hiding directly — this makes the Escape
+  // path identical to click-outside: the app loses focus first, then the
+  // blur handler calls hideQuickAdd(). Without this, hiding a focused
+  // window causes macOS to restore the hidden main window.
   ipcMain.on(IPC_CHANNELS.QUICK_ADD_HIDE, () => {
-    hideQuickAdd();
+    if (quickAddWin && !quickAddWin.isDestroyed() && quickAddWin.isFocused()) {
+      quickAddWin.blur();
+    } else {
+      hideQuickAdd();
+    }
   });
 
   ipcMain.on(IPC_CHANNELS.QUICK_ADD_RESIZE, (_event, height: number) => {
@@ -84,6 +92,14 @@ export function createQuickAddWindow(): void {
         width: WINDOW_WIDTH,
         height: Math.round(height),
       });
+    }
+  });
+
+  ipcMain.on(IPC_CHANNELS.QUICK_ADD_NAVIGATE_TASK, (_event, taskId: string) => {
+    summonWindow();
+    const main = getMainWindow();
+    if (main && !main.isDestroyed()) {
+      main.webContents.send(IPC_CHANNELS.TASK_NAVIGATE, { taskId });
     }
   });
 }
@@ -116,7 +132,7 @@ export function showQuickAdd(): void {
 
   // Suppress app activation handler so the main window doesn't also appear.
   // On macOS, showing any BrowserWindow fires `did-become-active` on the app.
-  activationSuppressedUntil = Date.now() + 300;
+  activationSuppressedUntil = Date.now() + 500;
 
   suppressBlur();
   positionOnActiveDisplay();
@@ -132,14 +148,33 @@ export function showQuickAdd(): void {
     theme,
   };
 
+  // Record main window state so we can restore it on dismiss.
+  // macOS may restore the main window when the app activates for the quick add.
+  const main = getMainWindow();
+  mainWasVisibleBeforeQuickAdd = !!(main && !main.isDestroyed() && main.isVisible());
+
+  // Send payload before showing so the renderer can apply the theme
+  // before the first visible frame, preventing a light-mode flash.
+  quickAddWin.webContents.send(IPC_CHANNELS.QUICK_ADD_PAYLOAD, payload);
   quickAddWin.show();
   quickAddWin.focus();
-  quickAddWin.webContents.send(IPC_CHANNELS.QUICK_ADD_PAYLOAD, payload);
+
+  // If macOS restored the main window during app activation, re-hide it.
+  if (!mainWasVisibleBeforeQuickAdd && main && !main.isDestroyed() && main.isVisible()) {
+    main.hide();
+  }
 }
 
 export function hideQuickAdd(): void {
   if (!quickAddWin || quickAddWin.isDestroyed()) return;
+  activationSuppressedUntil = Date.now() + 500;
+
   quickAddWin.hide();
+
+  // Deactivate the app so macOS returns focus to the previous app.
+  if (process.platform === 'darwin' && !mainWasVisibleBeforeQuickAdd) {
+    app.hide();
+  }
 }
 
 export function isActivationSuppressed(): boolean {

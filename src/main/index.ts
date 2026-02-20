@@ -40,7 +40,7 @@ import {
   restoreWindowBounds,
   getMainWindow,
 } from './window/summonController';
-import { createQuickAddWindow, isActivationSuppressed } from './window/quickAddWindow';
+import { createQuickAddWindow, isActivationSuppressed, getQuickAddWindow } from './window/quickAddWindow';
 
 if (started) {
   app.quit();
@@ -262,26 +262,22 @@ app.whenReady().then(() => {
   void initRemindersSync();
 
   const handleAppActivation = (): void => {
-    // Skip if the quick add window was just shown — it triggers
-    // `did-become-active` on macOS, which would also summon main window.
     if (isActivationSuppressed()) return;
+
+    const qaWin = getQuickAddWindow();
+    if (qaWin && !qaWin.isDestroyed() && qaWin.isVisible()) return;
 
     const existingMain = getMainWindow();
     if (!existingMain || existingMain.isDestroyed()) {
       mainWindow = createMainWindow();
       initSummonController(mainWindow);
-      // ready-to-show handler in createMainWindow() will show the window
     } else {
       summonWindow();
     }
-    // Check for updates on activation (throttled to 15m)
     void checkForUpdates(false);
   };
 
   app.on('activate', handleAppActivation);
-  if (process.platform === 'darwin') {
-    app.on('did-become-active', handleAppActivation);
-  }
 });
 
 app.on('will-quit', () => {
