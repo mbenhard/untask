@@ -5,6 +5,39 @@ All notable changes to Untask will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.9] - 2026-02-20
+
+### Added
+
+- **Ollama overhaul** — Native API integration via `ai-sdk-ollama` with automatic model detection, slim mode for small models, thinking model support, pre-stream warmup, and speed optimizations
+- **Search notes** — Notes now appear in the search popup alongside tasks
+- **Tooltips** — Cursor-following tooltips on icon buttons, due date badges, and subtask counts
+- **Notification system** — In-app notifications with onboarding flow
+- **Keyboard shortcuts** — `Cmd+Backspace` to delete tasks; `Cmd+N` is now context-sensitive (creates a note in Notes view, task elsewhere)
+- **Task body indicator** — Visual dot showing which tasks have body content
+- **Navigation pulse** — Background pulse animation when navigating to a task
+- **Chat loading states** — Phase-aware indicators: Sending, Loading model, Thinking
+- **New AI models** — Additional OpenRouter models and updated tooling schema
+- **Onboarding model picker** — Model selection added to the provider setup step
+
+### Improved
+
+- Onboarding identity and AI system prompt refined
+- Due date picker simplified with better time validation
+- Window minimum size increased (620x600) for better layout
+- Settings section titles use uppercase mono style
+- Simplified AI memory system (removed background knowledge extraction)
+
+### Fixed
+
+- Keyboard navigation across task groups
+- Task item layout shift on status change
+- Model catalog view layout and undo toast state
+- Ollama warmup validation and model size warnings
+- Empty chat bubble showing when stopping generation
+- Update banner now runs `brew update` before `brew upgrade`
+- Auto-approve for chat actions
+
 ## [0.1.8] - 2026-02-19
 
 ### Changed
@@ -126,6 +159,8 @@ Standalone ReminderScheduler (no longer AI-gated); AI personalization with user'
 - macOS app with Electron Forge packaging
 - Homebrew cask distribution
 
+[0.1.9]: https://github.com/mbenhard/untask/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/mbenhard/untask/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/mbenhard/untask/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/mbenhard/untask/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/mbenhard/untask/compare/v0.1.4...v0.1.5
