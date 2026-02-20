@@ -14,6 +14,8 @@ type UseTaskListKeyboardOptions = {
   onCycleStatus: (id: string) => void;
   onStartTitleEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
   isAnyBodyEditing: boolean;
   isEditingTitle: boolean;
   isDragActive: boolean;
@@ -46,6 +48,8 @@ export const useTaskListKeyboard = ({
   onCycleStatus,
   onStartTitleEdit,
   onDelete,
+  onMoveUp,
+  onMoveDown,
   isAnyBodyEditing,
   isEditingTitle,
   isDragActive,
@@ -70,6 +74,19 @@ export const useTaskListKeyboard = ({
         const focusedTask = tasks[focusedIndex];
         if (focusedTask) {
           onDelete(focusedTask.id);
+        }
+        return;
+      }
+
+      if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        event.preventDefault();
+        event.stopPropagation();
+        const focusedTask = tasks[focusedIndex];
+        if (!focusedTask) return;
+        if (event.key === 'ArrowUp') {
+          onMoveUp?.(focusedTask.id);
+        } else {
+          onMoveDown?.(focusedTask.id);
         }
         return;
       }
@@ -180,6 +197,8 @@ export const useTaskListKeyboard = ({
       onCycleStatus,
       onStartTitleEdit,
       onDelete,
+      onMoveUp,
+      onMoveDown,
       expandedTaskId,
       containerRef,
       onNavigateNextGroup,

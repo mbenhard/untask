@@ -350,6 +350,42 @@ export const TaskList = ({
     [allTasks, reorderTasks, taskIds],
   );
 
+  const handleMoveUp = useCallback(
+    (taskId: string): void => {
+      const currentIndex = taskIds.indexOf(taskId);
+      if (currentIndex <= 0) return;
+
+      const reorderedScopedIds = arrayMove(taskIds, currentIndex, currentIndex - 1);
+      const fullOrderedIds = reconcileScopedReorder(
+        allTasks.map((task) => task.id),
+        taskIds,
+        reorderedScopedIds,
+      );
+
+      setFocusedIndex(currentIndex - 1);
+      void reorderTasks(fullOrderedIds);
+    },
+    [allTasks, reorderTasks, taskIds, setFocusedIndex],
+  );
+
+  const handleMoveDown = useCallback(
+    (taskId: string): void => {
+      const currentIndex = taskIds.indexOf(taskId);
+      if (currentIndex < 0 || currentIndex >= taskIds.length - 1) return;
+
+      const reorderedScopedIds = arrayMove(taskIds, currentIndex, currentIndex + 1);
+      const fullOrderedIds = reconcileScopedReorder(
+        allTasks.map((task) => task.id),
+        taskIds,
+        reorderedScopedIds,
+      );
+
+      setFocusedIndex(currentIndex + 1);
+      void reorderTasks(fullOrderedIds);
+    },
+    [allTasks, reorderTasks, taskIds, setFocusedIndex],
+  );
+
   const onKeyDown = useTaskListKeyboard({
     tasks,
     focusedIndex,
@@ -365,6 +401,8 @@ export const TaskList = ({
     containerRef,
     onStartTitleEdit: setEditingTitleTaskId,
     onDelete: handleDelete,
+    onMoveUp: handleMoveUp,
+    onMoveDown: handleMoveDown,
     isEditingTitle: editingTitleTaskId !== null,
     onNavigateNextGroup,
     onNavigatePrevGroup,
@@ -395,8 +433,8 @@ export const TaskList = ({
         className="outline-none"
       >
         <p id={`${scopeId}-hint`} className="sr-only">
-          Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
-          Press Space to complete or reopen. Press T to toggle today.
+          Use Arrow Up and Arrow Down to move focus. Press Option+Arrow Up or Option+Arrow Down to reorder.
+          Press Enter to expand. Press Space to complete or reopen. Press T to toggle today.
           Press P to cycle priority. Press S to cycle status.
           In Tasks view, drag tasks between status groups or drop onto tasks for exact placement.
           Press E to edit title. Press Command+Backspace to delete.
