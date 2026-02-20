@@ -11,7 +11,7 @@ import { cn } from '../../lib/utils';
 import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { Popover, PopoverContent, Tooltip, TooltipContent, TooltipTrigger } from '../ui';
-import { formatDueDateDisplay, isDueDateOverdue } from './dueDate';
+import { formatDueDateDisplay, isDueDateOverdue, parseDueDate, parseDueTime } from './dueDate';
 import { getNextPriority } from './taskInteraction';
 
 export interface TaskItemProps {
@@ -115,6 +115,15 @@ export const TaskItem = ({
     [task.dueDate],
   );
   const isOverdue = !isCompleted && isDueDateOverdue(task.dueDate, Date.now());
+  const dueDateTooltip = useMemo(() => {
+    if (!task.dueDate) return null;
+    const date = parseDueDate(task.dueDate);
+    if (!date) return null;
+    const time = parseDueTime(task.dueDate);
+    let label = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if (time) label += ` at ${time}`;
+    return label;
+  }, [task.dueDate]);
 
   const completedAtLabel = useMemo(() => {
     if (!task.completedAt) {
@@ -334,18 +343,30 @@ export const TaskItem = ({
           ) : null}
 
           {dueDateLabel ? (
-            <span className={cn(
-              'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
-              isOverdue && 'text-destructive',
-            )}>
-              {dueDateLabel}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={cn(
+                  'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
+                  isOverdue && 'text-destructive',
+                )}>
+                  {dueDateLabel}
+                </span>
+              </TooltipTrigger>
+              {dueDateTooltip && <TooltipContent>{dueDateTooltip}</TooltipContent>}
+            </Tooltip>
           ) : null}
 
           {childrenCount > 0 && (
-            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
-              {childrenDoneCount}/{childrenCount}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
+                  {childrenDoneCount}/{childrenCount}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {childrenDoneCount}/{childrenCount} subtasks done
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {isCompleted && completedAtLabel ? (
