@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 import { cn } from '../../lib/utils';
+import { useToastStore } from '../../stores/toastStore';
 import { SettingsGeneral } from './SettingsGeneral';
 import { SettingsTasks } from './SettingsTasks';
 import { SettingsAI } from './SettingsAI';
@@ -22,7 +23,11 @@ const TABS: { id: SettingsTab; label: string }[] = [
 export const SettingsView = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const showToast = useToastStore((s) => s.showToast);
+  const setNotice = useCallback(
+    (notice: string | null) => { if (notice) showToast(notice); },
+    [showToast],
+  );
   const [version, setVersion] = useState<string>('');
 
   useEffect(() => {
@@ -60,7 +65,6 @@ export const SettingsView = () => {
                 onClick={() => {
                   setActiveTab(tab.id);
                   setError(null);
-                  setNotice(null);
                 }}
                 className={cn(
                   'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
@@ -75,25 +79,13 @@ export const SettingsView = () => {
           })}
         </nav>
 
-        {/* Messages */}
-        {(error || notice) && (
-          <div className="space-y-1.5">
-            {error && (
-              <div
-                className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive"
-                role="alert"
-              >
-                {error}
-              </div>
-            )}
-            {notice && (
-              <div
-                className="rounded-md border border-border/40 px-2 py-1.5 text-[11px] text-muted-foreground"
-                role="status"
-              >
-                {notice}
-              </div>
-            )}
+        {/* Error banner */}
+        {error && (
+          <div
+            className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive"
+            role="alert"
+          >
+            {error}
           </div>
         )}
 
