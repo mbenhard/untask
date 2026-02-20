@@ -119,8 +119,6 @@ forge.env
 swift-helper/.build
 resources/bin/untask-helper
 
-# Compiled Xcode asset catalog
-assets/icons/Assets.car
 
 # npm lockfile (project uses pnpm)
 package-lock.json
