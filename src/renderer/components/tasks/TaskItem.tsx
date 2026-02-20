@@ -186,21 +186,40 @@ export const TaskItem = ({
   const showMoveToProject = canMoveToProject && projects.length > 0;
 
   const handleDuplicate = () => {
-    void createTask({
-      title: task.title,
-      parentId: task.parentId,
-      body: task.body,
-      status: isTerminal ? 'active' : task.status,
-      priority: task.priority,
-      today: task.today ?? undefined,
-      client: task.client,
-      dueDate: task.dueDate,
-      dueType: task.dueType,
-      effort: task.effort,
-      reminderOffset: task.reminderOffset as any, // Cast to any since TaskCreateInput expects ReminderOffset | null, while Task has string | null
-      recurrence: task.recurrence,
-    });
     setMenuOpen(false);
+
+    // Capture current tasks to find children without being affected by optimistic additions
+    const currentTasks = allTasks;
+
+    const duplicateRecursive = async (taskToCopy: Task, newParentId: string | null) => {
+      const isTaskTerminal = TERMINAL_STATUSES.includes(taskToCopy.status as PredefinedStatusId);
+      const created = await createTask({
+        title: taskToCopy.title,
+        parentId: newParentId,
+        body: taskToCopy.body,
+        status: isTaskTerminal ? 'active' : taskToCopy.status,
+        priority: taskToCopy.priority,
+        today: taskToCopy.today ?? undefined,
+        client: taskToCopy.client,
+        dueDate: taskToCopy.dueDate,
+        dueType: taskToCopy.dueType,
+        effort: taskToCopy.effort,
+        reminderOffset: taskToCopy.reminderOffset as any,
+        recurrence: taskToCopy.recurrence,
+      });
+
+      if (created) {
+        const children = currentTasks
+          .filter((t) => t.parentId === taskToCopy.id)
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        for (const child of children) {
+          await duplicateRecursive(child, created.id);
+        }
+      }
+    };
+
+    void duplicateRecursive(task, task.parentId);
   };
 
   const activeChildrenCount = childrenCount - childrenDoneCount;
