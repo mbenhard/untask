@@ -167,41 +167,41 @@ describe('SettingsMemory typography controls', () => {
 
     await waitFor(() =>
       Array.from(container.querySelectorAll('button')).some(
-        (button) => button.textContent?.trim() === 'Classic',
+        (button) => button.textContent?.trim() === 'Warm',
       ),
     );
-    const classicPresetButton = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent?.trim() === 'Classic',
+    const warmPresetButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Warm',
     );
-    if (!classicPresetButton) {
-      throw new Error('Classic preset button not found');
+    if (!warmPresetButton) {
+      throw new Error('Warm preset button not found');
     }
 
     flushSync(() => {
-      classicPresetButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      warmPresetButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     await waitFor(() =>
       untaskMock.settings.set.mock.calls.some(
-        ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'inter',
+        ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'dm-sans',
       ),
     );
     await waitFor(() =>
       untaskMock.settings.set.mock.calls.some(
         ([key, value]) =>
-          key === UI_FONT_MONO_SETTING_KEY && value === 'jetbrains-mono',
+          key === UI_FONT_MONO_SETTING_KEY && value === 'ibm-plex-mono',
       ),
     );
 
     expect(
       untaskMock.settings.set.mock.calls.some(
-        ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'inter',
+        ([key, value]) => key === UI_FONT_SANS_SETTING_KEY && value === 'dm-sans',
       ),
     ).toBe(true);
     expect(
       untaskMock.settings.set.mock.calls.some(
         ([key, value]) =>
-          key === UI_FONT_MONO_SETTING_KEY && value === 'jetbrains-mono',
+          key === UI_FONT_MONO_SETTING_KEY && value === 'ibm-plex-mono',
       ),
     ).toBe(true);
   });

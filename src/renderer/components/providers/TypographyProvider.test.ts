@@ -233,14 +233,14 @@ describe('TypographyProvider', () => {
 
     await waitFor(() => latestContext?.isReady === true);
 
-    await expect(latestContext?.applyPreset('classic')).rejects.toThrow(
+    await expect(latestContext?.applyPreset('warm')).rejects.toThrow(
       'Failed to save one or more typography preset values.',
     );
     await waitFor(
-      () => latestContext?.sansId === 'inter' && latestContext?.monoId === 'geist-mono',
+      () => latestContext?.sansId === 'dm-sans' && latestContext?.monoId === 'geist-mono',
     );
 
-    expect(localStorage.getItem(UI_FONT_SANS_STORAGE_KEY)).toBe('inter');
+    expect(localStorage.getItem(UI_FONT_SANS_STORAGE_KEY)).toBe('dm-sans');
     expect(localStorage.getItem(UI_FONT_MONO_STORAGE_KEY)).toBe('geist-mono');
     expect(document.documentElement.style.getPropertyValue('--ui-font-mono-stack')).toContain(
       'Geist Mono',
