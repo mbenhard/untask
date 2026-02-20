@@ -1,6 +1,7 @@
-import { BrowserWindow, Notification } from 'electron';
+import { Notification } from 'electron';
 
 import { IPC_CHANNELS } from '../../types/ipc';
+import { getMainWindow } from '../window/summonController';
 import {
   SETTING_KEY_NOTIFICATIONS_ENABLED,
   SETTING_KEY_NOTIFICATIONS_SOUND,
@@ -65,10 +66,10 @@ const showNativeNotification = (
   });
   observePermission(notification);
   notification.on('click', () => {
-    const windows = BrowserWindow.getAllWindows();
-    if (windows.length > 0 && !windows[0].isDestroyed()) {
-      windows[0].show();
-      windows[0].focus();
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.show();
+      win.focus();
     }
     onClick?.();
   });
@@ -76,10 +77,9 @@ const showNativeNotification = (
 };
 
 const sendTaskNavigate = (taskId: string): void => {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) {
-      window.webContents.send(IPC_CHANNELS.TASK_NAVIGATE, { taskId });
-    }
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.TASK_NAVIGATE, { taskId });
   }
 };
 

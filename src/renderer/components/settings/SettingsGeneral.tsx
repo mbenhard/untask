@@ -378,6 +378,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
             type="button"
             className="rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
             onClick={() => {
+              localStorage.removeItem('untask-bootstrap-done');
               void getUntask()
                 .settings.set('app.bootstrap_completed', 'false')
                 .then(() => window.location.reload());

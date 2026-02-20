@@ -40,6 +40,7 @@ import {
   restoreWindowBounds,
   getMainWindow,
 } from './window/summonController';
+import { createQuickAddWindow, isActivationSuppressed } from './window/quickAddWindow';
 
 if (started) {
   app.quit();
@@ -157,6 +158,7 @@ const bootstrap = (): void => {
 
   mainWindow = createMainWindow();
   initSummonController(mainWindow);
+  createQuickAddWindow();
   setupTray();
   applyDockMode();
   registerGlobalShortcuts(mainWindow);
@@ -260,6 +262,10 @@ app.whenReady().then(() => {
   void initRemindersSync();
 
   const handleAppActivation = (): void => {
+    // Skip if the quick add window was just shown — it triggers
+    // `did-become-active` on macOS, which would also summon main window.
+    if (isActivationSuppressed()) return;
+
     const existingMain = getMainWindow();
     if (!existingMain || existingMain.isDestroyed()) {
       mainWindow = createMainWindow();

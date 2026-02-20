@@ -1,10 +1,11 @@
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { eq } from 'drizzle-orm';
 
 import { IPC_CHANNELS } from '../../types/ipc';
+import { getMainWindow } from '../window/summonController';
 import { getDb } from '../db';
 import { remindersMappings, type RemindersMapping } from '../db/schema';
 import {
@@ -171,10 +172,9 @@ function clearPushInFlight(): void {
 type SyncStatus = { status: 'syncing' | 'idle' | 'error'; message?: string };
 
 function broadcastSyncStatus(syncStatus: SyncStatus): void {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) {
-      window.webContents.send(IPC_CHANNELS.REMINDERS_SYNC_STATUS, syncStatus);
-    }
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.REMINDERS_SYNC_STATUS, syncStatus);
   }
 }
 

@@ -2,7 +2,7 @@ import { type BrowserWindow, globalShortcut, Menu, shell } from 'electron';
 
 import { IPC_CHANNELS } from '../types/ipc';
 import { getSetting } from './services/settingsService';
-import { toggleWindow, showQuickAdd, hideWindow, summonWindow } from './window/summonController';
+import { toggleWindow, showQuickAdd, hideWindow, summonWindow, getMainWindow } from './window/summonController';
 
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
   'shortcut.toggleWindow': 'CommandOrControl+Shift+Space',
@@ -42,11 +42,6 @@ function registerShortcut(
   }
 
   return registered;
-}
-
-function getMainWindow(): BrowserWindow | undefined {
-  const { BrowserWindow: BW } = require('electron') as typeof import('electron');
-  return BW.getAllWindows()[0];
 }
 
 function sendMenuAction(channel: string): void {

@@ -9,14 +9,12 @@ import { useTheme } from '../providers/ThemeProvider';
 
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
-import { useQuickAddListener } from '../../hooks/useQuickAddListener';
 import { cn } from '../../lib/utils';
 import {
   selectActiveView,
   selectAiEnabled,
   selectChatOverlayState,
   selectChatView,
-  selectQuickAddOpen,
   selectUnreadProactive,
   useAppStore,
 } from '../../stores/appStore';
@@ -43,8 +41,6 @@ import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
 import { ChatInput } from './ChatInput';
 import { ToastContainer } from '../ui/Toast';
-import { QuickAddOverlay } from '../tasks/QuickAddOverlay';
-
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
 
@@ -81,7 +77,6 @@ export const AppShell = () => {
   const chatOverlayState = useAppStore(selectChatOverlayState);
   const chatView = useAppStore(selectChatView);
   const unreadProactive = useAppStore(selectUnreadProactive);
-  const quickAddOpen = useAppStore(selectQuickAddOpen);
   const setView = useAppStore((state) => state.setView);
   const openChatOverlay = useAppStore((state) => state.openChatOverlay);
   const peekChatOverlay = useAppStore((state) => state.peekChatOverlay);
@@ -135,6 +130,17 @@ export const AppShell = () => {
     };
   }, [setView]);
 
+  // Refresh task list when tasks are changed from another window (e.g. quick add)
+  useEffect(() => {
+    const unsubscribe = window.untask?.tasks.onTaskDataChanged(() => {
+      void useTaskStore.getState().refreshTasks();
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
   const clearInput = useCallback(() => {
     setChatInputValue('');
   }, []);
@@ -152,8 +158,6 @@ export const AppShell = () => {
     clearInput,
     onToggleTheme: toggleTheme,
   });
-
-  useQuickAddListener();
 
   useMenuActions();
 
@@ -318,125 +322,125 @@ export const AppShell = () => {
         </motion.section>
 
         {aiEnabled ? (
-        <div className="pointer-events-none absolute inset-0 z-20">
-          <div className="absolute inset-0">
-            <AnimatePresence initial={false} mode="wait">
-              {chatOverlayState === 'peek' ? (
-                <motion.button
-                  key="chat-overlay-peek"
-                  type="button"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={overlayTransition}
-                  className="pointer-events-auto absolute bottom-3 right-3 flex h-8 w-14 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-[10px] font-medium tracking-wide text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:text-foreground"
-                  aria-label="Open chat"
-                  onClick={openChatFromOverlay}
-                >
-                  Chat
-                  {unreadProactive ? (
-                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive" />
-                  ) : null}
-                </motion.button>
-              ) : null}
+          <div className="pointer-events-none absolute inset-0 z-20">
+            <div className="absolute inset-0">
+              <AnimatePresence initial={false} mode="wait">
+                {chatOverlayState === 'peek' ? (
+                  <motion.button
+                    key="chat-overlay-peek"
+                    type="button"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={overlayTransition}
+                    className="pointer-events-auto absolute bottom-3 right-3 flex h-8 w-14 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-[10px] font-medium tracking-wide text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:text-foreground"
+                    aria-label="Open chat"
+                    onClick={openChatFromOverlay}
+                  >
+                    Chat
+                    {unreadProactive ? (
+                      <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive" />
+                    ) : null}
+                  </motion.button>
+                ) : null}
 
-              {chatOverlayState === 'open' ? (
-                <motion.aside
-                  ref={openPanelRef}
-                  key="chat-overlay-open"
-                  initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
-                  transition={overlayTransition}
-                  style={{
-                    width: 'min(clamp(340px, 30vw, 460px), calc(100vw - 24px))',
-                  }}
-                  className="pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm"
-                >
-                  {/* Header: adapts based on chatView */}
-                  <header className="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
-                    {chatView === 'threads' ? (
-                      <span className="truncate px-1.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-                        Threads
-                      </span>
-                    ) : (
+                {chatOverlayState === 'open' ? (
+                  <motion.aside
+                    ref={openPanelRef}
+                    key="chat-overlay-open"
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
+                    transition={overlayTransition}
+                    style={{
+                      width: 'min(clamp(340px, 30vw, 460px), calc(100vw - 24px))',
+                    }}
+                    className="pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm"
+                  >
+                    {/* Header: adapts based on chatView */}
+                    <header className="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
+                      {chatView === 'threads' ? (
+                        <span className="truncate px-1.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+                          Threads
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          onClick={() => setChatView('threads')}
+                        >
+                          <ArrowLeft className="size-3" />
+                          <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
+                            {activeConversationTitle}
+                          </span>
+                        </button>
+                      )}
                       <button
                         type="button"
-                        className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        onClick={() => setChatView('threads')}
+                        onClick={collapseChatOverlay}
+                        className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        aria-label="Close chat"
                       >
-                        <ArrowLeft className="size-3" />
-                        <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
-                          {activeConversationTitle}
-                        </span>
+                        <X className="size-4" />
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={collapseChatOverlay}
-                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      aria-label="Close chat"
-                    >
-                      <X className="size-4" />
-                    </button>
-                  </header>
+                    </header>
 
-                  {/* Body: switches between thread list and conversation */}
-                  <AnimatePresence mode="wait">
-                    {chatView === 'threads' ? (
-                      <motion.div
-                        key="threads"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0 }}
-                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-                      >
-                        <ThreadListView
-                          conversations={conversations}
-                          activeConversationId={activeConversationId}
-                          isLoading={isLoadingConversations}
-                          onCollapse={collapseChatOverlay}
-                          onSelect={handleThreadSelect}
-                          onCreate={() => {
-                            void handleThreadCreate();
-                          }}
-                          onArchive={(conversationId) => {
-                            void archiveConversation(conversationId);
-                          }}
-                          onDelete={(conversationId) => {
-                            void deleteConversation(conversationId);
-                          }}
-                        />
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="conversation"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0 }}
-                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-                      >
-                        <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
-                          <ChatView onSuggestionClick={handleSuggestionClick} />
-                        </div>
-                        <div className="border-t border-dashed border-border/50">
-                          <ChatInput
-                            inputRef={inputRef}
-                            value={chatInputValue}
-                            onChange={setChatInputValue}
-                            onSubmit={handleSubmit}
+                    {/* Body: switches between thread list and conversation */}
+                    <AnimatePresence mode="wait">
+                      {chatView === 'threads' ? (
+                        <motion.div
+                          key="threads"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0 }}
+                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                        >
+                          <ThreadListView
+                            conversations={conversations}
+                            activeConversationId={activeConversationId}
+                            isLoading={isLoadingConversations}
+                            onCollapse={collapseChatOverlay}
+                            onSelect={handleThreadSelect}
+                            onCreate={() => {
+                              void handleThreadCreate();
+                            }}
+                            onArchive={(conversationId) => {
+                              void archiveConversation(conversationId);
+                            }}
+                            onDelete={(conversationId) => {
+                              void deleteConversation(conversationId);
+                            }}
                           />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.aside>
-              ) : null}
-            </AnimatePresence>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="conversation"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0 }}
+                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                        >
+                          <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
+                            <ChatView onSuggestionClick={handleSuggestionClick} />
+                          </div>
+                          <div className="border-t border-dashed border-border/50">
+                            <ChatInput
+                              inputRef={inputRef}
+                              value={chatInputValue}
+                              onChange={setChatInputValue}
+                              onSubmit={handleSubmit}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.aside>
+                ) : null}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
         ) : null}
 
         <div className="no-drag pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
@@ -486,7 +490,6 @@ export const AppShell = () => {
       </div>
 
       <SearchModal />
-      {quickAddOpen && <QuickAddOverlay />}
       <ToastContainer />
     </div>
   );

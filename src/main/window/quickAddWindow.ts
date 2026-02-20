@@ -1,0 +1,151 @@
+import { BrowserWindow, ipcMain, nativeTheme, screen, app } from 'electron';
+import path from 'node:path';
+
+import { IPC_CHANNELS, type QuickAddWindowPayload } from '../../types/ipc';
+import { getSetting } from '../services/settingsService';
+
+const WINDOW_WIDTH = 600;
+const COLLAPSED_HEIGHT = 60;
+const BLUR_SUPPRESSION_MS = 150;
+
+let quickAddWin: BrowserWindow | null = null;
+let blurSuppressedUntil = 0;
+let activationSuppressedUntil = 0;
+
+function resolveTheme(): 'dark' | 'light' {
+  // Theme is stored in localStorage as 'untask-theme' in the renderer,
+  // but we can't access it from the main process. Check DB settings first,
+  // then fall back to system preference.
+  const stored = getSetting('theme');
+  if (stored === 'light') return 'light';
+  if (stored === 'dark') return 'dark';
+
+  return nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+}
+
+export function createQuickAddWindow(): void {
+  if (quickAddWin && !quickAddWin.isDestroyed()) return;
+
+  quickAddWin = new BrowserWindow({
+    width: WINDOW_WIDTH,
+    height: COLLAPSED_HEIGHT,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    resizable: false,
+    movable: false,
+    fullscreenable: false,
+    hasShadow: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-quickadd.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      devTools: !app.isPackaged,
+    },
+  });
+
+  quickAddWin.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+  });
+
+  // Load the quick add renderer
+  if (QUICK_ADD_VITE_DEV_SERVER_URL) {
+    // Dev server serves all HTML files from root; request the quick-add entry
+    void quickAddWin.loadURL(`${QUICK_ADD_VITE_DEV_SERVER_URL}/quick-add.html`);
+  } else {
+    void quickAddWin.loadFile(
+      path.join(__dirname, `../renderer/${QUICK_ADD_VITE_NAME}/quick-add.html`),
+    );
+  }
+
+  // Blur handler: dismiss on blur (Spotlight-style)
+  quickAddWin.on('blur', () => {
+    if (Date.now() < blurSuppressedUntil) return;
+    if (quickAddWin && quickAddWin.isVisible() && !quickAddWin.isDestroyed()) {
+      quickAddWin.hide();
+    }
+  });
+
+  // Register IPC handlers for quick-add-specific channels
+  ipcMain.on(IPC_CHANNELS.QUICK_ADD_HIDE, () => {
+    hideQuickAdd();
+  });
+
+  ipcMain.on(IPC_CHANNELS.QUICK_ADD_RESIZE, (_event, height: number) => {
+    if (quickAddWin && !quickAddWin.isDestroyed()) {
+      const bounds = quickAddWin.getBounds();
+      quickAddWin.setBounds({
+        x: bounds.x,
+        y: bounds.y,
+        width: WINDOW_WIDTH,
+        height: Math.round(height),
+      });
+    }
+  });
+}
+
+function suppressBlur(): void {
+  blurSuppressedUntil = Date.now() + BLUR_SUPPRESSION_MS;
+}
+
+function positionOnActiveDisplay(): void {
+  if (!quickAddWin || quickAddWin.isDestroyed()) return;
+
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  const { x, y, width, height } = display.workArea;
+
+  quickAddWin.setPosition(
+    Math.round(x + (width - WINDOW_WIDTH) / 2),
+    Math.round(y + height * 0.2),
+  );
+}
+
+export function showQuickAdd(): void {
+  if (!quickAddWin || quickAddWin.isDestroyed()) return;
+
+  // Toggle behavior: if already visible, hide it
+  if (quickAddWin.isVisible()) {
+    hideQuickAdd();
+    return;
+  }
+
+  // Suppress app activation handler so the main window doesn't also appear.
+  // On macOS, showing any BrowserWindow fires `did-become-active` on the app.
+  activationSuppressedUntil = Date.now() + 300;
+
+  suppressBlur();
+  positionOnActiveDisplay();
+
+  // Reset height to collapsed
+  quickAddWin.setSize(WINDOW_WIDTH, COLLAPSED_HEIGHT);
+
+  // Build and send payload (clipboard auto-paste disabled)
+  const theme = resolveTheme();
+  const payload: QuickAddWindowPayload = {
+    text: '',
+    source: 'empty',
+    theme,
+  };
+
+  quickAddWin.show();
+  quickAddWin.focus();
+  quickAddWin.webContents.send(IPC_CHANNELS.QUICK_ADD_PAYLOAD, payload);
+}
+
+export function hideQuickAdd(): void {
+  if (!quickAddWin || quickAddWin.isDestroyed()) return;
+  quickAddWin.hide();
+}
+
+export function isActivationSuppressed(): boolean {
+  return Date.now() < activationSuppressedUntil;
+}
+
+export function getQuickAddWindow(): BrowserWindow | null {
+  return quickAddWin;
+}

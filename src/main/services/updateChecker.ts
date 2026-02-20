@@ -1,7 +1,7 @@
-import { app, BrowserWindow, net, Notification, shell } from 'electron';
+import { app, net, Notification, shell } from 'electron';
 
 import { setUpdateTooltip } from '../tray';
-import { toggleWindow } from '../window/summonController';
+import { toggleWindow, getMainWindow } from '../window/summonController';
 
 import { getSetting, setSetting } from './settingsService';
 
@@ -64,10 +64,9 @@ export const setUpdateChannel = (channel: string): void => {
 
 const notifyRenderer = (info: UpdateInfo): void => {
   if (!updateChannel) return;
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(updateChannel, info);
-    }
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(updateChannel, info);
   }
 };
 

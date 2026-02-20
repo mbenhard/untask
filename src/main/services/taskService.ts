@@ -13,6 +13,8 @@ import { getDb } from '../db';
 import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
 import { calculateNextOccurrence } from './recurrenceEngine';
 import { getSetting, setSetting } from './settingsService';
+import { getMainWindow } from '../window/summonController';
+import { IPC_CHANNELS } from '../../types/ipc';
 
 // ─── Validation schemas ─────────────────────────────────────
 export const createTaskSchema = z.object({
@@ -61,6 +63,13 @@ const emitTaskChange = (event: TaskChangeEvent): void => {
     } catch {
       // Ignore listener failures so task mutations always complete.
     }
+  }
+
+  // Broadcast to the main window renderer so it can refresh its task store.
+  // This is essential for cross-window mutations (e.g. quick add creating tasks).
+  const mainWin = getMainWindow();
+  if (mainWin && !mainWin.isDestroyed()) {
+    mainWin.webContents.send(IPC_CHANNELS.TASK_DATA_CHANGED);
   }
 };
 

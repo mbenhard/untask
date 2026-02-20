@@ -16,8 +16,6 @@ type AppStore = {
   unreadProactive: boolean;
   newTaskTrigger: number;
   aiEnabled: boolean;
-  quickAddOpen: boolean;
-  quickAddText: string;
   setView: (view: AppView) => void;
   setViewFromAssistant: (view: AppView) => void;
   openChatOverlay: () => void;
@@ -28,8 +26,6 @@ type AppStore = {
   setUnreadProactive: (value: boolean) => void;
   triggerNewTask: () => void;
   setAiEnabled: (enabled: boolean) => void;
-  openQuickAdd: (text: string) => void;
-  closeQuickAdd: () => void;
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -40,8 +36,6 @@ export const useAppStore = create<AppStore>((set) => ({
   unreadProactive: false,
   newTaskTrigger: 0,
   aiEnabled: true,
-  quickAddOpen: false,
-  quickAddText: '',
   setView: (view) =>
     set((state) => {
       if (state.activeView === view) {
@@ -96,9 +90,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setUnreadProactive: (value) => set({ unreadProactive: value }),
   triggerNewTask: () =>
     set((state) => ({ newTaskTrigger: state.newTaskTrigger + 1 })),
-  setAiEnabled: (enabled) => set({ aiEnabled: enabled, quickAddOpen: false, quickAddText: '' }),
-  openQuickAdd: (text) => set({ quickAddOpen: true, quickAddText: text }),
-  closeQuickAdd: () => set({ quickAddOpen: false, quickAddText: '' }),
+  setAiEnabled: (enabled) => set({ aiEnabled: enabled }),
 }));
 
 export const selectActiveView = (state: AppStore) => state.activeView;
@@ -113,4 +105,3 @@ export const selectUnreadProactive = (state: AppStore) =>
 export const selectNewTaskTrigger = (state: AppStore) =>
   state.newTaskTrigger;
 export const selectAiEnabled = (state: AppStore) => state.aiEnabled;
-export const selectQuickAddOpen = (state: AppStore) => state.quickAddOpen;

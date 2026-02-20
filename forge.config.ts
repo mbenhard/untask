@@ -80,11 +80,22 @@ const config: ForgeConfig = {
           config: 'vite.preload.config.ts',
           target: 'preload',
         },
+        {
+          entry: {
+            'preload-quickadd': 'src/preload/quickadd.ts',
+          },
+          config: 'vite.preload.config.ts',
+          target: 'preload',
+        },
       ],
       renderer: [
         {
           name: 'main_window',
           config: 'vite.renderer.config.ts',
+        },
+        {
+          name: 'quick_add',
+          config: 'vite.quickadd-renderer.config.ts',
         },
       ],
     }),

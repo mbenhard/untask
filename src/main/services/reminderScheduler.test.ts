@@ -62,16 +62,15 @@ vi.mock('electron', () => ({
   Notification: Object.assign(MockNotificationClass, {
     isSupported: vi.fn(() => true),
   }),
-  BrowserWindow: {
-    getAllWindows: vi.fn(() => [
-      {
-        isDestroyed: () => false,
-        show: mockWindowShow,
-        focus: mockWindowFocus,
-        webContents: { send: mockWebContentsSend },
-      },
-    ]),
-  },
+}));
+
+vi.mock('../window/summonController', () => ({
+  getMainWindow: vi.fn(() => ({
+    isDestroyed: () => false,
+    show: mockWindowShow,
+    focus: mockWindowFocus,
+    webContents: { send: mockWebContentsSend },
+  })),
 }));
 
 vi.mock('./taskService', () => ({

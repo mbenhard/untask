@@ -49,7 +49,6 @@ import {
   type BackupImportDialogResponse,
   type BackupListResponse,
   type BackupMetadataPayload,
-  type QuickAddPayload,
   type SearchQueryRequest,
   type SearchQueryResponse,
   type TaskDeleteRequestPayload,
@@ -94,20 +93,6 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_REQUEST_HIDE),
     escapeLayerExit: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_ESCAPE_LAYER_EXIT),
-    onQuickAddPayload: (
-      listener: (payload: QuickAddPayload) => void,
-    ): (() => void) => {
-      const wrapped = (
-        _event: Electron.IpcRendererEvent,
-        payload: QuickAddPayload,
-      ) => listener(payload);
-
-      ipcRenderer.on(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
-
-      return () => {
-        ipcRenderer.removeListener(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
-      };
-    },
     onBackupRestored: (listener: () => void): (() => void) => {
       const wrapped = (): void => listener();
 
@@ -221,6 +206,13 @@ const untaskApi: UntaskApi = {
 
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.TASK_NAVIGATE, wrapped);
+      };
+    },
+    onTaskDataChanged: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.TASK_DATA_CHANGED, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.TASK_DATA_CHANGED, wrapped);
       };
     },
     getStatuses: (): Promise<TaskStatusConfig> =>
@@ -456,6 +448,10 @@ const untaskApi: UntaskApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.REMINDERS_SYNC_STATUS, wrapped);
       };
     },
+  },
+  shell: {
+    openExternal: (url: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_EXTERNAL, url),
   },
 };
 

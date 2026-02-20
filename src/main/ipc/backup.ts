@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { getMainWindow } from '../window/summonController';
 import path from 'node:path';
 import {
   IPC_CHANNELS,
@@ -55,12 +56,9 @@ const withTimeout = async <T>(
 };
 
 const notifyBackupRestored = (): void => {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (window.isDestroyed()) {
-      continue;
-    }
-
-    window.webContents.send(IPC_CHANNELS.APP_BACKUP_RESTORED);
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.APP_BACKUP_RESTORED);
   }
 };
 

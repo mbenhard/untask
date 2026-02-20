@@ -6,7 +6,6 @@ describe('IPC_CHANNELS', () => {
   it('contains app lifecycle channels', () => {
     expect(IPC_CHANNELS.APP_REQUEST_HIDE).toBe('app:request-hide');
     expect(IPC_CHANNELS.APP_ESCAPE_LAYER_EXIT).toBe('app:escape-layer-exit');
-    expect(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD).toBe('app:quick-add-payload');
     expect(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN).toBe('app:get-launch-at-login');
     expect(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN).toBe('app:set-launch-at-login');
     expect(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE).toBe('app:get-window-dismiss-mode');

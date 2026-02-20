@@ -39,7 +39,6 @@ export const IPC_CHANNELS = {
   // ─── App/window lifecycle channels ──────────────────────
   APP_REQUEST_HIDE: 'app:request-hide',
   APP_ESCAPE_LAYER_EXIT: 'app:escape-layer-exit',
-  APP_QUICK_ADD_PAYLOAD: 'app:quick-add-payload',
   APP_BACKUP_RESTORED: 'app:backup-restored',
   APP_GET_LAUNCH_AT_LOGIN: 'app:get-launch-at-login',
   APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
@@ -74,6 +73,7 @@ export const IPC_CHANNELS = {
   TASK_GET_STATUSES: 'task:get-statuses',
   TASK_SET_STATUSES: 'task:set-statuses',
   TASK_UNDO_LAST_USER_ACTION: 'task:undo-last-user-action',
+  TASK_DATA_CHANGED: 'task:data-changed',
   CHAT_SEND: 'chat:send',
   CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_HISTORY: 'chat:history',
@@ -151,12 +151,19 @@ export const IPC_CHANNELS = {
   NOTIFICATIONS_PROBE_PERMISSION: 'notifications:probe-permission',
   NOTIFICATIONS_OPEN_SETTINGS: 'notifications:open-settings',
   // ─── Attachment channels ─────────────────────────────────
+  // ─── Quick add channels ──────────────────────────────────
+  QUICK_ADD_HIDE: 'quick-add:hide',
+  QUICK_ADD_RESIZE: 'quick-add:resize',
+  QUICK_ADD_PAYLOAD: 'quick-add:payload',
+  // ─── Attachment channels ─────────────────────────────────
   ATTACHMENT_SAVE: 'attachment:save',
   ATTACHMENT_OPEN: 'attachment:open',
   ATTACHMENT_REVEAL: 'attachment:reveal',
   ATTACHMENT_DELETE: 'attachment:delete',
   ATTACHMENT_READ: 'attachment:read',
   ATTACHMENT_PICK_AND_SAVE: 'attachment:pick-and-save',
+  // --- Shell channels ---
+  SHELL_OPEN_EXTERNAL: 'shell:open-external',
 } as const;
 
 export type SettingsBootstrapState = {
@@ -279,6 +286,12 @@ export type TaskUndoResultPayload = {
 export type QuickAddPayload = {
   text: string;
   source: 'clipboard-url' | 'clipboard-text' | 'empty';
+};
+
+export type QuickAddWindowPayload = {
+  text: string;
+  source: 'clipboard-url' | 'clipboard-text' | 'empty';
+  theme: 'dark' | 'light';
 };
 
 export type LaunchAtLoginPayload = {

@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, shell } from 'electron';
 import {
   IPC_CHANNELS,
   type SettingsBootstrapState,
@@ -290,6 +290,16 @@ export const registerAppHandlers = (): void => {
       'APP_GET_UPDATE_INFO',
       (): UpdateInfo | null => {
         return getCachedUpdateInfo();
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SHELL_OPEN_EXTERNAL,
+    withIpcLogging(
+      'SHELL_OPEN_EXTERNAL',
+      async (_event: Electron.IpcMainInvokeEvent, url: string): Promise<void> => {
+        await shell.openExternal(url);
       },
     ),
   );

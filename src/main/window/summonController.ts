@@ -1,9 +1,8 @@
 import type { BrowserWindow } from 'electron';
 
-import { readClipboardForQuickAdd } from '../clipboard';
 import { getSetting, setSetting } from '../services/settingsService';
 import { triggerRemindersPull } from '../services/remindersSync';
-import { IPC_CHANNELS } from '../../types/ipc';
+import { showQuickAdd as showQuickAddWindow } from './quickAddWindow';
 
 import {
   parseBoundsJson,
@@ -86,11 +85,7 @@ export function summonWindow(): void {
 }
 
 export function showQuickAdd(): void {
-  if (!win || win.isDestroyed()) return;
-
-  const payload = readClipboardForQuickAdd();
-  summonWindow();
-  win.webContents.send(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, payload);
+  showQuickAddWindow();
 }
 
 export function hideWindow(): void {

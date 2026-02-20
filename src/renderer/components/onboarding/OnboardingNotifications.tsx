@@ -61,6 +61,23 @@ export const OnboardingNotifications = ({ onNext }: OnboardingNotificationsProps
           Skip for now
         </button>
       </div>
+
+      <div className="mt-2 text-center">
+        <p className="text-[11px] text-muted-foreground/80">
+          Using macOS Focus modes?{' '}
+          <button
+            type="button"
+            onClick={() =>
+              void getUntask().shell.openExternal(
+                'x-apple.systempreferences:com.apple.Focus-Settings.extension',
+              )
+            }
+            className="underline transition-colors hover:text-foreground"
+          >
+            Allow Untask
+          </button>
+        </p>
+      </div>
     </div>
   );
 };

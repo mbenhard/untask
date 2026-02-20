@@ -1,16 +1,14 @@
-import { BrowserWindow } from 'electron';
-
 import type { ProactiveTriggerType } from '../../types/assistant';
 import type { ChatStreamEvent } from '../../types/chat';
 import { IPC_CHANNELS } from '../../types/ipc';
+import { getMainWindow } from '../window/summonController';
 
 // ─── Stream event emitter ───────────────────────────────────
 
-const emitToAllWindows = (event: ChatStreamEvent): void => {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) {
-      window.webContents.send(IPC_CHANNELS.CHAT_STREAM_EVENT, event);
-    }
+const emitToMainWindow = (event: ChatStreamEvent): void => {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(IPC_CHANNELS.CHAT_STREAM_EVENT, event);
   }
 };
 
@@ -53,7 +51,7 @@ export async function fireAiReminder(
     await deps.startProactiveTurn({
       triggerMessage: message,
       triggerType: 'time_reminder',
-      emit: emitToAllWindows,
+      emit: emitToMainWindow,
     });
   } catch (error) {
     // eslint-disable-next-line no-console

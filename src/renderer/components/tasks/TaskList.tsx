@@ -96,6 +96,8 @@ export const TaskList = ({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
   const [completeConfirmTriggerId, setCompleteConfirmTriggerId] = useState<string | null>(null);
+  const suppressFocusRef = useRef(false);
+  const prevTasksLengthForFocusRef = useRef(tasks.length);
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
@@ -148,6 +150,17 @@ export const TaskList = ({
 
   // Apply focus when focusedIndex changes
   useEffect(() => {
+    const taskWasAdded = tasks.length > prevTasksLengthForFocusRef.current;
+    if (taskWasAdded) {
+      prevTasksLengthForFocusRef.current = tasks.length;
+      return;
+    }
+
+    if (suppressFocusRef.current) {
+      suppressFocusRef.current = false;
+      return;
+    }
+
     const focusedTaskId = tasks[focusedIndex]?.id;
     if (!focusedTaskId) {
       return;
@@ -567,6 +580,14 @@ export const TaskList = ({
                             }
                           }}
                           onBlur={() => {
+                            if (newSubtaskTitle.trim()) {
+                              void createTask({
+                                title: newSubtaskTitle.trim(),
+                                parentId: task.id,
+                                status: 'active',
+                                priority: 'none',
+                              });
+                            }
                             setAddingSubtaskForId(null);
                             setNewSubtaskTitle('');
                           }}

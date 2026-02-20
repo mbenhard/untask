@@ -60,7 +60,7 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
     title: 'Notes editor',
     entries: [
       { keys: '⌘ Enter', action: 'Process with AI' },
-      { keys: '⌘ ⇧ A', action: 'Archive' },
+      { keys: '⌘ ⌫', action: 'Archive' },
       { keys: '⌥ ↑ / ↓', action: 'Prev/next note' },
     ],
   },

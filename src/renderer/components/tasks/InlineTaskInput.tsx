@@ -121,6 +121,9 @@ export const InlineTaskInput = ({
 
     setTitle('');
     resetMetadata();
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
   }, [createTask, defaultStatus, defaultToday, dueDate, isCreating, parentId, priority, resetMetadata, title, today]);
 
   if (!isOpen && !alwaysOpen) {
@@ -157,7 +160,11 @@ export const InlineTaskInput = ({
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             onBlur={() => {
-              if (showMetadata) return;
+              const trimmed = title.trim();
+              if (trimmed.length > 0 || hasMetadataSet) {
+                void handleSubmit();
+                return;
+              }
 
               if (title.trim().length === 0 && !hasMetadataSet) {
                 if (onDismiss) {

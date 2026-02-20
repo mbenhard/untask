@@ -154,8 +154,7 @@ export const useKeyboardShortcuts = ({
         notesActive
         && notesState.activeNoteId
         && (event.metaKey || event.ctrlKey)
-        && event.shiftKey
-        && event.key.toLowerCase() === 'a'
+        && event.key === 'Backspace'
       ) {
         event.preventDefault();
         void notesState.archiveNote(notesState.activeNoteId);

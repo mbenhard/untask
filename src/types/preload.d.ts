@@ -46,7 +46,6 @@ import type {
   BackupImportDialogResponse,
   BackupListResponse,
   BackupMetadataPayload,
-  QuickAddPayload,
   SearchQueryRequest,
   SearchQueryResponse,
   SettingsMemoryStatePayload,
@@ -89,7 +88,6 @@ export type UntaskApi = {
   app: {
     requestHide: () => Promise<void>;
     escapeLayerExit: () => Promise<void>;
-    onQuickAddPayload: (listener: (payload: QuickAddPayload) => void) => () => void;
     onBackupRestored: (listener: () => void) => () => void;
     getLaunchAtLogin: () => Promise<LaunchAtLoginResult>;
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
@@ -141,6 +139,7 @@ export type UntaskApi = {
     reopen: (id: string) => Promise<Task>;
     toggleToday: (id: string) => Promise<Task>;
     onTaskNavigate: (listener: (payload: TaskNavigatePayload) => void) => () => void;
+    onTaskDataChanged: (listener: () => void) => () => void;
     getStatuses: () => Promise<TaskStatusConfig>;
     setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
     undoLastUserAction: () => Promise<TaskUndoResultPayload>;
@@ -245,6 +244,9 @@ export type UntaskApi = {
     forceSync: () => Promise<void>;
     pullOnly: () => Promise<void>;
     onSyncStatus: (listener: (payload: RemindersSyncStatusPayload) => void) => () => void;
+  };
+  shell: {
+    openExternal: (url: string) => Promise<void>;
   };
 };
 
