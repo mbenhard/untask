@@ -95,7 +95,8 @@ export const TaskList = ({
   const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
-  const [completeConfirmTriggerId, setCompleteConfirmTriggerId] = useState<string | null>(null);
+  const [completeConfirmTrigger, setCompleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
+  const [deleteConfirmTrigger, setDeleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
@@ -282,7 +283,7 @@ export const TaskList = ({
           (t) => !isTerminalStatus(t.status as never),
         ).length;
         if (activeChildren > 0) {
-          setCompleteConfirmTriggerId(taskId);
+          setCompleteConfirmTrigger({ taskId, ts: Date.now() });
           return;
         }
         void completeTask(taskId);
@@ -317,7 +318,11 @@ export const TaskList = ({
       const activeChildren = subtasks.filter(
         (t) => !isTerminalStatus(t.status as never),
       ).length;
-      void deleteTask(taskId, activeChildren > 0);
+      if (activeChildren > 0) {
+        setDeleteConfirmTrigger({ taskId, ts: Date.now() });
+        return;
+      }
+      void deleteTask(taskId, false);
     },
     [allTasks, deleteTask, tasks],
   );
@@ -513,7 +518,8 @@ export const TaskList = ({
               onCompleteWithChildren={handleCompleteWithChildren}
               onToggleToday={handleToggleToday}
               onFocus={() => setFocusedIndex(index)}
-              completeConfirmTriggerId={completeConfirmTriggerId}
+              completeConfirmTrigger={completeConfirmTrigger}
+              deleteConfirmTrigger={deleteConfirmTrigger}
             >
               <TaskBody
                 task={task}

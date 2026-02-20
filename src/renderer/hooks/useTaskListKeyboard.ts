@@ -99,6 +99,12 @@ export const useTaskListKeyboard = ({
         return;
       }
 
+      // Prevent Tab from cycling through internal task row elements
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        return;
+      }
+
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         event.stopPropagation();

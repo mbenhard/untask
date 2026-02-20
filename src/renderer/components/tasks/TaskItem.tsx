@@ -30,7 +30,8 @@ export interface TaskItemProps {
   onCompleteWithChildren: (id: string) => void;
   onToggleToday: (id: string) => void;
   onFocus?: () => void;
-  completeConfirmTriggerId?: string | null;
+  completeConfirmTrigger?: { taskId: string; ts: number } | null;
+  deleteConfirmTrigger?: { taskId: string; ts: number } | null;
   children?: ReactNode;
 }
 
@@ -62,7 +63,8 @@ export const TaskItem = ({
   onCompleteWithChildren,
   onToggleToday,
   onFocus,
-  completeConfirmTriggerId,
+  completeConfirmTrigger,
+  deleteConfirmTrigger,
   children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -80,11 +82,21 @@ export const TaskItem = ({
     setTitleDraft(task.title);
   }, [task.title]);
 
+  // Open complete confirmation popover when triggered (e.g. from keyboard Space).
+  // Uses a {taskId, ts} object so repeated triggers on the same task always fire.
   useEffect(() => {
-    if (completeConfirmTriggerId === task.id && hasChildren && childrenDoneCount < childrenCount) {
+    if (completeConfirmTrigger?.taskId === task.id && hasChildren && childrenDoneCount < childrenCount) {
       setCompleteConfirmOpen(true);
     }
-  }, [completeConfirmTriggerId, task.id, hasChildren, childrenCount, childrenDoneCount]);
+  }, [completeConfirmTrigger, task.id, hasChildren, childrenCount, childrenDoneCount]);
+
+  // Open delete confirmation via the menu popover when triggered (e.g. from keyboard Cmd+Backspace).
+  useEffect(() => {
+    if (deleteConfirmTrigger?.taskId === task.id) {
+      setMenuOpen(true);
+      setMenuView('delete-confirm');
+    }
+  }, [deleteConfirmTrigger, task.id]);
 
   const {
     attributes,

@@ -24,6 +24,8 @@ export type SectionGroupProps = {
   addTaskConfig?: AddTaskConfig;
   /** External signal to open the add input (e.g. keyboard shortcut `n`) */
   triggerAdd?: number;
+  /** Callback when focus should move to the task list */
+  onRequestFocus?: () => void;
   children: ReactNode;
 };
 
@@ -37,6 +39,7 @@ export const SectionGroup = ({
   dropRef,
   addTaskConfig,
   triggerAdd,
+  onRequestFocus,
   children,
 }: SectionGroupProps) => {
   const [isAdding, setIsAdding] = useState(false);
@@ -78,7 +81,8 @@ export const SectionGroup = ({
 
   const handleDismiss = useCallback(() => {
     setIsAdding(false);
-  }, []);
+    onRequestFocus?.();
+  }, [onRequestFocus]);
 
   return (
     <section

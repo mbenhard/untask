@@ -56,9 +56,9 @@ export const InlineTaskInput = ({
   const createTask = useTaskStore((state) => state.createTask);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSeenTriggerRef = useRef<number | undefined>(triggerOpen);
+  const isCreatingRef = useRef(false);
   const [isOpen, setIsOpen] = useState(alwaysOpen || onDismiss !== undefined);
   const [title, setTitle] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
 
   // Metadata state
   const [priority, setPriority] = useState<NonNullable<Task['priority']>>('none');
@@ -100,11 +100,11 @@ export const InlineTaskInput = ({
 
   const handleSubmit = useCallback(async (): Promise<void> => {
     const normalizedTitle = title.trim();
-    if (normalizedTitle.length === 0 || isCreating) {
+    if (normalizedTitle.length === 0 || isCreatingRef.current) {
       return;
     }
 
-    setIsCreating(true);
+    isCreatingRef.current = true;
     const created = await createTask({
       title: normalizedTitle,
       parentId: parentId ?? undefined,
@@ -113,7 +113,7 @@ export const InlineTaskInput = ({
       today: today || defaultToday,
       dueDate,
     });
-    setIsCreating(false);
+    isCreatingRef.current = false;
 
     if (!created) {
       return;
@@ -121,10 +121,9 @@ export const InlineTaskInput = ({
 
     setTitle('');
     resetMetadata();
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-  }, [createTask, defaultStatus, defaultToday, dueDate, isCreating, parentId, priority, resetMetadata, title, today]);
+    // Re-focus is immediate — no disabled state to interfere.
+    inputRef.current?.focus();
+  }, [createTask, defaultStatus, defaultToday, dueDate, parentId, priority, resetMetadata, title, today]);
 
   if (!isOpen && !alwaysOpen) {
     return null;
@@ -193,12 +192,7 @@ export const InlineTaskInput = ({
                 }
               }
             }}
-            placeholder={
-              isCreating
-                ? 'Creating...'
-                : (placeholder ?? 'Type and press Enter')
-            }
-            disabled={isCreating}
+            placeholder={placeholder ?? 'Type and press Enter'}
             className="min-w-0 w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/30"
             aria-label={label}
           />
