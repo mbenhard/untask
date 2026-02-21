@@ -45,9 +45,34 @@ let hasShownNativeNotification = false;
 // ─── Install method detection ────────────────────────────────
 const detectInstallMethod = (): 'homebrew' | 'direct' => {
   const execPath = process.execPath.toLowerCase();
-  return execPath.includes('/homebrew/') || execPath.includes('/cellar/')
-    ? 'homebrew'
-    : 'direct';
+
+  // Check for Homebrew formula (Cellar) — e.g., /opt/homebrew/Cellar/untask/...
+  if (execPath.includes('/homebrew/') || execPath.includes('/cellar/')) {
+    return 'homebrew';
+  }
+
+  // Check for Homebrew Cask — look for Caskroom metadata
+  // Cask installs to /Applications/ but keeps metadata in Caskroom
+  const possiblePrefixes = [
+    process.env.HOMEBREW_PREFIX, // e.g., /opt/homebrew or /usr/local
+    '/opt/homebrew',
+    '/usr/local',
+  ].filter(Boolean) as string[];
+
+  for (const prefix of possiblePrefixes) {
+    const caskroomPath = `${prefix}/Caskroom/untask`;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      if (fs.existsSync(caskroomPath)) {
+        return 'homebrew';
+      }
+    } catch {
+      // Ignore errors, try next prefix
+    }
+  }
+
+  return 'direct';
 };
 
 // ─── Renderer notification ────────────────────────────────────
