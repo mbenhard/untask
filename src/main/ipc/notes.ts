@@ -10,6 +10,9 @@ import {
   restoreNote,
   deleteNote,
   listNotes,
+  pinNote,
+  unpinNote,
+  duplicateNote,
 } from '../services/notesService';
 
 export const registerNotesHandlers = (): void => {
@@ -69,6 +72,30 @@ export const registerNotesHandlers = (): void => {
     withIpcLogging('NOTES_DELETE', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
       const id = noteIdSchema.parse(idInput);
       return deleteNote(id);
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NOTES_PIN,
+    withIpcLogging('NOTES_PIN', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
+      const id = noteIdSchema.parse(idInput);
+      return pinNote(id);
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NOTES_UNPIN,
+    withIpcLogging('NOTES_UNPIN', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
+      const id = noteIdSchema.parse(idInput);
+      return unpinNote(id);
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NOTES_DUPLICATE,
+    withIpcLogging('NOTES_DUPLICATE', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
+      const id = noteIdSchema.parse(idInput);
+      return duplicateNote(id);
     }),
   );
 };

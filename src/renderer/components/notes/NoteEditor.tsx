@@ -10,6 +10,7 @@ import { Archive, ArchiveRestore, ArrowLeft, CheckSquare, Sparkles, Trash2 } fro
 import {
   selectActiveNoteId,
   selectActiveNoteTitle,
+  selectActiveNoteUpdatedAt,
   selectIsActiveNoteArchived,
   selectNotesContent,
   selectNotesError,
@@ -24,6 +25,49 @@ import { useTaskStore } from '../../stores/taskStore';
 import { resolveTaskTitleFromEditor } from './noteSlashActions';
 import { BlockEditor } from '../editor/BlockEditor';
 import { Button } from '../ui/button';
+
+// ─── Helpers ────────────────────────────────────────────────
+
+const formatEditedTime = (iso: string | null): string => {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'Edited just now';
+  if (minutes < 60) return `Edited ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Edited ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Edited yesterday';
+  if (days < 7) return `Edited ${days}d ago`;
+  // Fall back to absolute date
+  const d = new Date(iso);
+  return `Edited ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`;
+};
+
+type BlockContent = { type?: string; text?: string };
+type Block = { type?: string; content?: BlockContent[] };
+
+const deriveAutoTitleFromContent = (content: string): string => {
+  if (!content.trim()) return '';
+  try {
+    const blocks = JSON.parse(content) as Block[];
+    if (!Array.isArray(blocks)) return '';
+    for (const block of blocks) {
+      if (block.type === 'image' || block.type === 'file') continue;
+      if (!block.content || !Array.isArray(block.content)) continue;
+      const text = block.content
+        .filter((c) => c.type === 'text' && c.text)
+        .map((c) => c.text)
+        .join('')
+        .trim();
+      if (text) return text.length > 120 ? text.slice(0, 120) + '\u2026' : text;
+    }
+    return '';
+  } catch {
+    const firstLine = content.split('\n').find((l) => l.trim());
+    return firstLine?.replace(/^#+\s*/, '').trim() || '';
+  }
+};
 
 // ─── Slash menu items ──────────────────────────────────────
 
@@ -89,6 +133,7 @@ type NoteEditorProps = {
 export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const activeNoteId = useNotesStore(selectActiveNoteId);
   const title = useNotesStore(selectActiveNoteTitle);
+  const updatedAt = useNotesStore(selectActiveNoteUpdatedAt);
   const content = useNotesStore(selectNotesContent);
   const isDirty = useNotesStore(selectNotesIsDirty);
   const isLoading = useNotesStore(selectNotesIsLoading);
@@ -208,14 +253,21 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           </Button>
         ) : null}
 
-        <input
-          type="text"
-          value={title}
-          onChange={handleTitleChange}
-          onBlur={handleTitleBlur}
-          className="min-w-0 flex-1 bg-transparent pl-[9px] text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground"
-          placeholder="Untitled note"
-        />
+        <div className="min-w-0 flex-1">
+          <input
+            type="text"
+            value={title}
+            onChange={handleTitleChange}
+            onBlur={handleTitleBlur}
+            className="w-full bg-transparent pl-[9px] text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground/60"
+            placeholder={deriveAutoTitleFromContent(content) || 'Untitled note'}
+          />
+          {updatedAt ? (
+            <p className="pl-[9px] text-[10px] text-muted-foreground/70">
+              {formatEditedTime(updatedAt)}
+            </p>
+          ) : null}
+        </div>
 
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
           {notice ? (
@@ -237,6 +289,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
             className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={handleProcess}
             disabled={isProcessing}
+            title="Process with AI (⌘↵)"
           >
             <Sparkles size={12} />
             {isProcessing ? 'processing' : 'process'}
@@ -272,6 +325,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
               variant="ghost"
               className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
               onClick={handleArchive}
+              title="Archive (⌘⌫)"
             >
               <Archive size={12} />
               archive

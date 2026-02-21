@@ -35,6 +35,7 @@ type NotesStore = {
   // Editor state
   activeNoteId: string | null;
   activeNoteTitle: string;
+  activeNoteUpdatedAt: string | null;
   content: string;
   isLegacyMarkdown: boolean;
   isDirty: boolean;
@@ -60,6 +61,10 @@ type NotesStore = {
   archiveNote: (id: string) => Promise<void>;
   restoreNote: (id: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
+  pinNote: (id: string) => Promise<void>;
+  unpinNote: (id: string) => Promise<void>;
+  duplicateNote: (id: string) => Promise<void>;
+  copyAsMarkdown: (id: string) => Promise<void>;
   processWithAI: (markdownOverride?: string) => Promise<ProcessWithAIResult>;
 
   setViewportWidth: (width: number) => void;
@@ -207,6 +212,7 @@ const NOTES_LIST_RESET_STATE = {
   layoutMode: 'list' as const,
   activeNoteId: null,
   activeNoteTitle: '',
+  activeNoteUpdatedAt: null,
   content: '',
   isDirty: false,
 } as const;
@@ -223,6 +229,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   activeNoteId: null,
   activeNoteTitle: '',
+  activeNoteUpdatedAt: null,
   content: '',
   isLegacyMarkdown: false,
   isDirty: false,
@@ -271,6 +278,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         activeNoteId: note.id,
         selectedListNoteId: note.id,
         activeNoteTitle: note.title,
+        activeNoteUpdatedAt: note.updatedAt,
         content: note.content,
         isLegacyMarkdown: false,
         isDirty: false,
@@ -306,6 +314,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         activeNoteId: note.id,
         selectedListNoteId: note.id,
         activeNoteTitle: note.title,
+        activeNoteUpdatedAt: note.updatedAt,
         content: raw,
         isLegacyMarkdown: legacy,
         isDirty: false,
@@ -464,6 +473,49 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       get().setNotice({ kind: 'success', message: 'Note deleted.' });
       void get().loadList();
+    } catch (error) {
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
+    }
+  },
+
+  pinNote: async (id) => {
+    try {
+      await getUntask().notes.pin(id);
+      void get().loadList();
+    } catch (error) {
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
+    }
+  },
+
+  unpinNote: async (id) => {
+    try {
+      await getUntask().notes.unpin(id);
+      void get().loadList();
+    } catch (error) {
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
+    }
+  },
+
+  duplicateNote: async (id) => {
+    try {
+      const duplicate = await getUntask().notes.duplicate(id);
+      if (duplicate) {
+        void get().loadList();
+        await get().openNote(duplicate.id);
+        get().setNotice({ kind: 'success', message: 'Note duplicated.' });
+      }
+    } catch (error) {
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
+    }
+  },
+
+  copyAsMarkdown: async (id) => {
+    try {
+      const note = await getUntask().notes.get(id);
+      if (!note) return;
+      const markdown = serializeNoteForProcessing(note.content);
+      await navigator.clipboard.writeText(markdown);
+      get().setNotice({ kind: 'success', message: 'Copied as Markdown.' });
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
@@ -635,6 +687,7 @@ export const selectArchivedNotes = (state: NotesStore) => state.archivedNotes;
 export const selectSelectedListNoteId = (state: NotesStore) => state.selectedListNoteId;
 export const selectActiveNoteId = (state: NotesStore) => state.activeNoteId;
 export const selectActiveNoteTitle = (state: NotesStore) => state.activeNoteTitle;
+export const selectActiveNoteUpdatedAt = (state: NotesStore) => state.activeNoteUpdatedAt;
 export const selectNotesContent = (state: NotesStore) => state.content;
 export const selectNotesIsLegacyMarkdown = (state: NotesStore) => state.isLegacyMarkdown;
 export const selectNotesIsDirty = (state: NotesStore) => state.isDirty;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { getNote, saveNote, listNotes, blockNoteToMarkdown } from '../../services/notesService';
+import { getNote, saveNote, listNotes, blockNoteToMarkdown, getDisplayTitle } from '../../services/notesService';
 import type { ToolRegistryEntry, ToolExecutionContext, ToolExecutionEnvelope } from './types';
 import { successResult, normalizeForSummary } from './helpers';
 
@@ -39,9 +39,9 @@ export const listNotesTool = {
   execute: async (): Promise<ToolExecutionEnvelope> => {
     const { active, archived } = listNotes();
 
-    const formatNote = (note: { id: string; title: string; updatedAt: string | null }) => ({
+    const formatNote = (note: ReturnType<typeof listNotes>['active'][number]) => ({
       id: note.id,
-      title: note.title,
+      title: getDisplayTitle(note),
       updatedAt: note.updatedAt,
     });
 
@@ -64,15 +64,16 @@ export const readNoteTool = {
     const id = resolveNoteId(input.noteId, context.activeNoteId);
     const note = getNote(id);
     if (!note) throw new Error(`Note ${id} not found.`);
+    const displayTitle = getDisplayTitle(note);
     const markdown = blockNoteToMarkdown(note.content);
     const hasContent = markdown.trim().length > 0;
 
     return {
       status: 'success',
       message: hasContent
-        ? `Loaded note "${note.title}" (${markdown.length} chars).`
-        : `Note "${note.title}" is currently empty.`,
-      data: { note: { ...note, content: markdown } },
+        ? `Loaded note "${displayTitle}" (${markdown.length} chars).`
+        : `Note "${displayTitle}" is currently empty.`,
+      data: { note: { ...note, title: displayTitle, content: markdown } },
     };
   },
 } satisfies ToolRegistryEntry<'read_note', typeof readNoteToolInputSchema>;

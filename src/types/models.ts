@@ -105,6 +105,7 @@ export type Note = {
   title: string;
   content: string;
   status: 'active' | 'archived';
+  isPinned: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 };

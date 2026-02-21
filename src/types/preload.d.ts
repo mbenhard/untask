@@ -195,6 +195,9 @@ export type UntaskApi = {
     archive: (id: string) => Promise<Note | undefined>;
     restore: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;
+    pin: (id: string) => Promise<Note | undefined>;
+    unpin: (id: string) => Promise<Note | undefined>;
+    duplicate: (id: string) => Promise<Note | undefined>;
   };
   shortcuts: {
     reRegister: () => Promise<void>;

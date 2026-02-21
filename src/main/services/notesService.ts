@@ -93,19 +93,10 @@ const EMPTY_NOTE_TTL_MS = 60_000; // 1 minute
 export function createNote(title?: string): Note {
   const db = getDb();
   const now = new Date().toISOString();
-  const autoTitle =
-    title ??
-    new Date().toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
 
   const [created] = db
     .insert(notes)
-    .values({ title: autoTitle, content: '', status: 'active', updatedAt: now })
+    .values({ title: title ?? '', content: '', status: 'active', updatedAt: now })
     .returning()
     .all();
   return created;
@@ -167,6 +158,84 @@ export function deleteNote(id: string): void {
   db.delete(notes).where(eq(notes.id, id)).run();
 }
 
+export function pinNote(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ isPinned: true, updatedAt: new Date().toISOString() })
+    .where(eq(notes.id, id))
+    .returning()
+    .all();
+  return updated;
+}
+
+export function unpinNote(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ isPinned: false, updatedAt: new Date().toISOString() })
+    .where(eq(notes.id, id))
+    .returning()
+    .all();
+  return updated;
+}
+
+export function duplicateNote(id: string): Note | undefined {
+  const db = getDb();
+  const original = getNote(id);
+  if (!original) return undefined;
+  const now = new Date().toISOString();
+  const [created] = db
+    .insert(notes)
+    .values({
+      title: original.title,
+      content: original.content,
+      status: 'active',
+      isPinned: false,
+      updatedAt: now,
+    })
+    .returning()
+    .all();
+  return created;
+}
+
+/**
+ * Derive a display title for a note. When the stored title is empty,
+ * extract the first non-empty text from BlockNote JSON content.
+ * Used by the renderer (list) and AI tools so they see meaningful titles.
+ */
+export function getDisplayTitle(note: Note): string {
+  if (note.title) return note.title;
+  return deriveAutoTitle(note.content);
+}
+
+/**
+ * Extract a display title from BlockNote JSON content.
+ * Returns the text of the first non-empty text block, capped at 120 characters.
+ */
+export function deriveAutoTitle(content: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    // Legacy markdown — use first non-empty line
+    const firstLine = content.split('\n').find((l) => l.trim());
+    if (!firstLine) return '';
+    const cleaned = firstLine.replace(/^#+\s*/, '').trim();
+    return cleaned.length > 120 ? cleaned.slice(0, 120) + '…' : cleaned;
+  }
+
+  if (!Array.isArray(parsed)) return '';
+
+  for (const block of parsed as BlockNoteBlock[]) {
+    // Skip non-text blocks (image, file)
+    if (block.type === 'image' || block.type === 'file') continue;
+    const text = blockContentToText(block.content).trim();
+    if (text) return text.length > 120 ? text.slice(0, 120) + '…' : text;
+  }
+  return '';
+}
+
 export function listNotes(): { active: Note[]; archived: Note[] } {
   const db = getDb();
 
@@ -185,7 +254,7 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   const all = db
     .select()
     .from(notes)
-    .orderBy(desc(notes.createdAt))
+    .orderBy(desc(notes.isPinned), desc(notes.updatedAt))
     .all();
 
   const active: Note[] = [];

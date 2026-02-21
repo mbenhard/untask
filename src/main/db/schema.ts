@@ -60,6 +60,7 @@ export const notes = sqliteTable(
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
+    isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     updatedAt: text('updated_at'),
   },

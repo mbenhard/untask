@@ -345,6 +345,9 @@ const untaskApi: UntaskApi = {
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
     restore: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RESTORE, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
+    pin: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_PIN, id),
+    unpin: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_UNPIN, id),
+    duplicate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DUPLICATE, id),
   },
   shortcuts: {
     reRegister: (): Promise<void> =>
