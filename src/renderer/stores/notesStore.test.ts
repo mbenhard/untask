@@ -250,7 +250,11 @@ describe('notesStore', () => {
     api.get.mockResolvedValue(note);
 
     const writeText = vi.fn<(text: string) => Promise<void>>(async () => undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { clipboard: { writeText } },
+      writable: true,
+      configurable: true,
+    });
 
     await useNotesStore.getState().copyAsMarkdown('note-md');
 
