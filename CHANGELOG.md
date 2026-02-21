@@ -2,6 +2,21 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.11] - 2026-02-21
+
+Notes redesign and interaction polish.
+
+### Changes
+
+**Improved**
+- Redesigned notes UI with content-first hierarchy and pinning
+- Note titles derived from content instead of separate title field
+- Focus flow, toast feedback, and inline highlights
+
+**Fixed**
+- Quick Add no longer activates the main window
+- Improved Homebrew Cask detection in update checker
+
 ## [0.1.10] - 2026-02-20
 
 Standalone floating window for rapid task entry with slash commands and keyboard reordering.
@@ -265,6 +280,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.11]: https://github.com/mbenhard/untask/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/mbenhard/untask/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/mbenhard/untask/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/mbenhard/untask/compare/v0.1.7...v0.1.8
