@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -8,8 +8,13 @@ import { AlignLeft, ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, Fol
 import type { Task } from '../../../types/models';
 import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
+import { PRIORITY_DOT } from '../../lib/taskConstants';
+import { useFlashHighlight } from '../../hooks/useFlashHighlight';
+import { useAppStore } from '../../stores/appStore';
 import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
+import { useToastStore } from '../../stores/toastStore';
 import { Popover, PopoverContent, Tooltip, TooltipContent, TooltipTrigger } from '../ui';
 import { formatDueDateDisplay, isDueDateOverdue, parseDueDate, parseDueTime } from './dueDate';
 import { getNextPriority } from './taskInteraction';
@@ -35,12 +40,7 @@ export interface TaskItemProps {
   children?: ReactNode;
 }
 
-const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
-  none: 'bg-foreground/15',
-  low: 'bg-emerald-500',
-  medium: 'bg-amber-500',
-  high: 'bg-rose-500',
-};
+// Imported from shared constants
 
 const SORTABLE_TRANSITION = {
   duration: 220,
@@ -127,6 +127,19 @@ export const TaskItem = ({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const bookmarkRef = useRef<HTMLButtonElement>(null);
+  const flashBookmark = useFlashHighlight(bookmarkRef);
+  const prevToday = useRef(task.today);
+
+  useEffect(() => {
+    if (task.today !== prevToday.current) {
+      prevToday.current = task.today;
+      if (useAppStore.getState().activeView !== 'today') {
+        flashBookmark();
+      }
+    }
+  }, [task.today, flashBookmark]);
 
   const isCompleted = task.status === 'done';
   const isTerminal = TERMINAL_STATUSES.includes(task.status as PredefinedStatusId);
@@ -519,6 +532,7 @@ export const TaskItem = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                ref={bookmarkRef}
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
@@ -575,6 +589,10 @@ export const TaskItem = ({
                       type="button"
                       onClick={() => {
                         void updateTask({ id: task.id, status: 'active' });
+                        useToastStore.getState().showToast('Moved to Tasks', async () => {
+                          await getUntask().tasks.undoLastUserAction();
+                          await useTaskStore.getState().refreshTasks();
+                        });
                         setMenuOpen(false);
                       }}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -588,6 +606,10 @@ export const TaskItem = ({
                       type="button"
                       onClick={() => {
                         void updateTask({ id: task.id, status: 'inbox' });
+                        useToastStore.getState().showToast('Moved to Inbox', async () => {
+                          await getUntask().tasks.undoLastUserAction();
+                          await useTaskStore.getState().refreshTasks();
+                        });
                         setMenuOpen(false);
                       }}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

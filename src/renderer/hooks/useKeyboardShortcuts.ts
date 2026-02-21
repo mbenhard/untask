@@ -193,6 +193,7 @@ export const useKeyboardShortcuts = ({
           void (async () => {
             await getUntask().tasks.undoLastUserAction();
             await useTaskStore.getState().refreshTasks();
+            useToastStore.getState().showToast('Undone');
           })();
         }
         return;
@@ -218,7 +219,7 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        if (inputValueRef.current.length > 0) {
+        if (chatOverlayState === 'open' && inputValueRef.current.length > 0) {
           event.preventDefault();
           clearInput();
           return;
@@ -235,6 +236,10 @@ export const useKeyboardShortcuts = ({
           closeChatOverlayLayer();
           clearPendingNoteContext();
           inputRef.current?.blur();
+          requestAnimationFrame(() => {
+            const target = document.querySelector<HTMLElement>('[data-primary-focusable]');
+            target?.focus();
+          });
           return;
         }
       }

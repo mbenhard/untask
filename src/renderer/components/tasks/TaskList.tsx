@@ -19,21 +19,27 @@ import {
 } from '@dnd-kit/sortable';
 
 import type { Task } from '../../../types/models';
-import { isTerminalStatus } from '../../../types/models';
+import { isTerminalStatus, PREDEFINED_STATUSES } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
+import { useAppStore } from '../../stores/appStore';
 import { useTaskStore, getStableKey } from '../../stores/taskStore';
+import { useToastStore } from '../../stores/toastStore';
 import {
   useTaskStatusConfigStore,
   selectEnabledNonTerminal,
   selectFirstEnabledNonTerminal,
 } from '../../stores/taskStatusConfigStore';
+import type { PredefinedStatusId } from '../../../types/models';
 import {
   getNextPriority,
   getNextStatusInCycle,
   getStatusAfterToggleComplete,
 } from './taskInteraction';
+
+const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 import { reconcileScopedReorder } from './statusLaneDrag';
 import { TaskBody } from './TaskBody';
 import { TaskItem } from './TaskItem';
@@ -140,39 +146,41 @@ export const TaskList = ({
       return;
     }
 
-    const container = containerRef.current;
-    if (!container) return;
+    // Use rAF to let the DOM settle after view transitions before checking focus ownership.
+    const rafId = requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (!container) return;
 
-    const nextFocused = container.querySelector<HTMLElement>(
-      `[data-task-id="${focusedTaskId}"]`,
-    );
-    if (!nextFocused) return;
+      const nextFocused = container.querySelector<HTMLElement>(
+        `[data-task-id="${focusedTaskId}"]`,
+      );
+      if (!nextFocused) return;
 
-    // If focus is already on the target, do nothing
-    if (nextFocused === document.activeElement) return;
+      // If focus is already on the target, do nothing
+      if (nextFocused === document.activeElement) return;
 
-    const activeEl = document.activeElement;
+      const activeEl = document.activeElement;
 
-    // Don't steal focus from a nested TaskList (subtask list).
-    // Check if the focused element belongs to a deeper [role="listbox"]
-    // container — if so, this parent should not interfere.
-    if (
-      activeEl instanceof HTMLElement &&
-      container.contains(activeEl) &&
-      activeEl.closest('[role="listbox"]') !== container
-    ) {
-      return;
-    }
+      // Don't steal focus from a nested TaskList (subtask list).
+      // Check if the focused element belongs to a deeper [role="listbox"]
+      // container — if so, this parent should not interfere.
+      if (
+        activeEl instanceof HTMLElement &&
+        container.contains(activeEl) &&
+        activeEl.closest('[role="listbox"]') !== container
+      ) {
+        return;
+      }
 
-    // Primary lists can claim focus when nothing meaningful owns it
-    // (e.g. after view switch or inline input dismiss).
-    const focusIsUnowned = isPrimaryList && (!activeEl || activeEl === document.body);
-    if (!focusIsUnowned && !container.contains(activeEl)) return;
+      // Primary lists can claim focus when nothing meaningful owns it
+      // (e.g. after view switch or inline input dismiss).
+      const focusIsUnowned = isPrimaryList && (!activeEl || activeEl === document.body);
+      if (!focusIsUnowned && !container.contains(activeEl)) return;
 
-    // Use setTimeout to ensure any pending state updates or DOM changes complete first
-    setTimeout(() => {
       nextFocused.focus();
-    }, 10);
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [focusedIndex, isPrimaryList, tasks]);
 
   useEffect(() => {
@@ -329,9 +337,18 @@ export const TaskList = ({
 
   const handleToggleToday = useCallback(
     (taskId: string): void => {
+      const currentTask = tasks.find((t) => t.id === taskId);
+      const wasToday = currentTask?.today;
       void toggleToday(taskId);
+      // Only show toast when removing from Today while viewing Today (task leaves view)
+      if (wasToday && useAppStore.getState().activeView === 'today') {
+        useToastStore.getState().showToast('Removed from Today', async () => {
+          await getUntask().tasks.undoLastUserAction();
+          await useTaskStore.getState().refreshTasks();
+        });
+      }
     },
-    [toggleToday],
+    [tasks, toggleToday],
   );
 
   const handleCyclePriority = useCallback(
@@ -361,6 +378,11 @@ export const TaskList = ({
       );
 
       void updateTask({ id: taskId, status: nextStatus });
+      const label = statusLabelMap.get(nextStatus as PredefinedStatusId) ?? nextStatus;
+      useToastStore.getState().showToast(`Moved to ${label}`, async () => {
+        await getUntask().tasks.undoLastUserAction();
+        await useTaskStore.getState().refreshTasks();
+      });
     },
     [enabledNonTerminal, tasks, updateTask],
   );
@@ -485,6 +507,7 @@ export const TaskList = ({
         tabIndex={0}
         onKeyDown={onKeyDown}
         className="outline-none"
+        {...(isPrimaryList ? { 'data-primary-focusable': '' } : undefined)}
       >
         <p id={`${scopeId}-hint`} className="sr-only">
           Use Arrow Up and Arrow Down to move focus. Press Option+Arrow Up or Option+Arrow Down to reorder.
@@ -546,6 +569,21 @@ export const TaskList = ({
                         ariaLabel={`Subtasks for ${task.title}`}
                         scopeId={`subtasks:${task.id}`}
                         indentPx={8}
+                        onNavigatePrevGroup={() => {
+                          setFocusedIndex(index);
+                          requestAnimationFrame(() => {
+                            containerRef.current
+                              ?.querySelector<HTMLElement>(`[data-task-id="${task.id}"]`)
+                              ?.focus();
+                          });
+                        }}
+                        onNavigateNextGroup={() => {
+                          if (index < tasks.length - 1) {
+                            setFocusedIndex(index + 1);
+                          } else {
+                            onNavigateNextGroup?.();
+                          }
+                        }}
                       />
                     )}
                     {addingSubtaskForId === task.id && (

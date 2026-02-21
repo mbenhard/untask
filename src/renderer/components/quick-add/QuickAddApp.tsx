@@ -6,32 +6,13 @@ import type { Suggestion } from './slashCommands';
 import { detectSlashToken, extractTokens, getSuggestions } from './slashCommands';
 import { SlashPopover } from './SlashPopover';
 import { formatDueDateDisplay } from '../tasks/dueDate';
+import { PRIORITY_DOT, PRIORITY_LABEL, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { QuickAddDueDatePicker } from './QuickAddDueDatePicker';
 
 const COLLAPSED_HEIGHT = 60;
 const EXPANDED_HEIGHT = 102;
 
-// ─── Priority styling (matches InlineTaskInput / TaskItem) ───
-const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
-  none: 'bg-foreground/15',
-  low: 'bg-emerald-500',
-  medium: 'bg-amber-500',
-  high: 'bg-rose-500',
-};
-
-const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
-  none: 'priority',
-  low: 'Low',
-  medium: 'Med',
-  high: 'High',
-};
-
 const PRIORITY_ORDER: NonNullable<Task['priority']>[] = ['none', 'low', 'medium', 'high'];
-
-// Shared segment styling (matching InlineTaskInput)
-const SEGMENT =
-  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
-const SEGMENT_EMPTY = 'text-muted-foreground/50';
 
 type MetadataState = {
   priority: NonNullable<Task['priority']>;

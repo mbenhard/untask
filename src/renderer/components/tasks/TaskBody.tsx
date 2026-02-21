@@ -11,7 +11,11 @@ import type { Task, PredefinedStatusId } from '../../../types/models';
 import { PREDEFINED_STATUSES } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
+import { useFlashHighlight } from '../../hooks/useFlashHighlight';
+import { PRIORITY_DOT as SHARED_PRIORITY_DOT, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { useAppStore } from '../../stores/appStore';
+import { useToastStore } from '../../stores/toastStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import {
   useTaskStatusConfigStore,
@@ -31,10 +35,8 @@ type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
 const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
+  ...SHARED_PRIORITY_DOT,
   none: '',
-  low: 'bg-emerald-500',
-  medium: 'bg-amber-500',
-  high: 'bg-rose-500',
 };
 
 const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
@@ -43,11 +45,6 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
   medium: 'Med',
   high: 'High',
 };
-
-const SEGMENT =
-  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
-
-const SEGMENT_EMPTY = 'text-muted-foreground/50';
 
 const UNSUPPORTED_MEDIA_ITEMS = new Set(['Video', 'Audio']);
 
@@ -79,9 +76,20 @@ const PrioritySegment = ({
   const dot = PRIORITY_DOT[priority];
   const label = PRIORITY_LABEL[priority];
   const isEmpty = priority === 'none';
+  const ref = useRef<HTMLButtonElement>(null);
+  const flash = useFlashHighlight(ref);
+  const prevPriority = useRef(priority);
+
+  useEffect(() => {
+    if (priority !== prevPriority.current) {
+      prevPriority.current = priority;
+      flash();
+    }
+  }, [priority, flash]);
 
   return (
     <button
+      ref={ref}
       type="button"
       tabIndex={0}
       onClick={(e) => {
@@ -110,20 +118,35 @@ const DueDateSegment = ({
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
-}) => (
-  <TaskDueDatePicker
-    dueDate={task.dueDate}
-    emptyLabel="+ due date"
-    variant="segment"
-    reminderOffset={(task.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined}
-    onChange={(nextDueDate) => {
-      void onUpdate({ id: task.id, dueDate: nextDueDate });
-    }}
-    onReminderOffsetChange={(offset) => {
-      void onUpdate({ id: task.id, reminderOffset: offset });
-    }}
-  />
-);
+}) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const flash = useFlashHighlight(ref);
+  const prevDueDate = useRef(task.dueDate);
+
+  useEffect(() => {
+    if (task.dueDate !== prevDueDate.current) {
+      prevDueDate.current = task.dueDate;
+      flash();
+    }
+  }, [task.dueDate, flash]);
+
+  return (
+    <span ref={ref}>
+      <TaskDueDatePicker
+        dueDate={task.dueDate}
+        emptyLabel="+ due date"
+        variant="segment"
+        reminderOffset={(task.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined}
+        onChange={(nextDueDate) => {
+          void onUpdate({ id: task.id, dueDate: nextDueDate });
+        }}
+        onReminderOffsetChange={(offset) => {
+          void onUpdate({ id: task.id, reminderOffset: offset });
+        }}
+      />
+    </span>
+  );
+};
 
 // ─── Client Segment ─────────────────────────────────────────
 
@@ -238,6 +261,10 @@ const StatusSegment = ({
           type="button"
           onClick={() => {
             void onUpdate({ id: task.id, status: 'inbox' });
+            useToastStore.getState().showToast('Moved to Inbox', async () => {
+              await getUntask().tasks.undoLastUserAction();
+              await useTaskStore.getState().refreshTasks();
+            });
             setOpen(false);
           }}
           className={cn(
@@ -254,6 +281,10 @@ const StatusSegment = ({
             type="button"
             onClick={() => {
               void onUpdate({ id: task.id, status: id });
+              useToastStore.getState().showToast(`Moved to ${statusLabelMap.get(id) ?? id}`, async () => {
+                await getUntask().tasks.undoLastUserAction();
+                await useTaskStore.getState().refreshTasks();
+              });
               setOpen(false);
             }}
             className={cn(
@@ -274,6 +305,10 @@ const StatusSegment = ({
             type="button"
             onClick={() => {
               void onUpdate({ id: task.id, status: id });
+              useToastStore.getState().showToast(`Moved to ${statusLabelMap.get(id) ?? id}`, async () => {
+                await getUntask().tasks.undoLastUserAction();
+                await useTaskStore.getState().refreshTasks();
+              });
               setOpen(false);
             }}
             className={cn(
@@ -314,6 +349,16 @@ const RecurrenceSegment = ({
   const customTouched = useRef(false);
   const presetApplied = useRef(false);
   const isEmpty = !task.recurrence;
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const flash = useFlashHighlight(triggerRef);
+  const prevRecurrence = useRef(task.recurrence);
+
+  useEffect(() => {
+    if (task.recurrence !== prevRecurrence.current) {
+      prevRecurrence.current = task.recurrence;
+      flash();
+    }
+  }, [task.recurrence, flash]);
 
   const handleOpenChange = (next: boolean) => {
     if (!next && customTouched.current && !presetApplied.current) {
@@ -330,6 +375,7 @@ const RecurrenceSegment = ({
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           tabIndex={0}
           onClick={(e) => e.stopPropagation()}

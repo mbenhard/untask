@@ -13,6 +13,7 @@ let quickAddWin: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let activationSuppressedUntil = 0;
 let mainWasVisibleBeforeQuickAdd = false;
+let mainRecheckTimer: ReturnType<typeof setTimeout> | null = null;
 
 function resolveTheme(): 'dark' | 'light' {
   // Theme is stored in localStorage as 'untask-theme' in the renderer,
@@ -76,6 +77,9 @@ export function createQuickAddWindow(): void {
   // blur handler calls hideQuickAdd(). Without this, hiding a focused
   // window causes macOS to restore the hidden main window.
   ipcMain.on(IPC_CHANNELS.QUICK_ADD_HIDE, () => {
+    // Suppress activation BEFORE blurring so macOS can't activate the main
+    // window in the gap between blur() and the blur event firing hideQuickAdd().
+    activationSuppressedUntil = Date.now() + 500;
     if (quickAddWin && !quickAddWin.isDestroyed() && quickAddWin.isFocused()) {
       quickAddWin.blur();
     } else {
@@ -163,17 +167,43 @@ export function showQuickAdd(): void {
   if (!mainWasVisibleBeforeQuickAdd && main && !main.isDestroyed() && main.isVisible()) {
     main.hide();
   }
+
+  // Async re-check: macOS may restore the main window after the synchronous
+  // check above due to delayed app activation. Re-hide if it reappears.
+  if (!mainWasVisibleBeforeQuickAdd) {
+    if (mainRecheckTimer) clearTimeout(mainRecheckTimer);
+    mainRecheckTimer = setTimeout(() => {
+      mainRecheckTimer = null;
+      const m = getMainWindow();
+      if (m && !m.isDestroyed() && m.isVisible()) {
+        m.hide();
+      }
+    }, 150);
+  }
 }
 
 export function hideQuickAdd(): void {
   if (!quickAddWin || quickAddWin.isDestroyed()) return;
   activationSuppressedUntil = Date.now() + 500;
 
+  // Clear the async re-check timer if still pending (from 3c).
+  if (mainRecheckTimer) {
+    clearTimeout(mainRecheckTimer);
+    mainRecheckTimer = null;
+  }
+
   quickAddWin.hide();
 
   // Deactivate the app so macOS returns focus to the previous app.
   if (process.platform === 'darwin' && !mainWasVisibleBeforeQuickAdd) {
     app.hide();
+
+    // macOS may have activated the main window between hide() and app.hide().
+    // Re-hide if it appeared unexpectedly.
+    const main = getMainWindow();
+    if (main && !main.isDestroyed() && main.isVisible()) {
+      main.hide();
+    }
   }
 }
 

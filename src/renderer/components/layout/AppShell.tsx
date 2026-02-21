@@ -220,6 +220,10 @@ export const AppShell = () => {
     peekChatOverlay();
     clearPendingNoteContext();
     inputRef.current?.blur();
+    requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>('[data-primary-focusable]');
+      target?.focus();
+    });
   }, [clearPendingNoteContext, peekChatOverlay]);
 
   const activeConversationTitle = useMemo(() => {

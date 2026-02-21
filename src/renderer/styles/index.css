@@ -594,9 +594,20 @@
   animation: task-navigate-pulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+@keyframes field-changed-pulse {
+  0%   { background-color: color-mix(in srgb, var(--foreground) 12%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.field-changed-pulse {
+  animation: field-changed-pulse 400ms ease-out forwards;
+  border-radius: 2px;
+}
+
 /* Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
-  .task-navigated {
+  .task-navigated,
+  .field-changed-pulse {
     animation: none;
   }
   .bird-float,

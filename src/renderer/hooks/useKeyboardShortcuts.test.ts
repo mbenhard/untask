@@ -59,6 +59,7 @@ const resetStores = (): void => {
       title: 'Note',
       content: '',
       status: 'active',
+      isPinned: false,
       createdAt: null,
       updatedAt: null,
     }],

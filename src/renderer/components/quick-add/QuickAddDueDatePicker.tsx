@@ -2,15 +2,12 @@ import { useCallback, useRef, useState } from 'react';
 
 import { parseDate } from './slashCommands';
 import { formatDueDateDisplay } from '../tasks/dueDate';
+import { SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 
 type Props = {
   dueDate: string | null;
   onChange: (next: string | null) => void;
 };
-
-const SEGMENT =
-  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
-const SEGMENT_EMPTY = 'text-muted-foreground/50';
 
 /**
  * Lightweight due date picker for the quick-add window.

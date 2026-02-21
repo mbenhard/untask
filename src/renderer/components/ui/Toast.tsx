@@ -36,47 +36,43 @@ export const ToastContainer = () => {
     };
   }, [toast?.id, undoing, clearToast]);
 
-  if (!toast) return null;
-
-  const handleUndo = () => {
-    if (!toast.onUndo || undoing) return;
-    markUndoing();
-    void toast.onUndo();
-  };
-
-  const showUndo = toast.onUndo && !undoing;
-
   return (
     <AnimatePresence>
-      <motion.div
-        key={toast.id}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className={cn(
-          'fixed bottom-3 left-1/2 z-50 -translate-x-1/2',
-          'flex items-center gap-1.5',
-          'rounded-lg border border-border/60 bg-card/90 backdrop-blur-sm shadow-md',
-          'px-2.5 py-1.5',
-        )}
-      >
-        <span className="text-[11px] text-muted-foreground">
-          {undoing ? 'Undone' : toast.label}
-        </span>
-        {showUndo && (
-          <>
-            <span className="text-border">·</span>
-            <button
-              type="button"
-              onClick={handleUndo}
-              className="text-[11px] font-medium text-foreground hover:underline"
-            >
-              Undo
-            </button>
-          </>
-        )}
-      </motion.div>
+      {toast && (
+        <motion.div
+          key={toast.id}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className={cn(
+            'fixed bottom-3 left-1/2 z-50 -translate-x-1/2',
+            'flex items-center gap-1.5',
+            'rounded-lg border border-border/60 bg-card/90 backdrop-blur-sm shadow-md',
+            'px-2.5 py-1.5',
+          )}
+        >
+          <span className="text-[11px] text-muted-foreground">
+            {undoing ? 'Undone' : toast.label}
+          </span>
+          {toast.onUndo && !undoing && (
+            <>
+              <span className="text-border">·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (undoing) return;
+                  markUndoing();
+                  void toast.onUndo!();
+                }}
+                className="text-[11px] font-medium text-foreground hover:underline"
+              >
+                Undo
+              </button>
+            </>
+          )}
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };
