@@ -12,8 +12,6 @@ const BLUR_SUPPRESSION_MS = 150;
 let quickAddWin: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let activationSuppressedUntil = 0;
-let mainWasVisibleBeforeQuickAdd = false;
-let mainRecheckTimer: ReturnType<typeof setTimeout> | null = null;
 
 function resolveTheme(): 'dark' | 'light' {
   // Theme is stored in localStorage as 'untask-theme' in the renderer,
@@ -32,6 +30,7 @@ export function createQuickAddWindow(): void {
   quickAddWin = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: COLLAPSED_HEIGHT,
+    type: 'panel',
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -65,26 +64,19 @@ export function createQuickAddWindow(): void {
     );
   }
 
-  // Blur handler: dismiss on blur (Spotlight-style)
+  // Blur handler: dismiss on blur (Spotlight-style).
+  // With type: 'panel', blur fires naturally when the user clicks outside
+  // without macOS trying to activate the main window.
   quickAddWin.on('blur', () => {
     if (Date.now() < blurSuppressedUntil) return;
     hideQuickAdd();
   });
 
-  // Register IPC handlers for quick-add-specific channels.
-  // Blur the window instead of hiding directly — this makes the Escape
-  // path identical to click-outside: the app loses focus first, then the
-  // blur handler calls hideQuickAdd(). Without this, hiding a focused
-  // window causes macOS to restore the hidden main window.
+  // Escape key (from renderer) — hide directly.
+  // With type: 'panel', no blur() hack is needed because the panel
+  // never activated the app in the first place.
   ipcMain.on(IPC_CHANNELS.QUICK_ADD_HIDE, () => {
-    // Suppress activation BEFORE blurring so macOS can't activate the main
-    // window in the gap between blur() and the blur event firing hideQuickAdd().
-    activationSuppressedUntil = Date.now() + 500;
-    if (quickAddWin && !quickAddWin.isDestroyed() && quickAddWin.isFocused()) {
-      quickAddWin.blur();
-    } else {
-      hideQuickAdd();
-    }
+    hideQuickAdd();
   });
 
   ipcMain.on(IPC_CHANNELS.QUICK_ADD_RESIZE, (_event, height: number) => {
@@ -134,8 +126,7 @@ export function showQuickAdd(): void {
     return;
   }
 
-  // Suppress app activation handler so the main window doesn't also appear.
-  // On macOS, showing any BrowserWindow fires `did-become-active` on the app.
+  // Safety net: suppress app activation handler in case macOS fires it.
   activationSuppressedUntil = Date.now() + 500;
 
   suppressBlur();
@@ -144,7 +135,6 @@ export function showQuickAdd(): void {
   // Reset height to collapsed
   quickAddWin.setSize(WINDOW_WIDTH, COLLAPSED_HEIGHT);
 
-  // Build and send payload (clipboard auto-paste disabled)
   const theme = resolveTheme();
   const payload: QuickAddWindowPayload = {
     text: '',
@@ -152,59 +142,30 @@ export function showQuickAdd(): void {
     theme,
   };
 
-  // Record main window state so we can restore it on dismiss.
-  // macOS may restore the main window when the app activates for the quick add.
-  const main = getMainWindow();
-  mainWasVisibleBeforeQuickAdd = !!(main && !main.isDestroyed() && main.isVisible());
-
   // Send payload before showing so the renderer can apply the theme
   // before the first visible frame, preventing a light-mode flash.
   quickAddWin.webContents.send(IPC_CHANNELS.QUICK_ADD_PAYLOAD, payload);
-  quickAddWin.show();
+
+  // showInactive() + focus() is the recommended pattern for panel windows:
+  // shows the window and accepts keyboard input without activating the app.
+  quickAddWin.showInactive();
   quickAddWin.focus();
-
-  // If macOS restored the main window during app activation, re-hide it.
-  if (!mainWasVisibleBeforeQuickAdd && main && !main.isDestroyed() && main.isVisible()) {
-    main.hide();
-  }
-
-  // Async re-check: macOS may restore the main window after the synchronous
-  // check above due to delayed app activation. Re-hide if it reappears.
-  if (!mainWasVisibleBeforeQuickAdd) {
-    if (mainRecheckTimer) clearTimeout(mainRecheckTimer);
-    mainRecheckTimer = setTimeout(() => {
-      mainRecheckTimer = null;
-      const m = getMainWindow();
-      if (m && !m.isDestroyed() && m.isVisible()) {
-        m.hide();
-      }
-    }, 150);
-  }
 }
 
 export function hideQuickAdd(): void {
   if (!quickAddWin || quickAddWin.isDestroyed()) return;
+
+  // Safety net: suppress app activation handler.
   activationSuppressedUntil = Date.now() + 500;
 
-  // Clear the async re-check timer if still pending (from 3c).
-  if (mainRecheckTimer) {
-    clearTimeout(mainRecheckTimer);
-    mainRecheckTimer = null;
-  }
+  // Suppress blur to prevent re-entry from the blur event
+  // that fires when the focused window is hidden.
+  suppressBlur();
 
   quickAddWin.hide();
 
-  // Deactivate the app so macOS returns focus to the previous app.
-  if (process.platform === 'darwin' && !mainWasVisibleBeforeQuickAdd) {
-    app.hide();
-
-    // macOS may have activated the main window between hide() and app.hide().
-    // Re-hide if it appeared unexpectedly.
-    const main = getMainWindow();
-    if (main && !main.isDestroyed() && main.isVisible()) {
-      main.hide();
-    }
-  }
+  // With type: 'panel', no app.hide() is needed — the panel never
+  // activated the app, so focus returns to the previous app naturally.
 }
 
 export function isActivationSuppressed(): boolean {
