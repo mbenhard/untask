@@ -2,190 +2,268 @@
 
 All notable changes to Untask will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/),
-and this project adheres to [Semantic Versioning](https://semver.org/).
-
 ## [0.1.10] - 2026-02-20
 
-### Added
+Standalone floating window for rapid task entry with slash commands and keyboard reordering.
 
-- **Standalone quick add window** — New floating window for rapid task entry
-- **Redesigned quick add UI** — Slash commands & metadata row for richer task creation
-- **Option+Arrow keyboard shortcuts** — Reorder tasks with Option+Up/Down
-- **macOS Focus Mode integration** — Notifications onboarding now includes Focus Mode setup
-- **Website interactive previews** — Auto-playing demos on marketing site
+### Highlights
 
-### Improved
+- **Standalone quick add** — Floating window for task entry without opening the main app
+- **Slash commands** — Type `/priority`, `/due` in quick add for richer task creation
+- **Option+Arrow reordering** — Move tasks up and down with keyboard shortcuts
+- **macOS Focus Mode** — Notification onboarding includes Focus Mode setup
 
-- **Font presets** — Replaced Classic/Plex with Warm and Focus options
-- **Task component refactor** — Better keyboard navigation support
+### Changes
 
-### Fixed
+**Added**
+- Standalone quick add window
+- Redesigned quick add with slash commands and metadata row
+- Option+Up/Down for task reordering
+- macOS Focus Mode in notifications onboarding
+- Interactive previews on website
 
-- Duplicate task now recursively copies all subtasks
-- Duplicate task preserves effort, dueType, and reminderOffset
+**Improved**
+- Font presets: Warm and Focus replace Classic/Plex
+- Task components refactored for keyboard navigation
+
+**Fixed**
+- Duplicate task recursively copies subtasks
+- Duplicate preserves effort, dueType, reminderOffset
 - Focus management and subtask ordering
-- Confirmation dialog for completing tasks with active subtasks
-- Hide parent reference in nested subtask display
-- Settings notice banner replaced with floating toast
-- Eliminated startup flash and empty task list flicker
-- Fixed bundle ID for macOS notification registration
-- Assets.car tracking for CI packaging
-- AI gate evaluation now checks hard override before auto mode
+- Confirmation dialog for completing with active subtasks
+- Hidden parent reference in nested subtask display
+- Settings notice replaced with floating toast
+- Startup flash eliminated
+- Bundle ID for notification registration
+- AI gate checks hard override before auto mode
 
 ## [0.1.9] - 2026-02-20
 
-### Added
+Ollama overhaul, notes in search, cursor tooltips, and a notification system.
 
-- **Ollama overhaul** — Native API integration via `ai-sdk-ollama` with automatic model detection, slim mode for small models, thinking model support, pre-stream warmup, and speed optimizations
-- **Search notes** — Notes now appear in the search popup alongside tasks
-- **Tooltips** — Cursor-following tooltips on icon buttons, due date badges, and subtask counts
-- **Notification system** — In-app notifications with onboarding flow
-- **Keyboard shortcuts** — `Cmd+Backspace` to delete tasks; `Cmd+N` is now context-sensitive (creates a note in Notes view, task elsewhere)
-- **Task body indicator** — Visual dot showing which tasks have body content
-- **Navigation pulse** — Background pulse animation when navigating to a task
-- **Chat loading states** — Phase-aware indicators: Sending, Loading model, Thinking
-- **New AI models** — Additional OpenRouter models and updated tooling schema
-- **Onboarding model picker** — Model selection added to the provider setup step
+### Highlights
 
-### Improved
+- **Ollama overhaul** — Native API integration with auto model detection, slim mode, and thinking model support
+- **Search notes** — Notes now appear alongside tasks in the search popup
+- **Tooltips** — Cursor-following tooltips on buttons, badges, and counts
+- **Notifications** — In-app notification system with onboarding flow
+- **New shortcuts** — Cmd+Backspace to delete, context-sensitive Cmd+N
 
-- Onboarding identity and AI system prompt refined
-- Due date picker simplified with better time validation
-- Window minimum size increased (620x600) for better layout
+### Changes
+
+**Added**
+- Ollama native API via `ai-sdk-ollama` with model detection and warmup
+- Notes in search popup
+- Cursor-following tooltips
+- In-app notification system with onboarding
+- Cmd+Backspace to delete tasks
+- Context-sensitive Cmd+N (note in Notes view, task elsewhere)
+- Task body indicator dot
+- Navigation pulse animation
+- Chat loading states (Sending, Loading model, Thinking)
+- New OpenRouter models
+- Onboarding model picker
+
+**Improved**
+- Onboarding identity and AI prompt refined
+- Due date picker time validation simplified
+- Window minimum size increased to 620×600
 - Settings section titles use uppercase mono style
-- Simplified AI memory system (removed background knowledge extraction)
+- Simplified AI memory system
 
-### Fixed
-
+**Fixed**
 - Keyboard navigation across task groups
 - Task item layout shift on status change
-- Model catalog view layout and undo toast state
+- Model catalog layout and undo toast state
 - Ollama warmup validation and model size warnings
-- Empty chat bubble showing when stopping generation
-- Update banner now runs `brew update` before `brew upgrade`
+- Empty chat bubble when stopping generation
+- Update banner runs `brew update` before `brew upgrade`
 - Auto-approve for chat actions
 
 ## [0.1.8] - 2026-02-19
 
-### Changed
+Complete AI chat overhaul with modular tools and new settings UI.
 
-- **AI Chat refactor** — Major overhaul of chat orchestration with modular tools architecture (task, note, context helpers), error classification system, and improved stream handling
-- New settings UI: API key manager, model catalog, and provider selector
-- Added auto-titling for conversations
+### Highlights
+
+- **AI chat refactor** — Modular tools architecture with error classification and improved streaming
+- **Settings redesign** — API key manager, model catalog, and provider selector
+- **Auto-titling** — Conversations automatically titled based on content
+
+### Changes
+
+**Improved**
+- AI chat orchestration rewritten with modular tools (task, note, context)
+- New settings UI: API key manager, model catalog, provider selector
+- Auto-titling for conversations
 - Chat store refactored into modular slices
-
-### Website
-
-- Added Reminders sync callout to landing page
-- Updated preview sections
 
 ## [0.1.7] - 2026-02-19
 
-### Added
+Apple Reminders two-way sync, a global undo system, and Quick Add improvements.
 
-- **Apple Reminders sync** — Two-way sync with the macOS Reminders app via EventKit, with import, pull debounce, and race prevention
-- **Global undo system** — Undo task actions with toast notifications (Cmd+Z)
-- **Quick Add when AI is disabled** — Quick Add overlay works without AI enabled
+### Highlights
+
+- **Apple Reminders sync** — Two-way sync with macOS Reminders via EventKit
+- **Global undo** — Undo task actions with toast notifications and Cmd+Z
+- **Quick Add without AI** — Quick Add overlay works even with AI disabled
 - **Update notifications** — In-app update banner via Cloudflare Worker
 
-### Improved
+### Changes
 
-- Onboarding flow data persistence and polish
-- Quick Add overlay redesigned with unified popup styling
-- Reminders sync reliability (debounced pulls, race condition prevention)
+**Added**
+- Apple Reminders two-way sync with debounced pulls and race prevention
+- Global undo system with toast notifications
+- Quick Add overlay without AI dependency
+- In-app update banner
 
-### Fixed
+**Improved**
+- Onboarding flow persistence and polish
+- Quick Add overlay redesigned with unified styling
+- Reminders sync reliability
 
-- Chat hidden when AI is disabled; notification spam on AI toggle eliminated
-- BlockNote body correctly converted to markdown for Reminders notes
-- Swift helper date parsing and unsigned distribution build
+**Fixed**
+- Chat hidden when AI disabled; notification spam eliminated
+- BlockNote body converted to markdown for Reminders
+- Swift helper date parsing
 - Undo stack pollution prevented
 
 ## [0.1.6] - 2026-02-18
 
-Throttled update checks to 15-minute intervals; trigger on app activation.
+Update banner now checks on every window activation.
+
+### Changes
+
+**Fixed**
+- Update banner reliability when reopening without quitting
 
 ## [0.1.5] - 2026-02-18
 
-Redesigned due date picker UI and calendar styling; added note restore.
+Redesigned due date picker and note archive restore.
+
+### Highlights
+
+- **Due date picker** — Redesigned time input with cleaner layout and disabled state
+- **Calendar polish** — Refined day cell sizing, spacing, and selected state
+- **Note restore** — Archived notes can be restored back to active
+
+### Changes
+
+**Improved**
+- Due date picker time input redesigned
+- Calendar day cell sizing and spacing refined
+- Archived notes can be restored with one click
 
 ## [0.1.4] - 2026-02-18
 
-Fixed update banner: push notification from main process instead of renderer polling.
+Fixes the update banner not appearing for users on v0.1.2.
+
+### Changes
+
+**Fixed**
+- Update banner race condition: replaced renderer polling with push-based IPC
 
 ## [0.1.3] - 2026-02-18
 
-Standalone ReminderScheduler (no longer AI-gated); AI personalization with user's name; external links open in system browser.
+Native reminder notifications, a revamped due date picker, and AI personalization.
+
+### Highlights
+
+- **Native reminders** — macOS system notifications for due tasks, even with AI disabled
+- **Click-to-navigate** — Tapping a notification opens Untask and jumps to the task
+- **Overdue catch-up** — Missed reminders fire on next launch
+- **Remind me presets** — At due time, 15 min, 1 hour, or 1 day before
+- **Due date shortcuts** — Today, Tomorrow, Next Week in the picker
+
+### Changes
+
+**Added**
+- Native macOS reminder notifications independent of AI
+- Click-to-navigate notification handling
+- Overdue catch-up on app launch
+- Remind me offset selector in due date picker
+- Due date quick presets (Today, Tomorrow, Next Week)
+
+**Improved**
+- AI assistant uses your name from onboarding
+- Upgraded to Claude Sonnet 4.6
+
+**Fixed**
+- External links open in default browser
+- Chat timestamp alignment
 
 ## [0.1.2] - 2026-02-18
 
-### Added
+Multi-provider AI, file attachments, and macOS-native window behavior.
 
-- **Multi-provider AI support** — Switch between OpenRouter, OpenAI, Anthropic, and Ollama from Settings with validated API key storage
-- **File attachments in notes** — Drag-and-drop images and files into the note editor with automatic image resizing
-- **Chat thread sidebar** — Browse and switch between conversation threads in a dedicated sidebar
-- **Bird mascot** — Animated companion in the chat interface
-- **Dock mode** — Toggle between tray-only and dock app modes
-- **Keyboard shortcuts for notes** — Arrow keys to navigate notes list, Enter to open, improved focus management
-- **Custom URL protocol** — `untask://` protocol handler for deep linking
-- **SettingsCard component** — Reusable card component for the settings UI
-- **File context menus** — Right-click context menus in the block editor
+### Highlights
 
-### Changed
+- **Multi-provider AI** — Switch between OpenRouter, OpenAI, Anthropic, and Ollama from Settings
+- **File attachments** — Drag-and-drop images and files into notes with auto-resizing
+- **Chat sidebar** — Browse and switch conversation threads in a dedicated sidebar
+- **macOS window behavior** — Window shows on launch, close hides to tray, position remembered
+- **Bulletproof API keys** — Encrypted Keychain storage with automatic fallback
 
-- **Window shows on launch** — App window appears when clicking the dock icon or launching the app
-- **Close button hides, doesn't quit** — Cmd+W and the close button hide the window; quit via Cmd+Q or tray menu
-- **Window position restored** — Remembers size and position across restarts
-- **Single instance lock** — Prevents duplicate app instances; re-focuses existing window
-- **Redesigned Settings** — Expanded shortcuts UI, better visual design for general and AI settings
-- **Enhanced block editor** — File handling support with context menus
-- **Improved task body** — Better formatting and rendering in task detail view
-- **Simplified chat input** — Cleaner input area design
-- **Extended CSS system** — Refined styles across the app
-- **Provider abstraction** — Clean factory pattern for AI providers with typed configs
-- **Refactored IPC** — Domain-organized handlers with better error handling
-- **Runtime AI toggle** — Start/stop the proactive AI loop from settings without restart
+### Changes
 
-### Fixed
+**Added**
+- Multi-provider AI support with validated API key storage
+- File attachments in notes with automatic image resizing
+- Chat thread sidebar
+- Bird mascot in chat
+- Dock mode toggle
+- Keyboard shortcuts for notes
+- Custom `untask://` protocol handler
 
-- **API key storage reliability** — Dual-slot strategy: encrypted via macOS Keychain when available, with plaintext fallback that always works (even for unsigned builds)
-- **API key validation** — OpenRouter, OpenAI, and Anthropic keys validated against authenticated endpoints
-- **Zod validation on IPC** — All API key handlers validate input with Zod schemas
+**Improved**
+- Window shows on launch, close hides to tray
+- Window position and size restored across restarts
+- Single instance lock prevents duplicate windows
+- Redesigned Settings UI
+- Provider abstraction with typed configs
+- Domain-organized IPC handlers
 
-### Removed
-
-- `@extractus/article-extractor` dependency (unused)
-- ThreadDropdown component (replaced by ThreadListView sidebar)
-
-### Security
-
-- Electron security fuses configured for production hardening
-- API keys stripped from backup exports
-- Background update checker for new versions
+**Fixed**
+- API key storage reliability with dual-slot strategy
+- API key validation against authenticated endpoints
+- Zod validation on all IPC handlers
 
 ## [0.1.1] - 2026-02-18
 
-### Fixed
+Fixes the native database module missing from the packaged app.
 
-- Native `better-sqlite3` module included in packaged app (was excluded by Vite plugin's default ignore)
-- pnpm `symlink=false` in `.npmrc` to fix native module packaging
-- `.npmrc` `node-linker=hoisted` for Electron Forge compatibility
-- CI pipeline: full `pnpm install` (not `--ignore-scripts`) to download Electron binary
-- Added missing `@ai-sdk/anthropic` dependency
+### Changes
+
+**Fixed**
+- Native `better-sqlite3` module included in packaged app
+- Version corrected from 1.0.0 to 0.1.1
 
 ## [0.1.0] - 2026-02-18
 
-### Added
+Initial open-source release — local-first task management with an optional AI assistant.
 
-- Initial open-source release
-- Local-first task management with SQLite database
-- AI chat assistant (OpenRouter provider)
-- Note-taking with BlockNote editor
-- Tray app with global keyboard shortcut (Ctrl+Space)
-- Proactive AI assistant with memory and journaling
-- macOS app with Electron Forge packaging
-- Homebrew cask distribution
+### Highlights
+
+- **Task management** — Configurable status lanes with drag-and-drop reordering
+- **AI assistant** — Chat-based task creation with multi-provider support (bring your own key)
+- **Rich notes** — BlockNote editor with full-text search across tasks and notes
+- **Global shortcut** — Clipboard quick-add via Ctrl+Space
+- **Dark mode default** — Monochrome UI with light mode parity
+
+### Changes
+
+**Added**
+- Task management with configurable status lanes
+- Drag-and-drop reordering
+- Rich text notes (BlockNote editor)
+- Full-text search across tasks and notes
+- Clipboard quick-add via global shortcut
+- Backup and restore (encrypted export supported)
+- Dark mode default with light mode
+- Multi-provider AI: OpenRouter, OpenAI, Anthropic, Ollama
+- Chat-based task creation and modification
+- Structured AI memory system (profile, patterns, observations)
+- All AI mutations logged and undoable
 
 [0.1.10]: https://github.com/mbenhard/untask/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/mbenhard/untask/compare/v0.1.8...v0.1.9
