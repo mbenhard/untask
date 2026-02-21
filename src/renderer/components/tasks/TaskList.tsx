@@ -38,11 +38,11 @@ import {
   getNextStatusInCycle,
   getStatusAfterToggleComplete,
 } from './taskInteraction';
-
-const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 import { reconcileScopedReorder } from './statusLaneDrag';
 import { TaskBody } from './TaskBody';
 import { TaskItem } from './TaskItem';
+
+const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
 export interface TaskListProps {
   tasks: Task[];

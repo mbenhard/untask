@@ -40,8 +40,6 @@ export interface TaskItemProps {
   children?: ReactNode;
 }
 
-// Imported from shared constants
-
 const SORTABLE_TRANSITION = {
   duration: 220,
   easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
