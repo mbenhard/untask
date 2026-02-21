@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { Note } from '../../types/models';
 import { isBlockNoteJson } from '../components/editor/editorUtils';
 import { toErrorMessage } from '../lib/errors';
+import { deriveAutoTitle } from '../lib/noteUtils';
 import { getUntask } from '../lib/untask';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
@@ -34,7 +35,6 @@ type NotesStore = {
 
   // Editor state
   activeNoteId: string | null;
-  activeNoteTitle: string;
   activeNoteUpdatedAt: string | null;
   content: string;
   isLegacyMarkdown: boolean;
@@ -54,7 +54,6 @@ type NotesStore = {
   backToList: () => Promise<void>;
 
   setContent: (content: string) => void;
-  setTitle: (title: string) => void;
   save: () => Promise<boolean>;
   flushAndSave: () => Promise<boolean>;
 
@@ -211,7 +210,6 @@ const NOTES_LIST_RESET_STATE = {
   subView: 'list' as const,
   layoutMode: 'list' as const,
   activeNoteId: null,
-  activeNoteTitle: '',
   activeNoteUpdatedAt: null,
   content: '',
   isDirty: false,
@@ -228,7 +226,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   isWideViewport: getInitialIsWideViewport(),
 
   activeNoteId: null,
-  activeNoteTitle: '',
   activeNoteUpdatedAt: null,
   content: '',
   isLegacyMarkdown: false,
@@ -277,7 +274,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         layoutMode: nextLayout,
         activeNoteId: note.id,
         selectedListNoteId: note.id,
-        activeNoteTitle: note.title,
         activeNoteUpdatedAt: note.updatedAt,
         content: note.content,
         isLegacyMarkdown: false,
@@ -313,7 +309,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         layoutMode: nextLayout,
         activeNoteId: note.id,
         selectedListNoteId: note.id,
-        activeNoteTitle: note.title,
         activeNoteUpdatedAt: note.updatedAt,
         content: raw,
         isLegacyMarkdown: legacy,
@@ -382,36 +377,25 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       return { content, isDirty: true, isLegacyMarkdown: false };
     }),
 
-  setTitle: (title) =>
-    set((state) => {
-      if (state.activeNoteTitle === title) return state;
-      return { activeNoteTitle: title, isDirty: true };
-    }),
-
   save: async () => {
-    const { isDirty, content, activeNoteTitle, isSaving, activeNoteId } = get();
+    const { isDirty, content, isSaving, activeNoteId } = get();
     if (!isDirty || isSaving || !activeNoteId) {
       return true;
     }
 
     set({ isSaving: true, error: null });
     try {
-      const saved = await getUntask().notes.save(activeNoteId, content, activeNoteTitle);
+      const saved = await getUntask().notes.save(activeNoteId, content);
       let persisted = false;
       set((state) => {
         // If content changed while saving, keep dirty.
-        if (
-          state.activeNoteId !== activeNoteId
-          || state.content !== content
-          || state.activeNoteTitle !== activeNoteTitle
-        ) {
+        if (state.activeNoteId !== activeNoteId || state.content !== content) {
           return { isSaving: false, error: null };
         }
 
         persisted = true;
         return {
           content: saved?.content ?? content,
-          activeNoteTitle: saved?.title ?? activeNoteTitle,
           isDirty: false,
           isSaving: false,
           error: null,
@@ -527,7 +511,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       isDirty,
       isProcessing,
       activeNoteId,
-      activeNoteTitle,
     } = get();
 
     if (isProcessing || !activeNoteId) {
@@ -565,9 +548,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }
 
       // Stage note context for the next chat turn; user provides the first instruction.
+      const noteTitle = deriveAutoTitle(get().content) || 'Untitled note';
       useChatStore.getState().stageNoteContext({
         noteId: activeNoteId,
-        title: activeNoteTitle.trim().length > 0 ? activeNoteTitle : 'Untitled note',
+        title: noteTitle,
         markdown: promptContent,
       });
       useAppStore.getState().openChatOverlay();
@@ -686,7 +670,6 @@ export const selectActiveNotes = (state: NotesStore) => state.activeNotes;
 export const selectArchivedNotes = (state: NotesStore) => state.archivedNotes;
 export const selectSelectedListNoteId = (state: NotesStore) => state.selectedListNoteId;
 export const selectActiveNoteId = (state: NotesStore) => state.activeNoteId;
-export const selectActiveNoteTitle = (state: NotesStore) => state.activeNoteTitle;
 export const selectActiveNoteUpdatedAt = (state: NotesStore) => state.activeNoteUpdatedAt;
 export const selectNotesContent = (state: NotesStore) => state.content;
 export const selectNotesIsLegacyMarkdown = (state: NotesStore) => state.isLegacyMarkdown;

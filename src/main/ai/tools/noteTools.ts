@@ -99,7 +99,7 @@ export const editNoteTool = {
         context,
         'edit_note',
         'Note appended',
-        `Added ${input.content.length} characters to "${current.title}".`,
+        `Added ${input.content.length} characters to "${getDisplayTitle(current)}".`,
         {
           before: beforeContent,
           after: nextContent,
@@ -126,7 +126,7 @@ export const editNoteTool = {
         'edit_note',
         'Note section replaced',
         [
-          `Updated one section in "${current.title}".`,
+          `Updated one section in "${getDisplayTitle(current)}".`,
           `Before: "${normalizeForSummary(input.target, 72)}"`,
           `After: "${normalizeForSummary(input.replacement, 72)}"`,
         ].join(' '),
@@ -152,7 +152,7 @@ export const editNoteTool = {
       context,
       'edit_note',
       'Note rewritten',
-      `Replaced full note "${current.title}" (${beforeContent.length} -> ${nextContent.length} chars).`,
+      `Replaced full note "${getDisplayTitle(current)}" (${beforeContent.length} -> ${nextContent.length} chars).`,
       {
         before: beforeContent,
         after: nextContent,

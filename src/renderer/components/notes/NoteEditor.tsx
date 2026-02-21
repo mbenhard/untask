@@ -9,7 +9,6 @@ import { Archive, ArchiveRestore, ArrowLeft, CheckSquare, Sparkles, Trash2 } fro
 
 import {
   selectActiveNoteId,
-  selectActiveNoteTitle,
   selectActiveNoteUpdatedAt,
   selectIsActiveNoteArchived,
   selectNotesContent,
@@ -42,31 +41,6 @@ const formatEditedTime = (iso: string | null): string => {
   // Fall back to absolute date
   const d = new Date(iso);
   return `Edited ${d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`;
-};
-
-type BlockContent = { type?: string; text?: string };
-type Block = { type?: string; content?: BlockContent[] };
-
-const deriveAutoTitleFromContent = (content: string): string => {
-  if (!content.trim()) return '';
-  try {
-    const blocks = JSON.parse(content) as Block[];
-    if (!Array.isArray(blocks)) return '';
-    for (const block of blocks) {
-      if (block.type === 'image' || block.type === 'file') continue;
-      if (!block.content || !Array.isArray(block.content)) continue;
-      const text = block.content
-        .filter((c) => c.type === 'text' && c.text)
-        .map((c) => c.text)
-        .join('')
-        .trim();
-      if (text) return text.length > 120 ? text.slice(0, 120) + '\u2026' : text;
-    }
-    return '';
-  } catch {
-    const firstLine = content.split('\n').find((l) => l.trim());
-    return firstLine?.replace(/^#+\s*/, '').trim() || '';
-  }
 };
 
 // ─── Slash menu items ──────────────────────────────────────
@@ -132,7 +106,6 @@ type NoteEditorProps = {
 
 export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const activeNoteId = useNotesStore(selectActiveNoteId);
-  const title = useNotesStore(selectActiveNoteTitle);
   const updatedAt = useNotesStore(selectActiveNoteUpdatedAt);
   const content = useNotesStore(selectNotesContent);
   const isDirty = useNotesStore(selectNotesIsDirty);
@@ -143,7 +116,6 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const notice = useNotesStore(selectNotesNotice);
   const isArchived = useNotesStore(selectIsActiveNoteArchived);
   const setContent = useNotesStore((s) => s.setContent);
-  const setTitle = useNotesStore((s) => s.setTitle);
   const backToList = useNotesStore((s) => s.backToList);
   const archiveNote = useNotesStore((s) => s.archiveNote);
   const restoreNote = useNotesStore((s) => s.restoreNote);
@@ -208,20 +180,6 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     }
   }, [activeNoteId, isLoading]);
 
-  const handleTitleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setTitle(e.target.value);
-    },
-    [setTitle],
-  );
-
-  const handleTitleBlur = useCallback(() => {
-    // Trigger save on title blur to persist title changes.
-    if (useNotesStore.getState().isDirty) {
-      void useNotesStore.getState().save();
-    }
-  }, []);
-
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -253,21 +211,13 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           </Button>
         ) : null}
 
-        <div className="min-w-0 flex-1">
-          <input
-            type="text"
-            value={title}
-            onChange={handleTitleChange}
-            onBlur={handleTitleBlur}
-            className="w-full bg-transparent pl-[9px] text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground/60"
-            placeholder={deriveAutoTitleFromContent(content) || 'Untitled note'}
-          />
-          {updatedAt ? (
-            <p className="pl-[9px] text-[10px] text-muted-foreground/70">
-              {formatEditedTime(updatedAt)}
-            </p>
-          ) : null}
-        </div>
+        {updatedAt ? (
+          <span className="text-[10px] text-muted-foreground/70">
+            {formatEditedTime(updatedAt)}
+          </span>
+        ) : null}
+
+        <div className="min-w-0 flex-1" />
 
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
           {notice ? (

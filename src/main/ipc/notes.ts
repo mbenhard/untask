@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../types/ipc';
 import { withIpcLogging } from './helpers';
-import { noteIdSchema, noteTitleSchema, noteSaveSchema } from './schemas';
+import { noteIdSchema, noteSaveSchema } from './schemas';
 import {
   createNote,
   getNote,
@@ -13,9 +13,12 @@ import {
   pinNote,
   unpinNote,
   duplicateNote,
+  migrateNoteTitlesToContent,
 } from '../services/notesService';
 
 export const registerNotesHandlers = (): void => {
+  // One-time migration: move stored titles into note content
+  migrateNoteTitlesToContent();
   ipcMain.handle(
     IPC_CHANNELS.NOTES_LIST,
     withIpcLogging('NOTES_LIST', () => {
@@ -33,21 +36,19 @@ export const registerNotesHandlers = (): void => {
 
   ipcMain.handle(
     IPC_CHANNELS.NOTES_CREATE,
-    withIpcLogging('NOTES_CREATE', (_event: Electron.IpcMainInvokeEvent, titleInput?: string) => {
-      const title = noteTitleSchema.parse(titleInput);
-      return createNote(title);
+    withIpcLogging('NOTES_CREATE', () => {
+      return createNote();
     }),
   );
 
   ipcMain.handle(
     IPC_CHANNELS.NOTES_SAVE,
-    withIpcLogging('NOTES_SAVE', (_event: Electron.IpcMainInvokeEvent, idInput: string, contentInput: string, titleInput?: string) => {
+    withIpcLogging('NOTES_SAVE', (_event: Electron.IpcMainInvokeEvent, idInput: string, contentInput: string) => {
       const validated = noteSaveSchema.parse({
         id: idInput,
         content: contentInput,
-        title: titleInput,
       });
-      return saveNote(validated.id, validated.content, validated.title);
+      return saveNote(validated.id, validated.content);
     }),
   );
 

@@ -339,9 +339,9 @@ const untaskApi: UntaskApi = {
   notes: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES_LIST),
     get: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_GET, id),
-    create: (title?: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE, title),
-    save: (id: string, content: string, title?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content, title),
+    create: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE),
+    save: (id: string, content: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content),
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
     restore: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RESTORE, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),

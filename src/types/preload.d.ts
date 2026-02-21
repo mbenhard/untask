@@ -190,8 +190,8 @@ export type UntaskApi = {
   notes: {
     list: () => Promise<{ active: Note[]; archived: Note[] }>;
     get: (id: string) => Promise<Note | undefined>;
-    create: (title?: string) => Promise<Note>;
-    save: (id: string, content: string, title?: string) => Promise<Note | undefined>;
+    create: () => Promise<Note>;
+    save: (id: string, content: string) => Promise<Note | undefined>;
     archive: (id: string) => Promise<Note | undefined>;
     restore: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;

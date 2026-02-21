@@ -69,7 +69,6 @@ const resetStores = (): void => {
     subView: 'list',
     layoutMode: 'list',
     activeNoteId: null,
-    activeNoteTitle: '',
     content: '',
     error: null,
     notice: null,

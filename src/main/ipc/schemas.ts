@@ -77,12 +77,9 @@ export const chatThreadMutationSchema = z.object({
 
 export const noteIdSchema = z.string().min(1);
 
-export const noteTitleSchema = z.string().max(200).optional();
-
 export const noteSaveSchema = z.object({
   id: z.string().min(1),
   content: z.string(),
-  title: z.string().max(200).optional(),
 });
 
 export const memoryHistoryRequestSchema = z.object({

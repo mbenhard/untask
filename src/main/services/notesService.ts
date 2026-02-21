@@ -90,13 +90,67 @@ export const blockNoteToMarkdown = (raw: string): string => {
 
 const EMPTY_NOTE_TTL_MS = 60_000; // 1 minute
 
-export function createNote(title?: string): Note {
+/**
+ * One-time migration: prepend stored titles into note content as a heading block,
+ * then clear the title field. This allows titles to be derived purely from content.
+ * Safe to call multiple times — only affects notes with non-empty titles.
+ */
+export function migrateNoteTitlesToContent(): void {
+  const db = getDb();
+  const withTitles = db
+    .select()
+    .from(notes)
+    .where(and(
+      // SQLite: title != '' AND title IS NOT NULL
+      // drizzle-orm doesn't have a neq('') helper, so we use a raw filter
+    ))
+    .all()
+    .filter((n) => n.title.length > 0);
+
+  for (const note of withTitles) {
+    let newContent: string;
+
+    try {
+      const blocks = JSON.parse(note.content);
+      if (Array.isArray(blocks)) {
+        // Prepend the title as a heading block into the BlockNote JSON
+        const titleBlock = {
+          id: crypto.randomUUID(),
+          type: 'heading',
+          props: {
+            textColor: 'default',
+            backgroundColor: 'default',
+            textAlignment: 'left',
+            level: 1,
+          },
+          content: [{ type: 'text', text: note.title, styles: {} }],
+          children: [],
+        };
+        newContent = JSON.stringify([titleBlock, ...blocks]);
+      } else {
+        // Non-array JSON — prepend as markdown heading
+        newContent = `# ${note.title}\n\n${note.content}`;
+      }
+    } catch {
+      // Legacy markdown or plain text — prepend as heading
+      const content = note.content.trim();
+      newContent = content ? `# ${note.title}\n\n${content}` : `# ${note.title}`;
+    }
+
+    db.update(notes)
+      .set({ title: '', content: newContent })
+      .where(eq(notes.id, note.id))
+      .run();
+  }
+}
+
+export function createNote(): Note {
   const db = getDb();
   const now = new Date().toISOString();
 
   const [created] = db
     .insert(notes)
-    .values({ title: title ?? '', content: '', status: 'active', updatedAt: now })
+    .values({ title: '', content: '', status: 'active', updatedAt: now })
     .returning()
     .all();
   return created;
@@ -112,19 +166,13 @@ export function getNote(id: string): Note | undefined {
   return note;
 }
 
-export function saveNote(
-  id: string,
-  content: string,
-  title?: string,
-): Note | undefined {
+export function saveNote(id: string, content: string): Note | undefined {
   const db = getDb();
   const now = new Date().toISOString();
-  const set: Record<string, string> = { content, updatedAt: now };
-  if (title !== undefined) set.title = title;
 
   const [updated] = db
     .update(notes)
-    .set(set)
+    .set({ content, updatedAt: now })
     .where(eq(notes.id, id))
     .returning()
     .all();
@@ -162,7 +210,7 @@ export function pinNote(id: string): Note | undefined {
   const db = getDb();
   const [updated] = db
     .update(notes)
-    .set({ isPinned: true, updatedAt: new Date().toISOString() })
+    .set({ isPinned: true })
     .where(eq(notes.id, id))
     .returning()
     .all();
@@ -173,7 +221,7 @@ export function unpinNote(id: string): Note | undefined {
   const db = getDb();
   const [updated] = db
     .update(notes)
-    .set({ isPinned: false, updatedAt: new Date().toISOString() })
+    .set({ isPinned: false })
     .where(eq(notes.id, id))
     .returning()
     .all();
@@ -188,7 +236,7 @@ export function duplicateNote(id: string): Note | undefined {
   const [created] = db
     .insert(notes)
     .values({
-      title: original.title,
+      title: '',
       content: original.content,
       status: 'active',
       isPinned: false,

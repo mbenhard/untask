@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Archive,
@@ -14,6 +14,7 @@ import {
 import type { Note } from '../../../types/models';
 import { useAutoFocusList } from '../../hooks/useAutoFocusList';
 import { useNotesListKeyboard } from '../../hooks/useNotesListKeyboard';
+import { deriveAutoTitle, getContentPreview, getDisplayTitle } from '../../lib/noteUtils';
 import { cn } from '../../lib/utils';
 import {
   selectActiveNotes,
@@ -37,93 +38,6 @@ const formatRelativeTime = (iso: string | null): string => {
   const days = Math.floor(hours / 24);
   if (days === 1) return 'yesterday';
   return `${days}d ago`;
-};
-
-type BlockContent = { type?: string; text?: string };
-type Block = {
-  type?: string;
-  content?: BlockContent[];
-  children?: Block[];
-};
-
-const extractBlockText = (block: Block): string => {
-  if (!block.content || !Array.isArray(block.content)) return '';
-  return block.content
-    .filter((c) => c.type === 'text' && c.text)
-    .map((c) => c.text)
-    .join('')
-    .trim();
-};
-
-/**
- * Derive an auto-title from note content when stored title is empty.
- * Returns the first non-empty text block's text, capped at 120 chars.
- */
-const deriveAutoTitle = (content: string): string => {
-  if (!content.trim()) return '';
-
-  try {
-    const blocks = JSON.parse(content) as Block[];
-    if (!Array.isArray(blocks)) return '';
-
-    for (const block of blocks) {
-      if (block.type === 'image' || block.type === 'file') continue;
-      const text = extractBlockText(block);
-      if (text) return text.length > 120 ? text.slice(0, 120) + '\u2026' : text;
-    }
-    return '';
-  } catch {
-    const firstLine = content.split('\n').find((l) => l.trim());
-    if (!firstLine) return '';
-    const cleaned = firstLine.replace(/^#+\s*/, '').trim();
-    return cleaned.length > 120 ? cleaned.slice(0, 120) + '\u2026' : cleaned;
-  }
-};
-
-/**
- * Get the display title for a note.
- * If stored title is empty, derive from content.
- */
-const getDisplayTitle = (note: Note): string => {
-  if (note.title) return note.title;
-  return deriveAutoTitle(note.content) || 'Empty note';
-};
-
-/**
- * Get the content preview line, skipping the first text block
- * if auto-title is active (to avoid duplicating the title in the preview).
- */
-const getPreview = (note: Note): string => {
-  const content = note.content;
-  if (!content.trim()) return 'Empty note';
-  const isAutoTitle = !note.title;
-
-  try {
-    const blocks = JSON.parse(content) as Block[];
-    if (!Array.isArray(blocks)) return 'Empty note';
-
-    let skippedFirst = false;
-    for (const block of blocks) {
-      if (block.type === 'image' || block.type === 'file') continue;
-      const text = extractBlockText(block);
-      if (!text) continue;
-
-      // Skip the first text block if it was used for auto-title
-      if (isAutoTitle && !skippedFirst) {
-        skippedFirst = true;
-        continue;
-      }
-
-      return text;
-    }
-
-    return isAutoTitle ? '' : 'Empty note';
-  } catch {
-    // Legacy markdown
-    const lines = content.split('\n').filter((l) => l.trim());
-    const start = isAutoTitle ? 1 : 0;
-    return lines[start]?.replace(/^#+\s*/, '').trim() || '';
-  }
 };
 
 // ─── Context Menu ────────────────────────────────────────────
@@ -184,7 +98,7 @@ const NoteContextMenu = ({
     };
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
     const el = menuRef.current;
@@ -290,8 +204,8 @@ const NoteListItem = ({
   onUnpin,
   onArchive,
 }: NoteListItemProps) => {
-  const title = getDisplayTitle(note);
-  const preview = getPreview(note);
+  const title = getDisplayTitle(note.title, note.content);
+  const preview = getContentPreview(note.title, note.content);
   const isEmptyTitle = !note.title && !deriveAutoTitle(note.content);
 
   return (
@@ -335,67 +249,57 @@ const NoteListItem = ({
       {onPin || onUnpin || onArchive ? (
         <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           {note.isPinned && onUnpin ? (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               className="rounded p-0.5 text-muted-foreground hover:text-foreground"
               onClick={(e) => { e.stopPropagation(); onUnpin(note.id); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onUnpin(note.id); } }}
               aria-label="Unpin note"
             >
               <Pin size={12} />
-            </span>
+            </button>
           ) : onPin ? (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               className="rounded p-0.5 text-muted-foreground hover:text-foreground"
               onClick={(e) => { e.stopPropagation(); onPin(note.id); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onPin(note.id); } }}
               aria-label="Pin note"
             >
               <Pin size={12} />
-            </span>
+            </button>
           ) : null}
           {onArchive ? (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               className="rounded p-0.5 text-muted-foreground hover:text-foreground"
               onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onArchive(note.id); } }}
               aria-label="Archive note"
             >
               <Archive size={12} />
-            </span>
+            </button>
           ) : null}
         </span>
       ) : null}
 
       {/* Hover actions for archived notes */}
       {onRestore ? (
-        <span
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
           onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onRestore(note.id); } }}
           aria-label="Restore note"
         >
           <ArchiveRestore size={12} />
-        </span>
+        </button>
       ) : null}
       {onDelete && !onArchive ? (
-        <span
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
           onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onDelete(note.id); } }}
           aria-label="Delete note"
         >
           <Trash2 size={12} />
-        </span>
+        </button>
       ) : null}
 
       {/* Timestamp — hidden on hover when actions are visible */}
