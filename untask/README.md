@@ -13,6 +13,7 @@
   <a href="https://github.com/mbenhard/untask/releases/latest"><img src="https://img.shields.io/github/v/release/mbenhard/untask?label=download&color=black" alt="Download latest release" /></a>
   <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform: macOS" />
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  <a href="https://unta.sk"><img src="https://img.shields.io/badge/website-unta.sk-000000" alt="Website" /></a>
 </p>
 
 <br/>
@@ -173,18 +174,25 @@ The `.npmrc` includes `node-linker=hoisted` and `symlink=false` — both are req
 untask/
 ├── src/
 │   ├── main/              # Electron main process
-│   │   ├── ai/            # AI providers, chat, memory, tools
+│   │   ├── ai/            # AI providers, tools, memory
+│   │   ├── assistant/     # Proactive assistant & nudges
 │   │   ├── db/            # SQLite schema + migrations
+│   │   ├── ipc/           # IPC handlers (domain-organized)
+│   │   ├── lib/           # Shared main-process utilities
 │   │   ├── services/      # Task, notes, chat, settings services
 │   │   └── window/        # Window management, tray, dock mode
 │   ├── preload/           # IPC bridge (typed APIs)
 │   ├── renderer/          # React UI
 │   │   ├── components/    # All UI components
 │   │   ├── hooks/         # Custom React hooks
+│   │   ├── lib/           # Shared renderer utilities
 │   │   ├── stores/        # Zustand state stores
-│   │   └── styles/        # Global CSS
+│   │   ├── styles/        # Global CSS
+│   │   └── utils/         # Helpers and formatters
 │   └── types/             # Shared TypeScript types
 ├── drizzle/               # SQL migration files
+├── scripts/               # Build and release scripts
+├── swift-helper/          # Native macOS Swift helper
 ├── assets/                # App icons, tray icons
 └── docs/                  # Architecture, release docs
 ```
