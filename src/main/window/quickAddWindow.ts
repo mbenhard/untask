@@ -75,11 +75,11 @@ export function createQuickAddWindow(): void {
   // Escape key (from renderer) — hide directly.
   // With type: 'panel', no blur() hack is needed because the panel
   // never activated the app in the first place.
-  ipcMain.on(IPC_CHANNELS.QUICK_ADD_HIDE, () => {
+  const onHide = () => {
     hideQuickAdd();
-  });
+  };
 
-  ipcMain.on(IPC_CHANNELS.QUICK_ADD_RESIZE, (_event, height: number) => {
+  const onResize = (_event: Electron.IpcMainEvent, height: number) => {
     if (quickAddWin && !quickAddWin.isDestroyed()) {
       const bounds = quickAddWin.getBounds();
       quickAddWin.setBounds({
@@ -89,14 +89,25 @@ export function createQuickAddWindow(): void {
         height: Math.round(height),
       });
     }
-  });
+  };
 
-  ipcMain.on(IPC_CHANNELS.QUICK_ADD_NAVIGATE_TASK, (_event, taskId: string) => {
+  const onNavigateTask = (_event: Electron.IpcMainEvent, taskId: string) => {
     summonWindow();
     const main = getMainWindow();
     if (main && !main.isDestroyed()) {
       main.webContents.send(IPC_CHANNELS.TASK_NAVIGATE, { taskId });
     }
+  };
+
+  ipcMain.on(IPC_CHANNELS.QUICK_ADD_HIDE, onHide);
+  ipcMain.on(IPC_CHANNELS.QUICK_ADD_RESIZE, onResize);
+  ipcMain.on(IPC_CHANNELS.QUICK_ADD_NAVIGATE_TASK, onNavigateTask);
+
+  quickAddWin.on('closed', () => {
+    ipcMain.removeListener(IPC_CHANNELS.QUICK_ADD_HIDE, onHide);
+    ipcMain.removeListener(IPC_CHANNELS.QUICK_ADD_RESIZE, onResize);
+    ipcMain.removeListener(IPC_CHANNELS.QUICK_ADD_NAVIGATE_TASK, onNavigateTask);
+    quickAddWin = null;
   });
 }
 

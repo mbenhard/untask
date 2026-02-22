@@ -692,7 +692,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-3">
       {error ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <div className="min-w-0">
             <p className="truncate">{error}</p>
             {lastStreamError ? (

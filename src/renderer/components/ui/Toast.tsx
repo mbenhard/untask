@@ -45,6 +45,9 @@ export const ToastContainer = () => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
           className={cn(
             'fixed bottom-3 left-1/2 z-50 -translate-x-1/2',
             'flex items-center gap-1.5',

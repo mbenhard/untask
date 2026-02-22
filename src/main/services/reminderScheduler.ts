@@ -303,5 +303,6 @@ export const stopReminderScheduler = (): void => {
     unsubscribeTaskChange = null;
   }
 
+  cooldownMap.clear();
   deps = {};
 };

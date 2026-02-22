@@ -7,6 +7,7 @@ import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui';
 import { useTheme } from '../providers/ThemeProvider';
 
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
 import { cn } from '../../lib/utils';
@@ -97,6 +98,8 @@ export const AppShell = () => {
   const archiveConversation = useChatStore((state) => state.archiveConversation);
   const deleteConversation = useChatStore((state) => state.deleteConversation);
   const clearPendingNoteContext = useChatStore((state) => state.clearPendingNoteContext);
+
+  useFocusTrap(openPanelRef, chatOverlayState === 'open');
 
   useEffect(() => {
     void fetchTasks();

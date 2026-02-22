@@ -82,7 +82,8 @@ const cascadeUndoGroups = new Map<string, string[]>();
 const pushUserUndoEvent = (eventId: string): void => {
   userUndoStack.unshift(eventId);
   if (userUndoStack.length > USER_UNDO_STACK_SIZE) {
-    userUndoStack.pop();
+    const evicted = userUndoStack.pop();
+    if (evicted) cascadeUndoGroups.delete(evicted);
   }
 };
 
