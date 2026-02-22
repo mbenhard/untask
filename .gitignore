@@ -122,3 +122,8 @@ resources/bin/untask-helper
 
 # npm lockfile (project uses pnpm)
 package-lock.json
+
+# Private / not published to GitHub
+website/
+docs/plans/
+untask/
