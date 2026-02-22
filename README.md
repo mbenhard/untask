@@ -5,14 +5,15 @@
 <h1 align="center">Untask</h1>
 
 <p align="center">
-  A local-first personal task manager with an optional AI assistant.<br/>
-  Your data stays on your Mac. No account required. No cloud sync.
+  A local-first task manager for macOS with an optional AI assistant.<br/>
+  No account. No cloud. No subscription. Your data stays on your Mac.
 </p>
 
 <p align="center">
   <a href="https://github.com/mbenhard/untask/releases/latest"><img src="https://img.shields.io/github/v/release/mbenhard/untask?label=download&color=black" alt="Download latest release" /></a>
   <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="Platform: macOS" />
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  <a href="https://unta.sk"><img src="https://img.shields.io/badge/website-unta.sk-000000" alt="Website" /></a>
 </p>
 
 <br/>
@@ -25,16 +26,18 @@
 
 ## What is Untask?
 
-Untask is a desktop task manager that runs entirely on your Mac. Everything — your tasks, notes, and conversations — is stored in a local SQLite database on your machine. Nothing leaves your computer unless you explicitly connect an AI provider.
+I spent a long time testing task apps. None of them fit. So I built my own — and open sourced it in case it fits you too.
 
-It's designed for people who want a fast, keyboard-friendly way to manage their tasks without subscribing to yet another cloud service.
+Untask runs entirely on your Mac. Tasks, notes, and conversations are stored in a local SQLite database. Nothing leaves your machine unless you explicitly connect an AI provider. No account, no sync, no subscription.
+
+It's built for speed and keyboard control. The kind of app that gets out of your way.
 
 ### Who is it for?
 
-- Anyone who wants a simple, fast task manager that isn't a web app
-- Developers and power users who prefer keyboard shortcuts over mouse clicks
+- macOS users who've tried every task app and none of them stuck
+- Developers and power users who want keyboard shortcuts over mouse clicks
 - People who care about data privacy and want local-first software
-- Anyone curious about AI assistants but who wants to stay in control (bring your own API key, or don't use AI at all)
+- Anyone curious about AI assistants but who wants to stay in control — bring your own key, or skip AI entirely
 
 ## Features
 
@@ -171,18 +174,25 @@ The `.npmrc` includes `node-linker=hoisted` and `symlink=false` — both are req
 untask/
 ├── src/
 │   ├── main/              # Electron main process
-│   │   ├── ai/            # AI providers, chat, memory, tools
+│   │   ├── ai/            # AI providers, tools, memory
+│   │   ├── assistant/     # Proactive assistant & nudges
 │   │   ├── db/            # SQLite schema + migrations
+│   │   ├── ipc/           # IPC handlers (domain-organized)
+│   │   ├── lib/           # Shared main-process utilities
 │   │   ├── services/      # Task, notes, chat, settings services
 │   │   └── window/        # Window management, tray, dock mode
 │   ├── preload/           # IPC bridge (typed APIs)
 │   ├── renderer/          # React UI
 │   │   ├── components/    # All UI components
 │   │   ├── hooks/         # Custom React hooks
+│   │   ├── lib/           # Shared renderer utilities
 │   │   ├── stores/        # Zustand state stores
-│   │   └── styles/        # Global CSS
+│   │   ├── styles/        # Global CSS
+│   │   └── utils/         # Helpers and formatters
 │   └── types/             # Shared TypeScript types
 ├── drizzle/               # SQL migration files
+├── scripts/               # Build and release scripts
+├── swift-helper/          # Native macOS Swift helper
 ├── assets/                # App icons, tray icons
 └── docs/                  # Architecture, release docs
 ```
