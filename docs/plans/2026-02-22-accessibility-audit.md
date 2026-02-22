@@ -30,9 +30,9 @@ However, several significant gaps exist in screen reader support, ARIA semantics
 - **Resolution:** Added `preChatFocusRef` to store active element on open. `collapseChatOverlay` restores saved element if still in DOM, falls back to `[data-primary-focusable]`.
 - **WCAG:** 2.4.3
 
-**F-3: Popover menus don't reliably return focus to trigger on close**
+**F-3: Popover menus don't reliably return focus to trigger on close** — NOT AN ISSUE
 - `TaskItem.tsx:555-716`, `TaskBody.tsx:239-489` — `stopPropagation()` and manual `setMenuOpen(false)` may interfere with Radix's focus restoration.
-- **Fix:** Let Radix `onOpenChange` handle closes where possible.
+- **Assessment:** Radix Popover in controlled mode (`open` prop) handles focus restoration internally when `open` transitions to `false`, regardless of whether the change comes from `onOpenChange` or external state. The `onKeyDown stopPropagation` on PopoverContent only prevents parent keyboard handlers — Radix uses document-level listeners for dismiss. No fix needed.
 - **WCAG:** 2.4.3
 
 **F-4: View transitions don't manage focus placement** — FIXED
@@ -121,8 +121,9 @@ However, several significant gaps exist in screen reader support, ARIA semantics
 
 ### MEDIUM
 
-**S-4: Error states not associated with inputs**
+**S-4: Error states not associated with inputs** — PARTIALLY FIXED
 - `SettingsView.tsx:82-90` — Error banner uses `role="alert"` (good) but not linked to specific input via `aria-describedby`.
+- **Resolution:** Added `id="settings-error"` to the error banner so inputs can reference it via `aria-describedby`. Full field-level error association requires `setError` to carry the originating input ID, which is a structural change deferred for a future session.
 - **WCAG:** 3.3.1
 
 ### LOW

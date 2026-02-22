@@ -84,6 +84,7 @@ export const SettingsView = () => {
         {/* Error banner */}
         {error && (
           <div
+            id="settings-error"
             className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive"
             role="alert"
           >
