@@ -2,6 +2,20 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.12] - 2026-02-22
+
+Security hardening, accessibility audit, and memory leak fixes.
+
+### Changes
+
+**Improved**
+- **Security hardening** — Plaintext API key elimination with encrypted-only storage, backup path validation, CSP without `unsafe-inline`, URL scheme validation on external links, sensitive key blocklist in renderer IPC, AI prompt delimiters against injection, Ollama remote host warning, and Zod validation on all task IPC handlers
+- **Accessibility** — ARIA roles across navigation, task lists, chat, and editor; focus traps and restoration; keyboard-navigable hover actions; color contrast improvements; screen reader announcements with `role="alert"` and `aria-live`; `lang="en"` on HTML entry points (24 of 24 audited findings addressed)
+
+**Fixed**
+- Memory leaks: timer cleanup on window re-init, chat request ID tracking, backup scheduler guard, proactive placeholder timeouts, undo cascade cleanup, reminder cooldown map, quick-add IPC listener accumulation
+- Test environment navigator global stub for clipboard tests
+
 ## [0.1.11] - 2026-02-21
 
 Notes redesign and interaction polish.
@@ -280,6 +294,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.12]: https://github.com/mbenhard/untask/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/mbenhard/untask/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/mbenhard/untask/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/mbenhard/untask/compare/v0.1.8...v0.1.9
