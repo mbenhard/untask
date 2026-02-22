@@ -245,7 +245,7 @@ const StatusSegment = ({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className={SEGMENT}
-          aria-label="Status"
+          aria-label={`Status: ${label}`}
         >
           {label}
         </button>
@@ -381,7 +381,7 @@ const RecurrenceSegment = ({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
-          aria-label="Recurrence"
+          aria-label={isEmpty ? 'Recurrence: none' : `Recurrence: ${task.recurrence}`}
         >
           {isEmpty ? '+ repeat' : task.recurrence}
         </button>
@@ -555,7 +555,7 @@ const AttachmentSegment = ({
       className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
       aria-label={isEmpty ? 'Attach file' : `${count} attachment${count !== 1 ? 's' : ''} — click to add more`}
     >
-      <Paperclip className="mr-0.5 size-3" />
+      <Paperclip aria-hidden="true" className="mr-0.5 size-3" />
       {isEmpty ? 'attach' : count}
     </button>
   );

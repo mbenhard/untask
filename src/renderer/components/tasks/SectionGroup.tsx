@@ -101,6 +101,7 @@ export const SectionGroup = ({
           aria-controls={`section-${sectionId}`}
         >
           <ChevronRight
+            aria-hidden="true"
             className={cn(
               'size-3.5 text-muted-foreground transition-transform',
               !isCollapsed && 'rotate-90',
@@ -121,7 +122,7 @@ export const SectionGroup = ({
             className="ml-1.5 inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground/40 transition-colors hover:text-foreground"
             aria-label={`Add to ${label}`}
           >
-            <Plus className="size-3" />
+            <Plus className="size-3" aria-hidden="true" />
           </button>
         ) : null}
       </div>

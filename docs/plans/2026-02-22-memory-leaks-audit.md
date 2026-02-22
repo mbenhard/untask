@@ -12,41 +12,44 @@ The codebase demonstrates generally strong lifecycle management. The `will-quit`
 
 ### HIGH
 
-**1. Quick-Add Window IPC Listeners Accumulate on Recreation**
+**1. Quick-Add Window IPC Listeners Accumulate on Recreation** — FIXED
 - `quickAddWindow.ts:78-101` — `createQuickAddWindow()` registers 3 `ipcMain.on()` listeners on the global singleton, not on `webContents`. If the window is destroyed and recreated, old listeners remain and new ones accumulate. The guard at line 28 prevents duplicate windows but not duplicate listeners.
 - **Fix:** Move registrations outside the function, or add `ipcMain.removeAllListeners()` cleanup before re-registering, or clean up in `quickAddWin.on('closed', ...)`.
+- **Resolution:** Already fixed — `closed` handler at lines 106-111 removes all 3 listeners via `ipcMain.removeListener()`.
 
 ### MEDIUM
 
-**2. summonController `boundsSaveTimer` Not Cleared on Re-init**
+**2. summonController `boundsSaveTimer` Not Cleared on Re-init** — FIXED
 - `summonController.ts:41-63` — If the main window is destroyed and recreated (via `activate` handler), `initSummonController()` runs again without clearing the old `boundsSaveTimer`. The `saveBounds` guard (`if (!win || win.isDestroyed()) return`) mitigates the impact.
 - **Fix:** Call `clearTimeout(boundsSaveTimer)` at the start of `initSummonController()`.
+- **Resolution:** Added `clearTimeout(boundsSaveTimer); boundsSaveTimer = null;` at start of `initSummonController()`.
 
-**3. `cooldownMap` in Reminder Scheduler Grows Without Bounds**
+**3. `cooldownMap` in Reminder Scheduler Grows Without Bounds** — FIXED
 - `reminderScheduler.ts:37-42` — Records when reminders fired. Entries are never removed. `stopReminderScheduler()` doesn't clear it. Over months, accumulates thousands of stale entries.
 - **Fix:** Add `cooldownMap.clear()` to `stopReminderScheduler()`. Consider periodic sweep for entries older than 24h.
+- **Resolution:** Already fixed — `cooldownMap.clear()` called in `stopReminderScheduler()`.
 
-**4. `cascadeUndoGroups` Map Grows Without Bounds**
+**4. `cascadeUndoGroups` Map Grows Without Bounds** — FIXED
 - `taskService.ts:80` — Stores cascade-delete groupings for undo. Entries only removed when undo is exercised. When entries fall off the bounded `userUndoStack` (max 20), their `cascadeUndoGroups` entries persist forever.
-- **Fix:** When evicting from `userUndoStack`, also delete from `cascadeUndoGroups`:
-  ```typescript
-  const evicted = userUndoStack.pop();
-  if (evicted) cascadeUndoGroups.delete(evicted);
-  ```
+- **Fix:** When evicting from `userUndoStack`, also delete from `cascadeUndoGroups`.
+- **Resolution:** Already fixed — eviction at line 86 calls `cascadeUndoGroups.delete(evicted)`.
 
-**5. `activeChatRequestIds` / `canceledChatRequestIds` Can Leak Entries**
+**5. `activeChatRequestIds` / `canceledChatRequestIds` Can Leak Entries** — FIXED
 - `chat.ts:43-44` — If cancel is called after a stream already finished (race condition), the `canceledId` entry persists. `cancelActiveChatTurns()` adds to `canceledChatRequestIds` without removing from `activeChatRequestIds`.
 - **Fix:** Clear both Sets when no streams are in flight, or have `cancelActiveChatTurns()` also clear `activeChatRequestIds`.
+- **Resolution:** Added `activeChatRequestIds.clear()` at end of `cancelActiveChatTurns()`.
 
 ### LOW
 
-**6. Backup Scheduler Recursive setTimeout Can Escape Stop Guard**
+**6. Backup Scheduler Recursive setTimeout Can Escape Stop Guard** — FIXED
 - `backupService.ts:383-401` — `stopDailyBackupScheduler()` clears current timer, but if `runBackup()` is mid-flight, `scheduleNext()` creates a new timer after stop.
 - **Fix:** Add a `stopped` flag checked in `scheduleNext()`.
+- **Resolution:** Added `backupSchedulerStopped` flag; `scheduleNext()` returns early when set; `stopDailyBackupScheduler()` sets it; `startDailyBackupScheduler()` clears it.
 
-**7. Proactive Placeholder Timeout Never Cancelled**
+**7. Proactive Placeholder Timeout Never Cancelled** — FIXED
 - `chatStreamSlice.ts:81-95` — 2-minute safety timeout is fire-and-forget. Callback guards against already-finalized streams, so impact is benign.
 - **Fix:** Store timeout ID in `InFlightStream` and clear in `handleAssistantDone`.
+- **Resolution:** Added `safetyTimeoutId` to `InFlightStream` type. Stored timeout ID on creation. Cleared in `handleAssistantDone`, `handleError`, and `cancelStream`.
 
 **8. `_stableKeyMap` in Task Store Grows Between Refreshes**
 - `taskStore.ts:74` — Cleared on every `fetchTasks()`/`refreshTasks()`. Benign — refreshes happen frequently.

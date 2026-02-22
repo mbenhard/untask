@@ -124,16 +124,19 @@ export const SearchModal = () => {
       >
         {/* Input */}
         <div className="flex items-center gap-2 px-3 py-2.5">
-          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+          <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-expanded={hasQuery}
+            aria-controls="search-results-listbox"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search..."
             autoComplete="off"
             spellCheck={false}
-            className="h-full flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40"
+            className="h-full flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
           />
           {hasQuery && (
             <span className="text-[10px] tabular-nums text-muted-foreground/50">
@@ -146,6 +149,8 @@ export const SearchModal = () => {
         {(hasQuery || error) && (
           <div
             ref={listRef}
+            id="search-results-listbox"
+            role="listbox"
             className="max-h-64 overflow-y-auto border-t border-border/30 py-0.5"
           >
             {error ? (
@@ -169,6 +174,8 @@ export const SearchModal = () => {
                     <button
                       key={result.id}
                       type="button"
+                      role="option"
+                      aria-selected={isSelected}
                       data-selected={isSelected}
                       className={`flex w-full items-center gap-2 px-2.5 py-1 text-left ${isSelected ? 'bg-accent' : ''
                         } ${isDone ? 'opacity-40' : ''}`}
@@ -200,12 +207,14 @@ export const SearchModal = () => {
                     <button
                       key={result.id}
                       type="button"
+                      role="option"
+                      aria-selected={isSelected}
                       data-selected={isSelected}
                       className={`flex w-full items-center gap-2 px-2.5 py-1 text-left ${isSelected ? 'bg-accent' : ''}`}
                       onClick={() => navigateToResult(result)}
                       onMouseEnter={() => useSearchStore.setState({ selectedIndex: globalIdx })}
                     >
-                      <FileText className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+                      <FileText aria-hidden="true" className="h-3 w-3 shrink-0 text-muted-foreground/50" />
                       <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
                         {result.title}
                       </span>

@@ -17,4 +17,4 @@ export const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
 export const SEGMENT =
   'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
 
-export const SEGMENT_EMPTY = 'text-muted-foreground/50';
+export const SEGMENT_EMPTY = 'text-muted-foreground/70';

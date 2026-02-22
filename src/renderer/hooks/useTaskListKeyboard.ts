@@ -99,9 +99,8 @@ export const useTaskListKeyboard = ({
         return;
       }
 
-      // Prevent Tab from cycling through internal task row elements
+      // Allow Tab to leave the list container (roving tabIndex handles internal navigation)
       if (event.key === 'Tab') {
-        event.preventDefault();
         return;
       }
 

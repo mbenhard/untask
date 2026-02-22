@@ -29,7 +29,7 @@ export const TitleBar = () => {
 
       <div className="flex-1" />
 
-      <nav className="no-drag flex items-center gap-0.5" aria-label="Primary view tabs">
+      <nav className="no-drag flex items-center gap-0.5" aria-label="Primary view tabs" role="tablist">
         {PRIMARY_VIEWS.map((view) => {
           const isActive = activeView === view;
 
@@ -44,6 +44,8 @@ export const TitleBar = () => {
                   ? 'bg-accent text-foreground'
                   : 'text-muted-foreground hover:text-foreground/80',
               )}
+              role="tab"
+              aria-selected={isActive}
               aria-current={isActive ? 'page' : undefined}
             >
               {TAB_LABELS[view]}

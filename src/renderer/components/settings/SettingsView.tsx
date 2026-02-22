@@ -55,13 +55,15 @@ export const SettingsView = () => {
     <div className="h-full overflow-y-auto p-3">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {/* Tab strip */}
-        <nav className="flex items-center gap-0.5" aria-label="Settings tabs">
+        <nav className="flex items-center gap-0.5" aria-label="Settings tabs" role="tablist">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => {
                   setActiveTab(tab.id);
                   setError(null);
@@ -89,7 +91,9 @@ export const SettingsView = () => {
           </div>
         )}
 
-        {tabContent}
+        <div role="tabpanel">
+          {tabContent}
+        </div>
 
         {/* Footer / Credits */}
         <footer className="mt-12 mb-6 flex flex-col items-center gap-2 pt-6 text-center">

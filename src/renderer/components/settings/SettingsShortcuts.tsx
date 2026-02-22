@@ -246,7 +246,7 @@ const ShortcutRecorder = ({
           {pending ? formatAccelerator(pending) : 'Press a shortcut\u2026'}
         </div>
         {error ? (
-          <span className="text-[10px] text-destructive">{error}</span>
+          <span role="alert" className="text-[10px] text-destructive">{error}</span>
         ) : null}
         {pending ? (
           <button

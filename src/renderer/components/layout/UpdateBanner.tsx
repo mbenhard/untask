@@ -98,7 +98,7 @@ export const UpdateBanner = () => {
         className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
         aria-label="Dismiss update notification"
       >
-        <X className="size-3" />
+        <X className="size-3" aria-hidden="true" />
       </button>
     </div>
   );

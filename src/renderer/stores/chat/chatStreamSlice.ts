@@ -79,7 +79,7 @@ const bootstrapProactiveInFlight = (
 
   // Belt-and-suspenders: auto-remove stale proactive placeholder after 2 minutes
   const PROACTIVE_PLACEHOLDER_TIMEOUT_MS = 2 * 60 * 1000;
-  setTimeout(() => {
+  newInFlight.safetyTimeoutId = setTimeout(() => {
     const current = get().inFlightByRequestId[event.requestId];
     if (!current) return; // Already finalized
     const msg = get().messages.find((m) => m.id === placeholderId);
@@ -287,6 +287,10 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
     return;
   }
 
+  if (inFlight?.safetyTimeoutId) {
+    clearTimeout(inFlight.safetyTimeoutId);
+  }
+
   const actionCards = dedupeActionCards(
     event.actionCards.length > 0 ? event.actionCards : inFlight?.actionCards ?? [],
   );
@@ -374,8 +378,13 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
   void get().refreshConversations();
 };
 
-const handleError: StreamEventHandler = ({ set, event }) => {
+const handleError: StreamEventHandler = ({ set, get, event }) => {
   if (event.type !== 'error') return;
+
+  const errorInFlight = get().inFlightByRequestId[event.requestId];
+  if (errorInFlight?.safetyTimeoutId) {
+    clearTimeout(errorInFlight.safetyTimeoutId);
+  }
 
   set((state) => {
     const placeholderId = state.inFlightByRequestId[event.requestId]?.placeholderId;
@@ -486,6 +495,10 @@ export const createStreamActions = (
 
   cancelStream: async () => {
     await getUntask().chat.cancel();
+    // Clear all safety timeouts from in-flight streams
+    for (const inFlight of Object.values(get().inFlightByRequestId)) {
+      if (inFlight.safetyTimeoutId) clearTimeout(inFlight.safetyTimeoutId);
+    }
     const { messages } = get();
     const updatedMessages = messages
       .map((msg) => {

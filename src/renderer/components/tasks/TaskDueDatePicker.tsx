@@ -209,7 +209,7 @@ export const TaskDueDatePicker = ({
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
-          {variant === 'meta' ? <CalendarIcon className="size-3" /> : null}
+          {variant === 'meta' ? <CalendarIcon className="size-3" aria-hidden="true" /> : null}
           {displayLabel}
         </button>
       </Popover.Trigger>
@@ -234,7 +234,7 @@ export const TaskDueDatePicker = ({
         <div className="border-t border-border px-2 py-2">
           <div className="flex items-center justify-center gap-2">
             <div className="flex items-center gap-1">
-              <Clock className="size-3 shrink-0 text-muted-foreground" />
+              <Clock className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
               <input
                 ref={timeInputRef}
                 type="text"
@@ -251,7 +251,7 @@ export const TaskDueDatePicker = ({
             {onReminderOffsetChange && (
               <>
                 <div className="h-3 w-px bg-border" />
-                <Bell className="size-3 shrink-0 text-muted-foreground" />
+                <Bell className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <select
                   value={reminderOffset ?? 'at_due'}
                   onChange={handleReminderOffsetChange}
@@ -259,7 +259,7 @@ export const TaskDueDatePicker = ({
                   disabled={!dueDate}
                   className={cn(
                     'rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-xs text-foreground outline-none transition-colors focus:border-ring',
-                    !dueDate && 'pointer-events-none opacity-40',
+                    !dueDate && 'pointer-events-none opacity-50',
                   )}
                 >
                   {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
@@ -295,7 +295,7 @@ export const TaskDueDatePicker = ({
             size="xs"
             className={cn(
               'w-full text-muted-foreground',
-              !dueDate && 'pointer-events-none opacity-40',
+              !dueDate && 'pointer-events-none opacity-50',
             )}
             disabled={!dueDate}
             onClick={(event) => {

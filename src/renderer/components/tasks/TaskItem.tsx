@@ -296,6 +296,7 @@ export const TaskItem = ({
                         setCompleteConfirmOpen(true);
                       }}
                       aria-label={`Mark "${task.title}" complete`}
+                      aria-checked={isCompleted}
                       className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
                     >
                       <motion.span
@@ -316,6 +317,7 @@ export const TaskItem = ({
                         )}
                       >
                         <Check
+                          aria-hidden="true"
                           className={cn(
                             'size-2.5 transition-opacity duration-200',
                             isCompleted
@@ -388,6 +390,7 @@ export const TaskItem = ({
                       ? `Reopen "${task.title}"`
                       : `Mark "${task.title}" complete`
                   }
+                  aria-checked={isCompleted}
                   className="group inline-flex size-6 items-center justify-center text-foreground/90 outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <motion.span
@@ -408,6 +411,7 @@ export const TaskItem = ({
                     )}
                   >
                     <Check
+                      aria-hidden="true"
                       className={cn(
                         'size-2.5 transition-opacity duration-200',
                         isCompleted
@@ -429,6 +433,7 @@ export const TaskItem = ({
               PRIORITY_DOT[priority],
             )}
           />
+          <span className="sr-only">Priority: {priority}</span>
         </div>
 
         <div className="min-w-0 flex-1">
@@ -481,7 +486,7 @@ export const TaskItem = ({
                 <span
                   className="inline-flex h-5 items-center justify-center rounded border border-border/70 bg-muted/40 px-1 text-muted-foreground"
                 >
-                  <AlignLeft className="size-3" />
+                  <AlignLeft aria-hidden="true" className="size-3" />
                 </span>
               </TooltipTrigger>
               <TooltipContent>Has notes</TooltipContent>
@@ -544,7 +549,7 @@ export const TaskItem = ({
                     : 'hover:text-foreground',
                 )}
               >
-                <Bookmark className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
+                <Bookmark aria-hidden="true" className="size-3.5" fill={isToday ? 'currentColor' : 'none'} />
               </button>
             </TooltipTrigger>
             <TooltipContent>
@@ -568,7 +573,7 @@ export const TaskItem = ({
                     aria-label={`More actions for "${task.title}"`}
                     className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <ChevronDown className="size-3.5" />
+                    <ChevronDown aria-hidden="true" className="size-3.5" />
                   </button>
                 </Popover.Trigger>
               </TooltipTrigger>
@@ -581,10 +586,11 @@ export const TaskItem = ({
               onKeyDown={(event) => event.stopPropagation()}
             >
               {menuView === 'main' ? (
-                <div>
+                <div role="menu">
                   {task.status === 'inbox' && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         void updateTask({ id: task.id, status: 'active' });
                         useToastStore.getState().showToast('Moved to Tasks', async () => {
@@ -595,13 +601,14 @@ export const TaskItem = ({
                       }}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <ArrowRightLeft className="size-3" />
+                      <ArrowRightLeft aria-hidden="true" className="size-3" />
                       Move to Tasks
                     </button>
                   )}
                   {task.status !== 'inbox' && !isTerminal && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         void updateTask({ id: task.id, status: 'inbox' });
                         useToastStore.getState().showToast('Moved to Inbox', async () => {
@@ -612,55 +619,60 @@ export const TaskItem = ({
                       }}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <ArrowRightLeft className="size-3" />
+                      <ArrowRightLeft aria-hidden="true" className="size-3" />
                       Move to Inbox
                     </button>
                   )}
                   {cancelledEnabled && !isTerminal && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         void cancelTask(task.id);
                         setMenuOpen(false);
                       }}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <Ban className="size-3" />
+                      <Ban aria-hidden="true" className="size-3" />
                       Cancel task
                     </button>
                   )}
                   {showMoveToProject && (
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => setMenuView('projects')}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <FolderInput className="size-3" />
+                      <FolderInput aria-hidden="true" className="size-3" />
                       <span className="flex-1 text-left">Move to project</span>
                       <span className="text-border">&rarr;</span>
                     </button>
                   )}
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={handleDuplicate}
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
-                    <Copy className="size-3" />
+                    <Copy aria-hidden="true" className="size-3" />
                     Duplicate
                   </button>
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => setMenuView('delete-confirm')}
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <Trash2 className="size-3" />
+                    <Trash2 aria-hidden="true" className="size-3" />
                     Delete
                   </button>
                 </div>
               ) : menuView === 'projects' ? (
-                <div>
+                <div role="menu">
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => setMenuView('main')}
                     className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
                   >
@@ -670,6 +682,7 @@ export const TaskItem = ({
                     <button
                       key={project.id}
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         const updates: TaskUpdateInput = {
                           id: task.id,
@@ -727,7 +740,7 @@ export const TaskItem = ({
                 aria-label={`Reorder "${task.title}"`}
                 className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <GripVertical className="size-3.5" />
+                <GripVertical aria-hidden="true" className="size-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent>Drag to reorder</TooltipContent>

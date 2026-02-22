@@ -58,15 +58,15 @@ const formatTimestamp = (createdAt: string | null): string => {
 const toolStatusIcon = (status: string) => {
   switch (status) {
     case 'running':
-      return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+      return <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden="true" />;
     case 'success':
-      return <Check className="size-3 text-emerald-400" />;
+      return <Check className="size-3 text-emerald-400" aria-hidden="true" />;
     case 'error':
-      return <X className="size-3 text-destructive" />;
+      return <X className="size-3 text-destructive" aria-hidden="true" />;
     case 'confirmation_required':
-      return <AlertTriangle className="size-3 text-amber-400" />;
+      return <AlertTriangle className="size-3 text-amber-400" aria-hidden="true" />;
     default:
-      return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+      return <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden="true" />;
   }
 };
 
@@ -85,6 +85,7 @@ const ThinkingStep = ({ content }: ThinkingStepProps) => {
         className="flex items-center gap-1 text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors"
       >
         <ChevronRight
+          aria-hidden="true"
           className={cn(
             'size-2.5 transition-transform duration-150',
             expanded && 'rotate-90',
@@ -195,7 +196,7 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
                 }
               }}
             >
-              <Check className="size-3" />
+              <Check className="size-3" aria-hidden="true" />
               Approve
             </Button>
             <Button
@@ -209,14 +210,14 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
                 }
               }}
             >
-              <X className="size-3" />
+              <X className="size-3" aria-hidden="true" />
             </Button>
           </>
         ) : null}
 
         {showApprovedBadge ? (
           <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
-            <Check className="size-2.5" />
+            <Check className="size-2.5" aria-hidden="true" />
             Approved
           </span>
         ) : null}
@@ -235,7 +236,7 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
             onClick={() => onUndo(card.taskEventId)}
             className="shrink-0"
           >
-            <Undo2 className="size-3" />
+            <Undo2 className="size-3" aria-hidden="true" />
             Undo
           </Button>
         ) : null}
@@ -669,7 +670,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             {/* Image attachment indicator for history messages */}
             {!isAssistant && message.imageCount && message.imageCount > 0 && (
               <span className="flex items-center gap-1 px-1 text-[10px] text-muted-foreground/60">
-                <ImageIcon className="size-2.5" />
+                <ImageIcon className="size-2.5" aria-hidden="true" />
                 {message.imageCount} image{message.imageCount > 1 ? 's' : ''} attached
               </span>
             )}

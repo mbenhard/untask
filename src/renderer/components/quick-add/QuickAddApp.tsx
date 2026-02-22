@@ -304,7 +304,7 @@ export function QuickAddApp() {
             aria-expanded={suggestions.length > 0 ? true : undefined}
             className={[
               'flex-1 min-w-0 bg-transparent text-foreground text-[13px]',
-              'placeholder:text-muted-foreground/30',
+              'placeholder:text-muted-foreground/50',
               'outline-none border-none',
               'font-sans',
             ].join(' ')}

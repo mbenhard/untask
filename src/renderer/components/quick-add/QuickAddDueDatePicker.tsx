@@ -65,7 +65,7 @@ export function QuickAddDueDatePicker({ dueDate, onChange }: Props) {
         }}
         onBlur={commit}
         placeholder="tomorrow, friday, 15.03..."
-        className="w-32 bg-transparent text-[11px] font-mono text-foreground outline-none placeholder:text-muted-foreground/30 border-b border-foreground/20"
+        className="w-32 bg-transparent text-[11px] font-mono text-foreground outline-none placeholder:text-muted-foreground/50 border-b border-foreground/20"
       />
     );
   }

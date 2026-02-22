@@ -364,11 +364,14 @@ function stripApiKeysFromRestoredDb(dbPath: string): void {
 // ─── Scheduler ──────────────────────────────────────────────
 
 let backupTimerId: ReturnType<typeof setTimeout> | null = null;
+let backupSchedulerStopped = false;
 
 export function startDailyBackupScheduler(): void {
   if (backupTimerId !== null) {
     return;
   }
+
+  backupSchedulerStopped = false;
 
   const runBackup = async (): Promise<void> => {
     try {
@@ -381,6 +384,7 @@ export function startDailyBackupScheduler(): void {
   };
 
   const scheduleNext = (): void => {
+    if (backupSchedulerStopped) return;
     backupTimerId = setTimeout(() => {
       void runBackup();
       scheduleNext();
@@ -402,6 +406,7 @@ export function startDailyBackupScheduler(): void {
 }
 
 export function stopDailyBackupScheduler(): void {
+  backupSchedulerStopped = true;
   if (backupTimerId !== null) {
     clearTimeout(backupTimerId);
     backupTimerId = null;

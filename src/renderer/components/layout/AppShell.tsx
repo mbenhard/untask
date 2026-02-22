@@ -101,6 +101,14 @@ export const AppShell = () => {
 
   useFocusTrap(openPanelRef, chatOverlayState === 'open');
 
+  // Store focus target before chat overlay opens, restore when it closes
+  const preChatFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (chatOverlayState === 'open') {
+      preChatFocusRef.current = document.activeElement as HTMLElement | null;
+    }
+  }, [chatOverlayState]);
+
   useEffect(() => {
     void fetchTasks();
     void fetchStatusConfig();
@@ -175,6 +183,13 @@ export const AppShell = () => {
 
   useMenuActions();
 
+  // F-4: Place focus on primary element when view changes
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-primary-focusable]')?.focus();
+    });
+  }, [activeView]);
+
   const handleSubmit = useCallback(() => {
     const content = chatInputValue.trim();
 
@@ -224,8 +239,13 @@ export const AppShell = () => {
     clearPendingNoteContext();
     inputRef.current?.blur();
     requestAnimationFrame(() => {
-      const target = document.querySelector<HTMLElement>('[data-primary-focusable]');
-      target?.focus();
+      const saved = preChatFocusRef.current;
+      if (saved && document.contains(saved)) {
+        saved.focus();
+      } else {
+        document.querySelector<HTMLElement>('[data-primary-focusable]')?.focus();
+      }
+      preChatFocusRef.current = null;
     });
   }, [clearPendingNoteContext, peekChatOverlay]);
 
@@ -384,10 +404,11 @@ export const AppShell = () => {
                       ) : (
                         <button
                           type="button"
+                          aria-label="Back to threads"
                           className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           onClick={() => setChatView('threads')}
                         >
-                          <ArrowLeft className="size-3" />
+                          <ArrowLeft className="size-3" aria-hidden="true" />
                           <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
                             {activeConversationTitle}
                           </span>
@@ -399,7 +420,7 @@ export const AppShell = () => {
                         className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         aria-label="Close chat"
                       >
-                        <X className="size-4" />
+                        <X className="size-4" aria-hidden="true" />
                       </button>
                     </header>
 
@@ -476,7 +497,7 @@ export const AppShell = () => {
                   )}
                   aria-label="Settings"
                 >
-                  <Settings className="size-[15px]" />
+                  <Settings className="size-[15px]" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Settings</TooltipContent>
@@ -495,7 +516,7 @@ export const AppShell = () => {
                   )}
                   aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
                 >
-                  <LampDesk className="size-[15px]" />
+                  <LampDesk className="size-[15px]" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>

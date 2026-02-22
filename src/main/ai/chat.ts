@@ -155,6 +155,7 @@ export const cancelActiveChatTurns = (): void => {
   activeChatRequestIds.forEach((requestId) => {
     canceledChatRequestIds.add(requestId);
   });
+  activeChatRequestIds.clear();
 };
 
 // ─── Proactive turn (no user message saved) ─────────────────────

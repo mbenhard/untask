@@ -35,6 +35,10 @@ export function restoreWindowBounds(window: BrowserWindow): void {
 }
 
 export function initSummonController(mainWindow: BrowserWindow): void {
+  if (boundsSaveTimer) {
+    clearTimeout(boundsSaveTimer);
+    boundsSaveTimer = null;
+  }
   win = mainWindow;
   windowDismissMode = getWindowDismissMode();
 

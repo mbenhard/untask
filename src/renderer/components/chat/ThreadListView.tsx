@@ -202,7 +202,7 @@ export const ThreadListView = ({
     >
       <div className="border-b border-border/60 p-2">
         <label className="relative block">
-          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" aria-hidden="true" />
           <input
             ref={searchRef}
             type="text"
@@ -221,12 +221,12 @@ export const ThreadListView = ({
             onCreate();
           }}
         >
-          <Plus className="size-3.5" />
+          <Plus className="size-3.5" aria-hidden="true" />
           New Thread
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-1.5">
+      <div role="listbox" aria-label="Threads" className="flex-1 overflow-y-auto p-1.5">
         {isLoading ? (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">Loading threads...</p>
         ) : grouped.length === 0 ? (
@@ -247,6 +247,8 @@ export const ThreadListView = ({
                   return (
                     <div
                       key={conversation.id}
+                      role="option"
+                      aria-selected={isActive}
                       className={cn(
                         'group flex items-center gap-2 rounded-md px-2 py-1.5',
                         isActive ? 'bg-accent/70' : 'hover:bg-accent/40',
@@ -268,7 +270,7 @@ export const ThreadListView = ({
                         </p>
                       </button>
 
-                      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                         {!showArchived ? (
                           <button
                             type="button"
@@ -279,7 +281,7 @@ export const ThreadListView = ({
                             }}
                             aria-label="Archive thread"
                           >
-                            <Archive className="size-3.5" />
+                            <Archive className="size-3.5" aria-hidden="true" />
                           </button>
                         ) : null}
                         <button
@@ -291,7 +293,7 @@ export const ThreadListView = ({
                           }}
                           aria-label="Delete thread"
                         >
-                          <Trash2 className="size-3.5" />
+                          <Trash2 className="size-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     </div>

@@ -628,7 +628,7 @@ export const TaskList = ({
                           }}
                           onClick={(e) => e.stopPropagation()}
                           placeholder="New subtask..."
-                          className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40"
+                          className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
                         />
                       </div>
                     )}

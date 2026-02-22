@@ -119,54 +119,57 @@ const NoteContextMenu = ({
   return (
     <div
       ref={menuRef}
+      role="menu"
       className="fixed z-50 min-w-[180px] rounded-md border border-border/60 bg-popover p-1 shadow-md"
       style={{ left: x, top: y }}
     >
       {isArchived ? (
         <>
-          <button type="button" className={itemClass} onClick={action(onRestore)}>
-            <ArchiveRestore className="size-3.5" />
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onRestore)}>
+            <ArchiveRestore className="size-3.5" aria-hidden="true" />
             <span>Restore</span>
           </button>
-          <button type="button" className={itemClass} onClick={action(onCopyMarkdown)}>
-            <Clipboard className="size-3.5" />
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onCopyMarkdown)}>
+            <Clipboard className="size-3.5" aria-hidden="true" />
             <span>Copy as Markdown</span>
           </button>
           <div className="my-1 h-px bg-border/60" />
           <button
             type="button"
+            role="menuitem"
             className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
             onClick={action(onDelete)}
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3.5" aria-hidden="true" />
             <span>Delete</span>
           </button>
         </>
       ) : (
         <>
-          <button type="button" className={itemClass} onClick={action(isPinned ? onUnpin : onPin)}>
-            <Pin className="size-3.5" />
+          <button type="button" role="menuitem" className={itemClass} onClick={action(isPinned ? onUnpin : onPin)}>
+            <Pin className="size-3.5" aria-hidden="true" />
             <span>{isPinned ? 'Unpin' : 'Pin'}</span>
           </button>
-          <button type="button" className={itemClass} onClick={action(onArchive)}>
-            <Archive className="size-3.5" />
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onArchive)}>
+            <Archive className="size-3.5" aria-hidden="true" />
             <span>Archive</span>
           </button>
-          <button type="button" className={itemClass} onClick={action(onDuplicate)}>
-            <Copy className="size-3.5" />
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onDuplicate)}>
+            <Copy className="size-3.5" aria-hidden="true" />
             <span>Duplicate</span>
           </button>
-          <button type="button" className={itemClass} onClick={action(onCopyMarkdown)}>
-            <Clipboard className="size-3.5" />
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onCopyMarkdown)}>
+            <Clipboard className="size-3.5" aria-hidden="true" />
             <span>Copy as Markdown</span>
           </button>
           <div className="my-1 h-px bg-border/60" />
           <button
             type="button"
+            role="menuitem"
             className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
             onClick={action(onDelete)}
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3.5" aria-hidden="true" />
             <span>Delete</span>
           </button>
         </>
@@ -224,7 +227,7 @@ const NoteListItem = ({
     >
       {/* Pin indicator */}
       {note.isPinned ? (
-        <Pin size={10} className="shrink-0 text-muted-foreground/60" />
+        <Pin size={10} className="shrink-0 text-muted-foreground/60" aria-hidden="true" />
       ) : null}
 
       <div className="min-w-0 flex-1">
@@ -247,7 +250,7 @@ const NoteListItem = ({
 
       {/* Hover actions for active notes */}
       {onPin || onUnpin || onArchive ? (
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           {note.isPinned && onUnpin ? (
             <button
               type="button"
@@ -255,7 +258,7 @@ const NoteListItem = ({
               onClick={(e) => { e.stopPropagation(); onUnpin(note.id); }}
               aria-label="Unpin note"
             >
-              <Pin size={12} />
+              <Pin size={12} aria-hidden="true" />
             </button>
           ) : onPin ? (
             <button
@@ -264,7 +267,7 @@ const NoteListItem = ({
               onClick={(e) => { e.stopPropagation(); onPin(note.id); }}
               aria-label="Pin note"
             >
-              <Pin size={12} />
+              <Pin size={12} aria-hidden="true" />
             </button>
           ) : null}
           {onArchive ? (
@@ -274,7 +277,7 @@ const NoteListItem = ({
               onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
               aria-label="Archive note"
             >
-              <Archive size={12} />
+              <Archive size={12} aria-hidden="true" />
             </button>
           ) : null}
         </span>
@@ -284,21 +287,21 @@ const NoteListItem = ({
       {onRestore ? (
         <button
           type="button"
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 group-focus-within:opacity-100"
           onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
           aria-label="Restore note"
         >
-          <ArchiveRestore size={12} />
+          <ArchiveRestore size={12} aria-hidden="true" />
         </button>
       ) : null}
       {onDelete && !onArchive ? (
         <button
           type="button"
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 group-focus-within:opacity-100"
           onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
           aria-label="Delete note"
         >
-          <Trash2 size={12} />
+          <Trash2 size={12} aria-hidden="true" />
         </button>
       ) : null}
 
@@ -469,7 +472,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
           onClick={handleCreate}
         >
-          <Plus size={12} />
+          <Plus size={12} aria-hidden="true" />
           New
         </Button>
       </header>
@@ -520,8 +523,9 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                   'transition-transform',
                   archiveExpanded && 'rotate-90',
                 )}
+                aria-hidden="true"
               />
-              <Archive size={12} />
+              <Archive size={12} aria-hidden="true" />
               <span>Archived</span>
               <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium">
                 {archivedNotes.length}

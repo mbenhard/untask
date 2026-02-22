@@ -40,6 +40,7 @@ export type InFlightStream = {
   actionCards: ChatActionCard[];
   steps: TurnStep[];
   chips?: ChipAction[];
+  safetyTimeoutId?: ReturnType<typeof setTimeout>;
 };
 
 export type PendingViewSwitch = {

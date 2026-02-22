@@ -175,7 +175,7 @@ export const InlineTaskInput = ({
               }
             }}
             placeholder={placeholder ?? 'Type and press Enter'}
-            className="min-w-0 w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/30"
+            className="min-w-0 w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
             aria-label={label}
           />
         </div>
