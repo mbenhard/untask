@@ -165,10 +165,16 @@ export const buildSystemPrompt = (
   const compiledSections = [
     metaSection,
     '---',
+    '<user_identity>',
     identity,
-    ...(knowledgeSection ? ['---', knowledgeSection] : []),
+    '</user_identity>',
+    ...(knowledgeSection
+      ? ['---', '<user_knowledge>', knowledgeSection, '</user_knowledge>']
+      : []),
     '---',
+    '<user_tasks>',
     todaySection,
+    '</user_tasks>',
     '---',
     formatRules,
   ].join('\n\n');

@@ -4,25 +4,11 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' untask-file: data:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' untask-file: data:; connect-src 'self'; object-src 'none'; frame-src 'none'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Untask</title>
-    <script>
-      // Apply theme class synchronously to prevent light→dark flash
-      (function () {
-        var theme = localStorage.getItem('untask-theme');
-        var resolved =
-          theme === 'light'
-            ? 'light'
-            : theme === 'system'
-              ? window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light'
-              : 'dark';
-        document.documentElement.classList.add(resolved);
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

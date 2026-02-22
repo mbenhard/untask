@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { getMainWindow } from '../window/summonController';
 import path from 'node:path';
+import { realpath } from 'node:fs/promises';
 import {
   IPC_CHANNELS,
   type BackupListResponse,
@@ -30,6 +31,32 @@ import { initChatSearchFts, initNotesSearchFts, initSearchFts } from '../service
 import { refreshTodayBadge } from '../tray';
 
 const BACKUP_JOB_TIMEOUT_MS = 120_000;
+
+// ─── Path safety ─────────────────────────────────────────────────────────────
+// The non-dialog BACKUP_IMPORT handler is used by the settings UI to restore
+// from the app's own backup list. Restrict it to the backup directory.
+// The non-dialog BACKUP_EXPORT handler restricts to common user directories.
+
+const SAFE_EXPORT_DIRS = ['documents', 'downloads', 'desktop'] as const;
+
+const getBackupDirPath = (): string =>
+  path.join(app.getPath('userData'), 'backups');
+
+const assertImportPathSafe = async (source: string): Promise<void> => {
+  const resolved = await realpath(source);
+  const backupDir = path.resolve(getBackupDirPath());
+  if (!resolved.startsWith(backupDir + path.sep) && resolved !== backupDir) {
+    throw new Error('Import source must be within the app backup directory.');
+  }
+};
+
+const assertExportPathSafe = (destination: string): void => {
+  const resolved = path.resolve(destination);
+  const allowed = SAFE_EXPORT_DIRS.map((dir) => path.resolve(app.getPath(dir)));
+  if (!allowed.some((dir) => resolved.startsWith(dir + path.sep))) {
+    throw new Error('Export destination must be within Documents, Downloads, or Desktop.');
+  }
+};
 
 const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
@@ -123,6 +150,7 @@ export const registerBackupHandlers = (): void => {
       'BACKUP_EXPORT',
       async (_event: Electron.IpcMainInvokeEvent, request: BackupExportRequest): Promise<void> => {
         const validated = backupExportRequestSchema.parse(request ?? {});
+        assertExportPathSafe(validated.destination);
         await withTimeout(
           exportBackup(validated.destination, validated.passphrase),
           BACKUP_JOB_TIMEOUT_MS,
@@ -138,6 +166,7 @@ export const registerBackupHandlers = (): void => {
       'BACKUP_IMPORT',
       async (_event: Electron.IpcMainInvokeEvent, request: BackupImportRequest): Promise<void> => {
         const validated = backupImportRequestSchema.parse(request ?? {});
+        await assertImportPathSafe(validated.source);
         await withTimeout(
           restoreBackupAndReloadRuntime(validated),
           BACKUP_JOB_TIMEOUT_MS,

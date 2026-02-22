@@ -37,17 +37,20 @@ Local-first, single-user macOS app. No web server. Renderer loads only local con
 - **Fix:** Add blocklist rejecting keys matching `ai_*_key` and `encrypted_ai_*` patterns.
 - **Resolution:** Added `isSensitiveKey()` guard to `SETTINGS_GET` (returns null), `SETTINGS_SET` (throws), and `SETTINGS_GET_ALL` (filters out matching rows).
 
-**3.2: Backup import/export accept arbitrary filesystem paths**
+**3.2: Backup import/export accept arbitrary filesystem paths** — FIXED
 - `ipc/backup.ts:120-148` — Programmatic handlers accept any path. Compromised renderer could export DB to `/tmp/exfil.db`.
 - **Fix:** Remove non-dialog handlers from preload, or restrict to known safe directories.
+- **Resolution:** Added `assertImportPathSafe()` (restricts to app backup directory via realpath) and `assertExportPathSafe()` (restricts to Documents/Downloads/Desktop). Dialog handlers remain unrestricted since the user picks the path.
 
-**4.1: User content in AI system prompt without structural delimiters**
+**4.1: User content in AI system prompt without structural delimiters** — FIXED
 - `systemPrompt.ts:104-174` — Task titles, identity, knowledge injected with only markdown `---` separators. Particularly relevant since titles can come from Apple Reminders sync.
 - **Fix:** Wrap user content in XML-style delimiters (`<user_tasks>`, `<user_identity>`).
+- **Resolution:** Added `<user_identity>`, `<user_knowledge>`, and `<user_tasks>` XML delimiters around user-editable sections in the compiled system prompt.
 
-**6.1: CSP allows `'unsafe-inline'` for scripts**
+**6.1: CSP allows `'unsafe-inline'` for scripts** — FIXED
 - `index.html:7` — Needed for inline theme-detection script but weakens XSS protection.
 - **Fix:** Move theme script to separate file, remove `'unsafe-inline'`.
+- **Resolution:** Moved inline theme detection to `public/theme-init.js`. Removed `'unsafe-inline'` from `script-src` in both `index.html` and `quick-add.html`. Added explicit `connect-src 'self'`, `object-src 'none'`, `frame-src 'none'` directives.
 
 **9.1: Ad-hoc code signing, no developer certificate**
 - `forge.config.ts:41-54` — `codesign --sign -` creates valid signature but no trust chain.
