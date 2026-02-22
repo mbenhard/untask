@@ -299,6 +299,15 @@ export const registerAppHandlers = (): void => {
     withIpcLogging(
       'SHELL_OPEN_EXTERNAL',
       async (_event: Electron.IpcMainInvokeEvent, url: string): Promise<void> => {
+        let parsed: URL;
+        try {
+          parsed = new URL(url);
+        } catch {
+          throw new Error('Invalid URL.');
+        }
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+          throw new Error(`Refusing to open URL with scheme: ${parsed.protocol}`);
+        }
         await shell.openExternal(url);
       },
     ),

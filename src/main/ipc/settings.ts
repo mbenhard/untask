@@ -31,6 +31,14 @@ import { fireAiReminder } from '../assistant/proactiveLoop';
 import { initReminderScheduler } from '../services/reminderScheduler';
 import { startProactiveTurn } from '../ai/chat';
 
+// ─── Sensitive key blocklist ─────────────────────────────────────────────────
+// Prevent the renderer from reading or writing API key slots directly.
+// Keys are managed exclusively through the dedicated keyStorage module.
+const SENSITIVE_KEY_PATTERNS = [/^ai_\w+_key$/, /^encrypted_ai_/];
+
+const isSensitiveKey = (key: string): boolean =>
+  SENSITIVE_KEY_PATTERNS.some((re) => re.test(key));
+
 const getMemoryState = (): SettingsMemoryStatePayload => ({
   identity: getIdentity(),
   memory: getMemory(),
@@ -40,6 +48,7 @@ export const registerSettingsHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET,
     withIpcLogging('SETTINGS_GET', (_event: Electron.IpcMainInvokeEvent, key: string) => {
+      if (isSensitiveKey(key)) return null;
       return getSetting(key);
     }),
   );
@@ -47,6 +56,7 @@ export const registerSettingsHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_SET,
     withIpcLogging('SETTINGS_SET', (_event: Electron.IpcMainInvokeEvent, key: string, value: string) => {
+      if (isSensitiveKey(key)) throw new Error('Cannot modify sensitive keys via generic settings API.');
       return setSetting(key, value);
     }),
   );
@@ -54,7 +64,7 @@ export const registerSettingsHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.SETTINGS_GET_ALL,
     withIpcLogging('SETTINGS_GET_ALL', () => {
-      return getAllSettings();
+      return getAllSettings().filter((s) => !isSensitiveKey(s.key));
     }),
   );
 

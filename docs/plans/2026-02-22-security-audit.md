@@ -18,21 +18,24 @@ Local-first, single-user macOS app. No web server. Renderer loads only local con
 
 ### CRITICAL
 
-**5.1: Plaintext API keys always stored in SQLite**
+**5.1: Plaintext API keys always stored in SQLite** — FIXED
 - `keyStorage.ts:30-49` — `storeApiKey()` unconditionally writes raw API key to `settings` table before checking encryption availability. Encrypted copy stored alongside as secondary slot, but plaintext never removed. Any process with filesystem access can extract keys: `sqlite3 ~/Library/Application\ Support/Untask/untask.db "SELECT value FROM settings WHERE key LIKE 'ai_%_key'"`
 - **Fix:** When `safeStorage.isEncryptionAvailable()`, only store encrypted version. Delete plaintext slot after successful encryption. On retrieval failure, return null and prompt re-entry rather than falling back to plaintext.
+- **Resolution:** `storeApiKey()` now only writes plaintext when encryption is unavailable. Plaintext slot deleted after successful encryption. `getApiKey()` returns null (not plaintext fallback) when encrypted slot exists but decryption fails. Migration expanded to cover all 3 providers.
 
 ### HIGH
 
-**10.1: `SHELL_OPEN_EXTERNAL` accepts arbitrary URLs without scheme validation**
+**10.1: `SHELL_OPEN_EXTERNAL` accepts arbitrary URLs without scheme validation** — FIXED
 - `ipc/app.ts:297-305` — Passes any URL from renderer directly to `shell.openExternal`. Can open `file:///`, `ssh://`, custom schemes. A compromised renderer could launch local executables.
 - **Fix:** Validate URL scheme, restrict to `https:` and `http:` only.
+- **Resolution:** Added URL parsing + scheme validation. Rejects non-http(s) schemes with descriptive error.
 
 ### MEDIUM
 
-**2.1: SETTINGS_GET/SET accept arbitrary keys — can leak API keys via IPC**
+**2.1: SETTINGS_GET/SET accept arbitrary keys — can leak API keys via IPC** — FIXED
 - `preload/index.ts:359-361` — Renderer can read any setting key including `ai_openai_key` (plaintext API keys).
 - **Fix:** Add blocklist rejecting keys matching `ai_*_key` and `encrypted_ai_*` patterns.
+- **Resolution:** Added `isSensitiveKey()` guard to `SETTINGS_GET` (returns null), `SETTINGS_SET` (throws), and `SETTINGS_GET_ALL` (filters out matching rows).
 
 **3.2: Backup import/export accept arbitrary filesystem paths**
 - `ipc/backup.ts:120-148` — Programmatic handlers accept any path. Compromised renderer could export DB to `/tmp/exfil.db`.
