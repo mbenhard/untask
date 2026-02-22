@@ -133,10 +133,13 @@ xattr -cr /Applications/Untask.app
 git clone https://github.com/mbenhard/untask.git
 cd untask
 pnpm install
+pnpm build:helper   # one-time — builds the native macOS Reminders bridge
 pnpm start
 ```
 
 This will launch the app in development mode with hot reload.
+
+> **Note:** `pnpm build:helper` compiles a small Swift binary for macOS Reminders sync. You only need to run it once. If you skip it, everything works except Reminders sync.
 
 ### Common commands
 
