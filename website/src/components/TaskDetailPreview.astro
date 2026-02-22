@@ -1,0 +1,519 @@
+---
+// TaskDetailPreview — Expanded task showcase animation
+// A single task row transforms from input state → task state → expanded state
+// No DOM element swaps — one row morphs in place for smooth transitions
+---
+
+<section id="td-section" data-reveal class="px-6 py-24 sm:py-32">
+  <div data-thread-content class="mx-auto max-w-2xl">
+
+    <!-- Section label -->
+    <div class="mb-8 flex flex-col items-center text-center">
+      <div class="flex items-center gap-2.5">
+        <span class="font-mono text-[10px] tabular-nums text-muted-foreground/25">02</span>
+        <span class="h-px w-4 border-t border-dashed border-border/60"></span>
+        <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Everything in One Place</h2>
+      </div>
+      <p class="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground/40">
+        Expand any task. Add notes, set priority, assign a due date, attach subtasks. It's all there when you need it.
+      </p>
+    </div>
+
+    <!-- Window frame -->
+    <div class="overflow-hidden rounded-xl border border-border/70 bg-background shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
+
+      <!-- ═══ TitleBar ═══ -->
+      <header class="flex items-center px-[10px] pt-[4px] pb-1">
+        <div class="traffic-lights flex w-[68px] shrink-0 items-center gap-[6px]">
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FF5F57]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#28C840]/80"></span>
+        </div>
+        <div class="flex-1"></div>
+        <nav class="flex items-center gap-0.5">
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Today</span>
+          <span class="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-foreground">Tasks</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Inbox</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Notes</span>
+        </nav>
+      </header>
+
+      <!-- ═══ Content area ═══ -->
+      <div class="relative overflow-hidden p-3" style="min-height: 420px;">
+        <div class="mx-auto flex max-w-3xl flex-col gap-3">
+
+          <!-- ═══ SectionGroup: In Progress (expanded) ═══ -->
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 rotate-90 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">In Progress</span>
+                <span id="td-count" class="ml-auto font-mono text-[11px] text-muted-foreground">1</span>
+              </div>
+              <span class="ml-1.5 inline-flex size-5 items-center justify-center text-muted-foreground/40">
+                <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+              </span>
+            </div>
+
+            <div class="border-t border-border/60 px-1 py-1">
+
+              <!-- ═══ The Task — single row that morphs from input → task → expanded ═══ -->
+              <div id="td-task" class="border-b border-border/40">
+
+                <!-- Row (always 40px, no height changes during input→task transition) -->
+                <div id="td-row" class="flex min-h-10 items-center gap-2 px-1.5 transition-colors duration-200">
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-flex size-6 items-center justify-center">
+                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed transition-all duration-300" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                        <svg class="size-2.5 text-background opacity-0 transition-opacity duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      </span>
+                    </span>
+                    <span id="td-dot" class="size-[5px] rounded-full bg-foreground/15 transition-colors duration-300"></span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <span id="td-title" class="text-[13px] text-muted-foreground/30">Type and press Enter</span>
+                  </div>
+                  <!-- Right-side actions (hidden in input mode) -->
+                  <div id="td-actions" class="ml-auto flex items-center gap-1 opacity-0 transition-opacity duration-300">
+                    <span id="td-badge-date" class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground" style="display: none;">Feb 20</span>
+                    <span id="td-badge-subtasks" class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground" style="display: none;">1/2</span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+                    </span>
+                    <span id="td-chevron" class="inline-flex size-6 items-center justify-center text-muted-foreground transition-transform duration-200">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                    </span>
+                    <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" />
+                        <circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Expanded body (opens after task is "created" and focused) -->
+                <div id="td-body" class="overflow-hidden" style="max-height: 0; transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);">
+
+                  <!-- Content / notes area (BlockNote editor zone) -->
+                  <div class="border-t border-border/30 px-3 py-3">
+                    <p id="td-content" class="text-[13px] leading-relaxed text-foreground/80 opacity-0 transition-opacity duration-500"></p>
+                  </div>
+
+                  <!-- MetadataLine -->
+                  <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-3 py-2 font-mono text-[11px]">
+                    <span id="td-m-date" class="td-seg text-muted-foreground/50">+ due date</span>
+                    <span class="text-border/60">&middot;</span>
+                    <span id="td-m-priority" class="td-seg text-muted-foreground/50">+ priority</span>
+                    <span class="text-border/60">&middot;</span>
+                    <span id="td-m-status" class="td-seg text-muted-foreground/80">In Progress</span>
+                    <span class="text-border/60">&middot;</span>
+                    <span id="td-m-client" class="td-seg text-muted-foreground/50">+ client</span>
+                    <span class="text-border/60">&middot;</span>
+                    <span id="td-m-subtask" class="td-seg text-muted-foreground/50">+ subtask</span>
+                  </div>
+
+                  <!-- Subtask area -->
+                  <div id="td-subs" class="overflow-hidden" style="max-height: 0; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+
+                    <!-- Subtask inline input -->
+                    <div id="td-sub-input" class="overflow-hidden border-t border-border/30" style="max-height: 0; transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+                      <div class="flex min-h-10 items-center gap-2 px-1.5 pl-8">
+                        <span class="inline-flex size-6 items-center justify-center">
+                          <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));"></span>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <span id="td-sub-text" class="text-[13px] text-muted-foreground/30">New subtask...</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Subtask 1: Draft slide outline (starts unchecked, gets completed in animation) -->
+                    <div id="td-s1" class="overflow-hidden border-t border-border/30" style="max-height: 0; transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+                      <div class="flex min-h-10 items-center gap-2 px-1.5 pl-8">
+                        <span class="inline-flex size-6 items-center justify-center">
+                          <span id="td-s1-check" class="inline-flex size-4 items-center justify-center rounded-full border border-dashed transition-all duration-300" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                            <svg class="size-2.5 text-background opacity-0 transition-opacity duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                          </span>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <p id="td-s1-text" class="truncate text-[13px] text-foreground transition-all duration-300">Draft slide outline</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Subtask 2: Collect latest metrics (active) -->
+                    <div id="td-s2" class="overflow-hidden border-t border-border/30" style="max-height: 0; transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
+                      <div class="flex min-h-10 items-center gap-2 px-1.5 pl-8">
+                        <span class="inline-flex size-6 items-center justify-center">
+                          <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                            <svg class="size-2.5 opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                          </span>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-[13px] text-foreground">Collect latest metrics</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ Existing task: Write project brief (static) ═══ -->
+              <div class="flex min-h-10 items-center gap-2 px-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="inline-flex size-6 items-center justify-center">
+                    <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));">
+                      <svg class="size-2.5 text-background opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                    </span>
+                  </span>
+                  <span class="size-[5px] rounded-full bg-rose-500"></span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[13px] text-foreground">Write project brief</p>
+                </div>
+                <div class="ml-auto flex items-center gap-1">
+                  <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+                  </span>
+                  <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                  </span>
+                  <span class="inline-flex size-6 items-center justify-center text-muted-foreground">
+                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" />
+                      <circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- ═══ SectionGroup: Done (collapsed) ═══ -->
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">Done</span>
+                <span class="ml-auto font-mono text-[11px] text-muted-foreground">3</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- ═══ Bottom bar ═══ -->
+        <div class="mt-3 flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-1">
+            <span class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" />
+                <path d="m14.207 4.793-3.414 3.414" />
+                <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+                <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" />
+              </svg>
+            </span>
+          </div>
+          <div class="flex-1"></div>
+          <div class="flex h-8 w-14 items-center justify-center rounded-md border border-border/60 bg-background/90 text-[10px] font-medium tracking-wide text-muted-foreground shadow-lg backdrop-blur-sm">
+            Chat
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .traffic-lights:hover span:nth-child(1) { background-color: #FF5F57; }
+  .traffic-lights:hover span:nth-child(2) { background-color: #FEBC2E; }
+  .traffic-lights:hover span:nth-child(3) { background-color: #28C840; }
+
+  .td-cursor-blink::after {
+    content: '';
+    display: inline-block;
+    width: 1px;
+    height: 1em;
+    background: var(--muted-foreground);
+    opacity: 0.4;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    animation: td-blink 0.8s step-end infinite;
+  }
+
+  .td-typing::after {
+    content: '';
+    display: inline-block;
+    width: 1px;
+    height: 1em;
+    background: var(--foreground);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    animation: td-blink 0.8s step-end infinite;
+  }
+
+  @keyframes td-blink { 50% { opacity: 0; } }
+
+  .td-flash {
+    animation: td-field-flash 0.6s ease-out;
+  }
+
+  @keyframes td-field-flash {
+    0%   { background-color: color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 3px; }
+    100% { background-color: transparent; }
+  }
+
+  .td-glow {
+    animation: td-row-glow 1.5s ease-out;
+  }
+
+  @keyframes td-row-glow {
+    0%   { background-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+    100% { background-color: transparent; }
+  }
+
+  .td-chevron-up { transform: rotate(180deg); }
+</style>
+
+<script is:inline>
+// ─── State ───
+var tdTimers = [];
+var tdPaused = false;
+var tdTypingInterval = null;
+
+// ─── Cached DOM refs ───
+var tdCache = {};
+function $(id) { return tdCache[id] || (tdCache[id] = document.getElementById(id)); }
+
+// ─── Utilities ───
+
+function tdDelay(fn, ms) { var t = setTimeout(fn, ms); tdTimers.push(t); return t; }
+
+function tdClearAll() {
+  tdTimers.forEach(clearTimeout);
+  tdTimers = [];
+  if (tdTypingInterval) { clearInterval(tdTypingInterval); tdTypingInterval = null; }
+}
+
+function tdType(el, text, ms, cb) {
+  el.textContent = '';
+  var i = 0;
+  tdTypingInterval = setInterval(function() {
+    if (tdPaused) { clearInterval(tdTypingInterval); tdTypingInterval = null; return; }
+    el.textContent = text.substring(0, ++i);
+    if (i >= text.length) { clearInterval(tdTypingInterval); tdTypingInterval = null; if (cb) cb(); }
+  }, ms);
+}
+
+function tdFlash(el) {
+  el.classList.remove('td-flash');
+  void el.offsetWidth;
+  el.classList.add('td-flash');
+}
+
+// ─── Step sequencer ───
+// Flattens nested setTimeout chains into a readable timeline.
+// Steps: [delay, fn] for timed steps, or fn(next) for async steps (e.g. typing)
+
+function tdRun(steps, i) {
+  if (tdPaused || i >= steps.length) return;
+  var step = steps[i];
+  if (typeof step === 'function') {
+    step(function() { tdRun(steps, i + 1); });
+  } else {
+    tdDelay(function() {
+      if (tdPaused) return;
+      step[1]();
+      tdRun(steps, i + 1);
+    }, step[0]);
+  }
+}
+
+// ─── Reset to initial (input) state ───
+
+function tdReset() {
+  // Disable transitions on height-changing elements for instant collapse
+  // (prevents scroll glitch from animated height change re-triggering observer)
+  var heightEls = ['td-body','td-subs','td-sub-input','td-s1','td-s2'];
+  heightEls.forEach(function(id) { $(id).style.transition = 'none'; });
+
+  $('td-title').textContent = 'Type and press Enter';
+  $('td-title').className = 'text-[13px] text-muted-foreground/30';
+
+  $('td-row').style.backgroundColor = '';
+  $('td-row').classList.remove('td-glow');
+  $('td-actions').style.opacity = '0';
+  $('td-chevron').classList.remove('td-chevron-up');
+  $('td-dot').className = 'size-[5px] rounded-full bg-foreground/15 transition-colors duration-300';
+  $('td-count').textContent = '1';
+
+  $('td-badge-date').style.display = 'none';
+  $('td-badge-subtasks').style.display = 'none';
+
+  [['td-m-date','+ due date'],['td-m-priority','+ priority'],['td-m-client','+ client'],['td-m-subtask','+ subtask']].forEach(function(s) {
+    $(s[0]).textContent = s[1];
+    $(s[0]).className = 'td-seg text-muted-foreground/50';
+  });
+  $('td-m-status').className = 'td-seg text-muted-foreground/80';
+
+  heightEls.forEach(function(id) { $(id).style.maxHeight = '0'; });
+
+  $('td-content').textContent = '';
+  $('td-content').style.opacity = '0';
+
+  $('td-sub-text').textContent = 'New subtask...';
+  $('td-sub-text').className = 'text-[13px] text-muted-foreground/30';
+
+  // Subtask 1 checkbox → unchecked
+  var s1check = $('td-s1-check');
+  s1check.style.borderStyle = 'dashed';
+  s1check.style.borderColor = '';
+  s1check.style.backgroundColor = '';
+  s1check.querySelector('svg').style.opacity = '0';
+  $('td-s1-text').className = 'truncate text-[13px] text-foreground transition-all duration-300';
+
+  // Re-enable transitions after the browser has flushed the collapsed state
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      heightEls.forEach(function(id) { $(id).style.transition = ''; });
+    });
+  });
+}
+
+// ─── Animation timeline ───
+
+function runTdDemo() {
+  if (tdPaused) return;
+
+  tdRun([
+    // Typing the task title
+    [1500, function() {
+      $('td-title').className = 'td-typing text-[13px] text-foreground';
+      $('td-title').textContent = '';
+    }],
+    function(next) { tdType($('td-title'), 'Prepare client presentation', 45, next); },
+
+    // "Enter" — morph input row into task row
+    [400, function() {
+      $('td-title').className = 'text-[13px] text-foreground truncate';
+      $('td-actions').style.opacity = '1';
+      $('td-row').classList.add('td-glow');
+      $('td-count').textContent = '2';
+    }],
+
+    // Focus highlight + chevron flip
+    [400, function() {
+      $('td-row').style.backgroundColor = 'color-mix(in srgb, var(--accent) 40%, transparent)';
+      $('td-chevron').classList.add('td-chevron-up');
+    }],
+
+    // Expand body
+    [250, function() { $('td-body').style.maxHeight = '400px'; }],
+
+    // Content note — type in
+    [400, function() {
+      $('td-content').style.opacity = '1';
+      $('td-content').className = 'td-typing text-[13px] leading-relaxed text-foreground/80';
+    }],
+    function(next) { tdType($('td-content'), 'Finalize deck with design team before Thursday.', 25, next); },
+    [0, function() {
+      $('td-content').className = 'text-[13px] leading-relaxed text-foreground/80';
+    }],
+
+    // Priority segment
+    [500, function() {
+      $('td-m-priority').innerHTML = '<span class="inline-block size-[5px] rounded-full bg-amber-500" style="vertical-align:middle"></span> Med';
+      $('td-m-priority').className = 'td-seg text-muted-foreground';
+      tdFlash($('td-m-priority'));
+      $('td-dot').className = 'size-[5px] rounded-full bg-amber-500 transition-colors duration-300';
+    }],
+
+    // Due date segment
+    [800, function() {
+      $('td-m-date').textContent = 'Feb 20';
+      $('td-m-date').className = 'td-seg text-muted-foreground';
+      tdFlash($('td-m-date'));
+      $('td-badge-date').style.display = '';
+    }],
+
+    // Client — typing
+    [800, function() {
+      $('td-m-client').className = 'td-seg text-muted-foreground td-typing';
+      $('td-m-client').textContent = '';
+    }],
+    function(next) { tdType($('td-m-client'), 'Wavelength', 55, next); },
+    [0, function() {
+      $('td-m-client').className = 'td-seg text-muted-foreground';
+      tdFlash($('td-m-client'));
+    }],
+
+    // Subtasks — open area
+    [700, function() {
+      $('td-m-subtask').className = 'td-seg text-muted-foreground';
+      tdFlash($('td-m-subtask'));
+      $('td-subs').style.maxHeight = '200px';
+    }],
+    [250, function() { $('td-sub-input').style.maxHeight = '40px'; }],
+
+    // Type subtask 1
+    [350, function() { $('td-sub-text').className = 'td-typing text-[13px] text-foreground'; }],
+    function(next) { tdType($('td-sub-text'), 'Draft slide outline', 40, next); },
+    [300, function() {
+      $('td-s1').style.maxHeight = '40px';
+      $('td-sub-text').textContent = 'New subtask...';
+      $('td-sub-text').className = 'text-[13px] text-muted-foreground/30';
+    }],
+
+    // Complete subtask 1 — checkbox fills, text gets strikethrough
+    [600, function() {
+      var check = $('td-s1-check');
+      check.style.borderStyle = 'solid';
+      check.style.borderColor = 'var(--foreground)';
+      check.style.backgroundColor = 'var(--foreground)';
+      check.querySelector('svg').style.opacity = '1';
+      $('td-s1-text').className = 'truncate text-[13px] text-muted-foreground line-through transition-all duration-300';
+    }],
+
+    // Type subtask 2
+    [450, function() { $('td-sub-text').className = 'td-typing text-[13px] text-foreground'; }],
+    function(next) { tdType($('td-sub-text'), 'Collect latest metrics', 40, next); },
+    [300, function() {
+      $('td-s2').style.maxHeight = '40px';
+      $('td-sub-input').style.maxHeight = '0';
+      $('td-m-subtask').textContent = '1/2 subtasks';
+      $('td-m-subtask').className = 'td-seg text-muted-foreground';
+      tdFlash($('td-m-subtask'));
+      $('td-badge-subtasks').style.display = '';
+    }],
+
+    // Hold, then reset and loop
+    [3500, function() { tdReset(); }],
+    [1500, function() { runTdDemo(); }],
+  ], 0);
+}
+
+// ─── Public API ───
+
+function startTdAutoPlay() {
+  tdPaused = false;
+  tdReset();
+  tdDelay(runTdDemo, 500);
+}
+
+function stopTdAutoPlay() {
+  tdPaused = true;
+  tdClearAll();
+  tdReset();
+}
+
+window.startTdAutoPlay = startTdAutoPlay;
+window.stopTdAutoPlay = stopTdAutoPlay;
+</script>

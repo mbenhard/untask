@@ -1,0 +1,144 @@
+---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const siteName = 'Untask';
+const siteUrl = 'https://unta.sk';
+
+const {
+  title = 'Untask — Local-first task manager with an AI assistant',
+  description = 'A local-first personal task manager with an optional AI assistant. Open source, zero telemetry, MIT licensed.',
+  ogImage = '/og.jpg',
+} = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href;
+const ogImageUrl = new URL(ogImage, siteUrl).href;
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content={siteName} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    
+    <!-- Google tag (gtag.js) -->
+    <script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-V1YT9TKX3P"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-V1YT9TKX3P');
+    </script>
+  </head>
+  <body>
+    <slot />
+
+    <script is:inline>
+      // Scroll reveal: observe [data-reveal] elements, add .revealed on viewport entry
+      // data-reveal-eager: reveal immediately on load (no scroll needed)
+      // After reveal transition ends, clean up so element's own transitions work normally
+      (function () {
+        var els = document.querySelectorAll('[data-reveal]');
+        if (!els.length) return;
+
+        function reveal(el) {
+          var delay = el.dataset.revealDelay;
+          if (delay) el.style.setProperty('--reveal-delay', delay + 'ms');
+          el.classList.add('revealed');
+          el.addEventListener('transitionend', function cleanup() {
+            el.removeEventListener('transitionend', cleanup);
+            el.removeAttribute('data-reveal');
+            el.removeAttribute('data-reveal-eager');
+            el.classList.remove('revealed');
+            el.style.removeProperty('--reveal-delay');
+          }, { once: true });
+        }
+
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              reveal(entry.target);
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.15 });
+
+        els.forEach(function (el) {
+          if (el.hasAttribute('data-reveal-eager')) {
+            // Reveal on next frame so the initial opacity:0 is painted first
+            requestAnimationFrame(function () { reveal(el); });
+          } else {
+            observer.observe(el);
+          }
+        });
+      })();
+    </script>
+
+    <script is:inline>
+      // Theme toggle
+      function initTheme() {
+        const stored = localStorage.getItem('untask-theme');
+        if (stored === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else if (stored === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+
+      initTheme();
+
+      window.toggleTheme = function (event) {
+        const isDark = document.documentElement.classList.contains('dark');
+        const next = isDark ? 'light' : 'dark';
+
+        // Set CSS custom properties for the reveal origin
+        if (event) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const x = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+          const y = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+          document.documentElement.style.setProperty('--toggle-x', x + '%');
+          document.documentElement.style.setProperty('--toggle-y', y + '%');
+        }
+
+        if (document.startViewTransition) {
+          document.startViewTransition(() => {
+            document.documentElement.classList.toggle('dark', next === 'dark');
+            localStorage.setItem('untask-theme', next);
+          });
+        } else {
+          document.documentElement.classList.toggle('dark', next === 'dark');
+          localStorage.setItem('untask-theme', next);
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,183 @@
+---
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+
+const faqItems = [
+  {
+    id: 'gatekeeper',
+    q: 'App won\'t open after download?',
+    a: 'macOS blocks apps downloaded outside the App Store. Open Terminal and run:',
+    code: 'xattr -cr /Applications/Untask.app',
+    note: 'Then open the app again. This only needs to be done once. Installing via Homebrew avoids this entirely.',
+  },
+  {
+    q: 'AI not responding?',
+    a: 'Check Settings > Assistant — make sure a valid API key is saved for your selected provider. For Ollama, ensure it\'s running locally.',
+  },
+  {
+    q: 'Rate limit errors?',
+    a: 'Some models have usage limits. Wait and click "Retry". Try switching to a different model in Settings > Assistant.',
+  },
+  {
+    q: 'Where\'s my data?',
+    a: 'Everything is local: ~/Library/Application Support/Untask/. Database, attachments, and backups all stay on your machine.',
+  },
+  {
+    q: 'Backup & restore',
+    a: 'Settings > Backup > "Create backup" or "Export". To restore: click any backup, or Import a .taskdb file.',
+  },
+  {
+    q: 'Global shortcut not working?',
+    a: 'Another app may be using the same key combo. Go to Settings > Shortcuts and record a different combination.',
+  },
+  {
+    q: 'Bugs & feature requests',
+    a_html: 'Open an issue on <a href="https://github.com/mbenhard/untask/issues" target="_blank" rel="noopener" class="underline underline-offset-2 decoration-muted-foreground/30 hover:decoration-muted-foreground transition-colors">GitHub</a>. No promises, but I read everything.',
+  },
+  {
+    q: 'Is my data private?',
+    a: '100%. Nothing leaves your machine. No telemetry, no cloud.',
+  },
+];
+---
+
+<Base title="Support — Untask">
+  <main>
+    <section class="px-6 pt-24 pb-8 sm:pt-32">
+      <div class="mx-auto max-w-2xl">
+        <a href="/" class="mb-6 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/30 transition-colors hover:text-muted-foreground">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Untask
+        </a>
+        <h1 class="font-sans text-2xl font-normal tracking-tight text-foreground sm:text-3xl">
+          Before you ask
+        </h1>
+        <p class="mt-2 max-w-md text-[13px] leading-relaxed text-muted-foreground/60">
+          Most answers are here. If not, I'm one message away.
+        </p>
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            onclick="copyEmail(this)"
+            class="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          >
+            <svg class="email-copy-icon h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+            </svg>
+            <svg class="email-check-icon hidden h-3 w-3 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+            marcus@offbrand.design
+          </button>
+          <a
+            href="https://github.com/mbenhard/untask/issues"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          >
+            GitHub Issues
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+          <a
+            href="https://x.com/halfgypsyprince"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          >
+            X DM
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-6 pb-24 sm:pb-32">
+      <div class="mx-auto max-w-2xl">
+
+        <div class="mb-6">
+          <div class="flex items-center gap-2.5">
+            <span class="h-px w-4 border-t border-dashed border-border/60"></span>
+            <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">FAQ</h2>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2">
+          {faqItems.map((item) => (
+            <div id={item.id || undefined} class="rounded-md border border-dashed border-border/60 px-3 py-3">
+              <h3 class="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">
+                {item.q}
+              </h3>
+              {item.a && (
+                <p class="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {item.a}
+                </p>
+              )}
+              {item.a_html && (
+                <p class="mt-2 text-[12px] leading-relaxed text-muted-foreground" set:html={item.a_html} />
+              )}
+              {item.code && (
+                <div class="faq-code-block mt-2 flex items-center gap-0 rounded border border-border/40 bg-accent/50 font-mono text-[11px]">
+                  <code class="flex-1 overflow-x-auto px-2.5 py-1.5 text-foreground/80">{item.code}</code>
+                  <button
+                    onclick={`copyCode(this,'${item.code}')`}
+                    class="flex-none border-l border-border/40 px-2 py-1.5 text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+                    aria-label="Copy command"
+                  >
+                    <svg class="code-copy-icon h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                    </svg>
+                    <svg class="code-check-icon hidden h-3 w-3 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20 6 9 17l-5-5"/>
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {item.note && (
+                <p class="mt-1.5 text-[11px] leading-relaxed text-muted-foreground/60">
+                  {item.note}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+      </div>
+    </section>
+
+    <Footer />
+  </main>
+</Base>
+
+<script is:inline>
+  function copyEmail(btn) {
+    var email = atob('bWFyY3VzQG9mZmJyYW5kLmRlc2lnbg==');
+    navigator.clipboard.writeText(email).then(function() {
+      var copyIcon = btn.querySelector('.email-copy-icon');
+      var checkIcon = btn.querySelector('.email-check-icon');
+      copyIcon.classList.add('hidden');
+      checkIcon.classList.remove('hidden');
+      setTimeout(function() {
+        copyIcon.classList.remove('hidden');
+        checkIcon.classList.add('hidden');
+      }, 1500);
+    });
+  }
+
+  function copyCode(btn, text) {
+    navigator.clipboard.writeText(text).then(function() {
+      var copyIcon = btn.querySelector('.code-copy-icon');
+      var checkIcon = btn.querySelector('.code-check-icon');
+      copyIcon.classList.add('hidden');
+      checkIcon.classList.remove('hidden');
+      setTimeout(function() {
+        copyIcon.classList.remove('hidden');
+        checkIcon.classList.add('hidden');
+      }, 1500);
+    });
+  }
+</script>

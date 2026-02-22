@@ -1,0 +1,1028 @@
+---
+// NotesPreview — 1:1 CSS recreation of NotesList + NoteEditor
+// References: NotesView.tsx, NotesList.tsx, NoteEditor.tsx, BlockEditor.tsx,
+//             UntaskFormattingToolbar.tsx, UntaskSlashMenu.tsx
+// Animation: list view → click note → slash /heading → type paragraph → select+bold → loop
+---
+
+<section id="notes-section" data-reveal class="px-6 py-24 sm:py-32">
+  <div data-thread-content class="mx-auto max-w-2xl">
+
+    <!-- Section label -->
+    <div class="mb-8 flex flex-col items-center text-center">
+      <div class="flex items-center gap-2.5">
+        <span class="font-mono text-[10px] tabular-nums text-muted-foreground/25">03</span>
+        <span class="h-px w-4 border-t border-dashed border-border/60"></span>
+        <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Notes Live Here Too</h2>
+      </div>
+      <p class="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground/40">
+        Meeting notes, ideas, rough drafts — same window, no context switch. Rich text and slash commands, stored locally alongside everything else.
+      </p>
+      </p>
+    </div>
+
+    <!-- Window frame -->
+    <div class="relative overflow-hidden rounded-xl border border-border/70 bg-background shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
+
+      <!-- ═══ TitleBar ═══ -->
+      <header class="flex items-center px-[10px] pt-[4px] pb-1">
+        <div class="traffic-lights flex w-[68px] shrink-0 items-center gap-[6px]">
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FF5F57]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#28C840]/80"></span>
+        </div>
+        <div class="flex-1"></div>
+        <nav class="flex items-center gap-0.5">
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Today</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Tasks</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Inbox</span>
+          <span class="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-foreground">Notes</span>
+        </nav>
+      </header>
+
+      <!-- ═══ Content Container (crossfade between list ↔ editor) ═══ -->
+      <div class="notes-content-area relative" style="min-height: 420px;">
+
+        <!-- Demo cursor (shared across both views) -->
+        <div id="notes-cursor" class="pointer-events-none absolute z-50 opacity-0" style="top: 0; left: 0; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; will-change: transform;">
+          <div id="notes-cursor-inner" style="transition: transform 0.12s;">
+            <img id="notes-cursor-arrow" src="/cursor-default.svg" width="24" height="30" alt="" />
+            <svg id="notes-cursor-text" width="16" height="20" viewBox="0 0 16 20" fill="none" style="display: none; margin-left: -8px; margin-top: -2px;">
+              <path d="M5 1h2a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5M11 1H9a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M5 1h2a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5M11 1H9a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h2" stroke="black" stroke-width="0.75" stroke-linecap="round"/>
+              <line x1="4" y1="10" x2="12" y2="10" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="4" y1="10" x2="12" y2="10" stroke="black" stroke-width="0.75" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- ═══ STATE 1: Notes List View ═══ -->
+        <div id="notes-list-view" class="notes-view-state absolute inset-0 flex flex-col pb-14" style="opacity: 1; z-index: 2;">
+
+          <!-- List header -->
+          <header class="flex items-center justify-between px-3 py-2">
+            <span class="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Notes</span>
+            <button type="button" class="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus:outline-none">
+              <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+              New
+            </button>
+          </header>
+
+          <!-- Note items -->
+          <div class="flex-1 overflow-hidden px-1">
+
+            <!-- Note 1: Pinned — this is the one we'll click -->
+            <button id="notes-list-item-target" type="button" class="notes-list-item group flex w-full items-center gap-2 border-b border-border/40 px-2 py-2 text-left transition-colors duration-100">
+              <svg class="size-[10px] shrink-0 text-muted-foreground/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
+              </svg>
+              <div class="min-w-0 flex-1">
+                <span class="block truncate pl-0.5 text-[13px] font-medium text-foreground">Meeting agenda</span>
+                <p class="mt-0.5 truncate text-[11px] text-muted-foreground">Review project timeline and assign...</p>
+              </div>
+              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">2m ago</span>
+            </button>
+
+            <!-- Note 2 -->
+            <button type="button" class="notes-list-item group flex w-full items-center gap-2 border-b border-border/40 px-2 py-2 text-left transition-colors duration-100">
+              <div class="min-w-0 flex-1">
+                <span class="block truncate pl-0.5 text-[13px] font-medium text-foreground">Product launch checklist</span>
+                <p class="mt-0.5 truncate text-[11px] text-muted-foreground">Final review items for the Q2 release...</p>
+              </div>
+              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">1h ago</span>
+            </button>
+
+            <!-- Note 3 -->
+            <button type="button" class="notes-list-item group flex w-full items-center gap-2 px-2 py-2 text-left transition-colors duration-100">
+              <div class="min-w-0 flex-1">
+                <span class="block truncate pl-0.5 text-[13px] font-medium text-foreground">Design feedback</span>
+                <p class="mt-0.5 truncate text-[11px] text-muted-foreground">Spacing feels off on the settings page...</p>
+              </div>
+              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">3h ago</span>
+            </button>
+
+            <!-- Archived section toggle (matching NotesList.tsx) -->
+            <div class="mt-4 border-t border-border/50 pt-2 pb-2">
+              <button type="button" class="flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
+                <svg class="size-3 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m9 18 6-6-6-6"/>
+                </svg>
+                <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>
+                </svg>
+                <span>Archived</span>
+                <span class="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium">1</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ═══ STATE 2: Note Editor View ═══ -->
+        <div id="notes-editor-view" class="notes-view-state absolute inset-0 flex flex-col pb-14" style="opacity: 0; z-index: 1; pointer-events: none;">
+
+          <!-- Note header bar -->
+          <header class="flex items-center gap-2 px-3 py-2">
+            <button type="button" class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus:outline-none">
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            </button>
+            <span class="text-[10px] text-muted-foreground/70">Edited 2m ago</span>
+            <div class="min-w-0 flex-1"></div>
+            <div class="flex shrink-0 items-center gap-1.5 opacity-0" id="notes-demo-status">
+              <span class="text-[10px] tracking-[0.01em] text-muted-foreground">saving</span>
+            </div>
+            <div class="flex shrink-0 items-center gap-1">
+              <button type="button" class="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus:outline-none">
+                <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+                  <path d="M20 3v4"/><path d="M22 5h-4"/>
+                </svg>
+                process
+              </button>
+              <button type="button" class="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus:outline-none">
+                <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>
+                </svg>
+                archive
+              </button>
+            </div>
+          </header>
+
+          <!-- Editor body -->
+          <div id="notes-editor-body" class="relative min-h-0 flex-1 overflow-visible px-3 py-4">
+
+            <!-- ═══ Floating Formatting Toolbar ═══ -->
+            <div id="notes-fmt-toolbar" class="notes-toolbar-float pointer-events-none absolute z-40" style="opacity: 0; display: none;">
+              <div class="flex items-center gap-0.5 rounded-md border border-border/60 bg-popover p-0.5 shadow-md">
+                <span id="notes-fmt-bold" class="notes-fmt-btn flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors duration-100">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/></svg>
+                </span>
+                <span class="notes-fmt-btn flex size-7 items-center justify-center rounded-sm text-muted-foreground">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>
+                </span>
+                <span class="notes-fmt-btn flex size-7 items-center justify-center rounded-sm text-muted-foreground">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/></svg>
+                </span>
+                <span class="notes-fmt-btn flex size-7 items-center justify-center rounded-sm text-muted-foreground">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </span>
+                <div class="mx-0.5 h-4 w-px bg-border/40" aria-hidden="true"></div>
+                <span class="notes-fmt-btn flex size-7 items-center justify-center rounded-sm text-muted-foreground">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+              </div>
+            </div>
+
+            <!-- ═══ Slash Command Menu ═══ -->
+            <div id="notes-slash-menu" class="notes-slash-float pointer-events-none absolute z-40" style="opacity: 0; display: none;">
+              <div class="min-w-[200px] max-h-[280px] overflow-y-auto rounded-md border border-border/60 bg-popover p-1 shadow-md">
+                <div id="notes-slash-items"></div>
+              </div>
+            </div>
+
+            <!-- Editor content blocks -->
+            <div class="space-y-3 text-sm leading-relaxed text-foreground/90">
+
+              <!-- Existing heading -->
+              <h3 class="text-[0.95rem] font-semibold leading-[1.3] text-foreground">Meeting agenda</h3>
+
+              <!-- Existing bullet list -->
+              <ul class="list-disc space-y-1.5 pl-5 text-foreground/85">
+                <li>Review project timeline and deliverables</li>
+                <li>Assign owners for open items</li>
+                <li>Discuss budget for Q2</li>
+              </ul>
+
+              <!-- Existing paragraph -->
+              <p class="text-foreground/80">
+                Need to block Wednesday afternoon for deep work on the new design. No meetings.
+              </p>
+
+              <!-- ═══ DEMO: Slash command line (morphs into heading) ═══ -->
+              <div id="notes-demo-block" style="display: none;">
+                <!-- This container morphs between states:
+                     1. Paragraph with typed "/" text + caret
+                     2. Heading result after slash command completes -->
+                <p id="notes-demo-para" class="text-foreground/80" style="min-height: 1.5em;">
+                  <span id="notes-demo-slash-text"></span><span id="notes-demo-caret" class="notes-caret" style="display: none;"></span>
+                </p>
+                <h4 id="notes-demo-heading" class="text-[1rem] font-semibold leading-[1.3] text-foreground" style="display: none;"></h4>
+              </div>
+
+              <!-- ═══ DEMO: Typed paragraph line ═══ -->
+              <p id="notes-typed-line" style="display: none;">
+                <span id="notes-typed-text" class="text-foreground/80"></span><span id="notes-typed-caret" class="notes-caret" style="display: none;"></span>
+              </p>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ Bottom bar (visible in both states) ═══ -->
+        <div class="absolute inset-x-3 bottom-3 z-10 flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-1">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" />
+                <path d="m14.207 4.793-3.414 3.414" />
+                <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+                <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" />
+              </svg>
+            </span>
+          </div>
+          <div class="flex-1"></div>
+          <div class="flex h-8 w-14 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-[10px] font-medium tracking-wide text-muted-foreground shadow-lg backdrop-blur-sm">
+            Chat
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .traffic-lights:hover span:nth-child(1) { background-color: #FF5F57; }
+  .traffic-lights:hover span:nth-child(2) { background-color: #FEBC2E; }
+  .traffic-lights:hover span:nth-child(3) { background-color: #28C840; }
+
+  /* ─── View state crossfade ─── */
+
+  .notes-view-state {
+    transition: opacity 0.3s ease;
+  }
+
+  /* ─── List items ─── */
+
+  .notes-list-item:hover {
+    background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .notes-list-item.notes-item-active {
+    background-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  /* ─── Caret blink ─── */
+
+  .notes-caret {
+    display: inline-block;
+    width: 1.5px;
+    height: 1em;
+    background-color: var(--foreground);
+    vertical-align: text-bottom;
+    margin-left: 0.5px;
+    animation: notes-blink 1s step-end infinite;
+  }
+  @keyframes notes-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ─── Selection highlight ─── */
+
+  .notes-selection-hl {
+    background-color: color-mix(in srgb, #3b82f6 30%, transparent);
+    color: var(--foreground);
+    border-radius: 1px;
+    padding: 1px 0;
+  }
+
+  /* ─── Formatting toolbar ─── */
+
+  .notes-toolbar-float {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  .notes-fmt-btn-active {
+    background-color: var(--accent);
+    color: var(--foreground) !important;
+    border-radius: 2px;
+  }
+
+  /* ─── Slash menu ─── */
+
+  .notes-slash-float {
+    transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Slash menu item styles are inlined in the JS render function
+     to avoid Astro style scoping issues with dynamic innerHTML */
+</style>
+
+<script is:inline>
+// ═══════════════════════════════════════════
+// NotesPreview — Animation Controller
+// ═══════════════════════════════════════════
+
+var notesDemoPaused = false;
+var notesTimers = [];
+var notesTypeInterval = null;
+
+// ─── Timer management ───
+
+function nDelay(fn, ms) {
+  var t = setTimeout(fn, ms);
+  notesTimers.push(t);
+  return t;
+}
+
+function nClearTimers() {
+  notesTimers.forEach(clearTimeout);
+  notesTimers = [];
+  if (notesTypeInterval) {
+    clearInterval(notesTypeInterval);
+    notesTypeInterval = null;
+  }
+}
+
+// ─── DOM helpers ───
+
+var nCache = {};
+function n$(id) { return nCache[id] || (nCache[id] = document.getElementById(id)); }
+
+// ─── Cursor helpers ───
+
+function nMoveCursor(targetEl, cb) {
+  var cursor = n$('notes-cursor');
+  if (!cursor || !targetEl) { if (cb) cb(); return; }
+  var container = cursor.offsetParent;
+  if (!container) { if (cb) cb(); return; }
+  var cr = container.getBoundingClientRect();
+  var tr = targetEl.getBoundingClientRect();
+  var x = tr.left - cr.left + tr.width * 0.35;
+  var y = tr.top - cr.top + tr.height * 0.35;
+  cursor.style.opacity = '1';
+  cursor.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+  nDelay(cb, 550);
+}
+
+function nMoveCursorXY(x, y, cb) {
+  var cursor = n$('notes-cursor');
+  if (!cursor) { if (cb) cb(); return; }
+  cursor.style.opacity = '1';
+  cursor.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+  nDelay(cb, 550);
+}
+
+function nClickCursor(cb) {
+  var inner = n$('notes-cursor-inner');
+  if (!inner) { if (cb) cb(); return; }
+  inner.style.transform = 'scale(0.78)';
+  nDelay(function() {
+    inner.style.transform = 'scale(1)';
+    nDelay(cb, 120);
+  }, 120);
+}
+
+function nHideCursor() {
+  var cursor = n$('notes-cursor');
+  if (cursor) cursor.style.opacity = '0';
+}
+
+function nSetCursorType(type) {
+  var arrow = document.getElementById('notes-cursor-arrow');
+  var text = document.getElementById('notes-cursor-text');
+  if (!arrow || !text) return;
+  if (type === 'text') {
+    arrow.style.display = 'none';
+    text.style.display = '';
+  } else {
+    arrow.style.display = '';
+    text.style.display = 'none';
+  }
+}
+
+// ─── View state management ───
+
+function nShowView(viewId) {
+  var listView = n$('notes-list-view');
+  var editorView = n$('notes-editor-view');
+  if (viewId === 'list') {
+    listView.style.opacity = '1';
+    listView.style.zIndex = '2';
+    listView.style.pointerEvents = '';
+    editorView.style.opacity = '0';
+    editorView.style.zIndex = '1';
+    editorView.style.pointerEvents = 'none';
+  } else {
+    editorView.style.opacity = '1';
+    editorView.style.zIndex = '2';
+    editorView.style.pointerEvents = '';
+    listView.style.opacity = '0';
+    listView.style.zIndex = '1';
+    listView.style.pointerEvents = 'none';
+  }
+}
+
+// ─── Typewriter ───
+
+function nTypewriter(text, spanId, caretId, speed, cb) {
+  var span = document.getElementById(spanId);
+  var caret = document.getElementById(caretId);
+  if (!span) { if (cb) cb(); return; }
+  span.textContent = '';
+  if (caret) caret.style.display = '';
+  var i = 0;
+  notesTypeInterval = setInterval(function() {
+    if (notesDemoPaused) { clearInterval(notesTypeInterval); notesTypeInterval = null; return; }
+    span.textContent += text[i];
+    i++;
+    if (i >= text.length) {
+      clearInterval(notesTypeInterval);
+      notesTypeInterval = null;
+      if (cb) nDelay(cb, 400);
+    }
+  }, speed);
+}
+
+// ─── Drag-select ───
+
+function nDragSelect(spanId, hlText, cb) {
+  var span = document.getElementById(spanId);
+  var cursor = n$('notes-cursor');
+  var caret = document.getElementById('notes-typed-caret');
+  if (!span || !cursor) { if (cb) cb(); return; }
+  if (caret) caret.style.display = 'none';
+
+  // Switch to text cursor for selection
+  nSetCursorType('text');
+
+  // Use cursor's offsetParent as coordinate reference (same frame as nMoveCursor)
+  var container = cursor.offsetParent;
+  if (!container) { if (cb) cb(); return; }
+  var containerRect = container.getBoundingClientRect();
+
+  var fullText = span.textContent || '';
+  var hlStart = fullText.lastIndexOf(hlText);
+  if (hlStart < 0) hlStart = Math.max(0, fullText.length - hlText.length);
+  var before = fullText.substring(0, hlStart);
+  var highlight = fullText.substring(hlStart);
+
+  // Build initial state: before text + empty hl + rest as plain
+  // Inline highlight style to avoid Astro style scoping on dynamic innerHTML
+  var hlStyle = 'background-color:color-mix(in srgb,#3b82f6 30%,transparent);color:var(--foreground);border-radius:1px;padding:1px 0;';
+  span.innerHTML = before + '<span id="notes-drag-hl" style="' + hlStyle + '"></span><span id="notes-drag-rest">' + highlight + '</span>';
+
+  var hlSpan = document.getElementById('notes-drag-hl');
+  var restSpan = document.getElementById('notes-drag-rest');
+  if (!hlSpan || !restSpan) { if (cb) cb(); return; }
+
+  // Position cursor at start of highlight area
+  var restRect = restSpan.getBoundingClientRect();
+  var startX = restRect.left - containerRect.left - 4;
+  var startY = restRect.top - containerRect.top + restRect.height * 0.5;
+  cursor.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s';
+  cursor.style.transform = 'translate(' + startX + 'px, ' + startY + 'px)';
+
+  var charIdx = 0;
+  var totalChars = highlight.length;
+
+  nDelay(function() {
+    if (notesDemoPaused) return;
+
+    function dragStep() {
+      if (notesDemoPaused) return;
+      if (charIdx < totalChars) {
+        charIdx++;
+        hlSpan.textContent = highlight.substring(0, charIdx);
+        restSpan.textContent = highlight.substring(charIdx);
+
+        // Move cursor smoothly with the highlight edge
+        var curHlRect = hlSpan.getBoundingClientRect();
+        var cx = curHlRect.right - containerRect.left;
+        var cy = curHlRect.top - containerRect.top + curHlRect.height * 0.5;
+        cursor.style.transition = 'transform 0.04s linear, opacity 0.3s';
+        cursor.style.transform = 'translate(' + cx + 'px, ' + cy + 'px)';
+
+        nDelay(dragStep, 35);
+      } else {
+        restSpan.remove();
+        // Restore arrow cursor and normal speed
+        nSetCursorType('arrow');
+        cursor.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s';
+        nDelay(cb, 250);
+      }
+    }
+
+    dragStep();
+  }, 450);
+}
+
+// ─── Formatting toolbar ───
+
+function nShowToolbar(anchorEl) {
+  var toolbar = n$('notes-fmt-toolbar');
+  var body = n$('notes-editor-body');
+  if (!toolbar || !body || !anchorEl) return;
+  var bodyRect = body.getBoundingClientRect();
+  var anchorRect = anchorEl.getBoundingClientRect();
+  toolbar.style.display = '';
+  var toolbarW = 240;
+  var left = (anchorRect.left - bodyRect.left) + (anchorRect.width / 2) - (toolbarW / 2);
+  left = Math.max(0, Math.min(left, bodyRect.width - toolbarW));
+  var top = anchorRect.top - bodyRect.top - 42;
+  toolbar.style.left = left + 'px';
+  toolbar.style.top = top + 'px';
+  toolbar.style.transform = 'translateY(4px)';
+  void toolbar.offsetHeight;
+  toolbar.style.opacity = '1';
+  toolbar.style.transform = 'translateY(0)';
+}
+
+function nHideToolbar() {
+  var toolbar = n$('notes-fmt-toolbar');
+  if (!toolbar) return;
+  toolbar.style.opacity = '0';
+  toolbar.style.transform = 'translateY(4px)';
+  nDelay(function() { toolbar.style.display = 'none'; }, 200);
+}
+
+function nBoldBtnActive(on) {
+  var btn = n$('notes-fmt-bold');
+  if (!btn) return;
+  if (on) btn.classList.add('notes-fmt-btn-active');
+  else btn.classList.remove('notes-fmt-btn-active');
+}
+
+// ─── Slash menu ───
+
+var nSlashAllItems = [
+  { group: 'Headings', items: [
+    { title: 'Heading 1', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 20H11V13H4V20H2V4H4V11H11V4H13V20ZM21.0005 8V20H19.0005L19 10.204L17 10.74V8.67L19.5005 8H21.0005Z"/></svg>', active: false, subtext: 'Top-level heading' },
+    { title: 'Heading 2', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4V11H11V4H13V20H11V13H4V20H2V4H4ZM18.5 8C20.5711 8 22.25 9.67893 22.25 11.75C22.25 12.6074 21.9623 13.3976 21.4781 14.0292L21.3302 14.2102L18.0343 18H22V20H15L14.9993 18.444L19.8207 12.8981C20.0881 12.5908 20.25 12.1893 20.25 11.75C20.25 10.7835 19.4665 10 18.5 10C17.5818 10 16.8288 10.7071 16.7558 11.6065L16.75 11.75H14.75C14.75 9.67893 16.4289 8 18.5 8Z"/></svg>', active: false, subtext: 'Key section heading' },
+    { title: 'Heading 3', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 8L21.9984 10L19.4934 12.883C21.0823 13.3184 22.25 14.7728 22.25 16.5C22.25 18.5711 20.5711 20.25 18.5 20.25C16.674 20.25 15.1528 18.9449 14.8184 17.2166L16.7821 16.8352C16.9384 17.6413 17.6481 18.25 18.5 18.25C19.4665 18.25 20.25 17.4665 20.25 16.5C20.25 15.5335 19.4665 14.75 18.5 14.75C18.214 14.75 17.944 14.8186 17.7056 14.9403L16.3992 13.3932L19.3484 10H15V8H22ZM4 4V11H11V4H13V20H11V13H4V20H2V4H4Z"/></svg>', active: false, subtext: 'Subsection and group heading' },
+  ]},
+  { group: 'Basic blocks', items: [
+    { title: 'Quote', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 4H3V6H21V4ZM21 11H8V13H21V11ZM21 18H8V20H21V18ZM5 11H3V20H5V11Z"/></svg>', active: false, subtext: 'Quote or excerpt' },
+    { title: 'Toggle List', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22 18V20H2V18H22ZM2 3.5L10 8.5L2 13.5V3.5ZM22 11V13H12V11H22ZM22 4V6H12V4H22Z"/></svg>', active: false, subtext: 'List with hideable sub-items' },
+    { title: 'Numbered List', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4H21V6H8V4ZM5 3V6H6V7H3V6H4V4H3V3H5ZM3 14V11.5H5V11H3V10H6V12.5H4V13H6V14H3ZM5 19.5H3V18.5H5V18H3V17H6V21H3V20H5V19.5ZM8 11H21V13H8V11ZM8 18H21V20H8V18Z"/></svg>', active: false, subtext: 'List with ordered items' },
+    { title: 'Bullet List', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4H21V6H8V4ZM4.5 6.5C3.67157 6.5 3 5.82843 3 5C3 4.17157 3.67157 3.5 4.5 3.5C5.32843 3.5 6 4.17157 6 5C6 5.82843 5.32843 6.5 4.5 6.5ZM4.5 13.5C3.67157 13.5 3 12.8284 3 12C3 11.1716 3.67157 10.5 4.5 10.5C5.32843 10.5 6 11.1716 6 12C6 12.8284 5.32843 13.5 4.5 13.5ZM4.5 20.4C3.67157 20.4 3 19.7284 3 18.9C3 18.0716 3.67157 17.4 4.5 17.4C5.32843 17.4 6 18.0716 6 18.9C6 19.7284 5.32843 20.4 4.5 20.4ZM8 11H21V13H8V11ZM8 18H21V20H8V18Z"/></svg>', active: false, subtext: 'List with unordered items' },
+    { title: 'Check List', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8.00008 6V9H5.00008V6H8.00008ZM3.00008 4V11H10.0001V4H3.00008ZM13.0001 4H21.0001V6H13.0001V4ZM13.0001 11H21.0001V13H13.0001V11ZM13.0001 18H21.0001V20H13.0001V18ZM10.7072 16.2071L9.29297 14.7929L6.00008 18.0858L4.20718 16.2929L2.79297 17.7071L6.00008 20.9142L10.7072 16.2071Z"/></svg>', active: false, subtext: 'List with checkboxes' },
+    { title: 'Paragraph', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 6V21H11V6H5V4H19V6H13Z"/></svg>', active: false, subtext: 'The body of your document' },
+    { title: 'Code Block', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.41436 5.99995L5.70726 3.70706L4.29304 2.29285L0.585938 5.99995L4.29304 9.70706L5.70726 8.29285L3.41436 5.99995ZM9.58594 5.99995L7.29304 3.70706L8.70726 2.29285L12.4144 5.99995L8.70726 9.70706L7.29304 8.29285L9.58594 5.99995ZM14.0002 2.99995H21.0002C21.5524 2.99995 22.0002 3.44767 22.0002 3.99995V20C22.0002 20.5522 21.5524 21 21.0002 21H3.00015C2.44787 21 2.00015 20.5522 2.00015 20V12H4.00015V19H20.0002V4.99995H14.0002V2.99995Z"/></svg>', active: false, subtext: 'Code block with syntax highlighting' },
+  ]},
+  { group: 'Untask', items: [
+    { title: 'Create Task', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>', active: false, subtext: 'Create a task from selection or nearby text' },
+    { title: 'Process with AI', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>', active: false, subtext: 'Open AI chat with this note as context' }
+  ]}
+];
+
+function nFilterSlashItems(query) {
+  var q = query.toLowerCase().replace(/^\//, '');
+  var result = [];
+  var firstMarked = false;
+  for (var g = 0; g < nSlashAllItems.length; g++) {
+    var group = nSlashAllItems[g];
+    var filteredItems = [];
+    for (var i = 0; i < group.items.length; i++) {
+      var item = group.items[i];
+      if (item.title.toLowerCase().indexOf(q) !== -1) {
+        var isActive = !firstMarked;
+        if (isActive) firstMarked = true;
+        filteredItems.push({ title: item.title, icon: item.icon, active: isActive, subtext: item.subtext });
+      }
+    }
+    if (filteredItems.length > 0) {
+      result.push({ group: group.group, items: filteredItems });
+    }
+  }
+  return result;
+}
+
+function nRenderSlashMenu(groups) {
+  var container = document.getElementById('notes-slash-items');
+  if (!container) return;
+  var html = '';
+  // Inline all styles to avoid Astro style scoping issues with dynamic innerHTML
+  for (var g = 0; g < groups.length; g++) {
+    var group = groups[g];
+    html += '<div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:color-mix(in srgb,var(--muted-foreground) 60%,transparent);padding:8px 8px 4px;">' + group.group + '</div>';
+    for (var i = 0; i < group.items.length; i++) {
+      var item = group.items[i];
+      var itemStyle = 'display:flex;width:100%;align-items:center;gap:8px;border-radius:4px;padding:6px 8px;font-size:12px;transition:background-color 0.1s,color 0.1s;';
+      if (item.active) {
+        itemStyle += 'background-color:var(--accent);color:var(--foreground);';
+      } else {
+        itemStyle += 'color:var(--muted-foreground);';
+      }
+      html += '<div style="' + itemStyle + '">';
+      html += '<span style="width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">' + item.icon + '</span>';
+      html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + item.title + '</span>';
+      if (item.subtext) {
+        html += '<span style="margin-left:auto;flex-shrink:0;font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,monospace;font-size:10px;color:color-mix(in srgb,var(--muted-foreground) 50%,transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">' + item.subtext + '</span>';
+      }
+      html += '</div>';
+    }
+  }
+  container.innerHTML = html;
+}
+
+function nShowSlashMenu(anchorEl, query) {
+  var menu = n$('notes-slash-menu');
+  var body = n$('notes-editor-body');
+  if (!menu || !body || !anchorEl) return;
+  var bodyRect = body.getBoundingClientRect();
+  var anchorRect = anchorEl.getBoundingClientRect();
+  var groups = nFilterSlashItems(query);
+  nRenderSlashMenu(groups);
+  menu.style.display = '';
+  var left = anchorRect.left - bodyRect.left;
+  var top = anchorRect.bottom - bodyRect.top + 4;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  menu.style.transform = 'translateY(-4px)';
+  void menu.offsetHeight;
+  menu.style.opacity = '1';
+  menu.style.transform = 'translateY(0)';
+}
+
+function nUpdateSlashFilter(query) {
+  var groups = nFilterSlashItems(query);
+  nRenderSlashMenu(groups);
+}
+
+function nHideSlashMenu() {
+  var menu = n$('notes-slash-menu');
+  if (!menu) return;
+  menu.style.opacity = '0';
+  menu.style.transform = 'translateY(-4px)';
+  nDelay(function() { menu.style.display = 'none'; }, 150);
+}
+
+// ─── Reset ───
+
+function nResetAll() {
+  // Hide cursor and reset to arrow type
+  nHideCursor();
+  nSetCursorType('arrow');
+
+  // Reset to list view (instant, no transition)
+  var listView = n$('notes-list-view');
+  var editorView = n$('notes-editor-view');
+  if (listView) {
+    listView.style.transition = 'none';
+    listView.style.opacity = '1';
+    listView.style.zIndex = '2';
+    listView.style.pointerEvents = '';
+  }
+  if (editorView) {
+    editorView.style.transition = 'none';
+    editorView.style.opacity = '0';
+    editorView.style.zIndex = '1';
+    editorView.style.pointerEvents = 'none';
+  }
+  // Re-enable transitions next frame
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      if (listView) listView.style.transition = '';
+      if (editorView) editorView.style.transition = '';
+    });
+  });
+
+  // Remove list item active state
+  var target = n$('notes-list-item-target');
+  if (target) target.classList.remove('notes-item-active');
+
+  // Reset toolbar & slash menu
+  nHideToolbar();
+  nHideSlashMenu();
+  nBoldBtnActive(false);
+
+  // Reset demo block
+  var demoBlock = n$('notes-demo-block');
+  if (demoBlock) { demoBlock.style.display = 'none'; }
+  var demoPara = n$('notes-demo-para');
+  if (demoPara) { demoPara.style.display = ''; }
+  var demoSlashText = n$('notes-demo-slash-text');
+  if (demoSlashText) demoSlashText.textContent = '';
+  var demoCaret = n$('notes-demo-caret');
+  if (demoCaret) demoCaret.style.display = 'none';
+  var demoHeading = n$('notes-demo-heading');
+  if (demoHeading) { demoHeading.style.display = 'none'; demoHeading.textContent = ''; demoHeading.style.opacity = ''; }
+
+  // Reset typed line
+  var typedLine = n$('notes-typed-line');
+  if (typedLine) { typedLine.style.display = 'none'; typedLine.style.opacity = ''; }
+  var typedText = n$('notes-typed-text');
+  if (typedText) { typedText.textContent = ''; typedText.innerHTML = ''; }
+  var typedCaret = n$('notes-typed-caret');
+  if (typedCaret) typedCaret.style.display = 'none';
+
+  // Clean up drag elements
+  var dragHl = document.getElementById('notes-drag-hl');
+  if (dragHl) dragHl.removeAttribute('id');
+  var dragRest = document.getElementById('notes-drag-rest');
+  if (dragRest) dragRest.remove();
+}
+
+// ─── Main demo sequence ───
+
+function runNotesDemo() {
+  if (notesDemoPaused) return;
+
+  var listTarget = n$('notes-list-item-target');
+  var demoBlock = n$('notes-demo-block');
+  var demoPara = n$('notes-demo-para');
+  var demoSlashText = n$('notes-demo-slash-text');
+  var demoCaret = n$('notes-demo-caret');
+  var demoHeading = n$('notes-demo-heading');
+  var typedLine = n$('notes-typed-line');
+  var typedText = n$('notes-typed-text');
+  var typedCaret = n$('notes-typed-caret');
+
+  if (!listTarget || !demoBlock) return;
+
+  // ──────────────────────────────────
+  // PHASE 1: List view — cursor moves to note, clicks
+  // ──────────────────────────────────
+
+  nDelay(function() {
+    if (notesDemoPaused) return;
+
+    // Move cursor to the target note item
+    nMoveCursor(listTarget, function() {
+      if (notesDemoPaused) return;
+
+      // Highlight the list item
+      listTarget.classList.add('notes-item-active');
+
+      nDelay(function() {
+        if (notesDemoPaused) return;
+
+        // Click
+        nClickCursor(function() {
+          if (notesDemoPaused) return;
+
+          // Hide cursor during transition
+          nHideCursor();
+
+          // ──────────────────────────────────
+          // PHASE 2: Crossfade list → editor
+          // ──────────────────────────────────
+          nDelay(function() {
+            if (notesDemoPaused) return;
+            nShowView('editor');
+
+            // ──────────────────────────────────
+            // PHASE 3: Slash command → heading
+            // ──────────────────────────────────
+            nDelay(function() {
+              if (notesDemoPaused) return;
+
+              // Show the demo block (paragraph mode)
+              demoBlock.style.display = '';
+              demoPara.style.display = '';
+              demoHeading.style.display = 'none';
+
+              // Move cursor to the demo block area and click
+              nMoveCursor(demoPara, function() {
+                if (notesDemoPaused) return;
+                nClickCursor(function() {
+                  if (notesDemoPaused) return;
+
+                  // Type "/" — show slash menu with all items
+                  nTypewriter('/', 'notes-demo-slash-text', 'notes-demo-caret', 60, function() {
+                    if (notesDemoPaused) return;
+
+                    nShowSlashMenu(demoPara, '/');
+
+                    // Type "hea" to filter — menu narrows to heading items
+                    nDelay(function() {
+                      if (notesDemoPaused) return;
+
+                      var filterText = 'hea';
+                      var filterIdx = 0;
+
+                      function typeFilterChar() {
+                        if (notesDemoPaused) return;
+                        if (filterIdx < filterText.length) {
+                          demoSlashText.textContent += filterText[filterIdx];
+                          filterIdx++;
+                          nUpdateSlashFilter(demoSlashText.textContent);
+                          nDelay(typeFilterChar, 80);
+                        } else {
+                          // Pause on filtered results, then "select" Heading 2
+                          nDelay(function() {
+                            if (notesDemoPaused) return;
+
+                            // Update menu to highlight Heading 2 instead of Heading 1
+                            var groups = nFilterSlashItems('/hea');
+                            if (groups.length > 0 && groups[0].items.length > 1) {
+                              groups[0].items[0].active = false;
+                              groups[0].items[1].active = true;
+                              nRenderSlashMenu(groups);
+                            }
+
+                            nDelay(function() {
+                              if (notesDemoPaused) return;
+
+                              // Hide slash menu and morph line into heading
+                              nHideSlashMenu();
+                              demoCaret.style.display = 'none';
+
+                              // Fade out paragraph text
+                              demoPara.style.transition = 'opacity 0.2s ease';
+                              demoPara.style.opacity = '0';
+
+                              nDelay(function() {
+                                if (notesDemoPaused) return;
+                                demoPara.style.display = 'none';
+                                demoPara.style.opacity = '';
+                                demoPara.style.transition = '';
+
+                                // Show heading element and type into it
+                                demoHeading.style.display = '';
+                                demoHeading.textContent = '';
+                                demoHeading.style.opacity = '1';
+                                demoHeading.classList.add('notes-heading-typing');
+
+                                nDelay(function() {
+                                  if (notesDemoPaused) return;
+                                  var headingText = 'Action items';
+                                  var hIdx = 0;
+                                  notesTypeInterval = setInterval(function() {
+                                    if (notesDemoPaused) { clearInterval(notesTypeInterval); notesTypeInterval = null; return; }
+                                    demoHeading.textContent += headingText[hIdx];
+                                    hIdx++;
+                                    if (hIdx >= headingText.length) {
+                                      clearInterval(notesTypeInterval);
+                                      notesTypeInterval = null;
+                                      demoHeading.classList.remove('notes-heading-typing');
+
+                                      // ──────────────────────────────────
+                                      // PHASE 4: Type paragraph
+                                      // ──────────────────────────────────
+                                      nDelay(function() {
+                                        if (notesDemoPaused) return;
+
+                                        typedLine.style.display = '';
+                                        typedText.textContent = '';
+                                        typedText.innerHTML = '';
+
+                                        nTypewriter('Review deck with Lisa before Thursday', 'notes-typed-text', 'notes-typed-caret', 45, function() {
+                                          if (notesDemoPaused) return;
+
+                                          // ──────────────────────────────────
+                                          // PHASE 5: Drag-select + Bold
+                                          // ──────────────────────────────────
+                                          nDelay(function() {
+                                            if (notesDemoPaused) return;
+
+                                            nDragSelect('notes-typed-text', 'before Thursday', function() {
+                                              if (notesDemoPaused) return;
+
+                                              // Show toolbar above selected text
+                                              nShowToolbar(typedLine);
+
+                                              nDelay(function() {
+                                                if (notesDemoPaused) return;
+
+                                                // Move cursor to Bold button
+                                                var boldBtn = n$('notes-fmt-bold');
+                                                if (!boldBtn) return;
+
+                                                nMoveCursor(boldBtn, function() {
+                                                  if (notesDemoPaused) return;
+
+                                                  nClickCursor(function() {
+                                                    if (notesDemoPaused) return;
+
+                                                    // Apply bold
+                                                    nBoldBtnActive(true);
+
+                                                    nDelay(function() {
+                                                      if (notesDemoPaused) return;
+
+                                                      // Clear selection, apply bold styling to text
+                                                      var raw = typedText.textContent || '';
+                                                      var boldTarget = 'before Thursday';
+                                                      var bIdx = raw.lastIndexOf(boldTarget);
+                                                      if (bIdx >= 0) {
+                                                        var beforeBold = raw.substring(0, bIdx);
+                                                        typedText.innerHTML = beforeBold + '<strong>' + boldTarget + '</strong>';
+                                                      }
+                                                      nBoldBtnActive(false);
+                                                      nHideToolbar();
+
+                                                      // ──────────────────────────────────
+                                                      // PHASE 6: Hold, then reset and loop
+                                                      // ──────────────────────────────────
+                                                      nDelay(function() {
+                                                        if (notesDemoPaused) return;
+                                                        nHideCursor();
+
+                                                        // Fade out demo elements
+                                                        nDelay(function() {
+                                                          if (notesDemoPaused) return;
+
+                                                          // Fade typed line
+                                                          typedLine.style.transition = 'opacity 0.5s ease';
+                                                          typedLine.style.opacity = '0';
+
+                                                          // Fade heading
+                                                          demoHeading.style.transition = 'opacity 0.5s ease';
+                                                          demoHeading.style.opacity = '0';
+
+                                                          nDelay(function() {
+                                                            if (notesDemoPaused) return;
+
+                                                            // Crossfade back to list
+                                                            nShowView('list');
+                                                            listTarget.classList.remove('notes-item-active');
+
+                                                            // Clean up demo elements
+                                                            nDelay(function() {
+                                                              if (notesDemoPaused) return;
+
+                                                              // Reset demo block
+                                                              demoBlock.style.display = 'none';
+                                                              demoPara.style.display = '';
+                                                              demoPara.style.opacity = '';
+                                                              demoSlashText.textContent = '';
+                                                              demoCaret.style.display = 'none';
+                                                              demoHeading.style.display = 'none';
+                                                              demoHeading.textContent = '';
+                                                              demoHeading.style.opacity = '';
+                                                              demoHeading.style.transition = '';
+
+                                                              typedLine.style.display = 'none';
+                                                              typedLine.style.opacity = '';
+                                                              typedLine.style.transition = '';
+                                                              typedText.textContent = '';
+                                                              typedText.innerHTML = '';
+                                                              typedCaret.style.display = 'none';
+
+                                                              // Loop after pause
+                                                              nDelay(function() {
+                                                                if (!notesDemoPaused) runNotesDemo();
+                                                              }, 2000);
+                                                            }, 400);
+                                                          }, 600);
+                                                        }, 2000);
+                                                      }, 800);
+                                                    }, 250);
+                                                  });
+                                                });
+                                              }, 600);
+                                            });
+                                          }, 400);
+                                        });
+                                      }, 300);
+
+                                    }
+                                  }, 50);
+                                }, 200);
+                              }, 250);
+                            }, 500);
+                          }, 300);
+                        }
+                      }
+                      typeFilterChar();
+                    }, 400);
+                  });
+                });
+              });
+            }, 500);
+          }, 200);
+        });
+      }, 300);
+    });
+  }, 1200);
+}
+
+// ─── Public API ───
+
+function startNotesAutoPlay() {
+  notesDemoPaused = false;
+  nResetAll();
+  nDelay(function() { runNotesDemo(); }, 500);
+}
+
+function stopNotesAutoPlay() {
+  notesDemoPaused = true;
+  nClearTimers();
+  nResetAll();
+}
+
+window.startNotesAutoPlay = startNotesAutoPlay;
+window.stopNotesAutoPlay = stopNotesAutoPlay;
+</script>
+
+<style>
+  /* Heading typing caret (on the heading element itself) */
+  .notes-heading-typing::after {
+    content: '';
+    display: inline-block;
+    width: 1.5px;
+    height: 1em;
+    background-color: var(--foreground);
+    vertical-align: text-bottom;
+    margin-left: 0.5px;
+    animation: notes-blink 1s step-end infinite;
+  }
+</style>

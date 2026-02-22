@@ -1,0 +1,45 @@
+---
+// Tech stack — spec-sheet with SettingsRow-style divide-y separators
+const stack = [
+  { label: 'Runtime', value: 'Electron + React + TypeScript' },
+  { label: 'Database', value: 'SQLite (better-sqlite3 + Drizzle)' },
+  { label: 'AI', value: 'Vercel AI SDK, multi-provider' },
+  { label: 'State', value: 'Zustand' },
+  { label: 'Styling', value: 'Tailwind CSS' },
+  { label: 'Editor', value: 'BlockNote' },
+  { label: 'Storage', value: '~/Library/Application Support/Untask/' },
+];
+---
+
+<section data-reveal class="px-6 py-24 sm:py-32">
+  <div data-thread-content class="mx-auto max-w-2xl">
+
+    <!-- Section header -->
+    <div class="mb-8 flex flex-col items-center text-center">
+      <div class="flex items-center gap-2.5">
+        <span class="font-mono text-[10px] tabular-nums text-muted-foreground/25">07</span>
+        <span class="h-px w-4 border-t border-dashed border-border/60"></span>
+        <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Under the Hood</h2>
+      </div>
+      <p class="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground/40">
+        Electron shell, local SQLite, no cloud, no account. The stack is boring on purpose — fast, auditable, yours.
+      </p>
+    </div>
+
+    <!-- Spec list with dotted leaders -->
+    <div class="mx-auto max-w-md rounded-2xl border border-border/40 bg-accent/20 px-8 py-6 dark:bg-accent/10">
+      {stack.map((item) => (
+        <div class="stack-row flex items-baseline gap-2 py-1.5">
+          <span class="shrink-0 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground/50">
+            {item.label}
+          </span>
+          <span class="stack-dots min-w-[20px] flex-1 border-b border-dashed border-border/30"></span>
+          <span class="shrink-0 text-[12px] text-foreground/80">
+            {item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+
+  </div>
+</section>
