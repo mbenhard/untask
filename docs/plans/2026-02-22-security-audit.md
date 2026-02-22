@@ -62,15 +62,15 @@ Local-first, single-user macOS app. No web server. Renderer loads only local con
 
 ### LOW
 
-**2.2: Several task handlers lack Zod input validation** — `TASK_LIST`, `TASK_TOGGLE_TODAY`, `TASK_CANCEL`, `TASK_REOPEN`, `TASK_SET_STATUSES` accept raw input. Drizzle prevents SQL injection.
+**2.2: Several task handlers lack Zod input validation** — FIXED. Added Zod schemas for `TASK_LIST` (filter), `TASK_TOGGLE_TODAY`, `TASK_CANCEL`, `TASK_REOPEN` (taskId), `TASK_SET_STATUSES` (config), and `TASK_REORDER` (ids array).
 
-**4.2: Note context passed to AI without structural separation** — User-authored only, not imported from external sources.
+**4.2: Note context passed to AI without structural separation** — FIXED. Wrapped note context in `<user_note_context>` XML delimiters in streamOrchestration.ts.
 
-**5.3: Environment variable fallback for OpenRouter key** — `process.env.OPENROUTER_API_KEY` takes precedence. Dev convenience, minimal risk.
+**5.3: Environment variable fallback for OpenRouter key** — `process.env.OPENROUTER_API_KEY` takes precedence. Dev convenience, minimal risk. (Won't fix — intentional dev convenience.)
 
-**12.1: No macOS App Sandbox** — Amplifies local data exposure. Adding sandbox requires careful entitlement configuration.
+**12.1: No macOS App Sandbox** — Amplifies local data exposure. Adding sandbox requires careful entitlement configuration. (Won't fix — requires Apple Developer certificate and careful entitlement work.)
 
-**12.2: Ollama base URL user-configurable without loopback validation** — Could be pointed at malicious server. Add warning for non-localhost URLs.
+**12.2: Ollama base URL user-configurable without loopback validation** — FIXED. Added `isLoopbackUrl()` check; logs warning when base URL is not localhost/127.0.0.1/::1.
 
 ---
 

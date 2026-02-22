@@ -5,9 +5,15 @@ import {
   type TaskDeleteRequestPayload,
   type TaskCompleteRequestPayload,
 } from '../../types/ipc';
-import type { TaskStatusConfig } from '../../types/models';
 import { withIpcLogging } from './helpers';
-import { taskDeleteRequestSchema, taskCompleteRequestSchema } from './schemas';
+import {
+  taskDeleteRequestSchema,
+  taskCompleteRequestSchema,
+  taskIdSchema,
+  taskListFilterSchema,
+  taskReorderSchema,
+  taskStatusConfigSchema,
+} from './schemas';
 import {
   listTasks,
   createTask,
@@ -29,8 +35,9 @@ import { refreshTodayBadge } from '../tray';
 export const registerTaskHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.TASK_LIST,
-    withIpcLogging('TASK_LIST', (_event: Electron.IpcMainInvokeEvent, filter?: Parameters<typeof listTasks>[0]) => {
-      return listTasks(filter);
+    withIpcLogging('TASK_LIST', (_event: Electron.IpcMainInvokeEvent, filter?: unknown) => {
+      const validated = taskListFilterSchema.parse(filter);
+      return listTasks(validated);
     }),
   );
 
@@ -64,8 +71,9 @@ export const registerTaskHandlers = (): void => {
 
   ipcMain.handle(
     IPC_CHANNELS.TASK_REORDER,
-    withIpcLogging('TASK_REORDER', (_event: Electron.IpcMainInvokeEvent, ids: string[]) => {
-      reorderTasks(ids);
+    withIpcLogging('TASK_REORDER', (_event: Electron.IpcMainInvokeEvent, ids: unknown) => {
+      const validated = taskReorderSchema.parse(ids);
+      reorderTasks(validated);
     }),
   );
 
@@ -84,8 +92,9 @@ export const registerTaskHandlers = (): void => {
 
   ipcMain.handle(
     IPC_CHANNELS.TASK_TOGGLE_TODAY,
-    withIpcLogging('TASK_TOGGLE_TODAY', (_event: Electron.IpcMainInvokeEvent, id: string) => {
-      const result = toggleToday(id);
+    withIpcLogging('TASK_TOGGLE_TODAY', (_event: Electron.IpcMainInvokeEvent, id: unknown) => {
+      const validId = taskIdSchema.parse(id);
+      const result = toggleToday(validId);
       refreshTodayBadge();
       return result;
     }),
@@ -93,8 +102,9 @@ export const registerTaskHandlers = (): void => {
 
   ipcMain.handle(
     IPC_CHANNELS.TASK_CANCEL,
-    withIpcLogging('TASK_CANCEL', (_event: Electron.IpcMainInvokeEvent, id: string) => {
-      const result = cancelTask(id, 'user');
+    withIpcLogging('TASK_CANCEL', (_event: Electron.IpcMainInvokeEvent, id: unknown) => {
+      const validId = taskIdSchema.parse(id);
+      const result = cancelTask(validId, 'user');
       refreshTodayBadge();
       return result;
     }),
@@ -102,8 +112,9 @@ export const registerTaskHandlers = (): void => {
 
   ipcMain.handle(
     IPC_CHANNELS.TASK_REOPEN,
-    withIpcLogging('TASK_REOPEN', (_event: Electron.IpcMainInvokeEvent, id: string) => {
-      const result = reopenTask(id, 'user');
+    withIpcLogging('TASK_REOPEN', (_event: Electron.IpcMainInvokeEvent, id: unknown) => {
+      const validId = taskIdSchema.parse(id);
+      const result = reopenTask(validId, 'user');
       refreshTodayBadge();
       return result;
     }),
@@ -118,8 +129,9 @@ export const registerTaskHandlers = (): void => {
 
   ipcMain.handle(
     IPC_CHANNELS.TASK_SET_STATUSES,
-    withIpcLogging('TASK_SET_STATUSES', (_event: Electron.IpcMainInvokeEvent, config: TaskStatusConfig) => {
-      return setTaskStatusConfig(config);
+    withIpcLogging('TASK_SET_STATUSES', (_event: Electron.IpcMainInvokeEvent, config: unknown) => {
+      const validated = taskStatusConfigSchema.parse(config);
+      return setTaskStatusConfig(validated);
     }),
   );
 

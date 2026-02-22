@@ -108,6 +108,31 @@ export const backupDialogRequestSchema = z.object({
   passphrase: z.string().optional(),
 });
 
+// ─── Task handler schemas ─────────────────────────────────────────────────────
+
+const taskStatusValues = [
+  'inbox', 'active', 'in_progress', 'waiting', 'review', 'someday', 'cancelled', 'done',
+] as const;
+
+export const taskIdSchema = z.string().min(1);
+
+export const taskListFilterSchema = z.object({
+  status: z.enum(taskStatusValues).optional(),
+  parentId: z.string().nullable().optional(),
+  today: z.boolean().optional(),
+  priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
+  client: z.string().optional(),
+  search: z.string().optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+}).optional();
+
+export const taskReorderSchema = z.array(z.string().min(1)).min(1).max(500);
+
+export const taskStatusConfigSchema = z.object({
+  enabled: z.array(z.enum(taskStatusValues)),
+  order: z.array(z.enum(taskStatusValues)),
+});
+
 export const apiKeyProviderSchema = z.string().min(1).max(64).regex(/^[a-z0-9_-]+$/);
 export const apiKeyValueSchema = z.string().min(1).max(512);
 export const setApiKeySchema = z.object({ provider: apiKeyProviderSchema, key: apiKeyValueSchema });

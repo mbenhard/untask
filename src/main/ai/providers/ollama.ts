@@ -23,10 +23,27 @@ const THINKING_MODEL_PATTERN = /thinking|think(?:er)?|\br1\b|qwq/i;
  * `think: true` so Ollama separates reasoning into native events,
  * and no num_predict cap so thinking tokens don't steal response budget.
  */
+const isLoopbackUrl = (url: string): boolean => {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+};
+
 export function createOllamaProviderInstance(baseUrl?: string): ProviderInstance {
   const resolvedBaseUrl = (baseUrl?.trim() ?? '').length > 0
     ? baseUrl!.trim()
     : OLLAMA_DEFAULT_BASE_URL;
+
+  if (!isLoopbackUrl(resolvedBaseUrl)) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[ollama] Non-loopback base URL configured: ${resolvedBaseUrl}. ` +
+      'All conversation data will be sent to this remote host.',
+    );
+  }
 
   const provider = createOllama({
     baseURL: resolvedBaseUrl.replace(/\/$/, ''),

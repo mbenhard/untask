@@ -508,10 +508,11 @@ export const runAssistantStream = async (
           input.noteContext.noteId.trim().length > 0 &&
           input.noteContext.markdown.trim().length > 0
             ? [
-                'Attached note context:',
-                `- note_id: ${input.noteContext.noteId}`,
-                `- title: ${input.noteContext.title}`,
+                '<user_note_context>',
+                `note_id: ${input.noteContext.noteId}`,
+                `title: ${input.noteContext.title}`,
                 input.noteContext.markdown,
+                '</user_note_context>',
               ].join('\n')
             : null;
         const historyLimit = ollamaSlim ? OLLAMA_HISTORY_WINDOW_LIMIT : HISTORY_WINDOW_LIMIT;
