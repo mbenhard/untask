@@ -85,7 +85,8 @@ const bootstrapProactiveInFlight = (
     const msg = get().messages.find((m) => m.id === placeholderId);
     if (msg && !msg.content) {
       // Placeholder still has no content -- remove it
-      const { [event.requestId]: _, ...remaining } = get().inFlightByRequestId;
+      const remaining = { ...get().inFlightByRequestId };
+      delete remaining[event.requestId];
       set((state) => ({
         messages: state.messages.filter((m) => m.id !== placeholderId),
         inFlightByRequestId: remaining,
@@ -291,14 +292,53 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
     clearTimeout(inFlight.safetyTimeoutId);
   }
 
+  const mapped = mapMessageToUi(event.assistantMessage);
+  if (
+    mapped.conversationId &&
+    get().activeConversationId &&
+    mapped.conversationId !== get().activeConversationId
+  ) {
+    set((state) => {
+      const nextMessages = state.messages.filter(
+        (message) => message.id !== inFlight?.placeholderId,
+      );
+      const remaining = { ...state.inFlightByRequestId };
+      delete remaining[event.requestId];
+      const nextPayloads = { ...state.requestPayloadByRequestId };
+      delete nextPayloads[event.requestId];
+      const nextPendingViewSwitches = { ...state.pendingViewSwitchByRequestId };
+      delete nextPendingViewSwitches[event.requestId];
+      const nextConversationIds = { ...state.conversationIdByRequestId };
+      delete nextConversationIds[event.requestId];
+      const nextAssistantMessageIds = { ...state.assistantMessageIdByRequestId };
+      delete nextAssistantMessageIds[event.requestId];
+      const noMoreInFlight = Object.keys(remaining).length === 0;
+
+      return {
+        messages: noMoreInFlight
+          ? nextMessages.map((message) =>
+            message.isStreaming ? { ...message, isStreaming: false } : message,
+          )
+          : nextMessages,
+        inFlightByRequestId: remaining,
+        pendingViewSwitchByRequestId: nextPendingViewSwitches,
+        requestPayloadByRequestId: nextPayloads,
+        conversationIdByRequestId: nextConversationIds,
+        assistantMessageIdByRequestId: nextAssistantMessageIds,
+        isSending: !noMoreInFlight,
+      };
+    });
+
+    void get().refreshConversations();
+    return;
+  }
+
   const actionCards = dedupeActionCards(
     event.actionCards.length > 0 ? event.actionCards : inFlight?.actionCards ?? [],
   );
   const pendingViewSwitch = get().pendingViewSwitchByRequestId[event.requestId];
 
   set((state) => {
-    const mapped = mapMessageToUi(event.assistantMessage);
-
     // Guard: skip if this exact message ID is already in the array
     // (defensive against duplicate events or race conditions)
     const alreadyExists = state.messages.some((m) => m.id === mapped.id);
@@ -309,8 +349,9 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
       return { inFlightByRequestId: remaining };
     }
 
+    const placeholderId = inFlight?.placeholderId ?? `assistant-stream-${event.requestId}`;
     const baseMessages = state.messages.filter(
-      (message) => message.id !== inFlight?.placeholderId,
+      (message) => message.id !== placeholderId,
     );
     const finalizedSteps = collapseConsecutiveTextSteps(inFlight?.steps ?? mapped.steps);
     const finalizedChips = event.chips ?? inFlight?.chips ?? mapped.chips;
@@ -425,6 +466,10 @@ const handleError: StreamEventHandler = ({ set, get, event }) => {
     if (!event.retryable) {
       delete nextConversationIds[event.requestId];
     }
+    const nextAssistantMessageIds = {
+      ...state.assistantMessageIdByRequestId,
+    };
+    delete nextAssistantMessageIds[event.requestId];
 
     const noMoreInFlight = Object.keys(remaining).length === 0;
 
@@ -436,6 +481,7 @@ const handleError: StreamEventHandler = ({ set, get, event }) => {
       pendingViewSwitchByRequestId: nextPendingViewSwitches,
       requestPayloadByRequestId: nextPayloads,
       conversationIdByRequestId: nextConversationIds,
+      assistantMessageIdByRequestId: nextAssistantMessageIds,
       isSending: !noMoreInFlight,
       error: event.message,
       lastStreamError: {
@@ -530,6 +576,7 @@ export const createStreamActions = (
       isSending: false,
       inFlightByRequestId: {},
       pendingViewSwitchByRequestId: {},
+      requestPayloadByRequestId: {},
       conversationIdByRequestId: {},
       assistantMessageIdByRequestId: {},
     });
