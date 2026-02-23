@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as R
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
-import { BlockNoteView } from '@blocknote/mantine';
-import '@blocknote/mantine/style.css';
 import {
+  BlockNoteViewRaw as BlockNoteView,
   getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
   FormattingToolbarController,
   SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react';
+import '@blocknote/react/style.css';
 
 import { FileContextMenu } from './FileContextMenu';
 import { UntaskFormattingToolbar } from './UntaskFormattingToolbar';

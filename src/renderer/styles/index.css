@@ -231,14 +231,14 @@
 }
 
 /* Compact side menu icons (+ / drag handle) */
-.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:not(.mantine-Menu-item) svg {
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root:not(.mantine-Menu-item), .bn-button) svg {
   height: 16px !important;
   width: 16px !important;
   color: var(--muted-foreground) !important;
   opacity: 0.4;
 }
 
-.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:hover svg {
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover svg {
   opacity: 0.8;
 }
 
