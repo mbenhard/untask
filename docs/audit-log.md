@@ -750,3 +750,27 @@ Impact
 - Footprint: removed `editor-bn-mantine` runtime chunk from renderer build output.
 - Dependency surface: one fewer direct production dependency (`@blocknote/mantine`).
 - Compatibility: preserved editor behavior and existing compact side-menu styling by dual-targeting button class selectors during transition.
+
+## 41. Font payload subset pruning (`latin` + `latin-ext` only)
+
+What changed
+- Updated default renderer font imports in:
+  - `src/renderer/main.tsx`
+  - `src/renderer/quick-add.tsx`
+- Updated optional typography family loaders in:
+  - `src/renderer/components/providers/TypographyProvider.tsx`
+- Replaced broad `@fontsource/<family>/<weight>.css` imports with subset-specific imports:
+  - `@fontsource/<family>/latin-<weight>.css`
+  - `@fontsource/<family>/latin-ext-<weight>.css`
+
+Why
+- Renderer builds still shipped many non-Latin subset font assets (cyrillic/greek/vietnamese) for all configured families and weights.
+- Untask’s footprint objective prioritizes reducing packaged static payload where safe and measurable.
+
+Impact
+- Footprint (renderer assets): `woff2_count` `105` -> `46`; `woff2_total_bytes` `1,165,708` -> `710,844` (~`39%` reduction).
+- Build-size indicator:
+  - renderer main CSS `79.76 kB` -> `76.85 kB` (gzip `13.30 kB` -> `12.95 kB`)
+  - quick-add CSS `77.93 kB` -> `76.19 kB` (gzip `13.18 kB` -> `12.88 kB`)
+- Tradeoff:
+  - Non-Latin glyphs are no longer provided by bundled app fonts and will render via system fallback fonts.

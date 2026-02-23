@@ -30,6 +30,7 @@ Date: 2026-02-23
 | TASK-022 | Slash-menu query path rebuilt default/custom items on every query update | Fixed |
 | TASK-023 | Duplicate `assistant_done` terminal events could retain stale request-scoped stream state | Fixed |
 | TASK-024 | BlockNote editor runtime still shipped Mantine view/runtime chunk despite custom editor UI controls | Fixed |
+| TASK-025 | Font assets still shipped broad non-Latin subsets for all typography families | Fixed |
 | TEST-001 | Core task service recursion tests are skipped in default suite | Fixed |
 
 ## Detailed Issues
@@ -570,6 +571,29 @@ Fix
 
 Status
 - Fixed in `src/renderer/components/editor/BlockEditor.tsx`, `src/renderer/styles/index.css`, and `package.json`.
+
+## TASK-025: Font assets still shipped broad non-Latin subsets for all typography families
+
+Flow
+- Renderer/quick-add packaged asset footprint.
+
+Repro steps
+1. Build production renderer output.
+2. Inspect emitted `woff2` assets in `dist/assets`.
+3. Observe broad subset coverage (including cyrillic/greek/vietnamese) across configured typography families.
+
+Expected
+- Packaged font assets should be constrained to the minimum subset range needed for target usage while preserving current UI behavior.
+
+Actual (before fix)
+- `@fontsource/<family>/<weight>.css` imports pulled all package subsets, inflating shipped font asset count and size.
+
+Fix
+- Replaced broad imports with explicit `latin` + `latin-ext` subset imports for default and dynamically loaded typography families.
+- Applied in `main.tsx`, `quick-add.tsx`, and `TypographyProvider`.
+
+Status
+- Fixed in `src/renderer/main.tsx`, `src/renderer/quick-add.tsx`, and `src/renderer/components/providers/TypographyProvider.tsx`.
 
 ## TEST-001: Task service recursion tests could be skipped when native ABI mismatched
 
