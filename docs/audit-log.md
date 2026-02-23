@@ -689,3 +689,44 @@ Impact
 - Performance: lower per-keystroke work while slash menu is open.
 - Maintainability: slash-menu composition is centralized and memoized, making query-path behavior clearer.
 - Safety: no feature/UI changes; only execution strategy changed.
+
+## 38. Chat stream request-state cleanup consolidation + idempotent duplicate-finalization handling
+
+What changed
+- Added shared request-scoped cleanup helpers in `src/renderer/stores/chat/chatStreamSlice.ts`:
+  - `resolveRequestScopedCleanup()`
+  - `resolveMessagesForInFlightState()`
+- Reused those helpers across `assistant_done` and `error` handlers to remove duplicated map-pruning logic for:
+  - `inFlightByRequestId`
+  - `requestPayloadByRequestId`
+  - `pendingViewSwitchByRequestId`
+  - `conversationIdByRequestId`
+  - `assistantMessageIdByRequestId`
+- Hardened duplicate `assistant_done` path (`alreadyExists && !inFlight`) so it now also cleans any residual request-scoped state instead of only pruning in-flight entries.
+- Added regression coverage in `src/renderer/stores/chatStore.test.ts` for duplicate `assistant_done` idempotency and stale request-state cleanup.
+
+Why
+- Stream terminal paths were carrying repeated cleanup branches, increasing drift risk and making edge-case hardening slower.
+- Duplicate terminal events should be safely idempotent and leave no residual request-scoped state.
+
+Impact
+- Correctness: duplicate `assistant_done` events cannot leave stale per-request payload/navigation/conversation state behind.
+- Maintainability: one centralized cleanup policy reduces branching duplication in a high-churn stream slice.
+- Performance/footprint: fewer repeated object-manipulation blocks and smaller terminal-handler surface area.
+
+## 39. Conversation removal flow deduplicated (archive/delete)
+
+What changed
+- Extracted shared internal helpers in `src/renderer/stores/chat/chatConversationSlice.ts`:
+  - `resolveNextConversationAfterRemoval()`
+  - `runConversationRemoval()`
+- Updated both `archiveConversation` and `deleteConversation` actions to reuse this shared removal/fallback flow.
+
+Why
+- Archive and delete paths duplicated the same post-removal thread selection and fallback-thread creation logic.
+- Shared logic reduces drift risk and keeps conversation lifecycle behavior aligned across both actions.
+
+Impact
+- Maintainability: smaller, clearer action handlers with one source of truth for removal fallback behavior.
+- Footprint: removed repeated branch blocks in conversation slice hot paths.
+- Safety: no UI/feature changes; behavior is preserved.

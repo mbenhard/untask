@@ -72,106 +72,107 @@ export const loadConversationIntoState = async (
 export const createConversationActions = (
   set: StoreApi<ChatStore>['setState'],
   get: StoreApi<ChatStore>['getState'],
-) => ({
-  refreshConversations: async () => {
-    try {
-      set({ isLoadingConversations: true });
-      await refreshConversationsInternal(set);
-      set({ isLoadingConversations: false, error: null });
-    } catch (error) {
-      set({ isLoadingConversations: false, error: toErrorMessage(error, 'Unknown chat operation error.') });
-    }
-  },
+) => {
+  const resolveNextConversationAfterRemoval = async (conversationId: string) => {
+    const nextActive =
+      get().conversations.find(
+        (conversation) =>
+          conversation.id !== conversationId && !conversation.archivedAt,
+      )?.id ?? null;
 
-  createConversation: async (title?: string) => {
-    try {
-      await getUntask().chat.cancel();
-    } catch {
-      // Ignore cancel failures when no request is active.
-    }
-
-    try {
-      const created = await getUntask().chat.createThread(
-        title?.trim().length ? { title: title.trim() } : undefined,
-      );
-      await loadConversationIntoState(set, created.conversation.id);
-      await refreshConversationsInternal(set);
-      set({ error: null });
-    } catch (error) {
-      set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
-    }
-  },
-
-  setActiveConversation: async (conversationId: string) => {
-    if (!conversationId || conversationId === get().activeConversationId) {
+    if (nextActive) {
+      await loadConversationIntoState(set, nextActive);
       return;
     }
 
-    try {
-      await getUntask().chat.cancel();
-    } catch {
-      // Ignore cancel failures when no request is active.
+    const created = await getUntask().chat.createThread();
+    await loadConversationIntoState(set, created.conversation.id);
+    await refreshConversationsInternal(set);
+  };
+
+  const runConversationRemoval = async (
+    conversationId: string,
+    remove: () => Promise<void>,
+  ) => {
+    await remove();
+    await refreshConversationsInternal(set);
+
+    if (get().activeConversationId === conversationId) {
+      await resolveNextConversationAfterRemoval(conversationId);
     }
+  };
 
-    try {
-      await loadConversationIntoState(set, conversationId);
-      await refreshConversationsInternal(set);
-    } catch (error) {
-      set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
-    }
-  },
+  return {
+    refreshConversations: async () => {
+      try {
+        set({ isLoadingConversations: true });
+        await refreshConversationsInternal(set);
+        set({ isLoadingConversations: false, error: null });
+      } catch (error) {
+        set({ isLoadingConversations: false, error: toErrorMessage(error, 'Unknown chat operation error.') });
+      }
+    },
 
-  archiveConversation: async (conversationId: string) => {
-    try {
-      await getUntask().chat.archiveThread({ conversationId });
-      await refreshConversationsInternal(set);
-
-      if (get().activeConversationId === conversationId) {
-        const nextActive =
-          get().conversations.find(
-            (conversation) =>
-              conversation.id !== conversationId && !conversation.archivedAt,
-          )?.id ?? null;
-
-        if (nextActive) {
-          await loadConversationIntoState(set, nextActive);
-        } else {
-          const created = await getUntask().chat.createThread();
-          await loadConversationIntoState(set, created.conversation.id);
-          await refreshConversationsInternal(set);
-        }
+    createConversation: async (title?: string) => {
+      try {
+        await getUntask().chat.cancel();
+      } catch {
+        // Ignore cancel failures when no request is active.
       }
 
-      set({ error: null });
-    } catch (error) {
-      set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
-    }
-  },
+      try {
+        const created = await getUntask().chat.createThread(
+          title?.trim().length ? { title: title.trim() } : undefined,
+        );
+        await loadConversationIntoState(set, created.conversation.id);
+        await refreshConversationsInternal(set);
+        set({ error: null });
+      } catch (error) {
+        set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
+      }
+    },
 
-  deleteConversation: async (conversationId: string) => {
-    try {
-      await getUntask().chat.deleteThread({ conversationId });
-      await refreshConversationsInternal(set);
-
-      if (get().activeConversationId === conversationId) {
-        const nextActive =
-          get().conversations.find(
-            (conversation) =>
-              conversation.id !== conversationId && !conversation.archivedAt,
-          )?.id ?? null;
-
-        if (nextActive) {
-          await loadConversationIntoState(set, nextActive);
-        } else {
-          const created = await getUntask().chat.createThread();
-          await loadConversationIntoState(set, created.conversation.id);
-          await refreshConversationsInternal(set);
-        }
+    setActiveConversation: async (conversationId: string) => {
+      if (!conversationId || conversationId === get().activeConversationId) {
+        return;
       }
 
-      set({ error: null });
-    } catch (error) {
-      set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
-    }
-  },
-});
+      try {
+        await getUntask().chat.cancel();
+      } catch {
+        // Ignore cancel failures when no request is active.
+      }
+
+      try {
+        await loadConversationIntoState(set, conversationId);
+        await refreshConversationsInternal(set);
+      } catch (error) {
+        set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
+      }
+    },
+
+    archiveConversation: async (conversationId: string) => {
+      try {
+        await runConversationRemoval(
+          conversationId,
+          () => getUntask().chat.archiveThread({ conversationId }),
+        );
+        set({ error: null });
+      } catch (error) {
+        set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
+      }
+    },
+
+    deleteConversation: async (conversationId: string) => {
+      try {
+        await runConversationRemoval(
+          conversationId,
+          () => getUntask().chat.deleteThread({ conversationId }),
+        );
+        set({ error: null });
+      } catch (error) {
+        set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
+      }
+    },
+  };
+};

@@ -30,6 +30,82 @@ type StreamHandlerContext = {
 
 type StreamEventHandler = (ctx: StreamHandlerContext) => void;
 
+type RequestScopedCleanupOptions = {
+  keepRequestPayload?: boolean;
+  keepConversationId?: boolean;
+  keepAssistantMessageId?: boolean;
+};
+
+type RequestScopedCleanupResult = {
+  inFlightByRequestId: ChatStore['inFlightByRequestId'];
+  requestPayloadByRequestId: ChatStore['requestPayloadByRequestId'];
+  pendingViewSwitchByRequestId: ChatStore['pendingViewSwitchByRequestId'];
+  conversationIdByRequestId: ChatStore['conversationIdByRequestId'];
+  assistantMessageIdByRequestId: ChatStore['assistantMessageIdByRequestId'];
+  noMoreInFlight: boolean;
+};
+
+const removeRequestEntry = <T>(
+  map: Record<string, T>,
+  requestId: string,
+): Record<string, T> => {
+  if (!(requestId in map)) {
+    return map;
+  }
+
+  const next = { ...map };
+  delete next[requestId];
+  return next;
+};
+
+const resolveRequestScopedCleanup = (
+  state: Pick<
+    ChatStore,
+    | 'inFlightByRequestId'
+    | 'requestPayloadByRequestId'
+    | 'pendingViewSwitchByRequestId'
+    | 'conversationIdByRequestId'
+    | 'assistantMessageIdByRequestId'
+  >,
+  requestId: string,
+  options: RequestScopedCleanupOptions = {},
+): RequestScopedCleanupResult => {
+  const inFlightByRequestId = removeRequestEntry(state.inFlightByRequestId, requestId);
+  const pendingViewSwitchByRequestId = removeRequestEntry(
+    state.pendingViewSwitchByRequestId,
+    requestId,
+  );
+  const requestPayloadByRequestId = options.keepRequestPayload
+    ? state.requestPayloadByRequestId
+    : removeRequestEntry(state.requestPayloadByRequestId, requestId);
+  const conversationIdByRequestId = options.keepConversationId
+    ? state.conversationIdByRequestId
+    : removeRequestEntry(state.conversationIdByRequestId, requestId);
+  const assistantMessageIdByRequestId = options.keepAssistantMessageId
+    ? state.assistantMessageIdByRequestId
+    : removeRequestEntry(state.assistantMessageIdByRequestId, requestId);
+  const noMoreInFlight = Object.keys(inFlightByRequestId).length === 0;
+
+  return {
+    inFlightByRequestId,
+    requestPayloadByRequestId,
+    pendingViewSwitchByRequestId,
+    conversationIdByRequestId,
+    assistantMessageIdByRequestId,
+    noMoreInFlight,
+  };
+};
+
+const resolveMessagesForInFlightState = (
+  messages: ChatUiMessage[],
+  noMoreInFlight: boolean,
+): ChatUiMessage[] =>
+  noMoreInFlight
+    ? messages.map((message) =>
+      message.isStreaming ? { ...message, isStreaming: false } : message,
+    )
+    : messages;
+
 // ─── Proactive inFlight bootstrap ───────────────────────────
 
 /**
@@ -303,30 +379,16 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
       const nextMessages = state.messages.filter(
         (message) => message.id !== inFlight?.placeholderId,
       );
-      const remaining = { ...state.inFlightByRequestId };
-      delete remaining[event.requestId];
-      const nextPayloads = { ...state.requestPayloadByRequestId };
-      delete nextPayloads[event.requestId];
-      const nextPendingViewSwitches = { ...state.pendingViewSwitchByRequestId };
-      delete nextPendingViewSwitches[event.requestId];
-      const nextConversationIds = { ...state.conversationIdByRequestId };
-      delete nextConversationIds[event.requestId];
-      const nextAssistantMessageIds = { ...state.assistantMessageIdByRequestId };
-      delete nextAssistantMessageIds[event.requestId];
-      const noMoreInFlight = Object.keys(remaining).length === 0;
+      const cleanup = resolveRequestScopedCleanup(state, event.requestId);
 
       return {
-        messages: noMoreInFlight
-          ? nextMessages.map((message) =>
-            message.isStreaming ? { ...message, isStreaming: false } : message,
-          )
-          : nextMessages,
-        inFlightByRequestId: remaining,
-        pendingViewSwitchByRequestId: nextPendingViewSwitches,
-        requestPayloadByRequestId: nextPayloads,
-        conversationIdByRequestId: nextConversationIds,
-        assistantMessageIdByRequestId: nextAssistantMessageIds,
-        isSending: !noMoreInFlight,
+        messages: resolveMessagesForInFlightState(nextMessages, cleanup.noMoreInFlight),
+        inFlightByRequestId: cleanup.inFlightByRequestId,
+        pendingViewSwitchByRequestId: cleanup.pendingViewSwitchByRequestId,
+        requestPayloadByRequestId: cleanup.requestPayloadByRequestId,
+        conversationIdByRequestId: cleanup.conversationIdByRequestId,
+        assistantMessageIdByRequestId: cleanup.assistantMessageIdByRequestId,
+        isSending: !cleanup.noMoreInFlight,
       };
     });
 
@@ -344,10 +406,17 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
     // (defensive against duplicate events or race conditions)
     const alreadyExists = state.messages.some((m) => m.id === mapped.id);
     if (alreadyExists && !inFlight) {
-      // Message was already added (e.g., by the proactive fallback path)
-      const remaining = { ...state.inFlightByRequestId };
-      delete remaining[event.requestId];
-      return { inFlightByRequestId: remaining };
+      const cleanup = resolveRequestScopedCleanup(state, event.requestId, {
+        keepAssistantMessageId: true,
+      });
+      return {
+        inFlightByRequestId: cleanup.inFlightByRequestId,
+        pendingViewSwitchByRequestId: cleanup.pendingViewSwitchByRequestId,
+        requestPayloadByRequestId: cleanup.requestPayloadByRequestId,
+        conversationIdByRequestId: cleanup.conversationIdByRequestId,
+        assistantMessageIdByRequestId: cleanup.assistantMessageIdByRequestId,
+        isSending: !cleanup.noMoreInFlight,
+      };
     }
 
     const placeholderId = inFlight?.placeholderId ?? `assistant-stream-${event.requestId}`;
@@ -363,38 +432,19 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
       ...(finalizedChips ? { chips: finalizedChips } : {}),
     };
     const nextMessages = upsertMessage(baseMessages, finalizedAssistantMessage);
-    const remaining = {
-      ...state.inFlightByRequestId,
-    };
-    delete remaining[event.requestId];
-    const nextPayloads = {
-      ...state.requestPayloadByRequestId,
-    };
-    delete nextPayloads[event.requestId];
-    const nextPendingViewSwitches = {
-      ...state.pendingViewSwitchByRequestId,
-    };
-    delete nextPendingViewSwitches[event.requestId];
-    const nextConversationIds = {
-      ...state.conversationIdByRequestId,
-    };
-    delete nextConversationIds[event.requestId];
-
-    const noMoreInFlight = Object.keys(remaining).length === 0;
+    const cleanup = resolveRequestScopedCleanup(state, event.requestId);
 
     return {
-      messages: noMoreInFlight
-        ? nextMessages.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
-        : nextMessages,
-      inFlightByRequestId: remaining,
-      pendingViewSwitchByRequestId: nextPendingViewSwitches,
-      requestPayloadByRequestId: nextPayloads,
-      conversationIdByRequestId: nextConversationIds,
+      messages: resolveMessagesForInFlightState(nextMessages, cleanup.noMoreInFlight),
+      inFlightByRequestId: cleanup.inFlightByRequestId,
+      pendingViewSwitchByRequestId: cleanup.pendingViewSwitchByRequestId,
+      requestPayloadByRequestId: cleanup.requestPayloadByRequestId,
+      conversationIdByRequestId: cleanup.conversationIdByRequestId,
       assistantMessageIdByRequestId: {
-        ...state.assistantMessageIdByRequestId,
+        ...cleanup.assistantMessageIdByRequestId,
         [event.requestId]: finalizedAssistantMessage.id,
       },
-      isSending: !noMoreInFlight,
+      isSending: !cleanup.noMoreInFlight,
       error: null,
       lastStreamError:
         state.lastStreamError?.requestId === event.requestId
@@ -446,44 +496,19 @@ const handleError: StreamEventHandler = ({ set, get, event }) => {
       )
       : state.messages;
 
-    const remaining = {
-      ...state.inFlightByRequestId,
-    };
-    delete remaining[event.requestId];
-
-    const nextPayloads = {
-      ...state.requestPayloadByRequestId,
-    };
-    if (!event.retryable) {
-      delete nextPayloads[event.requestId];
-    }
-    const nextPendingViewSwitches = {
-      ...state.pendingViewSwitchByRequestId,
-    };
-    delete nextPendingViewSwitches[event.requestId];
-    const nextConversationIds = {
-      ...state.conversationIdByRequestId,
-    };
-    if (!event.retryable) {
-      delete nextConversationIds[event.requestId];
-    }
-    const nextAssistantMessageIds = {
-      ...state.assistantMessageIdByRequestId,
-    };
-    delete nextAssistantMessageIds[event.requestId];
-
-    const noMoreInFlight = Object.keys(remaining).length === 0;
+    const cleanup = resolveRequestScopedCleanup(state, event.requestId, {
+      keepRequestPayload: event.retryable,
+      keepConversationId: event.retryable,
+    });
 
     return {
-      messages: noMoreInFlight
-        ? nextMessages.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
-        : nextMessages,
-      inFlightByRequestId: remaining,
-      pendingViewSwitchByRequestId: nextPendingViewSwitches,
-      requestPayloadByRequestId: nextPayloads,
-      conversationIdByRequestId: nextConversationIds,
-      assistantMessageIdByRequestId: nextAssistantMessageIds,
-      isSending: !noMoreInFlight,
+      messages: resolveMessagesForInFlightState(nextMessages, cleanup.noMoreInFlight),
+      inFlightByRequestId: cleanup.inFlightByRequestId,
+      pendingViewSwitchByRequestId: cleanup.pendingViewSwitchByRequestId,
+      requestPayloadByRequestId: cleanup.requestPayloadByRequestId,
+      conversationIdByRequestId: cleanup.conversationIdByRequestId,
+      assistantMessageIdByRequestId: cleanup.assistantMessageIdByRequestId,
+      isSending: !cleanup.noMoreInFlight,
       error: event.message,
       lastStreamError: {
         requestId: event.requestId,
