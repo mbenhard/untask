@@ -674,3 +674,18 @@ Impact
 - Footprint: production renderer build no longer emits a `devLatencyMetrics` chunk.
 - Performance: no production parse/eval overhead for instrumentation runtime.
 - Safety: dev behavior is unchanged; production behavior remains no-op for probe calls.
+
+## 37. BlockEditor slash-menu query-path caching
+
+What changed
+- Updated `src/renderer/components/editor/BlockEditor.tsx` to cache composed slash-menu items (default + custom) per editor instance.
+- `SuggestionMenuController` query handling now filters a memoized item list instead of rebuilding default/custom items on each query character.
+
+Why
+- Previous implementation recomputed slash-menu items for every slash-menu query update.
+- This added avoidable allocation/work in a high-frequency editor interaction path.
+
+Impact
+- Performance: lower per-keystroke work while slash menu is open.
+- Maintainability: slash-menu composition is centralized and memoized, making query-path behavior clearer.
+- Safety: no feature/UI changes; only execution strategy changed.
