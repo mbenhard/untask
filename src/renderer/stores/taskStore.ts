@@ -6,6 +6,7 @@ import { getUntask } from '../lib/untask';
 import { useToastStore } from './toastStore';
 
 export type ReminderOffset = 'at_due' | '15m' | '1h' | '1d';
+const REMINDER_OFFSETS: ReminderOffset[] = ['at_due', '15m', '1h', '1d'];
 
 export type TaskCreateInput = {
   title: string;
@@ -72,6 +73,8 @@ type TaskStore = {
 // Maps realId → tempId so React keys survive the temp→real ID swap,
 // preventing unmount/remount flash. Cleared on every full refresh.
 const _stableKeyMap = new Map<string, string>();
+let _latestTaskListRequestId = 0;
+let _tempTaskIdCounter = 0;
 
 /** Returns a stable React key for a task, bridging optimistic temp IDs to real IDs. */
 export const getStableKey = (taskId: string): string =>
@@ -111,6 +114,149 @@ const byOrderThenCreatedAt = (left: Task, right: Task): number => {
   return leftCreatedAt.localeCompare(rightCreatedAt);
 };
 
+const sortTaskList = (tasks: Task[]): Task[] => [...tasks].sort(byOrderThenCreatedAt);
+
+const replaceTaskAndSort = (
+  tasks: Task[],
+  matchId: string,
+  replacement: Task,
+): Task[] =>
+  sortTaskList(tasks.map((task) => (task.id === matchId ? replacement : task)));
+
+const patchTaskById = (
+  tasks: Task[],
+  taskId: string,
+  patch: Partial<Task>,
+): Task[] =>
+  tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task));
+
+const buildChildrenByParent = (tasks: Task[]): Map<string, string[]> => {
+  const byParent = new Map<string, string[]>();
+  for (const task of tasks) {
+    if (!task.parentId) {
+      continue;
+    }
+    const current = byParent.get(task.parentId);
+    if (current) {
+      current.push(task.id);
+    } else {
+      byParent.set(task.parentId, [task.id]);
+    }
+  }
+  return byParent;
+};
+
+const collectTaskAndDescendantIds = (tasks: Task[], rootId: string): Set<string> => {
+  const ids = new Set<string>();
+  const byParent = buildChildrenByParent(tasks);
+  const stack = [rootId];
+
+  while (stack.length > 0) {
+    const currentId = stack.pop();
+    if (!currentId || ids.has(currentId)) {
+      continue;
+    }
+    ids.add(currentId);
+    const children = byParent.get(currentId);
+    if (children) {
+      for (const childId of children) {
+        stack.push(childId);
+      }
+    }
+  }
+
+  return ids;
+};
+
+const resolveDefaultReminderOffset = async (): Promise<ReminderOffset> => {
+  try {
+    const raw = await getUntask().settings.get('notifications.default_offset');
+    if (raw && REMINDER_OFFSETS.includes(raw as ReminderOffset)) {
+      return raw as ReminderOffset;
+    }
+  } catch {
+    // Fall back to at_due when settings are unavailable.
+  }
+  return 'at_due';
+};
+
+const markDoneForTaskAndDescendants = (
+  tasks: Task[],
+  rootId: string,
+  completedAt: string,
+): Task[] => {
+  const idsToMark = collectTaskAndDescendantIds(tasks, rootId);
+  return tasks.map((task) => {
+    if (!idsToMark.has(task.id)) {
+      return task;
+    }
+    return {
+      ...task,
+      status: 'done' as const,
+      completedAt,
+      cancelledAt: null,
+    };
+  });
+};
+
+const loadTasks = async (
+  set: (partial:
+    | Partial<TaskStore>
+    | ((state: TaskStore) => Partial<TaskStore>)
+  ) => void,
+  mode: 'fetch' | 'refresh',
+): Promise<void> => {
+  const requestId = ++_latestTaskListRequestId;
+  if (mode === 'fetch') {
+    set({ isLoading: true, error: null });
+  }
+
+  try {
+    const tasks = await getUntask().tasks.list();
+    if (requestId !== _latestTaskListRequestId) {
+      return;
+    }
+    _stableKeyMap.clear();
+    set((state) => {
+      const sortedTasks = sortTaskList(tasks);
+      const selectedTaskId = state.selectedTaskId;
+      const hasSelectedTask = selectedTaskId
+        ? sortedTasks.some((task) => task.id === selectedTaskId)
+        : true;
+
+      return {
+        tasks: sortedTasks,
+        selectedTaskId: hasSelectedTask ? selectedTaskId : null,
+        isLoading: false,
+        error: null,
+      };
+    });
+  } catch (e) {
+    if (requestId !== _latestTaskListRequestId) {
+      return;
+    }
+    set({
+      isLoading: false,
+      error: toErrorMessage(e, 'Unknown task operation error.'),
+    });
+  }
+};
+
+const showUndoToastAndRefresh = (
+  label: string,
+  refreshTasks: () => Promise<void>,
+): void => {
+  useToastStore.getState().showToast(label, async () => {
+    await getUntask().tasks.undoLastUserAction();
+    await refreshTasks();
+  });
+};
+
+const createOptimisticTempTaskId = (): string => {
+  _tempTaskIdCounter += 1;
+  return `_temp_${Date.now()}_${_tempTaskIdCounter}`;
+};
+
 // ─── Store ──────────────────────────────────────────────────
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
@@ -119,45 +265,20 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   error: null,
 
   // ── Fetch ───────────────────────────────────────────────
-  fetchTasks: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const tasks = await getUntask().tasks.list();
-      _stableKeyMap.clear();
-      set({ tasks: [...tasks].sort(byOrderThenCreatedAt), isLoading: false });
-    } catch (e) {
-      set({ isLoading: false, error: toErrorMessage(e, 'Unknown task operation error.') });
-    }
-  },
+  fetchTasks: async () => loadTasks(set, 'fetch'),
 
-  refreshTasks: async () => {
-    try {
-      const tasks = await getUntask().tasks.list();
-      _stableKeyMap.clear();
-      set({ tasks: [...tasks].sort(byOrderThenCreatedAt), error: null });
-    } catch (e) {
-      set({ error: toErrorMessage(e, 'Unknown task operation error.') });
-    }
-  },
+  refreshTasks: async () => loadTasks(set, 'refresh'),
 
   // ── Create (optimistic) ─────────────────────────────────
   createTask: async (input) => {
     // Auto-populate reminderOffset from default setting when dueDate is set
-    if (input.dueDate && input.reminderOffset === undefined) {
-      try {
-        const defaultOffset = await getUntask().settings.get('notifications.default_offset');
-        if (defaultOffset && ['at_due', '15m', '1h', '1d'].includes(defaultOffset)) {
-          input.reminderOffset = defaultOffset as ReminderOffset;
-        } else {
-          input.reminderOffset = 'at_due';
-        }
-      } catch {
-        input.reminderOffset = 'at_due';
-      }
-    }
+    const resolvedReminderOffset =
+      input.dueDate && input.reminderOffset === undefined
+        ? await resolveDefaultReminderOffset()
+        : input.reminderOffset;
 
     const nextOrder = input.order ?? (input.parentId ? getMaxOrder(get().tasks) : getMinOrder(get().tasks));
-    const tempId = `_temp_${Date.now()}`;
+    const tempId = createOptimisticTempTaskId();
     const tempTask: Task = {
       id: tempId,
       parentId: input.parentId ?? null,
@@ -172,23 +293,25 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       effort: input.effort ?? 'unknown',
       recurrence: input.recurrence ?? null,
       recurrenceSourceId: null,
-      reminderOffset: input.reminderOffset ?? null,
+      reminderOffset: resolvedReminderOffset ?? null,
       order: nextOrder,
       createdAt: new Date().toISOString(),
       completedAt: null,
       cancelledAt: null,
     };
 
-    set((s) => ({ tasks: [...s.tasks, tempTask].sort(byOrderThenCreatedAt), error: null }));
+    set((s) => ({ tasks: sortTaskList([...s.tasks, tempTask]), error: null }));
 
     try {
-      const created = await getUntask().tasks.create({ ...input, order: nextOrder } as Record<string, unknown>);
+      const created = await getUntask().tasks.create({
+        ...input,
+        reminderOffset: resolvedReminderOffset,
+        order: nextOrder,
+      } as Record<string, unknown>);
       // Bridge the temp→real ID so React keys stay stable (no unmount/remount flash).
       _stableKeyMap.set(created.id, tempId);
       set((s) => ({
-        tasks: s.tasks
-          .map((t) => (t.id === tempId ? created : t))
-          .sort(byOrderThenCreatedAt),
+        tasks: replaceTaskAndSort(s.tasks, tempId, created),
       }));
       return created;
     } catch (e) {
@@ -207,41 +330,28 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const prev = get().tasks.find((t) => t.id === id);
     if (!prev) return null;
 
+    const resolvedUpdates = { ...updates };
     // Auto-populate reminderOffset when adding a due date to a task that had none
-    if (updates.dueDate && !prev.dueDate && updates.reminderOffset === undefined) {
-      try {
-        const defaultOffset = await getUntask().settings.get('notifications.default_offset');
-        if (defaultOffset && ['at_due', '15m', '1h', '1d'].includes(defaultOffset)) {
-          updates.reminderOffset = defaultOffset as ReminderOffset;
-          input.reminderOffset = updates.reminderOffset;
-        } else {
-          updates.reminderOffset = 'at_due';
-          input.reminderOffset = 'at_due';
-        }
-      } catch {
-        updates.reminderOffset = 'at_due';
-        input.reminderOffset = 'at_due';
-      }
+    if (resolvedUpdates.dueDate && !prev.dueDate && resolvedUpdates.reminderOffset === undefined) {
+      resolvedUpdates.reminderOffset = await resolveDefaultReminderOffset();
     }
 
     // Optimistic patch
     set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      tasks: patchTaskById(s.tasks, id, resolvedUpdates),
       error: null,
     }));
 
     try {
-      const updated = await getUntask().tasks.update(input as Record<string, unknown>);
+      const updated = await getUntask().tasks.update({ id, ...resolvedUpdates } as Record<string, unknown>);
       set((s) => ({
-        tasks: s.tasks
-          .map((t) => (t.id === id ? updated : t))
-          .sort(byOrderThenCreatedAt),
+        tasks: replaceTaskAndSort(s.tasks, id, updated),
       }));
       return updated;
     } catch (e) {
       // Rollback to previous state
       set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+        tasks: replaceTaskAndSort(s.tasks, id, prev),
         error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
@@ -251,13 +361,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   // ── Delete (optimistic) ─────────────────────────────────
   deleteTask: async (id, cascade) => {
     const previousTasks = get().tasks;
-    const deletedIndex = previousTasks.findIndex((task) => task.id === id);
-    if (deletedIndex === -1) return false;
+    const previousSelectedTaskId = get().selectedTaskId;
+    if (!previousTasks.some((task) => task.id === id)) return false;
 
     const idsToRemove = new Set([id]);
     if (cascade) {
-      for (const t of previousTasks) {
-        if (t.parentId === id) idsToRemove.add(t.id);
+      const cascaded = collectTaskAndDescendantIds(previousTasks, id);
+      for (const cascadedId of cascaded) {
+        idsToRemove.add(cascadedId);
       }
     }
 
@@ -269,14 +380,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
     try {
       await getUntask().tasks.delete(cascade ? { id, cascade: true } : id);
-      useToastStore.getState().showToast('Task deleted', async () => {
-        await getUntask().tasks.undoLastUserAction();
-        await get().refreshTasks();
-      });
+      showUndoToastAndRefresh('Task deleted', get().refreshTasks);
       return true;
     } catch (e) {
       set(() => ({
         tasks: previousTasks,
+        selectedTaskId: previousSelectedTaskId,
         error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return false;
@@ -327,35 +436,36 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   // ── Complete (optimistic) ───────────────────────────────
   completeTask: async (id, options?: { completeChildren?: boolean }) => {
-    const prev = get().tasks.find((t) => t.id === id);
+    const previousTasks = get().tasks;
+    const prev = previousTasks.find((t) => t.id === id);
     if (!prev) return null;
 
-    set((s) => ({
-      tasks: s.tasks.map((t) =>
-        t.id === id
-          ? { ...t, status: 'done' as const, completedAt: new Date().toISOString() }
-          : t,
-      ),
+    const completedAt = new Date().toISOString();
+    const optimisticTasks = options?.completeChildren
+      ? markDoneForTaskAndDescendants(previousTasks, id, completedAt)
+      : patchTaskById(previousTasks, id, {
+        status: 'done',
+        completedAt,
+        cancelledAt: null,
+      });
+
+    set({
+      tasks: optimisticTasks,
       error: null,
-    }));
+    });
 
     try {
       const completed = await getUntask().tasks.complete(
         options?.completeChildren ? { id, completeChildren: true } : id,
       );
       set((s) => ({
-        tasks: s.tasks
-          .map((t) => (t.id === id ? completed : t))
-          .sort(byOrderThenCreatedAt),
+        tasks: replaceTaskAndSort(s.tasks, id, completed),
       }));
-      useToastStore.getState().showToast('Task completed', async () => {
-        await getUntask().tasks.undoLastUserAction();
-        await get().refreshTasks();
-      });
+      showUndoToastAndRefresh('Task completed', get().refreshTasks);
       return completed;
     } catch (e) {
-      set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+      set(() => ({
+        tasks: previousTasks,
         error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
@@ -368,29 +478,23 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     if (!prev) return null;
 
     set((s) => ({
-      tasks: s.tasks.map((t) =>
-        t.id === id
-          ? { ...t, status: 'cancelled' as const, cancelledAt: new Date().toISOString() }
-          : t,
-      ),
+      tasks: patchTaskById(s.tasks, id, {
+        status: 'cancelled',
+        cancelledAt: new Date().toISOString(),
+      }),
       error: null,
     }));
 
     try {
       const cancelled = await getUntask().tasks.cancel(id);
       set((s) => ({
-        tasks: s.tasks
-          .map((t) => (t.id === id ? cancelled : t))
-          .sort(byOrderThenCreatedAt),
+        tasks: replaceTaskAndSort(s.tasks, id, cancelled),
       }));
-      useToastStore.getState().showToast('Task cancelled', async () => {
-        await getUntask().tasks.undoLastUserAction();
-        await get().refreshTasks();
-      });
+      showUndoToastAndRefresh('Task cancelled', get().refreshTasks);
       return cancelled;
     } catch (e) {
       set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+        tasks: replaceTaskAndSort(s.tasks, id, prev),
         error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
@@ -403,29 +507,24 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     if (!prev) return null;
 
     set((s) => ({
-      tasks: s.tasks.map((t) =>
-        t.id === id
-          ? { ...t, status: 'active' as const, completedAt: null, cancelledAt: null }
-          : t,
-      ),
+      tasks: patchTaskById(s.tasks, id, {
+        status: 'active',
+        completedAt: null,
+        cancelledAt: null,
+      }),
       error: null,
     }));
 
     try {
       const reopened = await getUntask().tasks.reopen(id);
       set((s) => ({
-        tasks: s.tasks
-          .map((t) => (t.id === id ? reopened : t))
-          .sort(byOrderThenCreatedAt),
+        tasks: replaceTaskAndSort(s.tasks, id, reopened),
       }));
-      useToastStore.getState().showToast('Task reopened', async () => {
-        await getUntask().tasks.undoLastUserAction();
-        await get().refreshTasks();
-      });
+      showUndoToastAndRefresh('Task reopened', get().refreshTasks);
       return reopened;
     } catch (e) {
       set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+        tasks: replaceTaskAndSort(s.tasks, id, prev),
         error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
@@ -438,23 +537,19 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     if (!prev) return null;
 
     set((s) => ({
-      tasks: s.tasks.map((t) =>
-        t.id === id ? { ...t, today: !t.today } : t,
-      ),
+      tasks: patchTaskById(s.tasks, id, { today: !prev.today }),
       error: null,
     }));
 
     try {
       const toggled = await getUntask().tasks.toggleToday(id);
       set((s) => ({
-        tasks: s.tasks
-          .map((t) => (t.id === id ? toggled : t))
-          .sort(byOrderThenCreatedAt),
+        tasks: replaceTaskAndSort(s.tasks, id, toggled),
       }));
       return toggled;
     } catch (e) {
       set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? prev : t)),
+        tasks: replaceTaskAndSort(s.tasks, id, prev),
         error: toErrorMessage(e, 'Unknown task operation error.'),
       }));
       return null;
