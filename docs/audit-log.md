@@ -730,3 +730,23 @@ Impact
 - Maintainability: smaller, clearer action handlers with one source of truth for removal fallback behavior.
 - Footprint: removed repeated branch blocks in conversation slice hot paths.
 - Safety: no UI/feature changes; behavior is preserved.
+
+## 40. BlockNote Mantine runtime removed from renderer editor path
+
+What changed
+- Switched `BlockEditor` to use `BlockNoteViewRaw` from `@blocknote/react` (aliased as `BlockNoteView`) instead of `BlockNoteView` from `@blocknote/mantine`:
+  - `src/renderer/components/editor/BlockEditor.tsx`
+- Swapped stylesheet import from `@blocknote/mantine/style.css` to `@blocknote/react/style.css`.
+- Updated compact side-menu icon selectors in `src/renderer/styles/index.css` to target both legacy Mantine and current BlockNote React button classes:
+  - `.mantine-UnstyledButton-root`
+  - `.bn-button`
+- Removed `@blocknote/mantine` from direct dependencies in `package.json` and refreshed `pnpm-lock.yaml`.
+
+Why
+- The editor runtime had already been chunk-isolated; `@blocknote/mantine` remained a dedicated package/runtime chunk with avoidable footprint.
+- Untask already uses custom slash/formatting UI components, so keeping Mantine-specific BlockNote view wiring was unnecessary.
+
+Impact
+- Footprint: removed `editor-bn-mantine` runtime chunk from renderer build output.
+- Dependency surface: one fewer direct production dependency (`@blocknote/mantine`).
+- Compatibility: preserved editor behavior and existing compact side-menu styling by dual-targeting button class selectors during transition.

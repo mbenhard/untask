@@ -29,6 +29,7 @@ Date: 2026-02-23
 | TASK-021 | Dev-only latency probes still contributed a production runtime chunk | Fixed |
 | TASK-022 | Slash-menu query path rebuilt default/custom items on every query update | Fixed |
 | TASK-023 | Duplicate `assistant_done` terminal events could retain stale request-scoped stream state | Fixed |
+| TASK-024 | BlockNote editor runtime still shipped Mantine view/runtime chunk despite custom editor UI controls | Fixed |
 | TEST-001 | Core task service recursion tests are skipped in default suite | Fixed |
 
 ## Detailed Issues
@@ -545,6 +546,30 @@ Fix
 
 Status
 - Fixed in `src/renderer/stores/chat/chatStreamSlice.ts`.
+
+## TASK-024: BlockNote editor runtime still shipped Mantine view/runtime chunk despite custom editor UI controls
+
+Flow
+- Renderer editor footprint optimization.
+
+Repro steps
+1. Build renderer production bundle.
+2. Inspect emitted chunks for BlockNote runtime families.
+3. Observe dedicated `editor-bn-mantine` chunk presence even though Untask uses custom slash menu and formatting toolbar components.
+
+Expected
+- Editor path should avoid unused Mantine-specific BlockNote view/runtime where equivalent React package primitives are sufficient.
+
+Actual (before fix)
+- `BlockEditor` imported `BlockNoteView` and styles from `@blocknote/mantine`, keeping Mantine runtime/style path in bundle output.
+
+Fix
+- Switched `BlockEditor` view/style imports to `@blocknote/react` (`BlockNoteViewRaw` + `@blocknote/react/style.css`).
+- Updated compact side-menu icon selectors to target both legacy Mantine and current BlockNote React button classes.
+- Removed `@blocknote/mantine` direct dependency.
+
+Status
+- Fixed in `src/renderer/components/editor/BlockEditor.tsx`, `src/renderer/styles/index.css`, and `package.json`.
 
 ## TEST-001: Task service recursion tests could be skipped when native ABI mismatched
 
