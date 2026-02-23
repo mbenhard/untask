@@ -45,27 +45,39 @@ const sansFontLoaders: Record<SansFontId, () => Promise<unknown>> = {
   geist: async () => undefined,
   inter: async () =>
     Promise.all([
-      import('@fontsource/inter/400.css'),
-      import('@fontsource/inter/500.css'),
-      import('@fontsource/inter/600.css'),
+      import('@fontsource/inter/latin-400.css'),
+      import('@fontsource/inter/latin-ext-400.css'),
+      import('@fontsource/inter/latin-500.css'),
+      import('@fontsource/inter/latin-ext-500.css'),
+      import('@fontsource/inter/latin-600.css'),
+      import('@fontsource/inter/latin-ext-600.css'),
     ]),
   'ibm-plex-sans': async () =>
     Promise.all([
-      import('@fontsource/ibm-plex-sans/400.css'),
-      import('@fontsource/ibm-plex-sans/500.css'),
-      import('@fontsource/ibm-plex-sans/600.css'),
+      import('@fontsource/ibm-plex-sans/latin-400.css'),
+      import('@fontsource/ibm-plex-sans/latin-ext-400.css'),
+      import('@fontsource/ibm-plex-sans/latin-500.css'),
+      import('@fontsource/ibm-plex-sans/latin-ext-500.css'),
+      import('@fontsource/ibm-plex-sans/latin-600.css'),
+      import('@fontsource/ibm-plex-sans/latin-ext-600.css'),
     ]),
   'dm-sans': async () =>
     Promise.all([
-      import('@fontsource/dm-sans/400.css'),
-      import('@fontsource/dm-sans/500.css'),
-      import('@fontsource/dm-sans/600.css'),
+      import('@fontsource/dm-sans/latin-400.css'),
+      import('@fontsource/dm-sans/latin-ext-400.css'),
+      import('@fontsource/dm-sans/latin-500.css'),
+      import('@fontsource/dm-sans/latin-ext-500.css'),
+      import('@fontsource/dm-sans/latin-600.css'),
+      import('@fontsource/dm-sans/latin-ext-600.css'),
     ]),
   manrope: async () =>
     Promise.all([
-      import('@fontsource/manrope/400.css'),
-      import('@fontsource/manrope/500.css'),
-      import('@fontsource/manrope/600.css'),
+      import('@fontsource/manrope/latin-400.css'),
+      import('@fontsource/manrope/latin-ext-400.css'),
+      import('@fontsource/manrope/latin-500.css'),
+      import('@fontsource/manrope/latin-ext-500.css'),
+      import('@fontsource/manrope/latin-600.css'),
+      import('@fontsource/manrope/latin-ext-600.css'),
     ]),
 };
 
@@ -73,18 +85,24 @@ const monoFontLoaders: Record<MonoFontId, () => Promise<unknown>> = {
   'geist-mono': async () => undefined,
   'jetbrains-mono': async () =>
     Promise.all([
-      import('@fontsource/jetbrains-mono/400.css'),
-      import('@fontsource/jetbrains-mono/500.css'),
+      import('@fontsource/jetbrains-mono/latin-400.css'),
+      import('@fontsource/jetbrains-mono/latin-ext-400.css'),
+      import('@fontsource/jetbrains-mono/latin-500.css'),
+      import('@fontsource/jetbrains-mono/latin-ext-500.css'),
     ]),
   'ibm-plex-mono': async () =>
     Promise.all([
-      import('@fontsource/ibm-plex-mono/400.css'),
-      import('@fontsource/ibm-plex-mono/500.css'),
+      import('@fontsource/ibm-plex-mono/latin-400.css'),
+      import('@fontsource/ibm-plex-mono/latin-ext-400.css'),
+      import('@fontsource/ibm-plex-mono/latin-500.css'),
+      import('@fontsource/ibm-plex-mono/latin-ext-500.css'),
     ]),
   'fira-code': async () =>
     Promise.all([
-      import('@fontsource/fira-code/400.css'),
-      import('@fontsource/fira-code/500.css'),
+      import('@fontsource/fira-code/latin-400.css'),
+      import('@fontsource/fira-code/latin-ext-400.css'),
+      import('@fontsource/fira-code/latin-500.css'),
+      import('@fontsource/fira-code/latin-ext-500.css'),
     ]),
 };
 
