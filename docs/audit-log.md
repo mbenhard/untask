@@ -791,3 +791,23 @@ Impact
 - Performance: avoids repeated polling work in chat send path while images are being prepared.
 - Maintainability: wait semantics are centralized and explicit (`waitForImageProcessing`, waiter flush helper).
 - Correctness: preserves existing timeout guard and now has direct test coverage for processing-complete release behavior.
+
+## 43. Final implementation closeout audit and residual backlog capture
+
+What changed
+- Ran a final implementation review pass against `docs/refactor-plan.md` with a fresh verification baseline:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm test` (`43/43` files, `306/306` tests)
+  - `npx vite build -c vite.renderer.config.ts`
+- Updated roadmap snapshot with explicit closeout status and remaining non-blocking items.
+- Synced local run artifacts in `docs/plans/` (gitignored by repo policy) to mark review stage complete.
+
+Why
+- The refactor run had grown across many small batches; a single closeout checkpoint is needed to confirm no regressions and make the remaining scope explicit.
+- Capturing residual work prevents churn and keeps next-step prioritization objective.
+
+Impact
+- Correctness confidence: no new blocking findings detected in final verification pass.
+- Maintainability: the plan now clearly separates completed hardening work from optional follow-on optimization.
+- Execution clarity: remaining high-value items are narrowed to startup-relaunch automation coverage and editor payload hotspot reduction, not broad rewrites.

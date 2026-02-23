@@ -34,6 +34,13 @@ Date: 2026-02-23
 | TASK-026 | Chat send path polled image-processing state in fixed intervals before dispatch | Fixed |
 | TEST-001 | Core task service recursion tests are skipped in default suite | Fixed |
 
+## Remaining Non-Blocking Gaps
+
+| ID | Gap | Status |
+| --- | --- | --- |
+| GAP-001 | Startup/relaunch resilience flow is manual-only (`docs/manual-smoke-checklist.md` #10) with no automated Electron regression harness. | Open |
+| GAP-002 | Renderer still emits large editor vendor chunks (`editor-bn-core`, `editor-emoji`) and has no CI size budget guard. | Open |
+
 ## Detailed Issues
 
 ## TASK-001: Cascade delete only removed direct children in optimistic renderer state
