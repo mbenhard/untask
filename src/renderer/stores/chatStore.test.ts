@@ -502,6 +502,24 @@ describe('chatStore stream reliability', () => {
     };
 
     useChatStore.getState().applyStreamEvent(doneEvent);
+    useChatStore.setState({
+      requestPayloadByRequestId: {
+        'req-2': {
+          content: 'stale payload',
+          modelId: null,
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-2': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+      conversationIdByRequestId: {
+        'req-2': 'thread-1',
+      },
+      isSending: true,
+    });
     useChatStore.getState().applyStreamEvent(doneEvent);
 
     const state = useChatStore.getState();
@@ -510,6 +528,11 @@ describe('chatStore stream reliability', () => {
     );
     expect(assistantMessages).toHaveLength(1);
     expect(assistantMessages[0]?.actionCards).toHaveLength(1);
+    expect(state.requestPayloadByRequestId['req-2']).toBeUndefined();
+    expect(state.pendingViewSwitchByRequestId['req-2']).toBeUndefined();
+    expect(state.conversationIdByRequestId['req-2']).toBeUndefined();
+    expect(state.assistantMessageIdByRequestId['req-2']).toBe(assistantMessage.id);
+    expect(state.isSending).toBe(false);
   });
 
   it('replaces orphaned placeholder when assistant_done arrives without inFlight state', () => {

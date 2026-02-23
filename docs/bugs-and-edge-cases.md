@@ -28,6 +28,7 @@ Date: 2026-02-23
 | TASK-020 | JSON editor content paid an unnecessary post-mount hydration pass | Fixed |
 | TASK-021 | Dev-only latency probes still contributed a production runtime chunk | Fixed |
 | TASK-022 | Slash-menu query path rebuilt default/custom items on every query update | Fixed |
+| TASK-023 | Duplicate `assistant_done` terminal events could retain stale request-scoped stream state | Fixed |
 | TEST-001 | Core task service recursion tests are skipped in default suite | Fixed |
 
 ## Detailed Issues
@@ -521,6 +522,30 @@ Fix
 Status
 - Fixed in `src/renderer/components/editor/BlockEditor.tsx`.
 
+## TASK-023: Duplicate `assistant_done` events could retain stale request-scoped stream state
+
+Flow
+- Chat streaming terminal-event idempotency.
+
+Repro steps
+1. Complete a request via `assistant_done` so final assistant message is already present.
+2. Leave or reintroduce request-scoped residual entries for that same request ID (`requestPayloadByRequestId`, `pendingViewSwitchByRequestId`, `conversationIdByRequestId`).
+3. Receive duplicate `assistant_done` for the same request.
+
+Expected
+- Duplicate terminal events should be idempotent and still fully clear request-scoped state.
+
+Actual (before fix)
+- Duplicate-finalization guard path only pruned `inFlightByRequestId`, leaving other request-scoped maps untouched.
+
+Fix
+- Consolidated request cleanup into a shared helper used by `assistant_done` and `error` handlers.
+- Updated duplicate-finalization guard to run full request-scoped cleanup.
+- Added regression coverage to enforce cleanup behavior on duplicate `assistant_done`.
+
+Status
+- Fixed in `src/renderer/stores/chat/chatStreamSlice.ts`.
+
 ## TEST-001: Task service recursion tests could be skipped when native ABI mismatched
 
 Flow
@@ -567,6 +592,7 @@ Status
   - Cross-thread proactive `assistant_done` is dropped from active thread and request state is cleaned.
   - `cancelStream()` clears request payload mappings with other in-flight request state.
   - Late `assistant_done` replaces orphaned request placeholder even when in-flight metadata is already missing.
+  - Duplicate `assistant_done` terminal events clean stale request-scoped payload/navigation/conversation state idempotently.
   - Retryable `error` clears assistant-message request mapping while retaining retry payload.
   - Reasoning events no longer flip stream indicator back to thinking after token output starts.
 - `src/renderer/lib/devLatencyMetrics.test.ts`
