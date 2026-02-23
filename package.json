@@ -20,7 +20,7 @@
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "rebuild:node": "npm rebuild better-sqlite3",
     "ensure:sqlite-native": "node scripts/ensure-better-sqlite3.cjs",
-    "postinstall": "npm run rebuild:electron && bash scripts/patch-electron-dev.sh",
+    "postinstall": "node scripts/postinstall.cjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "npm run rebuild:node && drizzle-kit migrate && npm run rebuild:electron",
     "db:studio": "npm run rebuild:node && drizzle-kit studio && npm run rebuild:electron"
