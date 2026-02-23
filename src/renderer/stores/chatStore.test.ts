@@ -1115,6 +1115,45 @@ describe('chatStore stream reliability', () => {
     expect(mockChatApi.send).not.toHaveBeenCalled();
   });
 
+  it('waits for in-flight image processing to finish before sending', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
+
+    mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
+    mockChatApi.send.mockResolvedValue({
+      requestId: 'req-send-after-processing',
+      conversationId: 'thread-1',
+      userMessage: {
+        id: 'user-msg-processing',
+        conversationId: 'thread-1',
+        role: 'user',
+        content: 'after processing',
+        toolCalls: null,
+        chips: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    useChatStore.setState({ processingImageCount: 1 });
+
+    const sendPromise = useChatStore.getState().sendMessage('after processing');
+    await Promise.resolve();
+
+    expect(mockChatApi.getSelectedModel).not.toHaveBeenCalled();
+    expect(mockChatApi.send).not.toHaveBeenCalled();
+
+    useChatStore.getState().decrementProcessingImages();
+    await sendPromise;
+
+    expect(mockChatApi.getSelectedModel).toHaveBeenCalledTimes(1);
+    expect(mockChatApi.send).toHaveBeenCalledWith({
+      content: 'after processing',
+      modelId: 'moonshotai/kimi-k2.5',
+      conversationId: 'thread-1',
+    });
+  });
+
   it('clears assistant message mapping on retryable stream error while keeping retry payload', () => {
     useChatStore.setState({
       messages: [

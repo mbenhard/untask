@@ -774,3 +774,20 @@ Impact
   - quick-add CSS `77.93 kB` -> `76.19 kB` (gzip `13.18 kB` -> `12.88 kB`)
 - Tradeoff:
   - Non-Latin glyphs are no longer provided by bundled app fonts and will render via system fallback fonts.
+
+## 42. Chat send-path image-processing wait optimized (event-driven vs polling)
+
+What changed
+- Refactored `sendMessage()` wait behavior in `src/renderer/stores/chat/chatMessageSlice.ts`:
+  - replaced 100ms polling loop (`up to 50 checks`) with waiter registration that resolves when processing reaches zero, with the same 5s timeout cap.
+- Added waiter flush on `decrementProcessingImages()` transition to zero.
+- Added regression coverage in `src/renderer/stores/chatStore.test.ts` to ensure send dispatch is blocked while processing is in-flight and resumes when processing completes.
+
+Why
+- Poll-based waiting performed repeated timer wakeups and extra state reads during image-processing phases.
+- The send gate can be expressed as an event-style state transition without changing behavior.
+
+Impact
+- Performance: avoids repeated polling work in chat send path while images are being prepared.
+- Maintainability: wait semantics are centralized and explicit (`waitForImageProcessing`, waiter flush helper).
+- Correctness: preserves existing timeout guard and now has direct test coverage for processing-complete release behavior.
