@@ -38,6 +38,72 @@ export type TypographyContextValue = {
 
 const TypographyContext = createContext<TypographyContextValue | undefined>(undefined);
 
+const loadedSansFonts = new Set<SansFontId>(['geist']);
+const loadedMonoFonts = new Set<MonoFontId>(['geist-mono']);
+
+const sansFontLoaders: Record<SansFontId, () => Promise<unknown>> = {
+  geist: async () => undefined,
+  inter: async () =>
+    Promise.all([
+      import('@fontsource/inter/400.css'),
+      import('@fontsource/inter/500.css'),
+      import('@fontsource/inter/600.css'),
+    ]),
+  'ibm-plex-sans': async () =>
+    Promise.all([
+      import('@fontsource/ibm-plex-sans/400.css'),
+      import('@fontsource/ibm-plex-sans/500.css'),
+      import('@fontsource/ibm-plex-sans/600.css'),
+    ]),
+  'dm-sans': async () =>
+    Promise.all([
+      import('@fontsource/dm-sans/400.css'),
+      import('@fontsource/dm-sans/500.css'),
+      import('@fontsource/dm-sans/600.css'),
+    ]),
+  manrope: async () =>
+    Promise.all([
+      import('@fontsource/manrope/400.css'),
+      import('@fontsource/manrope/500.css'),
+      import('@fontsource/manrope/600.css'),
+    ]),
+};
+
+const monoFontLoaders: Record<MonoFontId, () => Promise<unknown>> = {
+  'geist-mono': async () => undefined,
+  'jetbrains-mono': async () =>
+    Promise.all([
+      import('@fontsource/jetbrains-mono/400.css'),
+      import('@fontsource/jetbrains-mono/500.css'),
+    ]),
+  'ibm-plex-mono': async () =>
+    Promise.all([
+      import('@fontsource/ibm-plex-mono/400.css'),
+      import('@fontsource/ibm-plex-mono/500.css'),
+    ]),
+  'fira-code': async () =>
+    Promise.all([
+      import('@fontsource/fira-code/400.css'),
+      import('@fontsource/fira-code/500.css'),
+    ]),
+};
+
+const ensureTypographyAssetsLoaded = async (selection: TypographySelection): Promise<void> => {
+  if (import.meta.env.MODE === 'test') {
+    return;
+  }
+
+  if (!loadedSansFonts.has(selection.sansId)) {
+    await sansFontLoaders[selection.sansId]();
+    loadedSansFonts.add(selection.sansId);
+  }
+
+  if (!loadedMonoFonts.has(selection.monoId)) {
+    await monoFontLoaders[selection.monoId]();
+    loadedMonoFonts.add(selection.monoId);
+  }
+};
+
 const toErrorMessage = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
 
@@ -79,6 +145,10 @@ export function TypographyProvider({ children }: { children: ReactNode }) {
 
   useLayoutEffect(() => {
     applyTypographySelection({ sansId, monoId });
+  }, [sansId, monoId]);
+
+  useEffect(() => {
+    void ensureTypographyAssetsLoaded({ sansId, monoId });
   }, [sansId, monoId]);
 
   useEffect(() => {

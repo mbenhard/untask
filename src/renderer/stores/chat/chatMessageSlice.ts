@@ -8,6 +8,7 @@ import { toErrorMessage } from '../../lib/errors';
 import { getUntask } from '../../lib/untask';
 import { resolveBlockNoteImages } from '../../utils/imageResize';
 import { useAppStore } from '../appStore';
+import { getActiveNoteDraftContent } from '../notesDraftBridge';
 import { useTaskStore } from '../taskStore';
 import { ensureActiveConversationId } from './chatConversationSlice';
 import type { ChatStore, ChatUiMessage } from './chatStoreTypes';
@@ -159,13 +160,8 @@ export const createMessageActions = (
     // Inject images from the attached note's content
     if (noteContext) {
       try {
-        const { useNotesStore } = await import('../notesStore');
-        const notesState = useNotesStore.getState();
-        // Use the raw BlockNote content if we're looking at the same note
-        const rawContent =
-          notesState.activeNoteId === noteContext.noteId
-            ? notesState.content
-            : null;
+        // Reuse the active in-memory draft only when this note is currently open.
+        const rawContent = getActiveNoteDraftContent(noteContext.noteId);
         if (rawContent) {
           const noteImages = await resolveBlockNoteImages(rawContent);
           images.push(...noteImages);

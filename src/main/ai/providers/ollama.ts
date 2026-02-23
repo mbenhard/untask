@@ -33,9 +33,9 @@ const isLoopbackUrl = (url: string): boolean => {
 };
 
 export function createOllamaProviderInstance(baseUrl?: string): ProviderInstance {
-  const resolvedBaseUrl = (baseUrl?.trim() ?? '').length > 0
-    ? baseUrl!.trim()
-    : OLLAMA_DEFAULT_BASE_URL;
+  const trimmedBaseUrl = baseUrl?.trim() ?? '';
+  const resolvedBaseUrl =
+    trimmedBaseUrl.length > 0 ? trimmedBaseUrl : OLLAMA_DEFAULT_BASE_URL;
 
   if (!isLoopbackUrl(resolvedBaseUrl)) {
     // eslint-disable-next-line no-console

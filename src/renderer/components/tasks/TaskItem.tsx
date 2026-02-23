@@ -5,15 +5,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { AlignLeft, ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
 
-import type { Task } from '../../../types/models';
-import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/models';
+import { TERMINAL_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { PRIORITY_DOT } from '../../lib/taskConstants';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
-import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
+import { type ReminderOffset, type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import { useToastStore } from '../../stores/toastStore';
 import { Popover, PopoverContent, Tooltip, TooltipContent, TooltipTrigger } from '../ui';
 import { formatDueDateDisplay, isDueDateOverdue, parseDueDate, parseDueTime } from './dueDate';
@@ -37,6 +36,8 @@ export interface TaskItemProps {
   onFocus?: () => void;
   completeConfirmTrigger?: { taskId: string; ts: number } | null;
   deleteConfirmTrigger?: { taskId: string; ts: number } | null;
+  onCompleteConfirmTriggerHandled?: (taskId: string) => void;
+  onDeleteConfirmTriggerHandled?: (taskId: string) => void;
   children?: ReactNode;
 }
 
@@ -44,6 +45,11 @@ const SORTABLE_TRANSITION = {
   duration: 220,
   easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
 } as const;
+
+const REMINDER_OFFSETS: ReminderOffset[] = ['at_due', '15m', '1h', '1d'];
+
+const isReminderOffset = (value: string | null): value is ReminderOffset =>
+  value !== null && REMINDER_OFFSETS.includes(value as ReminderOffset);
 
 export const TaskItem = ({
   task,
@@ -63,6 +69,8 @@ export const TaskItem = ({
   onFocus,
   completeConfirmTrigger,
   deleteConfirmTrigger,
+  onCompleteConfirmTriggerHandled,
+  onDeleteConfirmTriggerHandled,
   children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -83,18 +91,28 @@ export const TaskItem = ({
   // Open complete confirmation popover when triggered (e.g. from keyboard Space).
   // Uses a {taskId, ts} object so repeated triggers on the same task always fire.
   useEffect(() => {
-    if (completeConfirmTrigger?.taskId === task.id && hasChildren && childrenDoneCount < childrenCount) {
+    if (completeConfirmTrigger?.taskId !== task.id) return;
+
+    if (hasChildren && childrenDoneCount < childrenCount) {
       setCompleteConfirmOpen(true);
     }
-  }, [completeConfirmTrigger, task.id, hasChildren, childrenCount, childrenDoneCount]);
+    onCompleteConfirmTriggerHandled?.(task.id);
+  }, [
+    completeConfirmTrigger,
+    task.id,
+    hasChildren,
+    childrenCount,
+    childrenDoneCount,
+    onCompleteConfirmTriggerHandled,
+  ]);
 
   // Open delete confirmation via the menu popover when triggered (e.g. from keyboard Cmd+Backspace).
   useEffect(() => {
-    if (deleteConfirmTrigger?.taskId === task.id) {
-      setMenuOpen(true);
-      setMenuView('delete-confirm');
-    }
-  }, [deleteConfirmTrigger, task.id]);
+    if (deleteConfirmTrigger?.taskId !== task.id) return;
+    setMenuOpen(true);
+    setMenuView('delete-confirm');
+    onDeleteConfirmTriggerHandled?.(task.id);
+  }, [deleteConfirmTrigger, task.id, onDeleteConfirmTriggerHandled]);
 
   const {
     attributes,
@@ -227,7 +245,9 @@ export const TaskItem = ({
         dueDate: taskToCopy.dueDate,
         dueType: taskToCopy.dueType,
         effort: taskToCopy.effort,
-        reminderOffset: taskToCopy.reminderOffset as any,
+        reminderOffset: isReminderOffset(taskToCopy.reminderOffset)
+          ? taskToCopy.reminderOffset
+          : null,
         recurrence: taskToCopy.recurrence,
       });
 

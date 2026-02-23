@@ -31,7 +31,11 @@ export type TaskStatusConfig = {
 const statusMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s]));
 
 export function getStatusDef(id: PredefinedStatusId) {
-  return statusMap.get(id)!;
+  const statusDef = statusMap.get(id);
+  if (!statusDef) {
+    throw new Error(`Unknown task status id: ${id}`);
+  }
+  return statusDef;
 }
 
 export function getStatusLabel(id: PredefinedStatusId): string {

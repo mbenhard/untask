@@ -224,52 +224,55 @@ describe('generateToolCallDescription', () => {
 });
 
 describe('extractInlineChipBlock', () => {
-  it('extracts chips from "Action Chips:" heading with bullet list', () => {
-    const text = 'What would you like to do?\n\nAction Chips:\n- Plan my day\n- Check inbox\n- Review tasks';
+  const extract = (text: string) => {
     const result = extractInlineChipBlock(text);
     expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(3);
-    expect(result!.chips[0].label).toBe('Plan my day');
-    expect(result!.chips[0].type).toBe('response');
-    expect(result!.text).toBe('What would you like to do?');
+    if (!result) {
+      throw new Error('Expected inline chip block to be extracted');
+    }
+    return result;
+  };
+
+  it('extracts chips from "Action Chips:" heading with bullet list', () => {
+    const text = 'What would you like to do?\n\nAction Chips:\n- Plan my day\n- Check inbox\n- Review tasks';
+    const result = extract(text);
+    expect(result.chips).toHaveLength(3);
+    expect(result.chips[0].label).toBe('Plan my day');
+    expect(result.chips[0].type).toBe('response');
+    expect(result.text).toBe('What would you like to do?');
   });
 
   it('extracts chips from "Chips:" heading', () => {
     const text = 'Pick one.\n\nChips:\n- Yes\n- No';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(2);
-    expect(result!.chips[0].label).toBe('Yes');
-    expect(result!.chips[1].label).toBe('No');
+    const result = extract(text);
+    expect(result.chips).toHaveLength(2);
+    expect(result.chips[0].label).toBe('Yes');
+    expect(result.chips[1].label).toBe('No');
   });
 
   it('extracts chips from "Options:" heading (no chip keyword)', () => {
     const text = 'Which client?\n\nOptions:\n- Acme Corp\n- Globex Inc\n- Initech';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(3);
-    expect(result!.chips[0].label).toBe('Acme Corp');
+    const result = extract(text);
+    expect(result.chips).toHaveLength(3);
+    expect(result.chips[0].label).toBe('Acme Corp');
   });
 
   it('extracts chips from "Quick replies:" heading', () => {
     const text = 'How urgent?\n\nQuick replies:\n- High priority\n- Medium priority\n- Low priority';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(3);
+    const result = extract(text);
+    expect(result.chips).toHaveLength(3);
   });
 
   it('extracts chips from "Suggestions:" heading', () => {
     const text = 'Next steps.\n\nSuggestions:\n- Review budget\n- Call vendor';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(2);
+    const result = extract(text);
+    expect(result.chips).toHaveLength(2);
   });
 
   it('handles bold markdown in heading', () => {
     const text = 'Choose:\n\n**Options:**\n- A\n- B\n- C';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(3);
+    const result = extract(text);
+    expect(result.chips).toHaveLength(3);
   });
 
   it('returns null when no heading is found', () => {
@@ -284,31 +287,27 @@ describe('extractInlineChipBlock', () => {
 
   it('caps at 4 chips', () => {
     const text = 'Options:\n- A\n- B\n- C\n- D\n- E\n- F';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips.length).toBeLessThanOrEqual(4);
+    const result = extract(text);
+    expect(result.chips.length).toBeLessThanOrEqual(4);
   });
 
   it('strips quoted chip labels', () => {
     const text = 'Options:\n- "Start now"\n- "Defer to tomorrow"';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips[0].label).toBe('Start now');
+    const result = extract(text);
+    expect(result.chips[0].label).toBe('Start now');
   });
 
   it('deduplicates chip labels', () => {
     const text = 'Options:\n- Yes\n- Yes\n- No';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.chips).toHaveLength(2);
+    const result = extract(text);
+    expect(result.chips).toHaveLength(2);
   });
 
   it('strips the chip block from output text', () => {
     const text = 'Before text.\n\nOptions:\n- A\n- B\n\nAfter text.';
-    const result = extractInlineChipBlock(text);
-    expect(result).not.toBeNull();
-    expect(result!.text).toContain('Before text.');
-    expect(result!.text).toContain('After text.');
-    expect(result!.text).not.toContain('Options:');
+    const result = extract(text);
+    expect(result.text).toContain('Before text.');
+    expect(result.text).toContain('After text.');
+    expect(result.text).not.toContain('Options:');
   });
 });

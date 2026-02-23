@@ -59,21 +59,24 @@ export function extractTokens(text: string): ParsedInput {
 
   for (const pattern of TOKEN_PATTERNS) {
     const match = remaining.match(pattern.regex);
-    if (!match) continue;
+    if (!match || typeof match.index !== 'number') continue;
+
+    const matchStart = match.index;
+    const matchEnd = matchStart + match[0].length;
 
     if (pattern.type === 'today') {
       chips.push({ type: 'today', label: 'Today', value: 'true' });
-      remaining = remaining.slice(0, match.index!) + remaining.slice(match.index! + match[0].length);
+      remaining = remaining.slice(0, matchStart) + remaining.slice(matchEnd);
     } else if (pattern.type === 'priority') {
       const val = normalizePriority(match[1]);
       chips.push({ type: 'priority', label: `Priority: ${val}`, value: val });
-      remaining = remaining.slice(0, match.index!) + remaining.slice(match.index! + match[0].length);
+      remaining = remaining.slice(0, matchStart) + remaining.slice(matchEnd);
     } else if (pattern.type === 'due') {
       const rawDate = match[1].trim();
       const parsed = parseDate(rawDate);
       if (parsed) {
         chips.push({ type: 'due', label: `Due: ${rawDate}`, value: parsed });
-        remaining = remaining.slice(0, match.index!) + remaining.slice(match.index! + match[0].length);
+        remaining = remaining.slice(0, matchStart) + remaining.slice(matchEnd);
       }
     }
   }

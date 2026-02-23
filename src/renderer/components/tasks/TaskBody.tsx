@@ -1,10 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
-import {
-  type DefaultReactSuggestionItem,
-  getDefaultReactSlashMenuItems,
-} from '@blocknote/react';
 import { Paperclip } from 'lucide-react';
 
 import type { Task, PredefinedStatusId } from '../../../types/models';
@@ -22,15 +18,32 @@ import {
   selectEnabledNonTerminal,
   selectEnabledTerminal,
 } from '../../stores/taskStatusConfigStore';
-import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { getNextPriority } from './taskInteraction';
+import type { BlockEditorSlashMenuItem, BlockEditorSlashMenuParams } from '../editor/BlockEditor';
+
+const LazyBlockEditor = lazy(async () => {
+  const module = await import('../editor/BlockEditor');
+  return { default: module.BlockEditor };
+});
 
 // ─── Types & Constants ──────────────────────────────────────
 
 type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
+
+type DevLatencyApi = {
+  start: (flow: string, key: string | number) => void;
+  end: (flow: string, key: string | number) => number | null;
+  cancel: (flow: string, key: string | number) => void;
+};
+
+const NOOP_DEV_LATENCY: DevLatencyApi = {
+  start: () => undefined,
+  end: () => null,
+  cancel: () => undefined,
+};
 
 const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
@@ -49,9 +62,9 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
 const UNSUPPORTED_MEDIA_ITEMS = new Set(['Video', 'Audio']);
 
 const getAttachmentSlashMenuItems = (
-  editor: BlockNoteEditor,
-): DefaultReactSuggestionItem[] =>
-  getDefaultReactSlashMenuItems(editor).filter(
+  { defaultItems }: BlockEditorSlashMenuParams,
+): BlockEditorSlashMenuItem[] =>
+  defaultItems.filter(
     (item) => !UNSUPPORTED_MEDIA_ITEMS.has(item.title),
   );
 
@@ -659,6 +672,25 @@ export const TaskBody = ({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBodyRef = useRef<string | null>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
+  const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
+  const openMetricKeyRef = useRef<string | null>(null);
+  const hasRecordedOpenLatencyRef = useRef(false);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      let disposed = false;
+      void import('../../lib/devLatencyMetrics').then(({ devLatencyMetrics }) => {
+        if (!disposed) {
+          devLatencyRef.current = devLatencyMetrics;
+        }
+      });
+      return () => {
+        disposed = true;
+        devLatencyRef.current = NOOP_DEV_LATENCY;
+      };
+    }
+    return undefined;
+  }, []);
 
   const attachmentCount = useMemo(() => countAttachments(task.body), [task.body]);
 
@@ -698,6 +730,11 @@ export const TaskBody = ({
 
   const handleBodyChange = useCallback(
     (json: string) => {
+      const metricKey = openMetricKeyRef.current;
+      if (!hasRecordedOpenLatencyRef.current && metricKey) {
+        hasRecordedOpenLatencyRef.current = true;
+        devLatencyRef.current.end('task-editor-open', metricKey);
+      }
       pendingBodyRef.current = json;
 
       if (saveTimerRef.current) {
@@ -725,6 +762,32 @@ export const TaskBody = ({
       flushSave();
     };
   }, [flushSave]);
+
+  // Dev-only latency probe: expanded task editor -> first content change.
+  useEffect(() => {
+    if (!isExpanded) {
+      if (!hasRecordedOpenLatencyRef.current && openMetricKeyRef.current) {
+        devLatencyRef.current.cancel('task-editor-open', openMetricKeyRef.current);
+      }
+      openMetricKeyRef.current = null;
+      hasRecordedOpenLatencyRef.current = false;
+      return;
+    }
+
+    const key = String(task.id);
+    openMetricKeyRef.current = key;
+    hasRecordedOpenLatencyRef.current = false;
+    devLatencyRef.current.start('task-editor-open', key);
+
+    return () => {
+      if (!hasRecordedOpenLatencyRef.current) {
+        devLatencyRef.current.cancel('task-editor-open', key);
+      }
+      if (openMetricKeyRef.current === key) {
+        openMetricKeyRef.current = null;
+      }
+    };
+  }, [isExpanded, task.id]);
 
   const handleFocus = useCallback(() => {
     onBodyEditModeChange?.(true);
@@ -764,15 +827,17 @@ export const TaskBody = ({
         'px-3 py-3',
         !parentTask && 'border-t border-border/30',
       )}>
-        <BlockEditor
-          content={task.body ?? ''}
-          onChange={handleBodyChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          className="untask-task-editor"
-          editorRef={editorRef}
-          getSlashMenuItems={getAttachmentSlashMenuItems}
-        />
+        <Suspense fallback={<div className="untask-task-editor min-h-[96px]" aria-hidden="true" />}>
+          <LazyBlockEditor
+            content={task.body ?? ''}
+            onChange={handleBodyChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            className="untask-task-editor"
+            editorRef={editorRef}
+            getSlashMenuItems={getAttachmentSlashMenuItems}
+          />
+        </Suspense>
       </div>
 
       {/* Zone 2 — Metadata Line */}

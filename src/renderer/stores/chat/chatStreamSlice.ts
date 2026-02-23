@@ -113,6 +113,7 @@ const handleReasoning: StreamEventHandler = ({ set, event, inFlight }) => {
   } else {
     nextSteps.push({ kind: 'thinking', content: event.text });
   }
+  const hasTextOutput = nextSteps.some((step) => step.kind === 'text');
 
   set((state) => ({
     inFlightByRequestId: {
@@ -121,7 +122,7 @@ const handleReasoning: StreamEventHandler = ({ set, event, inFlight }) => {
     },
     messages: state.messages.map((message) =>
       message.id === inFlight.placeholderId
-        ? { ...message, steps: nextSteps, streamPhase: 'thinking' }
+        ? { ...message, steps: nextSteps, streamPhase: hasTextOutput ? undefined : 'thinking' }
         : message,
     ),
   }));

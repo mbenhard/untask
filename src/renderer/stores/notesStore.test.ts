@@ -31,17 +31,24 @@ type MockNotesApi = {
 
 const createMockNotesApi = (): MockNotesApi => ({
   list: vi.fn(async () => ({ active: [] as Note[], archived: [] as Note[] })),
-  get: vi.fn(async (_id: string) => undefined as Note | undefined),
+  get: vi.fn(async (id: string) => {
+    void id;
+    return undefined as Note | undefined;
+  }),
   create: vi.fn(async () => mockNote({ id: 'note-new' })),
-  save: vi.fn(async (_id: string, content: string) =>
-    mockNote({ content }),
-  ),
+  save: vi.fn(async (id: string, content: string) => {
+    void id;
+    return mockNote({ content });
+  }),
   archive: vi.fn(async () => undefined as void),
   restore: vi.fn(async () => undefined as void),
   delete: vi.fn(async () => undefined as void),
   pin: vi.fn(async () => undefined as void),
   unpin: vi.fn(async () => undefined as void),
-  duplicate: vi.fn(async (_id: string) => mockNote({ id: 'note-dup' }) as Note | undefined),
+  duplicate: vi.fn(async (id: string) => {
+    void id;
+    return mockNote({ id: 'note-dup' }) as Note | undefined;
+  }),
 });
 
 const getMockApi = (): MockNotesApi =>

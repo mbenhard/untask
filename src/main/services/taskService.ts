@@ -76,7 +76,7 @@ const emitTaskChange = (event: TaskChangeEvent): void => {
 const USER_UNDO_STACK_SIZE = 20;
 const userUndoStack: string[] = [];
 
-// Maps a parent delete event ID → child delete event IDs for atomic cascade undo.
+// Maps a parent event ID -> child event IDs so recursive user actions can undo atomically.
 const cascadeUndoGroups = new Map<string, string[]>();
 
 const pushUserUndoEvent = (eventId: string): void => {
@@ -89,6 +89,36 @@ const pushUserUndoEvent = (eventId: string): void => {
 
 const popUserUndoEvent = (): string | null => {
   return userUndoStack.shift() ?? null;
+};
+
+const groupNewUserUndoEvents = (stackLenBefore: number): void => {
+  const newEventCount = userUndoStack.length - stackLenBefore;
+  if (newEventCount <= 1) {
+    return;
+  }
+
+  const parentEventId = userUndoStack[0];
+  if (!parentEventId) {
+    return;
+  }
+  const childEventIds = userUndoStack.splice(1, newEventCount - 1);
+  cascadeUndoGroups.set(parentEventId, childEventIds);
+};
+
+const undoGroupedChildEvents = (eventId: string, source: TaskEventSource): void => {
+  const childEventIds = cascadeUndoGroups.get(eventId);
+  if (!childEventIds) {
+    return;
+  }
+
+  for (const childEventId of childEventIds) {
+    try {
+      undoTaskEvent(childEventId, source);
+    } catch {
+      // Child may have been restored/updated by other means; skip.
+    }
+  }
+  cascadeUndoGroups.delete(eventId);
 };
 
 export const subscribeTaskChanges = (
@@ -384,18 +414,8 @@ export function undoTaskEvent(
       restored,
     );
 
-    // Also restore cascade-deleted children so undo is atomic.
-    const childEventIds = cascadeUndoGroups.get(eventId);
-    if (childEventIds) {
-      for (const childEventId of childEventIds) {
-        try {
-          undoTaskEvent(childEventId, source);
-        } catch {
-          // Child may have been restored by other means; skip.
-        }
-      }
-      cascadeUndoGroups.delete(eventId);
-    }
+    // Also restore grouped child events (e.g., cascade delete) so undo is atomic.
+    undoGroupedChildEvents(eventId, source);
 
     emitTaskChange({ taskId: targetEvent.taskId, action: 'create' });
     return {
@@ -427,6 +447,9 @@ export function undoTaskEvent(
     existing ?? after,
     restored,
   );
+
+  // Also restore grouped child events (e.g., completeChildren) so undo is atomic.
+  undoGroupedChildEvents(eventId, source);
 
   emitTaskChange({ taskId: targetEvent.taskId, action: 'update' });
   return {
@@ -611,12 +634,7 @@ export function deleteTask(
   // Group cascade-deleted child events with the parent for atomic undo.
   // After cascade, the stack is [parent_event, ...child_events, ...old_events].
   if (source === 'user') {
-    const newEventCount = userUndoStack.length - stackLenBefore;
-    if (newEventCount > 1) {
-      const parentEventId = userUndoStack[0];
-      const childEventIds = userUndoStack.splice(1, newEventCount - 1);
-      cascadeUndoGroups.set(parentEventId, childEventIds);
-    }
+    groupNewUserUndoEvents(stackLenBefore);
   }
 
   emitTaskChange({ taskId: id, action: 'delete' });
@@ -677,12 +695,18 @@ export function completeTask(
   source: TaskEventSource = 'user',
   options?: CompleteTaskOptions,
 ): CompleteTaskResult {
+  const stackLenBefore = source === 'user' ? userUndoStack.length : 0;
   const completed = completeTaskRecursive(
     id,
     source,
     options?.completeChildren === true,
     new Set<string>(),
   );
+
+  // Group completeChildren descendant events with the parent for atomic undo.
+  if (source === 'user' && options?.completeChildren === true) {
+    groupNewUserUndoEvents(stackLenBefore);
+  }
 
   // Spawn next recurring instance if applicable
   const recurredTask = spawnRecurringInstance(completed, source);

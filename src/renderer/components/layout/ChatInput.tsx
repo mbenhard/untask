@@ -18,7 +18,7 @@ import {
   selectPendingImages,
   selectPendingNoteContext,
   selectProcessingImageCount,
-} from '../../stores/chatStore';
+} from '../../stores/chat';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 

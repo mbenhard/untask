@@ -754,6 +754,53 @@ describe('chatStore stream reliability', () => {
     });
   });
 
+  it('does not switch stream phase back to thinking after text output has started', () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-phase',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: '',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-phase': {
+          placeholderId: 'assistant-stream-req-phase',
+          actionCards: [],
+          steps: [],
+        },
+      },
+    });
+
+    const store = useChatStore.getState();
+    store.applyStreamEvent({
+      type: 'token',
+      requestId: 'req-phase',
+      text: 'Hello',
+    });
+
+    store.applyStreamEvent({
+      type: 'reasoning',
+      requestId: 'req-phase',
+      text: 'post-text reasoning',
+    });
+
+    const message = useChatStore
+      .getState()
+      .messages.find((m) => m.id === 'assistant-stream-req-phase');
+
+    expect(message?.streamPhase).toBeUndefined();
+    expect(message?.steps).toEqual([
+      { kind: 'text', content: 'Hello' },
+      { kind: 'thinking', content: 'post-text reasoning' },
+    ]);
+  });
+
   it('accumulates mixed event sequence into ordered steps', () => {
     useChatStore.setState({
       messages: [

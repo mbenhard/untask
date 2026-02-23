@@ -174,14 +174,18 @@ export const detectOllama = async (): Promise<OllamaDetectionResult> => {
 
     if (Array.isArray(tagsData.models)) {
       const basicModels = tagsData.models
-        .filter((m) => typeof m.name === 'string' && m.name.length > 0)
-        .map((m) => ({
-          name: m.name!,
-          size: typeof m.size === 'number' ? m.size : 0,
-          parameterSize: m.details?.parameter_size ?? '',
-          family: m.details?.family ?? '',
-          quantization: m.details?.quantization_level ?? '',
-        }));
+        .flatMap((m) => {
+          if (typeof m.name !== 'string' || m.name.length === 0) {
+            return [];
+          }
+          return [{
+            name: m.name,
+            size: typeof m.size === 'number' ? m.size : 0,
+            parameterSize: m.details?.parameter_size ?? '',
+            family: m.details?.family ?? '',
+            quantization: m.details?.quantization_level ?? '',
+          }];
+        });
 
       // Check tool support for all models in parallel
       const toolSupportResults = await Promise.all(

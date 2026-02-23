@@ -14,6 +14,7 @@ export const ToastContainer = () => {
   const undoing = useToastStore((s) => s.isUndoing);
   const markUndoing = useToastStore((s) => s.markUndoing);
   const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoHandler = toast?.onUndo;
 
   useEffect(() => {
     if (!toast) {
@@ -58,7 +59,7 @@ export const ToastContainer = () => {
           <span className="text-[11px] text-muted-foreground">
             {undoing ? 'Undone' : toast.label}
           </span>
-          {toast.onUndo && !undoing && (
+          {undoHandler && !undoing && (
             <>
               <span className="text-border">·</span>
               <button
@@ -66,7 +67,7 @@ export const ToastContainer = () => {
                 onClick={() => {
                   if (undoing) return;
                   markUndoing();
-                  void toast.onUndo!();
+                  void undoHandler();
                 }}
                 className="text-[11px] font-medium text-foreground hover:underline"
               >

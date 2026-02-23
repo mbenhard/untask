@@ -82,7 +82,7 @@ const buildMetaSection = (now: Date, timezone: string): string =>
 const buildTodaySection = (
   liveContext: AssistantLiveContext,
   now: Date,
-  taskLimit: number = 10,
+  taskLimit = 10,
 ): string => {
   const activeTasks = sortTasks(
     liveContext.tasks.filter(

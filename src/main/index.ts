@@ -110,8 +110,8 @@ const createMainWindow = (): BrowserWindow => {
     const appOrigins = [
       MAIN_WINDOW_VITE_DEV_SERVER_URL,
       'file://',
-    ].filter(Boolean);
-    if (!appOrigins.some((origin) => url.startsWith(origin!))) {
+    ].filter((origin): origin is string => Boolean(origin));
+    if (!appOrigins.some((origin) => url.startsWith(origin))) {
       event.preventDefault();
       void shell.openExternal(url);
     }

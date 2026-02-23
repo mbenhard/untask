@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -68,10 +67,10 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
 
   const canContinue = role !== null || style !== null || focus.trim().length > 0;
 
-  const handleContinue = () => {
+  const handleContinue = useCallback(() => {
     const identity = buildIdentityString(userName, role, style, focus);
     onNext(identity, role, style, focus);
-  };
+  }, [focus, onNext, role, style, userName]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -85,8 +84,7 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canContinue, role, style, focus, onSkip]);
+  }, [canContinue, handleContinue, onSkip]);
 
   return (
     <div className="flex flex-col gap-6">

@@ -484,8 +484,11 @@ describe('reminderScheduler', () => {
 
       const notification = mockNotifications.find((n) => n.title === 'Task overdue');
       expect(notification).toBeDefined();
+      if (!notification) {
+        throw new Error('Expected overdue notification');
+      }
 
-      notification!.handlers.click?.();
+      notification.handlers.click?.();
 
       expect(mockWindowShow).toHaveBeenCalled();
       expect(mockWindowFocus).toHaveBeenCalled();
@@ -505,8 +508,11 @@ describe('reminderScheduler', () => {
 
       const notification = mockNotifications.find((n) => n.title === '2 tasks overdue');
       expect(notification).toBeDefined();
+      if (!notification) {
+        throw new Error('Expected summary notification');
+      }
 
-      notification!.handlers.click?.();
+      notification.handlers.click?.();
 
       // Window focused but no task:navigate (summary, no specific task)
       expect(mockWindowShow).toHaveBeenCalled();
