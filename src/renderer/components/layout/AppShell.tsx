@@ -10,6 +10,7 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
+import { createTaskRefreshCoalescer } from '../../lib/taskRefreshCoalescer';
 import { cn } from '../../lib/utils';
 import {
   selectActiveView,
@@ -40,6 +41,7 @@ import { SettingsView } from '../settings/SettingsView';
 import { InboxView } from '../views/InboxView';
 import { TasksView } from '../views/TasksView';
 import { TodayView } from '../views/TodayView';
+import { findTaskForNavigation, resolveTaskNavigationView } from './taskNavigation';
 import { ChatInput } from './ChatInput';
 import { ToastContainer } from '../ui/Toast';
 import { TitleBar } from './TitleBar';
@@ -48,6 +50,7 @@ import { UpdateBanner } from './UpdateBanner';
 export const AppShell = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openPanelRef = useRef<HTMLElement>(null);
+  const taskRefreshStatsRef = useRef({ notifications: 0, refreshes: 0 });
   const [chatInputValue, setChatInputValue] = useState('');
 
   const { resolvedTheme, setTheme } = useTheme();
@@ -133,18 +136,15 @@ export const AppShell = () => {
     const unsubscribe = window.untask?.tasks.onTaskNavigate(async (payload) => {
       if (!payload?.taskId) return;
 
-      // Refresh so newly created tasks are in the store
-      await useTaskStore.getState().refreshTasks();
-
-      const task = useTaskStore.getState().tasks.find((t) => t.id === payload.taskId);
-      const resolvedView = task?.status === 'inbox'
-        ? 'inbox'
-        : task?.today
-          ? 'today'
-          : 'tasks';
+      const task = await findTaskForNavigation(
+        payload.taskId,
+        () => useTaskStore.getState().tasks,
+        () => useTaskStore.getState().refreshTasks(),
+      );
+      const resolvedView = resolveTaskNavigationView(task);
 
       setView(resolvedView);
-      useTaskStore.getState().selectTask(payload.taskId);
+      useTaskStore.getState().selectTask(task ? payload.taskId : null);
     });
 
     return () => {
@@ -154,11 +154,39 @@ export const AppShell = () => {
 
   // Refresh task list when tasks are changed from another window (e.g. quick add)
   useEffect(() => {
+    const metricCollector = import.meta.env.DEV
+      ? (event: 'notify' | 'refresh') => {
+        const stats = taskRefreshStatsRef.current;
+        if (event === 'notify') {
+          stats.notifications += 1;
+          if (stats.notifications % 25 === 0) {
+            const saved = stats.notifications - stats.refreshes;
+            console.debug(
+              `[task-refresh] notifications=${stats.notifications} refreshes=${stats.refreshes} coalesced=${saved}`,
+            );
+          }
+          return;
+        }
+        stats.refreshes += 1;
+      }
+      : undefined;
+
+    const coalescer = createTaskRefreshCoalescer(
+      async () => {
+        await useTaskStore.getState().refreshTasks();
+      },
+      {
+        cooldownMs: 120,
+        onMetric: metricCollector,
+      },
+    );
+
     const unsubscribe = window.untask?.tasks.onTaskDataChanged(() => {
-      void useTaskStore.getState().refreshTasks();
+      coalescer.notifyChange();
     });
 
     return () => {
+      coalescer.dispose();
       unsubscribe?.();
     };
   }, []);
@@ -228,7 +256,7 @@ export const AppShell = () => {
     }
 
     return <InboxView allTasks={tasks} isLoading={isLoading} error={error} />;
-  }, [activeView, error, isLoading, setView, tasks]);
+  }, [activeView, error, isLoading, tasks]);
 
   const openChatFromOverlay = useCallback(() => {
     openChatOverlay();
