@@ -59,14 +59,18 @@ export const resolveBlockNoteImages = async (blockNoteJson: string | null): Prom
   }
 
   const imageUrls = blocks
-    .filter(
-      (b) =>
-        b.type === 'image' &&
-        typeof b.props?.url === 'string' &&
-        b.props.url.startsWith('untask-file://') &&
-        IMAGE_EXTENSIONS.test(b.props.url),
-    )
-    .map((b) => b.props!.url!);
+    .flatMap((block) => {
+      const url = block.props?.url;
+      if (
+        block.type !== 'image' ||
+        typeof url !== 'string' ||
+        !url.startsWith('untask-file://') ||
+        !IMAGE_EXTENSIONS.test(url)
+      ) {
+        return [];
+      }
+      return [url];
+    });
 
   if (imageUrls.length === 0) return [];
 

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { viteAliases } from './vite.aliases';
+import { stripFontsourceWoffFallbacks } from './vite.stripWoffFallbackPlugin';
 
 // https://vitejs.dev/config
 export default defineConfig(async () => {
@@ -8,7 +9,7 @@ export default defineConfig(async () => {
   const tailwind = (await import('@tailwindcss/vite')).default;
 
   return {
-    plugins: [react(), tailwind()],
+    plugins: [stripFontsourceWoffFallbacks(), react(), tailwind()],
     resolve: {
       alias: viteAliases,
     },

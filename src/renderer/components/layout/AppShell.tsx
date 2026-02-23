@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -33,19 +33,55 @@ import {
   selectChatIsLoadingConversations,
   useChatStore,
 } from '../../stores/chatStore';
-import { ChatView } from '../chat/ChatView';
-import { ThreadListView } from '../chat/ThreadListView';
-import { NotesView } from '../notes/NotesView';
-import { SearchModal } from '../search/SearchModal';
-import { SettingsView } from '../settings/SettingsView';
-import { InboxView } from '../views/InboxView';
-import { TasksView } from '../views/TasksView';
-import { TodayView } from '../views/TodayView';
 import { findTaskForNavigation, resolveTaskNavigationView } from './taskNavigation';
-import { ChatInput } from './ChatInput';
 import { ToastContainer } from '../ui/Toast';
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
+
+const LazyChatView = lazy(async () => {
+  const module = await import('../chat/ChatView');
+  return { default: module.ChatView };
+});
+
+const LazyThreadListView = lazy(async () => {
+  const module = await import('../chat/ThreadListView');
+  return { default: module.ThreadListView };
+});
+
+const LazyChatInput = lazy(async () => {
+  const module = await import('./ChatInput');
+  return { default: module.ChatInput };
+});
+
+const LazyNotesView = lazy(async () => {
+  const module = await import('../notes/NotesView');
+  return { default: module.NotesView };
+});
+
+const LazySearchModal = lazy(async () => {
+  const module = await import('../search/SearchModal');
+  return { default: module.SearchModal };
+});
+
+const LazySettingsView = lazy(async () => {
+  const module = await import('../settings/SettingsView');
+  return { default: module.SettingsView };
+});
+
+const LazyTodayView = lazy(async () => {
+  const module = await import('../views/TodayView');
+  return { default: module.TodayView };
+});
+
+const LazyTasksView = lazy(async () => {
+  const module = await import('../views/TasksView');
+  return { default: module.TasksView };
+});
+
+const LazyInboxView = lazy(async () => {
+  const module = await import('../views/InboxView');
+  return { default: module.InboxView };
+});
 
 export const AppShell = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -213,9 +249,10 @@ export const AppShell = () => {
 
   // F-4: Place focus on primary element when view changes
   useEffect(() => {
-    requestAnimationFrame(() => {
+    const frameId = requestAnimationFrame(() => {
       document.querySelector<HTMLElement>('[data-primary-focusable]')?.focus();
     });
+    return () => cancelAnimationFrame(frameId);
   }, [activeView]);
 
   const handleSubmit = useCallback(() => {
@@ -240,22 +277,42 @@ export const AppShell = () => {
 
   const activeViewComponent = useMemo(() => {
     if (activeView === 'today') {
-      return <TodayView allTasks={tasks} isLoading={isLoading} error={error} />;
+      return (
+        <Suspense fallback={null}>
+          <LazyTodayView allTasks={tasks} isLoading={isLoading} error={error} />
+        </Suspense>
+      );
     }
 
     if (activeView === 'tasks') {
-      return <TasksView allTasks={tasks} isLoading={isLoading} error={error} />;
+      return (
+        <Suspense fallback={null}>
+          <LazyTasksView allTasks={tasks} isLoading={isLoading} error={error} />
+        </Suspense>
+      );
     }
 
     if (activeView === 'notes') {
-      return <NotesView />;
+      return (
+        <Suspense fallback={null}>
+          <LazyNotesView />
+        </Suspense>
+      );
     }
 
     if (activeView === 'settings') {
-      return <SettingsView />;
+      return (
+        <Suspense fallback={null}>
+          <LazySettingsView />
+        </Suspense>
+      );
     }
 
-    return <InboxView allTasks={tasks} isLoading={isLoading} error={error} />;
+    return (
+      <Suspense fallback={null}>
+        <LazyInboxView allTasks={tasks} isLoading={isLoading} error={error} />
+      </Suspense>
+    );
   }, [activeView, error, isLoading, tasks]);
 
   const openChatFromOverlay = useCallback(() => {
@@ -463,22 +520,24 @@ export const AppShell = () => {
                           transition={{ duration: 0 }}
                           className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
-                          <ThreadListView
-                            conversations={conversations}
-                            activeConversationId={activeConversationId}
-                            isLoading={isLoadingConversations}
-                            onCollapse={collapseChatOverlay}
-                            onSelect={handleThreadSelect}
-                            onCreate={() => {
-                              void handleThreadCreate();
-                            }}
-                            onArchive={(conversationId) => {
-                              void archiveConversation(conversationId);
-                            }}
-                            onDelete={(conversationId) => {
-                              void deleteConversation(conversationId);
-                            }}
-                          />
+                          <Suspense fallback={<div className="min-h-0 flex-1" />}>
+                            <LazyThreadListView
+                              conversations={conversations}
+                              activeConversationId={activeConversationId}
+                              isLoading={isLoadingConversations}
+                              onCollapse={collapseChatOverlay}
+                              onSelect={handleThreadSelect}
+                              onCreate={() => {
+                                void handleThreadCreate();
+                              }}
+                              onArchive={(conversationId) => {
+                                void archiveConversation(conversationId);
+                              }}
+                              onDelete={(conversationId) => {
+                                void deleteConversation(conversationId);
+                              }}
+                            />
+                          </Suspense>
                         </motion.div>
                       ) : (
                         <motion.div
@@ -490,15 +549,19 @@ export const AppShell = () => {
                           className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
                           <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
-                            <ChatView onSuggestionClick={handleSuggestionClick} />
+                            <Suspense fallback={<div className="h-full w-full" />}>
+                              <LazyChatView onSuggestionClick={handleSuggestionClick} />
+                            </Suspense>
                           </div>
                           <div className="border-t border-dashed border-border/50">
-                            <ChatInput
-                              inputRef={inputRef}
-                              value={chatInputValue}
-                              onChange={setChatInputValue}
-                              onSubmit={handleSubmit}
-                            />
+                            <Suspense fallback={<div className="h-[84px]" />}>
+                              <LazyChatInput
+                                inputRef={inputRef}
+                                value={chatInputValue}
+                                onChange={setChatInputValue}
+                                onSubmit={handleSubmit}
+                              />
+                            </Suspense>
                           </div>
                         </motion.div>
                       )}
@@ -556,7 +619,9 @@ export const AppShell = () => {
         </div>
       </div>
 
-      <SearchModal />
+      <Suspense fallback={null}>
+        <LazySearchModal />
+      </Suspense>
       <ToastContainer />
     </div>
   );

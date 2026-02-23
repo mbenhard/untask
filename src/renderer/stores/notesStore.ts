@@ -7,6 +7,7 @@ import { deriveAutoTitle } from '../lib/noteUtils';
 import { getUntask } from '../lib/untask';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
+import { setActiveNoteDraft } from './notesDraftBridge';
 
 export type NotesSubView = 'list' | 'editor';
 export type NotesLayoutMode = 'list' | 'split' | 'focus';
@@ -661,6 +662,22 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+const syncActiveNoteDraftFromState = (state: NotesStore): void => {
+  setActiveNoteDraft(state.activeNoteId, state.content);
+};
+
+syncActiveNoteDraftFromState(useNotesStore.getState());
+useNotesStore.subscribe((state, previousState) => {
+  if (
+    state.activeNoteId === previousState.activeNoteId
+    && state.content === previousState.content
+  ) {
+    return;
+  }
+
+  syncActiveNoteDraftFromState(state);
+});
 
 // Selectors
 export const selectNotesSubView = (state: NotesStore) => state.subView;

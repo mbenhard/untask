@@ -6,9 +6,7 @@ import {
   type DockModeResult,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
-  type MemoryPromotionEvaluationRequestPayload,
   type MemoryPromotionEvaluationResultPayload,
-  type MemoryPromotionConfirmRequestPayload,
   type MemoryPromotionConfirmResultPayload,
   type ChatKernelStatusResultPayload,
   type ChatKernelOrchestrationRequestPayload,
@@ -19,8 +17,7 @@ import { withIpcLogging } from './helpers';
 import { launchAtLoginSchema } from './schemas';
 import { buildCanonicalRuntimeContext } from '../ai/contextBuilder';
 import { buildSystemPrompt } from '../ai/systemPrompt';
-import { isBootstrapCompleted } from '../services/settingsService';
-import { getSetting, setSetting } from '../services/settingsService';
+import { getSetting, isBootstrapCompleted, setSetting } from '../services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from '../defaultSettings';
 import {
   requestHideFromRenderer,
@@ -199,10 +196,7 @@ export const registerAppHandlers = (): void => {
     IPC_CHANNELS.SETTINGS_EVALUATE_MEMORY_PROMOTION,
     withIpcLogging(
       'SETTINGS_EVALUATE_MEMORY_PROMOTION',
-      (
-        _event: Electron.IpcMainInvokeEvent,
-        _request: MemoryPromotionEvaluationRequestPayload,
-      ): MemoryPromotionEvaluationResultPayload => ({
+      (): MemoryPromotionEvaluationResultPayload => ({
         action: 'journal_only',
         proposedLayer: 'identity',
         proposedEntry: '',
@@ -218,10 +212,7 @@ export const registerAppHandlers = (): void => {
     IPC_CHANNELS.SETTINGS_CONFIRM_MEMORY_PROMOTION,
     withIpcLogging(
       'SETTINGS_CONFIRM_MEMORY_PROMOTION',
-      (
-        _event: Electron.IpcMainInvokeEvent,
-        _request: MemoryPromotionConfirmRequestPayload,
-      ): MemoryPromotionConfirmResultPayload => ({
+      (): MemoryPromotionConfirmResultPayload => ({
         resolved: false,
         decision: {
           action: 'journal_only',

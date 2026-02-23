@@ -1,4 +1,5 @@
 import { app, net, Notification, shell } from 'electron';
+import { existsSync } from 'node:fs';
 
 import { setUpdateTooltip } from '../tray';
 import { toggleWindow, getMainWindow } from '../window/summonController';
@@ -61,14 +62,8 @@ const detectInstallMethod = (): 'homebrew' | 'direct' => {
 
   for (const prefix of possiblePrefixes) {
     const caskroomPath = `${prefix}/Caskroom/untask`;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs');
-      if (fs.existsSync(caskroomPath)) {
-        return 'homebrew';
-      }
-    } catch {
-      // Ignore errors, try next prefix
+    if (existsSync(caskroomPath)) {
+      return 'homebrew';
     }
   }
 
@@ -228,7 +223,10 @@ export const checkForUpdates = async (force = false): Promise<UpdateInfo> => {
 
     // Schedule automatic retry with backoff
     if (retryCount < RETRY_DELAYS.length) {
-      const delay = RETRY_DELAYS[retryCount]!;
+      const delay =
+        RETRY_DELAYS[retryCount] ??
+        RETRY_DELAYS[RETRY_DELAYS.length - 1] ??
+        0;
       retryCount++;
       const timeout = setTimeout(() => void checkForUpdates(true), delay);
       retryTimeouts.push(timeout);

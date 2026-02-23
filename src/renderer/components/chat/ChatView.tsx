@@ -36,7 +36,7 @@ import {
   selectFocusMessageId,
   selectPendingNoteContext,
   useChatStore,
-} from '../../stores/chatStore';
+} from '../../stores/chat';
 import { Button } from '../ui/button';
 
 const formatTimestamp = (createdAt: string | null): string => {
@@ -536,7 +536,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
       const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
       const lastAssistantMessageId = [...messages].reverse().find((m) => m.role === 'assistant')?.id ?? null;
 
-      return messages.map((message, _messageIndex) => {
+      return messages.map((message) => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
         const hasSteps = isAssistant && message.steps.length > 0;

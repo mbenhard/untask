@@ -17,11 +17,14 @@ import {
 } from '../services/chatService';
 import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { getActiveProvider } from './providers';
-import { getModelWebSearchConfig, modelSupportsVision } from './models';
+import {
+  getModelWebSearchConfig,
+  isOllamaProvider,
+  modelSupportsVision,
+} from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
-import { isOllamaProvider } from './models';
 import { loadPendingActions } from './autonomy';
 import { classifyChatError, shouldRetryStreamAttempt } from './errorClassification';
 import { maybeAutoTitleConversation } from './autoTitle';

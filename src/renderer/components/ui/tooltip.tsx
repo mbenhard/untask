@@ -37,12 +37,21 @@ type TooltipContext = {
   updatePos: (x: number, y: number) => void;
 };
 
+const defaultSetOpen = (value: boolean): void => {
+  void value;
+};
+
+const defaultUpdatePos = (x: number, y: number): void => {
+  void x;
+  void y;
+};
+
 const TooltipCtx = createContext<TooltipContext>({
   open: false,
-  setOpen: () => {},
+  setOpen: defaultSetOpen,
   x: 0,
   y: 0,
-  updatePos: () => {},
+  updatePos: defaultUpdatePos,
 });
 
 function Tooltip({ children }: { children: ReactNode }) {
@@ -123,14 +132,16 @@ const PAD = 6;
 function TooltipContent({
   children,
   className,
-  side: _side,
-  sideOffset: _sideOffset,
+  side,
+  sideOffset,
 }: {
   children: ReactNode;
   className?: string;
   side?: string;
   sideOffset?: number;
 }) {
+  void side;
+  void sideOffset;
   const { open, x, y } = useContext(TooltipCtx);
   const ref = useRef<HTMLDivElement>(null);
 

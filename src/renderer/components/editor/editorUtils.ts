@@ -38,6 +38,32 @@ export const parseStoredBlocks = (content: string): PartialBlock[] | null => {
   }
 };
 
+export type InitialEditorContent = {
+  initialBlocks?: PartialBlock[];
+  legacyMarkdown: string | null;
+};
+
+/**
+ * Resolve persisted content into editor initialization data.
+ * JSON content is passed as initial blocks; non-JSON content is treated as legacy markdown.
+ */
+export const resolveInitialEditorContent = (content: string): InitialEditorContent => {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return { initialBlocks: undefined, legacyMarkdown: null };
+  }
+
+  if (!isBlockNoteJson(content)) {
+    return { initialBlocks: undefined, legacyMarkdown: content };
+  }
+
+  const blocks = parseStoredBlocks(content);
+  return {
+    initialBlocks: blocks ?? undefined,
+    legacyMarkdown: null,
+  };
+};
+
 /**
  * Check whether a JSON blocks string represents an empty document
  * (only empty paragraph blocks with no text content).

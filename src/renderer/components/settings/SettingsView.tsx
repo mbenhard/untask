@@ -39,7 +39,7 @@ export const SettingsView = () => {
       case 'general':
         return <SettingsGeneral setError={setError} setNotice={setNotice} />;
       case 'tasks':
-        return <SettingsTasks setError={setError} setNotice={setNotice} />;
+        return <SettingsTasks />;
       case 'reminders':
         return <SettingsReminders setError={setError} setNotice={setNotice} />;
       case 'assistant':

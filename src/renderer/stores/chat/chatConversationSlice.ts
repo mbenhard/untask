@@ -12,7 +12,6 @@ import { mapMessageToUi } from './chatStoreTypes';
 
 export const refreshConversationsInternal = async (
   set: StoreApi<ChatStore>['setState'],
-  _get: StoreApi<ChatStore>['getState'],
 ): Promise<void> => {
   const result = await getUntask().chat.listThreads({
     includeArchived: true,
@@ -77,7 +76,7 @@ export const createConversationActions = (
   refreshConversations: async () => {
     try {
       set({ isLoadingConversations: true });
-      await refreshConversationsInternal(set, get);
+      await refreshConversationsInternal(set);
       set({ isLoadingConversations: false, error: null });
     } catch (error) {
       set({ isLoadingConversations: false, error: toErrorMessage(error, 'Unknown chat operation error.') });
@@ -96,7 +95,7 @@ export const createConversationActions = (
         title?.trim().length ? { title: title.trim() } : undefined,
       );
       await loadConversationIntoState(set, created.conversation.id);
-      await refreshConversationsInternal(set, get);
+      await refreshConversationsInternal(set);
       set({ error: null });
     } catch (error) {
       set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
@@ -116,7 +115,7 @@ export const createConversationActions = (
 
     try {
       await loadConversationIntoState(set, conversationId);
-      await refreshConversationsInternal(set, get);
+      await refreshConversationsInternal(set);
     } catch (error) {
       set({ error: toErrorMessage(error, 'Unknown chat operation error.') });
     }
@@ -125,7 +124,7 @@ export const createConversationActions = (
   archiveConversation: async (conversationId: string) => {
     try {
       await getUntask().chat.archiveThread({ conversationId });
-      await refreshConversationsInternal(set, get);
+      await refreshConversationsInternal(set);
 
       if (get().activeConversationId === conversationId) {
         const nextActive =
@@ -139,7 +138,7 @@ export const createConversationActions = (
         } else {
           const created = await getUntask().chat.createThread();
           await loadConversationIntoState(set, created.conversation.id);
-          await refreshConversationsInternal(set, get);
+          await refreshConversationsInternal(set);
         }
       }
 
@@ -152,7 +151,7 @@ export const createConversationActions = (
   deleteConversation: async (conversationId: string) => {
     try {
       await getUntask().chat.deleteThread({ conversationId });
-      await refreshConversationsInternal(set, get);
+      await refreshConversationsInternal(set);
 
       if (get().activeConversationId === conversationId) {
         const nextActive =
@@ -166,7 +165,7 @@ export const createConversationActions = (
         } else {
           const created = await getUntask().chat.createThread();
           await loadConversationIntoState(set, created.conversation.id);
-          await refreshConversationsInternal(set, get);
+          await refreshConversationsInternal(set);
         }
       }
 

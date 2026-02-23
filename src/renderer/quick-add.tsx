@@ -3,12 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import '@fontsource/geist/400.css';
 import '@fontsource/geist/500.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/dm-sans/400.css';
-import '@fontsource/dm-sans/500.css';
-import '@fontsource/manrope/400.css';
-import '@fontsource/manrope/500.css';
+import '@fontsource/geist/600.css';
 
 import { QuickAddApp } from './components/quick-add/QuickAddApp';
 import './styles/index.css';

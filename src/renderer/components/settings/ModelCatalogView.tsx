@@ -205,6 +205,12 @@ const RECOMMENDED_OLLAMA_MODELS: readonly { name: string; size: string }[] = [
 ];
 
 const PULL_PREFIX = 'pull:';
+const NOOP_PULL_MODEL = (_model: string): void => {
+  void _model;
+};
+const NOOP_CANCEL_PULL = (): void => {
+  return;
+};
 
 const MIN_PARAMETER_SIZE_BILLIONS = 7;
 
@@ -409,8 +415,8 @@ export const ModelCatalogView = ({
           selectedModelId={selectedModelId}
           onChange={onChange}
           pullProgress={pullProgress ?? null}
-          onPullModel={onPullModel ?? (() => { })}
-          onCancelPull={onCancelPull ?? (() => { })}
+          onPullModel={onPullModel ?? NOOP_PULL_MODEL}
+          onCancelPull={onCancelPull ?? NOOP_CANCEL_PULL}
         />
       </SettingsRow>
     );

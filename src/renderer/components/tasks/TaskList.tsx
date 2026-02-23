@@ -18,8 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
-import type { Task } from '../../../types/models';
-import { isTerminalStatus, PREDEFINED_STATUSES } from '../../../types/models';
+import { isTerminalStatus, PREDEFINED_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
@@ -32,7 +31,6 @@ import {
   selectEnabledNonTerminal,
   selectFirstEnabledNonTerminal,
 } from '../../stores/taskStatusConfigStore';
-import type { PredefinedStatusId } from '../../../types/models';
 import {
   getNextPriority,
   getNextStatusInCycle,
@@ -187,6 +185,8 @@ export const TaskList = ({
     if (!selectedTaskId) {
       return;
     }
+    let pulseFrameId: number | null = null;
+    let focusFrameId: number | null = null;
 
     const selectedIndex = tasks.findIndex((task) => task.id === selectedTaskId);
 
@@ -199,9 +199,9 @@ export const TaskList = ({
 
       // Trigger navigation pulse. Clear first to restart animation if same task.
       setNavigatedTaskId(null);
-      requestAnimationFrame(() => setNavigatedTaskId(selectedTaskId));
+      pulseFrameId = requestAnimationFrame(() => setNavigatedTaskId(selectedTaskId));
 
-      requestAnimationFrame(() => {
+      focusFrameId = requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
         const target = container.querySelector<HTMLElement>(
@@ -211,7 +211,14 @@ export const TaskList = ({
         target.scrollIntoView({ block: 'nearest' });
         target.focus();
       });
-      return;
+      return () => {
+        if (pulseFrameId !== null) {
+          cancelAnimationFrame(pulseFrameId);
+        }
+        if (focusFrameId !== null) {
+          cancelAnimationFrame(focusFrameId);
+        }
+      };
     }
 
     // Not a direct task — check if it's a subtask whose parent is in this list.
@@ -225,7 +232,15 @@ export const TaskList = ({
     setFocusedIndex(parentIndex);
     setExpandedTaskId(subtask.parentId);
     setIsAnyBodyEditing(false);
-  }, [allTasks, selectTask, selectedTaskId, tasks]);
+    return () => {
+      if (pulseFrameId !== null) {
+        cancelAnimationFrame(pulseFrameId);
+      }
+      if (focusFrameId !== null) {
+        cancelAnimationFrame(focusFrameId);
+      }
+    };
+  }, [allTasks, selectTask, selectedTaskId, tasks, setFocusedIndex]);
 
   // Clear navigated highlight after animation completes
   useEffect(() => {
@@ -317,6 +332,18 @@ export const TaskList = ({
     },
     [completeTask, expandedTaskId],
   );
+
+  const handleCompleteConfirmTriggerHandled = useCallback((taskId: string): void => {
+    setCompleteConfirmTrigger((current) => (
+      current?.taskId === taskId ? null : current
+    ));
+  }, []);
+
+  const handleDeleteConfirmTriggerHandled = useCallback((taskId: string): void => {
+    setDeleteConfirmTrigger((current) => (
+      current?.taskId === taskId ? null : current
+    ));
+  }, []);
 
   const handleDelete = useCallback(
     (taskId: string): void => {
@@ -543,6 +570,8 @@ export const TaskList = ({
               onFocus={() => setFocusedIndex(index)}
               completeConfirmTrigger={completeConfirmTrigger}
               deleteConfirmTrigger={deleteConfirmTrigger}
+              onCompleteConfirmTriggerHandled={handleCompleteConfirmTriggerHandled}
+              onDeleteConfirmTriggerHandled={handleDeleteConfirmTriggerHandled}
             >
               <TaskBody
                 task={task}

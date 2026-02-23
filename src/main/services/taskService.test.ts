@@ -19,6 +19,7 @@ import {
   deleteTask,
   getTaskById,
   listTasks,
+  undoLastUserTaskEvent,
 } from './taskService';
 
 const hasNativeSqlite = (() => {
@@ -102,6 +103,26 @@ describeIfNativeSqlite('taskService hierarchy integrity', () => {
 
     expect(getTaskById(parent.id)?.status).toBe('done');
     expect(getTaskById(child.id)?.status).toBe('done');
+  });
+
+  it('undos completeChildren atomically for descendants', () => {
+    const parent = createTask({ title: 'Parent task', status: 'active' });
+    const childA = createTask({ title: 'Child A', parentId: parent.id, status: 'active' });
+    const childB = createTask({ title: 'Child B', parentId: parent.id, status: 'active' });
+
+    completeTask(parent.id, 'user', { completeChildren: true });
+
+    expect(getTaskById(parent.id)?.status).toBe('done');
+    expect(getTaskById(childA.id)?.status).toBe('done');
+    expect(getTaskById(childB.id)?.status).toBe('done');
+
+    const undoResult = undoLastUserTaskEvent();
+    expect(undoResult?.undone).toBe(true);
+    expect(undoResult?.originalAction).toBe('complete');
+
+    expect(getTaskById(parent.id)?.status).toBe('active');
+    expect(getTaskById(childA.id)?.status).toBe('active');
+    expect(getTaskById(childB.id)?.status).toBe('active');
   });
 });
 

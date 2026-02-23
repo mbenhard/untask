@@ -59,7 +59,9 @@ export const SearchModal = () => {
   useFocusTrap(panelRef, isOpen);
 
   useEffect(() => {
-    if (isOpen) requestAnimationFrame(() => inputRef.current?.focus());
+    if (!isOpen) return;
+    const frameId = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frameId);
   }, [isOpen]);
 
   useEffect(() => {

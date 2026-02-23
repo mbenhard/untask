@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { IPC_CHANNELS } from '../../types/ipc';
 import { getMainWindow } from '../window/summonController';
 import { getDb } from '../db';
-import { remindersMappings, type RemindersMapping } from '../db/schema';
+import { remindersMappings, type RemindersMapping, type Task } from '../db/schema';
 import {
   SETTING_KEY_REMINDERS_SYNC_ENABLED,
   SETTING_KEY_REMINDERS_LIST_ID,
@@ -18,7 +18,6 @@ import { getSetting, getSettingWithDefault, setSetting } from './settingsService
 import { listTasks, getTaskById, completeTask, subscribeTaskChanges, createTask, cancelTask, updateTask } from './taskService';
 import { blockNoteToMarkdown } from './notesService';
 import { TERMINAL_STATUSES, type PredefinedStatusId, type TaskStatusConfig } from '../../types/models';
-import type { Task } from '../db/schema';
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -549,7 +548,8 @@ async function pullChanges(): Promise<void> {
 // ─── Bulk initial sync ──────────────────────────────────────
 
 async function runInitialSync(): Promise<void> {
-  if (!listId) return;
+  const activeListId = listId;
+  if (!activeListId) return;
 
   broadcastSyncStatus({ status: 'syncing' });
 
@@ -569,7 +569,7 @@ async function runInitialSync(): Promise<void> {
     for (let i = 0; i < tasksToSync.length; i += BATCH_SIZE) {
       const batch = tasksToSync.slice(i, i + BATCH_SIZE);
       const batchPayload = batch.map((task) => ({
-        listId: listId!,
+        listId: activeListId,
         ...buildReminderPayload(task),
       }));
 
@@ -679,7 +679,7 @@ function stopWatcher(): void {
 
 // ─── Debounced push handler ─────────────────────────────────
 
-function onTaskChange(_event: import('./taskService').TaskChangeEvent): void {
+function onTaskChange(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;

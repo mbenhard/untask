@@ -1,6 +1,5 @@
-import { net, protocol } from 'electron';
+import { app, net, protocol } from 'electron';
 import path from 'node:path';
-import { app } from 'electron';
 
 const SCHEME = 'untask-file';
 

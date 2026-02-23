@@ -1,10 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
-import {
-  type DefaultReactSuggestionItem,
-  getDefaultReactSlashMenuItems,
-} from '@blocknote/react';
 import { Archive, ArchiveRestore, ArrowLeft, CheckSquare, Sparkles, Trash2 } from 'lucide-react';
 
 import {
@@ -22,8 +18,13 @@ import {
 } from '../../stores/notesStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { resolveTaskTitleFromEditor } from './noteSlashActions';
-import { BlockEditor } from '../editor/BlockEditor';
 import { Button } from '../ui/button';
+import type { BlockEditorSlashMenuItem, BlockEditorSlashMenuParams } from '../editor/BlockEditor';
+
+const LazyBlockEditor = lazy(async () => {
+  const module = await import('../editor/BlockEditor');
+  return { default: module.BlockEditor };
+});
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const createTaskFromCursor = async (editor: BlockNoteEditor): Promise<void> => {
   });
 };
 
-const createProcessItem = (editor: BlockNoteEditor): DefaultReactSuggestionItem => ({
+const createProcessItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
   title: 'Process with AI',
   onItemClick: () => {
     const markdown = editor.blocksToMarkdownLossy(editor.document);
@@ -81,7 +82,7 @@ const createProcessItem = (editor: BlockNoteEditor): DefaultReactSuggestionItem 
   subtext: 'Open AI chat with this note as context',
 });
 
-const createTaskItem = (editor: BlockNoteEditor): DefaultReactSuggestionItem => ({
+const createTaskItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
   title: 'Create Task',
   onItemClick: () => {
     void createTaskFromCursor(editor);
@@ -92,14 +93,29 @@ const createTaskItem = (editor: BlockNoteEditor): DefaultReactSuggestionItem => 
   subtext: 'Create a task from selection or nearby text',
 });
 
-const getSlashMenuItems = (editor: BlockNoteEditor): DefaultReactSuggestionItem[] => [
-  ...getDefaultReactSlashMenuItems(editor),
+const getSlashMenuItems = ({
+  editor,
+  defaultItems,
+}: BlockEditorSlashMenuParams): BlockEditorSlashMenuItem[] => [
+  ...defaultItems,
   createTaskItem(editor),
   createProcessItem(editor),
 ];
 
 type NoteEditorProps = {
   showBackButton?: boolean;
+};
+
+type DevLatencyApi = {
+  start: (flow: string, key: string | number) => void;
+  end: (flow: string, key: string | number) => number | null;
+  cancel: (flow: string, key: string | number) => void;
+};
+
+const NOOP_DEV_LATENCY: DevLatencyApi = {
+  start: () => undefined,
+  end: () => null,
+  cancel: () => undefined,
 };
 
 // ─── Component ─────────────────────────────────────────────
@@ -124,10 +140,34 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
+  const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
+  const openMetricKeyRef = useRef<string | null>(null);
+  const hasRecordedOpenLatencyRef = useRef(false);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      let disposed = false;
+      void import('../../lib/devLatencyMetrics').then(({ devLatencyMetrics }) => {
+        if (!disposed) {
+          devLatencyRef.current = devLatencyMetrics;
+        }
+      });
+      return () => {
+        disposed = true;
+        devLatencyRef.current = NOOP_DEV_LATENCY;
+      };
+    }
+    return undefined;
+  }, []);
 
   // 2s debounced auto-save
   const handleChange = useCallback(
     (json: string) => {
+      const metricKey = openMetricKeyRef.current;
+      if (!hasRecordedOpenLatencyRef.current && metricKey) {
+        hasRecordedOpenLatencyRef.current = true;
+        devLatencyRef.current.end('note-editor-open', metricKey);
+      }
       setContent(json);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
@@ -178,6 +218,32 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
       }, 50);
       return () => clearTimeout(timer);
     }
+  }, [activeNoteId, isLoading]);
+
+  // Dev-only latency probe: note opened -> first content change.
+  useEffect(() => {
+    if (!activeNoteId || isLoading) {
+      if (!hasRecordedOpenLatencyRef.current && openMetricKeyRef.current) {
+        devLatencyRef.current.cancel('note-editor-open', openMetricKeyRef.current);
+      }
+      openMetricKeyRef.current = null;
+      hasRecordedOpenLatencyRef.current = false;
+      return;
+    }
+
+    const key = String(activeNoteId);
+    openMetricKeyRef.current = key;
+    hasRecordedOpenLatencyRef.current = false;
+    devLatencyRef.current.start('note-editor-open', key);
+
+    return () => {
+      if (!hasRecordedOpenLatencyRef.current) {
+        devLatencyRef.current.cancel('note-editor-open', key);
+      }
+      if (openMetricKeyRef.current === key) {
+        openMetricKeyRef.current = null;
+      }
+    };
   }, [activeNoteId, isLoading]);
 
   if (isLoading) {
@@ -285,14 +351,22 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <BlockEditor
-          key={activeNoteId}
-          content={content}
-          onChange={handleChange}
-          className="untask-notes-editor"
-          getSlashMenuItems={getSlashMenuItems}
-          editorRef={editorRef}
-        />
+        <Suspense
+          fallback={(
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-muted-foreground">Loading editor...</p>
+            </div>
+          )}
+        >
+          <LazyBlockEditor
+            key={activeNoteId}
+            content={content}
+            onChange={handleChange}
+            className="untask-notes-editor"
+            getSlashMenuItems={getSlashMenuItems}
+            editorRef={editorRef}
+          />
+        </Suspense>
       </div>
     </div>
   );

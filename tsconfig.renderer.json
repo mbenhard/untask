@@ -12,6 +12,8 @@
   "include": [
     "vite.aliases.ts",
     "vite.renderer.config.ts",
+    "vite.quickadd-renderer.config.ts",
+    "vite.stripWoffFallbackPlugin.ts",
     "src/renderer/**/*",
     "src/types/**/*.ts",
     "src/types/**/*.d.ts"
