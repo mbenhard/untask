@@ -31,6 +31,7 @@ Date: 2026-02-23
 | TASK-023 | Duplicate `assistant_done` terminal events could retain stale request-scoped stream state | Fixed |
 | TASK-024 | BlockNote editor runtime still shipped Mantine view/runtime chunk despite custom editor UI controls | Fixed |
 | TASK-025 | Font assets still shipped broad non-Latin subsets for all typography families | Fixed |
+| TASK-026 | Chat send path polled image-processing state in fixed intervals before dispatch | Fixed |
 | TEST-001 | Core task service recursion tests are skipped in default suite | Fixed |
 
 ## Detailed Issues
@@ -595,6 +596,30 @@ Fix
 Status
 - Fixed in `src/renderer/main.tsx`, `src/renderer/quick-add.tsx`, and `src/renderer/components/providers/TypographyProvider.tsx`.
 
+## TASK-026: Chat send path polled image-processing state in fixed intervals before dispatch
+
+Flow
+- Chat compose/send when image attachments are still processing.
+
+Repro steps
+1. Queue image processing in chat composer (`processingImageCount > 0`).
+2. Trigger `sendMessage()`.
+3. Observe pre-send wait strategy in chat store.
+
+Expected
+- Send should wait until processing completes (or timeout) without repeated polling churn.
+
+Actual (before fix)
+- `sendMessage()` used a fixed polling loop (`100ms` interval, up to `50` checks) to wait for processing completion.
+
+Fix
+- Replaced polling with event-driven waiter registration resolved when processing count returns to zero.
+- Kept existing 5-second timeout safety cap.
+- Added regression coverage verifying send remains blocked until `decrementProcessingImages()` releases it.
+
+Status
+- Fixed in `src/renderer/stores/chat/chatMessageSlice.ts`.
+
 ## TEST-001: Task service recursion tests could be skipped when native ABI mismatched
 
 Flow
@@ -642,6 +667,7 @@ Status
   - `cancelStream()` clears request payload mappings with other in-flight request state.
   - Late `assistant_done` replaces orphaned request placeholder even when in-flight metadata is already missing.
   - Duplicate `assistant_done` terminal events clean stale request-scoped payload/navigation/conversation state idempotently.
+  - `sendMessage()` waits for in-flight image processing completion before dispatching send.
   - Retryable `error` clears assistant-message request mapping while retaining retry payload.
   - Reasoning events no longer flip stream indicator back to thinking after token output starts.
 - `src/renderer/lib/devLatencyMetrics.test.ts`

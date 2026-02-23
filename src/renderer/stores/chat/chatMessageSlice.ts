@@ -118,21 +118,63 @@ export const createMessageActions = (
     images?: string[],
     noteContext?: ChatNoteContext,
   ) => Promise<void>,
-) => ({
+) => {
+  const imageProcessingWaiters = new Set<() => void>();
+  const IMAGE_PROCESSING_WAIT_TIMEOUT_MS = 5_000;
+
+  const flushImageProcessingWaiters = (): void => {
+    if (imageProcessingWaiters.size === 0) {
+      return;
+    }
+
+    const waiters = Array.from(imageProcessingWaiters);
+    imageProcessingWaiters.clear();
+    waiters.forEach((resolve) => resolve());
+  };
+
+  const waitForImageProcessing = async (): Promise<void> => {
+    if (get().processingImageCount <= 0) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      let isDone = false;
+      const timeoutId = setTimeout(() => {
+        if (isDone) {
+          return;
+        }
+        isDone = true;
+        imageProcessingWaiters.delete(complete);
+        resolve();
+      }, IMAGE_PROCESSING_WAIT_TIMEOUT_MS);
+
+      const complete = () => {
+        if (isDone) {
+          return;
+        }
+        isDone = true;
+        clearTimeout(timeoutId);
+        imageProcessingWaiters.delete(complete);
+        resolve();
+      };
+
+      imageProcessingWaiters.add(complete);
+
+      // Re-check after registration to avoid missing a transition to zero.
+      if (get().processingImageCount <= 0) {
+        complete();
+      }
+    });
+  };
+
+  return {
   sendMessage: async (content: string) => {
     if (get().isSending) {
       return;
     }
 
-    // Wait for any in-flight image processing to complete
-    const waitForProcessing = async () => {
-      let checks = 0;
-      while (get().processingImageCount > 0 && checks < 50) {
-        await new Promise((r) => { setTimeout(r, 100); });
-        checks += 1;
-      }
-    };
-    await waitForProcessing();
+    // Wait for any in-flight image processing to complete.
+    await waitForImageProcessing();
 
     const selected = await getUntask().chat.getSelectedModel().catch(() => null);
     if (selected?.modelId) {
@@ -314,10 +356,15 @@ export const createMessageActions = (
   incrementProcessingImages: () =>
     set((state) => ({ processingImageCount: state.processingImageCount + 1 })),
 
-  decrementProcessingImages: () =>
-    set((state) => ({ processingImageCount: Math.max(0, state.processingImageCount - 1) })),
+  decrementProcessingImages: () => {
+    set((state) => ({ processingImageCount: Math.max(0, state.processingImageCount - 1) }));
+    if (get().processingImageCount <= 0) {
+      flushImageProcessingWaiters();
+    }
+  },
 
   clearFocusMessageId: () => set({ focusMessageId: null }),
 
   clearError: () => set({ error: null }),
-});
+  };
+};
