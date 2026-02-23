@@ -27,6 +27,7 @@ Date: 2026-02-23
 | TASK-019 | Editor interaction latency had no direct dev-time measurement signal | Fixed |
 | TASK-020 | JSON editor content paid an unnecessary post-mount hydration pass | Fixed |
 | TASK-021 | Dev-only latency probes still contributed a production runtime chunk | Fixed |
+| TASK-022 | Slash-menu query path rebuilt default/custom items on every query update | Fixed |
 | TEST-001 | Core task service recursion tests are skipped in default suite | Fixed |
 
 ## Detailed Issues
@@ -497,6 +498,28 @@ Fix
 
 Status
 - Fixed in `src/renderer/components/notes/NoteEditor.tsx` and `src/renderer/components/tasks/TaskBody.tsx`.
+
+## TASK-022: Slash-menu query path rebuilt full item lists on each query update
+
+Flow
+- Editor slash-menu typing interactions (`/` query updates).
+
+Repro steps
+1. Open editor slash menu.
+2. Type query characters repeatedly.
+3. Observe `BlockEditor` slash-menu item handling path.
+
+Expected
+- Query updates should filter from stable slash-menu items, not rebuild item definitions each time.
+
+Actual (before fix)
+- Each query update rebuilt default slash items and recomposed custom item arrays before filtering.
+
+Fix
+- `BlockEditor` now memoizes composed slash-menu items per editor instance and filters that memoized list per query.
+
+Status
+- Fixed in `src/renderer/components/editor/BlockEditor.tsx`.
 
 ## TEST-001: Task service recursion tests could be skipped when native ABI mismatched
 

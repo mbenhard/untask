@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
@@ -201,7 +201,22 @@ export const BlockEditor = ({
     [editor],
   );
 
-  const hasCustomSlashMenu = getSlashMenuItems !== undefined;
+  const customSlashMenuItems = useMemo(() => {
+    if (!getSlashMenuItems) {
+      return null;
+    }
+
+    const defaultItems = getDefaultReactSlashMenuItems(editor);
+    return getSlashMenuItems({ editor, defaultItems });
+  }, [editor, getSlashMenuItems]);
+
+  const getCustomSlashMenuItems = useCallback(async (query: string) => {
+    if (!customSlashMenuItems) {
+      return [];
+    }
+
+    return filterSuggestionItems(customSlashMenuItems, query);
+  }, [customSlashMenuItems]);
 
   return (
     <div
@@ -223,15 +238,7 @@ export const BlockEditor = ({
         <SuggestionMenuController
           triggerCharacter="/"
           suggestionMenuComponent={UntaskSlashMenu}
-          getItems={
-            hasCustomSlashMenu
-              ? async (query) => {
-                  const defaultItems = getDefaultReactSlashMenuItems(editor);
-                  const items = getSlashMenuItems({ editor, defaultItems });
-                  return filterSuggestionItems(items, query);
-                }
-              : undefined
-          }
+          getItems={customSlashMenuItems ? getCustomSlashMenuItems : undefined}
         />
         <FormattingToolbarController
           formattingToolbar={UntaskFormattingToolbar}
