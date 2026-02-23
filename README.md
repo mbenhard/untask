@@ -144,6 +144,7 @@ This will launch the app in development mode with hot reload.
 pnpm start           # Run the app in dev mode
 pnpm typecheck       # Type-check all TypeScript configs
 pnpm test            # Run tests (Vitest)
+pnpm test:full       # Rebuild better-sqlite3 if needed, then run all tests
 pnpm package         # Build the app (unpackaged)
 pnpm make            # Build distributable .zip/.dmg
 ```
@@ -167,6 +168,12 @@ npx electron-rebuild -f -w better-sqlite3
 **Native module issues:**
 
 The `.npmrc` includes `node-linker=hoisted` and `symlink=false` — both are required for Electron Forge to correctly package native modules like `better-sqlite3`. Don't change these.
+
+If tests are being skipped because `better-sqlite3` cannot load for your current Node ABI, run:
+
+```sh
+pnpm test:full
+```
 
 ## Project Structure
 
