@@ -6,6 +6,8 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
+  defaultDropAnimationSideEffects,
+  type DropAnimation,
   type DragEndEvent,
   type DragStartEvent,
   useSensor,
@@ -21,7 +23,6 @@ import {
 import { isTerminalStatus, PREDEFINED_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
-import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore, getStableKey } from '../../stores/taskStore';
@@ -37,8 +38,21 @@ import {
   getStatusAfterToggleComplete,
 } from './taskInteraction';
 import { reconcileScopedReorder } from './statusLaneDrag';
+import { DragPreview } from './DragPreview';
 import { TaskBody } from './TaskBody';
 import { TaskItem } from './TaskItem';
+
+const SHARED_DROP_ANIMATION: DropAnimation = {
+  duration: 220,
+  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: {
+      active: {
+        opacity: '0.45',
+      },
+    },
+  }),
+};
 
 const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
@@ -104,6 +118,11 @@ export const TaskList = ({
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
+
+  // Stable ref so the selectedTaskId effect doesn't re-run (and cancel its
+  // rAFs) when the parent supplies a new callback reference.
+  const setFocusedIndexRef = useRef(setFocusedIndex);
+  setFocusedIndexRef.current = setFocusedIndex;
 
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const effectiveActiveDragId = dndMode === 'shared' ? sharedActiveDragId : activeDragId;
@@ -193,7 +212,7 @@ export const TaskList = ({
     if (selectedIndex >= 0) {
       // Direct task in this list — expand + focus it.
       selectTask(null);
-      setFocusedIndex(selectedIndex);
+      setFocusedIndexRef.current(selectedIndex);
       setExpandedTaskId(selectedTaskId);
       setIsAnyBodyEditing(false);
 
@@ -229,7 +248,7 @@ export const TaskList = ({
     if (parentIndex < 0) return;
 
     // Expand parent so the nested TaskList renders and picks up selectedTaskId.
-    setFocusedIndex(parentIndex);
+    setFocusedIndexRef.current(parentIndex);
     setExpandedTaskId(subtask.parentId);
     setIsAnyBodyEditing(false);
     return () => {
@@ -240,7 +259,7 @@ export const TaskList = ({
         cancelAnimationFrame(focusFrameId);
       }
     };
-  }, [allTasks, selectTask, selectedTaskId, tasks, setFocusedIndex]);
+  }, [allTasks, selectTask, selectedTaskId, tasks]);
 
   // Clear navigated highlight after animation completes
   useEffect(() => {
@@ -416,11 +435,13 @@ export const TaskList = ({
 
   const handleDragStart = useCallback((event: DragStartEvent): void => {
     setActiveDragId(String(event.active.id));
+    document.body.classList.add('cursor-grabbing');
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent): void => {
       setActiveDragId(null);
+      document.body.classList.remove('cursor-grabbing');
 
       const { active, over } = event;
       if (!over) {
@@ -681,20 +702,12 @@ export const TaskList = ({
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveDragId(null)}
+        onDragCancel={() => { setActiveDragId(null); document.body.classList.remove('cursor-grabbing'); }}
       >
         {listContent}
 
-        <DragOverlay>
-          {activeDragTask ? (
-            <div
-              className={cn(
-                'min-h-9 bg-background/90 px-2 py-1 text-[12px] text-foreground/90',
-              )}
-            >
-              {activeDragTask.title}
-            </div>
-          ) : null}
+        <DragOverlay dropAnimation={SHARED_DROP_ANIMATION}>
+          {activeDragTask ? <DragPreview task={activeDragTask} /> : null}
         </DragOverlay>
       </DndContext>
     </div>

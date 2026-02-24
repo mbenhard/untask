@@ -88,8 +88,8 @@ export const SectionGroup = ({
     <section
       ref={dropRef}
       className={cn(
-        'rounded-md border border-border/60 transition-colors',
-        isDropTarget && 'border-ring/70 bg-accent/20',
+        'rounded-md border border-border/60 transition-all duration-200',
+        isDropTarget && 'border-ring bg-accent/30 shadow-sm shadow-ring/10',
       )}
     >
       <div className="flex items-center px-2 py-2">

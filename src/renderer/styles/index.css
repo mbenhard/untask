@@ -674,6 +674,12 @@
   animation: task-navigate-pulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* Drag and drop: force grabbing cursor on everything during active drag */
+body.cursor-grabbing,
+body.cursor-grabbing * {
+  cursor: grabbing !important;
+}
+
 @keyframes field-changed-pulse {
   0%   { background-color: color-mix(in srgb, var(--foreground) 12%, transparent); }
   100% { background-color: transparent; }

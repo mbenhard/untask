@@ -320,7 +320,7 @@ export const TaskItem = ({
         'overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
         isFocused && 'bg-accent/40',
         isNavigatedTo && 'task-navigated',
-        isDragging && 'z-10 opacity-80',
+        isDragging && 'z-10 opacity-30',
       )}
     >
       <div onClick={() => onToggleExpand(task.id)} className="flex min-h-10 items-center gap-2 px-1.5">
@@ -801,7 +801,7 @@ export const TaskItem = ({
                   event.stopPropagation();
                 }}
                 aria-label={`Reorder "${task.title}"`}
-                className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                className="inline-flex size-6 cursor-grab items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring active:cursor-grabbing"
               >
                 <GripVertical aria-hidden="true" className="size-3.5" />
               </button>

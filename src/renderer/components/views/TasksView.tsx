@@ -25,6 +25,7 @@ import {
   useTaskStatusConfigStore,
   selectLaneOrder,
 } from '../../stores/taskStatusConfigStore';
+import { DragPreview } from '../tasks/DragPreview';
 import { type AddTaskConfig, SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 import {
@@ -288,11 +289,13 @@ export const TasksView = ({
 
   const handleDragStart = useCallback((event: DragStartEvent): void => {
     setActiveDragId(String(event.active.id));
+    document.body.classList.add('cursor-grabbing');
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent): void => {
       setActiveDragId(null);
+      document.body.classList.remove('cursor-grabbing');
 
       if (!event.over) return;
 
@@ -378,7 +381,7 @@ export const TasksView = ({
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveDragId(null)}
+          onDragCancel={() => { setActiveDragId(null); document.body.classList.remove('cursor-grabbing'); }}
         >
           <div className="space-y-2">
             {laneOrder.map((key) => {
@@ -436,11 +439,7 @@ export const TasksView = ({
           </div>
 
           <DragOverlay dropAnimation={SHARED_DROP_ANIMATION}>
-            {activeDragTask ? (
-              <div className="min-h-9 bg-background/90 px-2 py-1 text-[12px] text-foreground/90">
-                {activeDragTask.title}
-              </div>
-            ) : null}
+            {activeDragTask ? <DragPreview task={activeDragTask} /> : null}
           </DragOverlay>
         </DndContext>
       </div>
