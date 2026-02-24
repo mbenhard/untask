@@ -83,6 +83,8 @@ export const TaskItem = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuView, setMenuView] = useState<'main' | 'projects' | 'delete-confirm'>('main');
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
+  const completeConfirmAllButtonRef = useRef<HTMLButtonElement>(null);
+  const deleteConfirmButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setTitleDraft(task.title);
@@ -113,6 +115,36 @@ export const TaskItem = ({
     setMenuView('delete-confirm');
     onDeleteConfirmTriggerHandled?.(task.id);
   }, [deleteConfirmTrigger, task.id, onDeleteConfirmTriggerHandled]);
+
+  useEffect(() => {
+    if (!menuOpen || menuView !== 'delete-confirm') return;
+
+    const frameId = requestAnimationFrame(() => {
+      deleteConfirmButtonRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [menuOpen, menuView]);
+
+  useEffect(() => {
+    if (!completeConfirmOpen) return;
+
+    const frameId = requestAnimationFrame(() => {
+      completeConfirmAllButtonRef.current?.focus();
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [completeConfirmOpen]);
+
+  useEffect(() => {
+    if (menuOpen) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setMenuView('main');
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [menuOpen]);
 
   const {
     attributes,
@@ -270,7 +302,6 @@ export const TaskItem = ({
   const handleDelete = (cascade?: boolean) => {
     void deleteTask(task.id, cascade);
     setMenuOpen(false);
-    setMenuView('main');
   };
 
   return (
@@ -376,6 +407,7 @@ export const TaskItem = ({
                       Only this
                     </button>
                     <button
+                      ref={completeConfirmAllButtonRef}
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
@@ -581,7 +613,6 @@ export const TaskItem = ({
             open={menuOpen}
             onOpenChange={(open) => {
               setMenuOpen(open);
-              if (!open) setMenuView('main');
             }}
           >
             <Tooltip>
@@ -730,12 +761,13 @@ export const TaskItem = ({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setMenuView('main')}
+                      onClick={() => setMenuOpen(false)}
                       className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       Cancel
                     </button>
                     <button
+                      ref={deleteConfirmButtonRef}
                       type="button"
                       onClick={() => handleDelete(activeChildrenCount > 0)}
                       className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
