@@ -371,6 +371,101 @@ describe('chatStore stream reliability', () => {
     expect(chatState.pendingViewSwitchByRequestId['req-auto-1']).toBeUndefined();
   });
 
+  it('prefers a non-inbox tool view intent over a later inbox intent', () => {
+    const now = new Date().toISOString();
+    const assistantMessage: ChatMessage = {
+      id: 'assistant-auto-switch-1b',
+      conversationId: 'thread-1',
+      role: 'assistant',
+      content: 'Done.',
+      toolCalls: null,
+      chips: null,
+      createdAt: now,
+    };
+
+    useAppStore.setState({
+      activeView: 'today',
+      manualNavigationVersion: 0,
+      chatOverlayState: 'peek',
+      newTaskTrigger: 0,
+    });
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-auto-1b',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: '',
+          createdAt: now,
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-auto-1b': {
+          placeholderId: 'assistant-stream-req-auto-1b',
+          actionCards: [],
+          steps: [],
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-auto-1b': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'tool_call_completed',
+      requestId: 'req-auto-1b',
+      toolName: 'update_task',
+      toolCallId: 'tc-1b',
+      status: 'success',
+      message: 'Task updated',
+      actionCard: {
+        id: 'card-auto-1b',
+        toolName: 'update_task',
+        status: 'success',
+        title: 'Task updated',
+        detail: 'Moved to Tasks',
+        undoable: true,
+        createdAt: now,
+        viewIntent: 'tasks',
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'tool_call_completed',
+      requestId: 'req-auto-1b',
+      toolName: 'create_task',
+      toolCallId: 'tc-2b',
+      status: 'success',
+      message: 'Task created',
+      actionCard: {
+        id: 'card-auto-2b',
+        toolName: 'create_task',
+        status: 'success',
+        title: 'Task created',
+        detail: 'Captured in inbox',
+        undoable: true,
+        createdAt: now,
+        viewIntent: 'inbox',
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'req-auto-1b',
+      assistantMessage,
+      actionCards: [],
+    });
+
+    expect(useAppStore.getState().activeView).toBe('tasks');
+  });
+
   it('suppresses auto-switch when user navigates during the same turn', () => {
     const now = new Date().toISOString();
     const assistantMessage: ChatMessage = {

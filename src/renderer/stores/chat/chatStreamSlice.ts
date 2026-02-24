@@ -4,7 +4,12 @@
  */
 import type { StoreApi } from 'zustand';
 
-import type { ChatStreamEvent, TurnStep } from '../../../types/chat';
+import type {
+  ChatActionCard,
+  ChatStreamEvent,
+  ChatViewIntent,
+  TurnStep,
+} from '../../../types/chat';
 import { getUntask } from '../../lib/untask';
 import { useAppStore } from '../appStore';
 import { useTaskStore } from '../taskStore';
@@ -105,6 +110,30 @@ const resolveMessagesForInFlightState = (
       message.isStreaming ? { ...message, isStreaming: false } : message,
     )
     : messages;
+
+const resolveFinalViewIntent = (
+  actionCards: ChatActionCard[],
+  fallbackIntent: ChatViewIntent | null,
+): ChatViewIntent | null => {
+  const successfulIntents = actionCards
+    .filter((card) => card.status === 'success' && card.viewIntent)
+    .map((card) => card.viewIntent as ChatViewIntent);
+
+  if (successfulIntents.length === 0) {
+    return fallbackIntent;
+  }
+
+  // Avoid jumping to Inbox when the same turn also touched a richer view.
+  const lastNonInboxIntent = [...successfulIntents]
+    .reverse()
+    .find((intent) => intent !== 'inbox');
+
+  if (lastNonInboxIntent) {
+    return lastNonInboxIntent;
+  }
+
+  return successfulIntents[successfulIntents.length - 1] ?? fallbackIntent;
+};
 
 // ─── Proactive inFlight bootstrap ───────────────────────────
 
@@ -453,14 +482,19 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
     };
   });
 
-  if (pendingViewSwitch?.pendingViewIntent) {
+  const resolvedViewIntent = resolveFinalViewIntent(
+    actionCards,
+    pendingViewSwitch?.pendingViewIntent ?? null,
+  );
+
+  if (resolvedViewIntent && pendingViewSwitch) {
     const appStore = useAppStore.getState();
     const userNavigatedDuringTurn =
       appStore.manualNavigationVersion >
       pendingViewSwitch.manualNavigationVersionAtStart;
 
     if (!userNavigatedDuringTurn) {
-      appStore.setViewFromAssistant(pendingViewSwitch.pendingViewIntent);
+      appStore.setViewFromAssistant(resolvedViewIntent);
     }
   }
 
