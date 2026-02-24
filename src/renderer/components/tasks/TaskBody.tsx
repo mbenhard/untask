@@ -754,7 +754,9 @@ export const TaskBody = ({
       saveTimerRef.current = setTimeout(() => {
         saveTimerRef.current = null;
         const body = isEmptyDocument(json) ? null : json;
-        pendingBodyRef.current = null;
+        // Do NOT clear pendingBodyRef here — only flushSave should clear it.
+        // flushSave goes through updateTask() which syncs the Zustand store,
+        // ensuring task.body is up-to-date before the editor unmounts on collapse.
         // Persist directly via IPC — bypass Zustand to avoid re-render/focus loss.
         // Suppress the TASK_DATA_CHANGED refresh so the broadcast from the main
         // process doesn't trigger a full store reload that steals editor focus.
