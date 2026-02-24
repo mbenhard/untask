@@ -19,10 +19,9 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pip install setuptools
       - run: pnpm install
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm vitest run
       - name: Build Swift helper
         run: |
           cd swift-helper
