@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
-import { Archive, ArchiveRestore, ArrowLeft, CheckSquare, Sparkles, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
 
 import {
   selectActiveNoteId,
@@ -16,8 +16,6 @@ import {
   selectNotesNotice,
   useNotesStore,
 } from '../../stores/notesStore';
-import { useTaskStore } from '../../stores/taskStore';
-import { resolveTaskTitleFromEditor } from './noteSlashActions';
 import { Button } from '../ui/button';
 import { EditorBlockSkeleton } from '../ui/loadingShells';
 import { Skeleton } from '../ui/skeleton';
@@ -48,30 +46,6 @@ const formatEditedTime = (iso: string | null): string => {
 
 // ─── Slash menu items ──────────────────────────────────────
 
-const createTaskFromCursor = async (editor: BlockNoteEditor): Promise<void> => {
-  const title = resolveTaskTitleFromEditor(editor);
-  if (!title) {
-    useNotesStore
-      .getState()
-      .setNotice({ kind: 'error', message: 'Could not create task. Add text first.' });
-    return;
-  }
-
-  const created = await useTaskStore.getState().createTask({ title, status: 'inbox' });
-  if (created) {
-    useNotesStore
-      .getState()
-      .setNotice({ kind: 'success', message: 'Task added to Inbox.' });
-    return;
-  }
-
-  const taskError = useTaskStore.getState().error;
-  useNotesStore.getState().setNotice({
-    kind: 'error',
-    message: taskError ?? 'Task creation failed.',
-  });
-};
-
 const createProcessItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
   title: 'Process with AI',
   onItemClick: () => {
@@ -84,17 +58,6 @@ const createProcessItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem =>
   subtext: 'Open AI chat with this note as context',
 });
 
-const createTaskItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
-  title: 'Create Task',
-  onItemClick: () => {
-    void createTaskFromCursor(editor);
-  },
-  aliases: ['task'],
-  group: 'Untask',
-  icon: <CheckSquare size={18} />,
-  subtext: 'Type /task <title> or use the line above',
-});
-
 const getSlashMenuItems = ({
   editor,
   defaultItems,
@@ -104,7 +67,6 @@ const getSlashMenuItems = ({
       ? { ...item, aliases: [...(item.aliases ?? []), 'todo'] }
       : item,
   ),
-  createTaskItem(editor),
   createProcessItem(editor),
 ];
 
