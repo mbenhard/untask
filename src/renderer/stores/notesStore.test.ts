@@ -30,6 +30,11 @@ type MockNotesApi = {
   duplicate: ReturnType<typeof vi.fn<(id: string) => Promise<Note | undefined>>>;
 };
 
+type MockSettingsApi = {
+  get: ReturnType<typeof vi.fn<(key: string) => Promise<string | null>>>;
+  set: ReturnType<typeof vi.fn<(key: string, value: string) => Promise<{ key: string; value: string }>>>;
+};
+
 const createMockNotesApi = (): MockNotesApi => ({
   list: vi.fn(async () => ({ active: [] as Note[], archived: [] as Note[] })),
   get: vi.fn(async (id: string) => {
@@ -52,18 +57,30 @@ const createMockNotesApi = (): MockNotesApi => ({
   }),
 });
 
+const createMockSettingsApi = (): MockSettingsApi => ({
+  get: vi.fn(async (_key: string) => null),
+  set: vi.fn(async (key: string, value: string) => ({ key, value })),
+});
+
 const getMockApi = (): MockNotesApi =>
   ((globalThis as { window?: unknown }).window as {
     untask: { notes: MockNotesApi };
   }).untask.notes;
 
+const getMockSettingsApi = (): MockSettingsApi =>
+  ((globalThis as { window?: unknown }).window as {
+    untask: { settings: MockSettingsApi };
+  }).untask.settings;
+
 describe('notesStore', () => {
   beforeEach(() => {
     const notes = createMockNotesApi();
+    const settings = createMockSettingsApi();
 
     (globalThis as { window?: unknown }).window = {
       untask: {
         notes,
+        settings,
       },
     };
 
@@ -86,7 +103,6 @@ describe('notesStore', () => {
       selectedListNoteId: null,
       subView: 'list',
       layoutMode: 'list',
-      isWideViewport: false,
       activeNoteId: null,
       content: '',
       isLegacyMarkdown: false,
@@ -168,27 +184,60 @@ describe('notesStore', () => {
     expect(state.error).toContain('save failed');
   });
 
-  it('switches split/focus layout without dropping active editor state', () => {
+  it('keeps focus layout without dropping active editor state', () => {
     useNotesStore.setState({
       subView: 'editor',
       layoutMode: 'focus',
-      isWideViewport: false,
       activeNoteId: 'note-keep',
       content: 'draft-content',
       isDirty: true,
     });
 
-    useNotesStore.getState().setViewportWidth(1280);
+    useNotesStore.getState().setLayoutMode('focus');
     let state = useNotesStore.getState();
-    expect(state.layoutMode).toBe('split');
+    expect(state.layoutMode).toBe('focus');
     expect(state.content).toBe('draft-content');
     expect(state.isDirty).toBe(true);
 
-    useNotesStore.getState().setViewportWidth(900);
+    useNotesStore.getState().setLayoutMode('focus');
     state = useNotesStore.getState();
     expect(state.layoutMode).toBe('focus');
     expect(state.content).toBe('draft-content');
     expect(state.isDirty).toBe(true);
+  });
+
+  it('enterNotesView opens persisted last note when available', async () => {
+    const api = getMockApi();
+    const settings = getMockSettingsApi();
+    const noteA = mockNote({ id: 'note-a' });
+    const noteB = mockNote({ id: 'note-b' });
+
+    api.list.mockResolvedValue({ active: [noteA, noteB], archived: [] });
+    api.get.mockResolvedValue(noteB);
+    settings.get.mockResolvedValue('note-b');
+
+    await useNotesStore.getState().enterNotesView();
+
+    const state = useNotesStore.getState();
+    expect(state.activeNoteId).toBe('note-b');
+    expect(state.layoutMode).toBe('focus');
+  });
+
+  it('enterNotesView creates note when no active notes exist', async () => {
+    const api = getMockApi();
+    const settings = getMockSettingsApi();
+    const created = mockNote({ id: 'note-created' });
+
+    api.list.mockResolvedValue({ active: [], archived: [] });
+    api.create.mockResolvedValue(created);
+    settings.get.mockResolvedValue(null);
+
+    await useNotesStore.getState().enterNotesView();
+
+    const state = useNotesStore.getState();
+    expect(state.activeNoteId).toBe('note-created');
+    expect(state.layoutMode).toBe('focus');
+    expect(settings.set).toHaveBeenCalledWith('notes.last_opened_id', 'note-created');
   });
 
   // ─── Pin / Unpin ──────────────────────────────────────────

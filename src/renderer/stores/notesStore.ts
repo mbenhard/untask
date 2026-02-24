@@ -11,7 +11,7 @@ import { setActiveNoteDraft } from './notesDraftBridge';
 import { useToastStore } from './toastStore';
 
 export type NotesSubView = 'list' | 'editor';
-export type NotesLayoutMode = 'list' | 'split' | 'focus';
+export type NotesLayoutMode = 'list' | 'focus';
 
 export type NotesNotice = {
   kind: 'success' | 'error' | 'info';
@@ -33,7 +33,6 @@ type NotesStore = {
   // View state
   subView: NotesSubView;
   layoutMode: NotesLayoutMode;
-  isWideViewport: boolean;
 
   // Editor state
   activeNoteId: string | null;
@@ -49,6 +48,7 @@ type NotesStore = {
 
   // Actions
   loadList: () => Promise<void>;
+  enterNotesView: () => Promise<void>;
   createNote: () => Promise<void>;
   openNote: (id: string) => Promise<void>;
   openSelectedNote: () => Promise<boolean>;
@@ -68,7 +68,6 @@ type NotesStore = {
   copyAsMarkdown: (id: string) => Promise<void>;
   processWithAI: (markdownOverride?: string) => Promise<ProcessWithAIResult>;
 
-  setViewportWidth: (width: number) => void;
   setLayoutMode: (mode: NotesLayoutMode) => void;
   setSelectedListNoteId: (id: string | null) => void;
   selectRelativeActive: (delta: -1 | 1) => string | null;
@@ -78,11 +77,26 @@ type NotesStore = {
   clearError: () => void;
 };
 
-const getInitialIsWideViewport = (): boolean =>
-  typeof window !== 'undefined' && window.innerWidth >= 1100;
+const NOTES_LAST_OPENED_ID_SETTING_KEY = 'notes.last_opened_id';
 
-const editorLayoutForViewport = (isWideViewport: boolean): NotesLayoutMode =>
-  isWideViewport ? 'split' : 'focus';
+const editorLayout = (): NotesLayoutMode => 'focus';
+
+const readPersistedLastOpenedNoteId = async (): Promise<string | null> => {
+  try {
+    const value = await getUntask().settings.get(NOTES_LAST_OPENED_ID_SETTING_KEY);
+    return value && value.trim().length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistLastOpenedNoteId = async (noteId: string | null): Promise<void> => {
+  try {
+    await getUntask().settings.set(NOTES_LAST_OPENED_ID_SETTING_KEY, noteId ?? '');
+  } catch {
+    // Settings persistence should never block core notes flows.
+  }
+};
 
 let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -231,7 +245,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   subView: 'list',
   layoutMode: 'list',
-  isWideViewport: getInitialIsWideViewport(),
 
   activeNoteId: null,
   activeNoteUpdatedAt: null,
@@ -243,6 +256,51 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   isProcessing: false,
   error: null,
   notice: null,
+
+  enterNotesView: async () => {
+    let activeNotes = get().activeNotes;
+    try {
+      const { active, archived } = await getUntask().notes.list();
+      set((state) => {
+        const selectedStillExists =
+          state.selectedListNoteId !== null
+          && active.some((note) => note.id === state.selectedListNoteId);
+
+        return {
+          activeNotes: active,
+          archivedNotes: archived,
+          selectedListNoteId: selectedStillExists ? state.selectedListNoteId : (active[0]?.id ?? null),
+          isListLoading: false,
+          error: null,
+        };
+      });
+      activeNotes = active;
+    } catch (error) {
+      set({ error: toErrorMessage(error, 'Notes operation failed.') });
+      return;
+    }
+
+    if (activeNotes.length === 0) {
+      await get().createNote();
+      return;
+    }
+
+    const persistedLastOpenedId = await readPersistedLastOpenedNoteId();
+    const target = persistedLastOpenedId
+      ? activeNotes.find((note) => note.id === persistedLastOpenedId)
+      : null;
+
+    if (target) {
+      await get().openNote(target.id);
+      return;
+    }
+
+    if (persistedLastOpenedId) {
+      await persistLastOpenedNoteId(null);
+    }
+
+    await get().openNote(activeNotes[0].id);
+  },
 
   loadList: async () => {
     if (get().isListLoading) return;
@@ -275,7 +333,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }
 
       const note = await getUntask().notes.create();
-      const nextLayout = editorLayoutForViewport(get().isWideViewport);
+      const nextLayout = editorLayout();
 
       set({
         subView: 'editor',
@@ -288,6 +346,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         isDirty: false,
         error: null,
       });
+      await persistLastOpenedNoteId(note.id);
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
@@ -310,7 +369,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       const raw = note.content;
       const legacy = raw.length > 0 && !isBlockNoteJson(raw);
-      const nextLayout = editorLayoutForViewport(get().isWideViewport);
+      const nextLayout = editorLayout();
 
       set({
         subView: 'editor',
@@ -324,6 +383,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         isLoading: false,
         error: null,
       });
+      await persistLastOpenedNoteId(note.id);
     } catch (error) {
       set({ isLoading: false, error: toErrorMessage(error, 'Notes operation failed.') });
     }
@@ -432,6 +492,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       // If we archived the currently open note, go back to list.
       if (wasActive) {
         set(NOTES_LIST_RESET_STATE);
+        await persistLastOpenedNoteId(null);
       }
 
       get().setNotice({ kind: 'success', message: 'Note archived.' });
@@ -472,6 +533,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       if (get().activeNoteId === id) {
         set(NOTES_LIST_RESET_STATE);
+        await persistLastOpenedNoteId(null);
       }
 
       get().setNotice({ kind: 'success', message: 'Note deleted.' });
@@ -607,33 +669,9 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
   },
 
-  setViewportWidth: (width) => {
-    const isWideViewport = Number.isFinite(width) && width >= 1100;
-
-    set((state) => {
-      if (state.isWideViewport === isWideViewport) {
-        return state;
-      }
-
-      const nextLayout = state.activeNoteId
-        ? editorLayoutForViewport(isWideViewport)
-        : 'list';
-
-      return {
-        isWideViewport,
-        layoutMode: nextLayout,
-        subView: nextLayout === 'list' ? 'list' : 'editor',
-      };
-    });
-  },
-
   setLayoutMode: (mode) => {
     set((state) => {
-      const nextMode = state.activeNoteId
-        ? mode === 'split' && !state.isWideViewport
-          ? 'focus'
-          : mode
-        : 'list';
+      const nextMode = state.activeNoteId ? mode : 'list';
 
       const nextSubView: NotesSubView = nextMode === 'list' ? 'list' : 'editor';
 
@@ -715,7 +753,6 @@ useNotesStore.subscribe((state, previousState) => {
 // Selectors
 export const selectNotesSubView = (state: NotesStore) => state.subView;
 export const selectNotesLayoutMode = (state: NotesStore) => state.layoutMode;
-export const selectNotesIsWideViewport = (state: NotesStore) => state.isWideViewport;
 export const selectActiveNotes = (state: NotesStore) => state.activeNotes;
 export const selectArchivedNotes = (state: NotesStore) => state.archivedNotes;
 export const selectSelectedListNoteId = (state: NotesStore) => state.selectedListNoteId;

@@ -129,6 +129,7 @@ export const useKeyboardShortcuts = ({
         if (event.code === 'Digit4') {
           event.preventDefault();
           setView('notes');
+          void useNotesStore.getState().enterNotesView();
           return;
         }
         if (event.code === 'Comma') {

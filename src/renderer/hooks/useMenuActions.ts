@@ -12,7 +12,7 @@ export function useMenuActions(): void {
 
     const unsubNote = window.untask?.app.onMenuNewNote(() => {
       useAppStore.getState().setView('notes');
-      void useNotesStore.getState().createNote();
+      void useNotesStore.getState().enterNotesView();
     });
 
     return () => {

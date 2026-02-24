@@ -108,6 +108,16 @@ describe('useKeyboardShortcuts', () => {
         tasks?: {
           undoLastUserAction?: () => Promise<{ ok: true; undone: false }>;
         };
+        notes?: {
+          list?: () => Promise<{ active: unknown[]; archived: unknown[] }>;
+          get?: (id: string) => Promise<null>;
+          create?: () => Promise<{ id: string; title: string; content: string; status: 'active'; isPinned: false; createdAt: null; updatedAt: null }>;
+          save?: (id: string, content: string) => Promise<null>;
+        };
+        settings?: {
+          get?: (key: string) => Promise<string | null>;
+          set?: (key: string, value: string) => Promise<{ key: string; value: string }>;
+        };
       };
     };
     untaskWindow.untask = {
@@ -116,6 +126,24 @@ describe('useKeyboardShortcuts', () => {
       },
       tasks: {
         undoLastUserAction,
+      },
+      notes: {
+        list: vi.fn(async () => ({ active: [], archived: [] })),
+        get: vi.fn(async (_id: string) => null),
+        create: vi.fn(async () => ({
+          id: 'note-created',
+          title: '',
+          content: '',
+          status: 'active' as const,
+          isPinned: false as const,
+          createdAt: null,
+          updatedAt: null,
+        })),
+        save: vi.fn(async (_id: string, _content: string) => null),
+      },
+      settings: {
+        get: vi.fn(async (_key: string) => null),
+        set: vi.fn(async (key: string, value: string) => ({ key, value })),
       },
     };
   });

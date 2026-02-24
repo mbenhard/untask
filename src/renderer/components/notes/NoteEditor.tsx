@@ -89,7 +89,7 @@ const createTaskItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
   onItemClick: () => {
     void createTaskFromCursor(editor);
   },
-  aliases: ['task', 'todo'],
+  aliases: ['task'],
   group: 'Untask',
   icon: <CheckSquare size={18} />,
   subtext: 'Create a task from selection or nearby text',
@@ -99,7 +99,11 @@ const getSlashMenuItems = ({
   editor,
   defaultItems,
 }: BlockEditorSlashMenuParams): BlockEditorSlashMenuItem[] => [
-  ...defaultItems,
+  ...defaultItems.map((item) =>
+    item.title === 'Check List'
+      ? { ...item, aliases: [...(item.aliases ?? []), 'todo'] }
+      : item,
+  ),
   createTaskItem(editor),
   createProcessItem(editor),
 ];
@@ -141,10 +145,13 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const processWithAI = useNotesStore((s) => s.processWithAI);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editorHostRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
   const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
   const openMetricKeyRef = useRef<string | null>(null);
   const hasRecordedOpenLatencyRef = useRef(false);
+  const shouldAutoFocusRef = useRef(false);
+  const lastAutoFocusedNoteIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -211,16 +218,92 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     void processWithAI();
   }, [processWithAI]);
 
+  const isEditorSurfaceFocused = useCallback((): boolean => {
+    const host = editorHostRef.current;
+    if (!host) return false;
+    const activeEl = document.activeElement;
+    return activeEl instanceof HTMLElement && host.contains(activeEl);
+  }, []);
+
+  const focusEditorSurface = useCallback((): boolean => {
+    editorRef.current?.focus();
+    const host = editorHostRef.current;
+    const editable = host?.querySelector<HTMLElement>(
+      '.bn-editor [contenteditable="true"], .ProseMirror[contenteditable="true"]',
+    );
+    editable?.focus();
+    return isEditorSurfaceFocused();
+  }, [isEditorSurfaceFocused]);
+
+  const attemptAutoFocus = useCallback(() => {
+    if (!activeNoteId || !shouldAutoFocusRef.current || lastAutoFocusedNoteIdRef.current === activeNoteId) {
+      return;
+    }
+
+    const focused = focusEditorSurface();
+    if (focused) {
+      shouldAutoFocusRef.current = false;
+      lastAutoFocusedNoteIdRef.current = activeNoteId;
+    }
+  }, [activeNoteId, focusEditorSurface]);
+
+  const handleEditorReady = useCallback(() => {
+    attemptAutoFocus();
+  }, [attemptAutoFocus]);
+
+  useEffect(() => {
+    if (!activeNoteId || !shouldAutoFocusRef.current || lastAutoFocusedNoteIdRef.current === activeNoteId) {
+      return;
+    }
+
+    let attempts = 0;
+    let frameId: number | null = null;
+    const maxAttempts = 10;
+
+    const tick = () => {
+      if (!shouldAutoFocusRef.current || lastAutoFocusedNoteIdRef.current === activeNoteId) {
+        return;
+      }
+
+      attempts += 1;
+      const focused = focusEditorSurface();
+      if (focused) {
+        shouldAutoFocusRef.current = false;
+        lastAutoFocusedNoteIdRef.current = activeNoteId;
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [activeNoteId, focusEditorSurface]);
+
   // Auto-focus editor when note opens
   useEffect(() => {
-    if (!isLoading && activeNoteId && editorRef.current) {
+    if (!isLoading && activeNoteId) {
+      if (lastAutoFocusedNoteIdRef.current !== activeNoteId) {
+        shouldAutoFocusRef.current = true;
+      }
       // Small delay to let BlockNote finish hydration
       const timer = setTimeout(() => {
-        editorRef.current?.focus();
+        attemptAutoFocus();
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [activeNoteId, isLoading]);
+    shouldAutoFocusRef.current = false;
+    if (!activeNoteId) {
+      lastAutoFocusedNoteIdRef.current = null;
+    }
+    return undefined;
+  }, [activeNoteId, attemptAutoFocus, isLoading]);
 
   // Dev-only latency probe: note opened -> first content change.
   useEffect(() => {
@@ -364,7 +447,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={editorHostRef} className="min-h-0 flex-1 overflow-y-auto">
         <Suspense
           fallback={<EditorBlockSkeleton className="h-full px-3 py-2" />}
         >
@@ -375,6 +458,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
             className="untask-notes-editor"
             getSlashMenuItems={getSlashMenuItems}
             editorRef={editorRef}
+            onEditorReady={handleEditorReady}
           />
         </Suspense>
       </div>

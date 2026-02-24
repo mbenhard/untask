@@ -33,6 +33,8 @@ export type BlockEditorProps = {
   getSlashMenuItems?: (params: BlockEditorSlashMenuParams) => BlockEditorSlashMenuItem[];
   /** Ref to access the editor instance from parent components. */
   editorRef?: MutableRefObject<BlockNoteEditor | null>;
+  /** Called after editor instance is created and exposed. */
+  onEditorReady?: (editor: BlockNoteEditor) => void;
 };
 
 export type BlockEditorSlashMenuItem = DefaultReactSuggestionItem;
@@ -53,6 +55,7 @@ export const BlockEditor = ({
   editable = true,
   getSlashMenuItems,
   editorRef,
+  onEditorReady,
 }: BlockEditorProps) => {
   const { resolvedTheme } = useTheme();
   const initialContentResolutionRef = useRef(resolveInitialEditorContent(content));
@@ -78,12 +81,13 @@ export const BlockEditor = ({
     if (editorRef) {
       editorRef.current = editor;
     }
+    onEditorReady?.(editor);
     return () => {
       if (editorRef) {
         editorRef.current = null;
       }
     };
-  }, [editor, editorRef]);
+  }, [editor, editorRef, onEditorReady]);
 
   const isHydratingRef = useRef(false);
   const hasConvertedLegacyRef = useRef(false);
