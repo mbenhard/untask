@@ -53,7 +53,7 @@ export const SettingsView = () => {
 
   return (
     <div className="h-full overflow-y-auto p-3">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+      <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-3">
         {/* Tab strip */}
         <nav className="flex items-center gap-0.5" aria-label="Settings tabs" role="tablist">
           {TABS.map((tab) => {
@@ -92,7 +92,7 @@ export const SettingsView = () => {
           </div>
         )}
 
-        <div role="tabpanel">
+        <div role="tabpanel" className="flex-1">
           {tabContent}
         </div>
 
