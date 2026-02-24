@@ -36,9 +36,11 @@ export const InlineTaskInput = ({
   triggerOpen,
 }: InlineTaskInputProps) => {
   const createTask = useTaskStore((state) => state.createTask);
+  const selectTask = useTaskStore((state) => state.selectTask);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSeenTriggerRef = useRef<number | undefined>(triggerOpen);
   const isCreatingRef = useRef(false);
+  const lastCreatedIdRef = useRef<string | null>(null);
   const [isOpen, setIsOpen] = useState(alwaysOpen || onDismiss !== undefined);
   const [title, setTitle] = useState('');
 
@@ -80,7 +82,7 @@ export const InlineTaskInput = ({
     lastSeenTriggerRef.current = triggerOpen;
   }, [triggerOpen]);
 
-  const handleSubmit = useCallback(async (): Promise<void> => {
+  const handleSubmit = useCallback(async (options?: { refocus?: boolean }): Promise<void> => {
     const normalizedTitle = title.trim();
     if (normalizedTitle.length === 0 || isCreatingRef.current) {
       return;
@@ -101,10 +103,12 @@ export const InlineTaskInput = ({
       return;
     }
 
+    lastCreatedIdRef.current = created.id;
     setTitle('');
     resetMetadata();
-    // Re-focus is immediate — no disabled state to interfere.
-    inputRef.current?.focus();
+    if (options?.refocus !== false) {
+      inputRef.current?.focus();
+    }
   }, [createTask, defaultStatus, defaultToday, dueDate, parentId, priority, resetMetadata, title, today]);
 
   if (!isOpen && !alwaysOpen) {
@@ -140,7 +144,25 @@ export const InlineTaskInput = ({
             type="text"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            onBlur={() => {
+            onBlur={(event) => {
+              // When focus moves to a task item (user clicked on a task),
+              // submit any pending text but don't re-focus — and defer
+              // the dismiss so the click lands on the task first.
+              const relatedTarget = event.relatedTarget as HTMLElement | null;
+              const blurredToTask = relatedTarget?.closest('[data-task-id]') != null;
+
+              if (blurredToTask) {
+                const trimmed = title.trim();
+                if (trimmed.length > 0 || hasMetadataSet) {
+                  void handleSubmit({ refocus: false });
+                }
+                // Dismiss after the click event has fired
+                requestAnimationFrame(() => {
+                  onDismiss?.();
+                });
+                return;
+              }
+
               const trimmed = title.trim();
               if (trimmed.length > 0 || hasMetadataSet) {
                 void handleSubmit();
@@ -165,8 +187,15 @@ export const InlineTaskInput = ({
 
               if (event.key === 'Escape') {
                 event.preventDefault();
+                const taskIdToSelect = lastCreatedIdRef.current;
                 setTitle('');
                 resetMetadata();
+                lastCreatedIdRef.current = null;
+                // Navigate to the last-created task via the store so
+                // TaskList focuses and expands it automatically.
+                if (taskIdToSelect) {
+                  selectTask(taskIdToSelect);
+                }
                 if (onDismiss) {
                   onDismiss();
                 } else if (!alwaysOpen) {

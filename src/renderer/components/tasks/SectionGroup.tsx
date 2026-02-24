@@ -81,8 +81,26 @@ export const SectionGroup = ({
 
   const handleDismiss = useCallback(() => {
     setIsAdding(false);
-    onRequestFocus?.();
-  }, [onRequestFocus]);
+    // Only reset focus to the first task when nothing meaningful is
+    // already focused (e.g. after Escape). When the user clicked a task
+    // to dismiss the input, focus is already on that task — calling
+    // onRequestFocus would steal it back to index 0.
+    const activeEl = document.activeElement;
+    const focusAlreadyOnTask =
+      activeEl instanceof HTMLElement && activeEl.closest('[data-task-id]') != null;
+    if (!focusAlreadyOnTask) {
+      onRequestFocus?.();
+    }
+    // After the input unmounts, focus may land on document.body
+    // (e.g. when focusedIndex was already 0 and the setter is a no-op).
+    // Ensure keyboard navigation works by focusing the first task.
+    requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const section = document.getElementById(`section-${sectionId}`);
+      const firstTask = section?.querySelector<HTMLElement>('[data-task-id]');
+      firstTask?.focus();
+    });
+  }, [onRequestFocus, sectionId]);
 
   return (
     <section
