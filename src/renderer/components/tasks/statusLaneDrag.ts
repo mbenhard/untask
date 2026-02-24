@@ -92,11 +92,11 @@ export const moveTaskAcrossStatusLanes = ({
 
   const targetList = nextGroups[targetLane] ?? [];
   nextGroups[targetLane] = targetList;
+  // For same-lane moves the target index maps directly to the post-removal
+  // array (matching @dnd-kit arrayMove semantics).  For cross-lane moves the
+  // target list is a separate array unaffected by the source removal.  In
+  // both cases no index adjustment is needed.
   let targetIndex = tentativeTargetIndex;
-
-  if (source.lane === targetLane && source.index < targetIndex) {
-    targetIndex -= 1;
-  }
 
   targetIndex = Math.max(0, Math.min(targetIndex, targetList.length));
 

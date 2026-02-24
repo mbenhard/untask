@@ -45,6 +45,23 @@ describe('statusLaneDrag', () => {
     expect(result?.nextGroups.active).toEqual(['a', 'c', 'b']);
   });
 
+  it('moves a task one position down within the same lane', () => {
+    const groups = createGroups({
+      done: ['d1', 'd2', 'd3'],
+    });
+
+    const result = moveTaskAcrossStatusLanes({
+      groups,
+      activeId: 'd1',
+      overId: 'd2',
+      laneKeys: DEFAULT_LANE_KEYS,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.didChangeLane).toBe(false);
+    expect(result?.nextGroups.done).toEqual(['d2', 'd1', 'd3']);
+  });
+
   it('moves across lanes with exact insertion when dropped on a task item', () => {
     const groups = createGroups({
       in_progress: ['i1'],
