@@ -4,6 +4,7 @@ import type { Note } from '../../types/models';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
 import { useNotesStore } from './notesStore';
+import { useToastStore } from './toastStore';
 
 const mockNote = (overrides?: Partial<Note>): Note => ({
   id: 'note-1',
@@ -95,6 +96,11 @@ describe('notesStore', () => {
       isProcessing: false,
       error: null,
       notice: null,
+    });
+
+    useToastStore.setState({
+      toast: null,
+      isUndoing: false,
     });
   });
 
@@ -280,5 +286,49 @@ describe('notesStore', () => {
     await useNotesStore.getState().copyAsMarkdown('note-1');
 
     expect(useNotesStore.getState().error).toContain('fetch failed');
+  });
+
+  it('archiveNote registers undo toast that restores the note', async () => {
+    const api = getMockApi();
+    await useNotesStore.getState().archiveNote('note-1');
+
+    expect(api.archive).toHaveBeenCalledWith('note-1');
+    const toast = useToastStore.getState().toast;
+    expect(toast?.label).toBe('Note archived');
+    expect(toast?.onUndo).toBeTypeOf('function');
+
+    if (toast?.onUndo) {
+      await toast.onUndo();
+    }
+    expect(api.restore).toHaveBeenCalledWith('note-1');
+  });
+
+  it('deleteNote undo recreates a deleted archived note snapshot', async () => {
+    const api = getMockApi();
+    useNotesStore.setState({
+      activeNotes: [],
+      archivedNotes: [mockNote({
+        id: 'note-archived',
+        status: 'archived',
+        content: 'hello',
+        isPinned: true,
+      })],
+    });
+
+    await useNotesStore.getState().deleteNote('note-archived');
+
+    expect(api.delete).toHaveBeenCalledWith('note-archived');
+    const toast = useToastStore.getState().toast;
+    expect(toast?.label).toBe('Note deleted');
+    expect(toast?.onUndo).toBeTypeOf('function');
+
+    if (toast?.onUndo) {
+      await toast.onUndo();
+    }
+
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(api.save).toHaveBeenCalledWith('note-new', 'hello');
+    expect(api.pin).toHaveBeenCalledWith('note-new');
+    expect(api.archive).toHaveBeenCalledWith('note-new');
   });
 });

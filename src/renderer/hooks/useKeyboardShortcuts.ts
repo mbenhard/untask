@@ -152,12 +152,30 @@ export const useKeyboardShortcuts = ({
 
       if (
         notesActive
-        && notesState.activeNoteId
         && (event.metaKey || event.ctrlKey)
         && event.key === 'Backspace'
       ) {
         event.preventDefault();
-        void notesState.archiveNote(notesState.activeNoteId);
+        if (notesState.activeNoteId) {
+          void notesState.archiveNote(notesState.activeNoteId);
+          return;
+        }
+
+        const selectedId = notesState.selectedListNoteId;
+        if (!selectedId) {
+          return;
+        }
+
+        const isArchived = notesState.archivedNotes.some((note) => note.id === selectedId);
+        if (isArchived) {
+          void notesState.deleteNote(selectedId);
+          return;
+        }
+
+        const isActive = notesState.activeNotes.some((note) => note.id === selectedId);
+        if (isActive) {
+          void notesState.archiveNote(selectedId);
+        }
         return;
       }
 
@@ -189,6 +207,9 @@ export const useKeyboardShortcuts = ({
         if (toastStore.toast && toastStore.toast.onUndo && !toastStore.isUndoing) {
           toastStore.markUndoing();
           void toastStore.toast.onUndo();
+        } else if (notesActive) {
+          // Notes use local undo callbacks through toast actions only.
+          return;
         } else {
           void (async () => {
             await getUntask().tasks.undoLastUserAction();

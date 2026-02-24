@@ -8,6 +8,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { useAppStore } from '../stores/appStore';
 import { useNotesStore } from '../stores/notesStore';
 import { useSearchStore } from '../stores/searchStore';
+import { useToastStore } from '../stores/toastStore';
 
 type HarnessProps = {
   inputValue: string;
@@ -28,6 +29,7 @@ const HookHarness = ({ inputRef, inputValue, clearInput }: HarnessProps): null =
 const defaultNotesActions = {
   processWithAI: useNotesStore.getState().processWithAI,
   archiveNote: useNotesStore.getState().archiveNote,
+  deleteNote: useNotesStore.getState().deleteNote,
   openAdjacentNote: useNotesStore.getState().openAdjacentNote,
   backToList: useNotesStore.getState().backToList,
   selectRelativeActive: useNotesStore.getState().selectRelativeActive,
@@ -74,12 +76,18 @@ const resetStores = (): void => {
     notice: null,
     ...defaultNotesActions,
   });
+
+  useToastStore.setState({
+    toast: null,
+    isUndoing: false,
+  });
 };
 
 describe('useKeyboardShortcuts', () => {
   let container: HTMLDivElement;
   let root: Root;
   let requestHide: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  let undoLastUserAction: ReturnType<typeof vi.fn<() => Promise<{ ok: true; undone: false }>>>;
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -88,16 +96,26 @@ describe('useKeyboardShortcuts', () => {
     resetStores();
 
     requestHide = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    undoLastUserAction = vi.fn<() => Promise<{ ok: true; undone: false }>>().mockResolvedValue({
+      ok: true,
+      undone: false,
+    });
     const untaskWindow = window as unknown as {
       untask?: {
         app?: {
           requestHide?: () => Promise<void>;
+        };
+        tasks?: {
+          undoLastUserAction?: () => Promise<{ ok: true; undone: false }>;
         };
       };
     };
     untaskWindow.untask = {
       app: {
         requestHide,
+      },
+      tasks: {
+        undoLastUserAction,
       },
     };
   });
@@ -261,6 +279,101 @@ describe('useKeyboardShortcuts', () => {
     });
 
     expect(archiveNote).toHaveBeenCalledWith('note-1');
+  });
+
+  it('runs Cmd/Ctrl+Backspace to archive selected list note when editor is not open', () => {
+    const archiveNote = vi.fn(async () => undefined);
+    useAppStore.setState({ activeView: 'notes' });
+    useNotesStore.setState({
+      subView: 'list',
+      layoutMode: 'list',
+      activeNoteId: null,
+      selectedListNoteId: 'note-1',
+      activeNotes: [{
+        id: 'note-1',
+        title: 'A',
+        content: '',
+        status: 'active',
+        isPinned: false,
+        createdAt: null,
+        updatedAt: null,
+      }],
+      archivedNotes: [],
+      archiveNote: archiveNote as never,
+    });
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', metaKey: true }));
+    });
+
+    expect(archiveNote).toHaveBeenCalledWith('note-1');
+  });
+
+  it('runs Cmd/Ctrl+Backspace to delete selected archived note from list', () => {
+    const deleteNote = vi.fn(async () => undefined);
+    useAppStore.setState({ activeView: 'notes' });
+    useNotesStore.setState({
+      subView: 'list',
+      layoutMode: 'list',
+      activeNoteId: null,
+      selectedListNoteId: 'note-archived-1',
+      activeNotes: [],
+      archivedNotes: [{
+        id: 'note-archived-1',
+        title: 'A',
+        content: '',
+        status: 'archived',
+        isPinned: false,
+        createdAt: null,
+        updatedAt: null,
+      }],
+      deleteNote: deleteNote as never,
+    });
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', metaKey: true }));
+    });
+
+    expect(deleteNote).toHaveBeenCalledWith('note-archived-1');
+  });
+
+  it('does not run task undo fallback in notes view when no toast undo is available', () => {
+    useAppStore.setState({ activeView: 'notes' });
+    useNotesStore.setState({
+      subView: 'list',
+      layoutMode: 'list',
+      activeNoteId: null,
+    });
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true }));
+    });
+
+    expect(undoLastUserAction).not.toHaveBeenCalled();
   });
 
   it('runs Alt+ArrowDown to move to adjacent note', () => {
