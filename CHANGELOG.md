@@ -2,6 +2,28 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.13] - 2026-02-24
+
+Notes editor overhaul, AI chat hardening, and renderer performance pass.
+
+### Changes
+
+**Added**
+- **Skeleton loading shells** — All views show skeleton UI during load with prefetch on hover
+- **AI-first chat routing** — Deterministic routing, semantic intent probing, and scope-guarded pending actions
+- **Drag preview** — Task reorder shows a real row preview instead of a ghost
+
+**Improved**
+- **Notes editor overhaul** — Migrated to Ariakit, unified context menu, Cmd+click links, redesigned drag handles, and proper navigation with focus management
+- **AI reliability** — Centralized stream cleanup, stale approval purging, post-mutation verification, and structured diagnostics
+- **Task interactions** — Cmd+N targets focused lane, Enter confirms completion, subtask status cycling blocked
+- **Performance** — Removed Mantine runtime (~7 deps), pruned font subsets to latin-only, memoized slash menus, coalesced task refreshes, lazy-loaded font CSS
+
+**Fixed**
+- Notes list scroll, delete/undo shortcuts, derived titles in search, and drag handle alignment
+- Task navigation pulse, cascade delete, confirmation menu flash, and optimistic state consistency
+- API key Keychain prompt spam, settings footer flash, and multi-line AI error rendering
+
 ## [0.1.12] - 2026-02-22
 
 Security hardening, accessibility audit, and memory leak fixes.
@@ -294,6 +316,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.13]: https://github.com/mbenhard/untask/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/mbenhard/untask/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/mbenhard/untask/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/mbenhard/untask/compare/v0.1.9...v0.1.10
