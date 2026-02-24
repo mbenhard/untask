@@ -337,7 +337,7 @@ describe('notesStore', () => {
   it('enterNotesView does not override explicit note open while loading', async () => {
     const api = getMockApi();
     const noteB = mockNote({ id: 'note-b', content: 'body-b' });
-    let resolveGet: ((note: Note) => void) | null = null;
+    let resolveGet: (note: Note) => void = () => undefined;
     const getPromise = new Promise<Note>((resolve) => {
       resolveGet = resolve;
     });
@@ -349,9 +349,7 @@ describe('notesStore', () => {
     await useNotesStore.getState().enterNotesView();
 
     expect(api.list).not.toHaveBeenCalled();
-    expect(typeof resolveGet).toBe('function');
-    const finishGet = resolveGet as (note: Note) => void;
-    finishGet(noteB);
+    resolveGet(noteB);
 
     await openPromise;
     expect(useNotesStore.getState().activeNoteId).toBe('note-b');

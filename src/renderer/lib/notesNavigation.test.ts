@@ -33,9 +33,11 @@ describe('navigateToNotes', () => {
   });
 
   it('routes explicit create intent to createNote', async () => {
-    let resolveCreate: (() => void) | null = null;
+    let resolveCreate: () => void = () => undefined;
     const createNote = vi.fn(async () => new Promise<void>((resolve) => {
-      resolveCreate = resolve;
+      resolveCreate = () => {
+        resolve();
+      };
     }));
     useNotesStore.setState({
       createNote: createNote as never,
@@ -45,9 +47,7 @@ describe('navigateToNotes', () => {
     await Promise.resolve();
 
     expect(isExplicitNotesNavigationInFlight()).toBe(true);
-    expect(typeof resolveCreate).toBe('function');
-    const completeCreate = resolveCreate as () => void;
-    completeCreate();
+    resolveCreate();
     await createPromise;
     expect(useAppStore.getState().activeView).toBe('notes');
     expect(createNote).toHaveBeenCalledTimes(1);
