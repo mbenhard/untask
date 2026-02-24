@@ -2,6 +2,24 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.14] - 2026-02-24
+
+Editor stability, notification cleanup, and drag-reorder fixes.
+
+### Changes
+
+**Improved**
+- **Escape-to-last-task** — Pressing Escape after creating tasks navigates to the most recently created task
+- **Keyboard reorder snap** — Alt+Up/Down reorders now snap instantly without animation flash
+
+**Fixed**
+- Task description editor no longer loses focus during auto-save
+- Unsaved task descriptions are preserved when collapsing a task
+- Single-click task expansion works after using the quick-add input
+- Dragging a task one position down within the same lane no longer fails silently
+- View switching no longer auto-scrolls to a focused task
+- Removed intrusive startup overdue notifications and AI proactive chat reminders
+
 ## [0.1.13] - 2026-02-24
 
 Notes editor overhaul, AI chat hardening, and renderer performance pass.
@@ -316,6 +334,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.14]: https://github.com/mbenhard/untask/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/mbenhard/untask/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/mbenhard/untask/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/mbenhard/untask/compare/v0.1.10...v0.1.11
