@@ -9,11 +9,11 @@ import { NotesList } from './NotesList';
 
 export const NotesView = () => {
   const activeNoteId = useNotesStore(selectActiveNoteId);
-  const enterNotesView = useNotesStore((s) => s.enterNotesView);
+  const loadList = useNotesStore((s) => s.loadList);
 
   useEffect(() => {
-    void enterNotesView();
-  }, [enterNotesView]);
+    void loadList();
+  }, [loadList]);
 
   if (activeNoteId) {
     return <NoteEditor />;

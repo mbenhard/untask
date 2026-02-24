@@ -185,7 +185,7 @@ type NoteListItemProps = {
   note: Note;
   selected: boolean;
   onClick: (id: string) => void;
-  onHover: (id: string) => void;
+  onFocusSelect: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, note: Note) => void;
   // Archived-only hover actions
   onRestore?: (id: string) => void;
@@ -200,7 +200,7 @@ const NoteListItem = ({
   note,
   selected,
   onClick,
-  onHover,
+  onFocusSelect,
   onContextMenu,
   onRestore,
   onDelete,
@@ -217,8 +217,7 @@ const NoteListItem = ({
       type="button"
       data-note-id={note.id}
       onClick={() => onClick(note.id)}
-      onMouseEnter={() => onHover(note.id)}
-      onFocus={() => onHover(note.id)}
+      onFocus={() => onFocusSelect(note.id)}
       onContextMenu={(e) => onContextMenu(e, note)}
       className={cn(
         'group flex w-full items-center gap-2 border-b border-border/40 px-2 py-2 text-left transition-colors duration-100 last:border-b-0',
@@ -392,7 +391,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     [openNote, setSelectedListNoteId],
   );
 
-  const handleHover = useCallback(
+  const handleFocusSelect = useCallback(
     (id: string) => {
       setSelectedListNoteId(id);
     },
@@ -497,7 +496,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                 note={note}
                 selected={effectiveSelectedId === note.id}
                 onClick={handleOpen}
-                onHover={handleHover}
+                onFocusSelect={handleFocusSelect}
                 onContextMenu={handleContextMenu}
                 onPin={handlePin}
                 onUnpin={handleUnpin}
@@ -537,7 +536,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                     note={note}
                     selected={false}
                     onClick={handleOpen}
-                    onHover={handleHover}
+                    onFocusSelect={handleFocusSelect}
                     onContextMenu={handleContextMenu}
                     onRestore={handleRestore}
                     onDelete={handleDelete}

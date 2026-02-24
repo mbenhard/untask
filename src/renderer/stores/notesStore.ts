@@ -47,7 +47,7 @@ type NotesStore = {
   notice: NotesNotice | null;
 
   // Actions
-  loadList: () => Promise<void>;
+  loadList: (preferredSelectedId?: string | null) => Promise<void>;
   enterNotesView: () => Promise<void>;
   createNote: () => Promise<void>;
   openNote: (id: string) => Promise<void>;
@@ -227,6 +227,20 @@ const clampIndex = (index: number, length: number): number => {
   return Math.min(Math.max(index, 0), length - 1);
 };
 
+const getAdjacentActiveNoteId = (activeNotes: Note[], removedId: string): string | null => {
+  if (activeNotes.length <= 1) {
+    return null;
+  }
+
+  const removedIndex = activeNotes.findIndex((note) => note.id === removedId);
+  if (removedIndex === -1) {
+    return null;
+  }
+
+  const fallback = activeNotes[removedIndex + 1] ?? activeNotes[removedIndex - 1];
+  return fallback?.id ?? null;
+};
+
 /** Shared state fragment that resets the editor to list mode. */
 const NOTES_LIST_RESET_STATE = {
   subView: 'list' as const,
@@ -302,20 +316,21 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     await get().openNote(activeNotes[0].id);
   },
 
-  loadList: async () => {
+  loadList: async (preferredSelectedId) => {
     if (get().isListLoading) return;
     set({ isListLoading: true, error: null });
     try {
       const { active, archived } = await getUntask().notes.list();
       set((state) => {
+        const preferred = preferredSelectedId ?? state.selectedListNoteId;
         const selectedStillExists =
-          state.selectedListNoteId !== null
-          && active.some((note) => note.id === state.selectedListNoteId);
+          preferred !== null
+          && active.some((note) => note.id === preferred);
 
         return {
           activeNotes: active,
           archivedNotes: archived,
-          selectedListNoteId: selectedStillExists ? state.selectedListNoteId : (active[0]?.id ?? null),
+          selectedListNoteId: selectedStillExists ? preferred : (active[0]?.id ?? null),
           isListLoading: false,
         };
       });
@@ -487,12 +502,18 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   archiveNote: async (id) => {
     try {
       const wasActive = get().activeNoteId === id;
+      const nextSelectedId = getAdjacentActiveNoteId(get().activeNotes, id);
       await getUntask().notes.archive(id);
 
       // If we archived the currently open note, go back to list.
       if (wasActive) {
-        set(NOTES_LIST_RESET_STATE);
+        set({
+          ...NOTES_LIST_RESET_STATE,
+          selectedListNoteId: nextSelectedId,
+        });
         await persistLastOpenedNoteId(null);
+      } else if (get().selectedListNoteId === id) {
+        set({ selectedListNoteId: nextSelectedId });
       }
 
       get().setNotice({ kind: 'success', message: 'Note archived.' });
@@ -500,7 +521,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         await getUntask().notes.restore(id);
         void get().loadList();
       });
-      void get().loadList();
+      void get().loadList(nextSelectedId);
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
@@ -528,12 +549,18 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       const snapshot: DeletedNoteSnapshot | null = source
         ? { content: source.content, status: source.status, isPinned: source.isPinned }
         : null;
+      const nextSelectedId = getAdjacentActiveNoteId(activeNotes, id);
 
       await getUntask().notes.delete(id);
 
       if (get().activeNoteId === id) {
-        set(NOTES_LIST_RESET_STATE);
+        set({
+          ...NOTES_LIST_RESET_STATE,
+          selectedListNoteId: nextSelectedId,
+        });
         await persistLastOpenedNoteId(null);
+      } else if (get().selectedListNoteId === id) {
+        set({ selectedListNoteId: nextSelectedId });
       }
 
       get().setNotice({ kind: 'success', message: 'Note deleted.' });
@@ -552,7 +579,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
           void get().loadList();
         });
       }
-      void get().loadList();
+      void get().loadList(nextSelectedId);
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }

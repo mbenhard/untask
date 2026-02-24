@@ -352,6 +352,46 @@ describe('notesStore', () => {
     expect(api.restore).toHaveBeenCalledWith('note-1');
   });
 
+  it('archiveNote keeps list selection on adjacent note when selected note is archived', async () => {
+    const api = getMockApi();
+    const noteA = mockNote({ id: 'note-a' });
+    const noteB = mockNote({ id: 'note-b' });
+    const noteC = mockNote({ id: 'note-c' });
+
+    useNotesStore.setState({
+      activeNoteId: null,
+      subView: 'list',
+      layoutMode: 'list',
+      activeNotes: [noteA, noteB, noteC],
+      selectedListNoteId: 'note-b',
+    });
+    api.list.mockResolvedValue({ active: [noteA, noteC], archived: [mockNote({ id: 'note-b', status: 'archived' })] });
+
+    await useNotesStore.getState().archiveNote('note-b');
+
+    expect(useNotesStore.getState().selectedListNoteId).toBe('note-c');
+  });
+
+  it('deleteNote keeps list selection on adjacent note when selected note is deleted', async () => {
+    const api = getMockApi();
+    const noteA = mockNote({ id: 'note-a' });
+    const noteB = mockNote({ id: 'note-b' });
+    const noteC = mockNote({ id: 'note-c' });
+
+    useNotesStore.setState({
+      activeNoteId: null,
+      subView: 'list',
+      layoutMode: 'list',
+      activeNotes: [noteA, noteB, noteC],
+      selectedListNoteId: 'note-b',
+    });
+    api.list.mockResolvedValue({ active: [noteA, noteC], archived: [] });
+
+    await useNotesStore.getState().deleteNote('note-b');
+
+    expect(useNotesStore.getState().selectedListNoteId).toBe('note-c');
+  });
+
   it('deleteNote undo recreates a deleted archived note snapshot', async () => {
     const api = getMockApi();
     useNotesStore.setState({
