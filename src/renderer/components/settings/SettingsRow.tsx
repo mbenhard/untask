@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../lib/utils';
+import { Skeleton } from '../ui/skeleton';
 
 export type SettingsRowProps = {
   label: string;
@@ -21,10 +22,9 @@ export const SettingsRow = ({ label, hint, loading, children, className }: Setti
     </div>
     <div className="flex shrink-0 items-center">
       {loading ? (
-        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <div className="size-2 animate-pulse rounded-full bg-muted-foreground/30" />
-          Loading...
-        </span>
+        <div aria-busy="true" data-testid="settings-row-loading-skeleton">
+          <Skeleton className="h-5 w-20 rounded-sm" />
+        </div>
       ) : (
         children
       )}

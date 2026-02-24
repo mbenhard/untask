@@ -19,6 +19,7 @@ import {
   selectEnabledTerminal,
 } from '../../stores/taskStatusConfigStore';
 import { isEmptyDocument } from '../editor/editorUtils';
+import { EditorBlockSkeleton } from '../ui/loadingShells';
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { getNextPriority } from './taskInteraction';
@@ -827,7 +828,7 @@ export const TaskBody = ({
         'px-3 py-3',
         !parentTask && 'border-t border-border/30',
       )}>
-        <Suspense fallback={<div className="untask-task-editor min-h-[96px]" aria-hidden="true" />}>
+        <Suspense fallback={<EditorBlockSkeleton className="untask-task-editor min-h-[96px]" />}>
           <LazyBlockEditor
             content={task.body ?? ''}
             onChange={handleBodyChange}

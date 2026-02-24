@@ -19,6 +19,8 @@ import {
 import { useTaskStore } from '../../stores/taskStore';
 import { resolveTaskTitleFromEditor } from './noteSlashActions';
 import { Button } from '../ui/button';
+import { EditorBlockSkeleton } from '../ui/loadingShells';
+import { Skeleton } from '../ui/skeleton';
 import type { BlockEditorSlashMenuItem, BlockEditorSlashMenuParams } from '../editor/BlockEditor';
 
 const LazyBlockEditor = lazy(async () => {
@@ -248,8 +250,20 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading note...</p>
+      <div className="flex h-full flex-col overflow-hidden" aria-busy="true" data-testid="note-editor-skeleton">
+        <header className="flex items-center gap-2 px-3 py-2">
+          {showBackButton ? <Skeleton className="h-6 w-6 rounded-sm" /> : null}
+          <Skeleton className="h-3 w-28" />
+          <div className="min-w-0 flex-1" />
+          <Skeleton className="h-3 w-20" />
+          <div className="flex items-center gap-1">
+            <Skeleton className="h-6 w-14 rounded-sm" />
+            <Skeleton className="h-6 w-14 rounded-sm" />
+          </div>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+          <EditorBlockSkeleton className="h-full" />
+        </div>
       </div>
     );
   }
@@ -352,11 +366,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Suspense
-          fallback={(
-            <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-muted-foreground">Loading editor...</p>
-            </div>
-          )}
+          fallback={<EditorBlockSkeleton className="h-full px-3 py-2" />}
         >
           <LazyBlockEditor
             key={activeNoteId}

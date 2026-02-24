@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { Task } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
+import { TaskViewSkeleton } from '../ui/loadingShells';
 import { SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 
@@ -33,8 +34,12 @@ export const InboxView = ({
     [allTasks],
   );
 
+  if (isLoading) {
+    return <TaskViewSkeleton />;
+  }
+
   return (
-    <div className="h-full overflow-y-auto p-3 pb-14">
+    <div className="h-full overflow-y-auto p-3 pb-14" aria-busy={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error ? (
           <p className="text-[11px] text-destructive">
@@ -42,33 +47,31 @@ export const InboxView = ({
           </p>
         ) : null}
 
-        {!isLoading ? (
-          <SectionGroup
-            sectionId="inbox"
-            label="Inbox"
-            count={inboxTasks.length}
-            isCollapsed={isCollapsed}
-            onToggle={() => setIsCollapsed((c) => !c)}
-            addTaskConfig={{
-              defaultStatus: 'inbox',
-              showMetadata: true,
-              placeholder: 'Type to capture...',
-            }}
-            triggerAdd={activeView === 'inbox' ? newTaskTrigger : undefined}
-            onRequestFocus={() => setFocusedIndex(0)}
-          >
-            <TaskList
-              tasks={inboxTasks}
-              allTasks={allTasks}
-              emptyMessage="Inbox is empty."
-              ariaLabel="Inbox tasks"
-              scopeId="inbox"
-              isPrimaryList
-              focusedIndex={focusedIndex}
-              onFocusedIndexChange={setFocusedIndex}
-            />
-          </SectionGroup>
-        ) : null}
+        <SectionGroup
+          sectionId="inbox"
+          label="Inbox"
+          count={inboxTasks.length}
+          isCollapsed={isCollapsed}
+          onToggle={() => setIsCollapsed((c) => !c)}
+          addTaskConfig={{
+            defaultStatus: 'inbox',
+            showMetadata: true,
+            placeholder: 'Type to capture...',
+          }}
+          triggerAdd={activeView === 'inbox' ? newTaskTrigger : undefined}
+          onRequestFocus={() => setFocusedIndex(0)}
+        >
+          <TaskList
+            tasks={inboxTasks}
+            allTasks={allTasks}
+            emptyMessage="Inbox is empty."
+            ariaLabel="Inbox tasks"
+            scopeId="inbox"
+            isPrimaryList
+            focusedIndex={focusedIndex}
+            onFocusedIndexChange={setFocusedIndex}
+          />
+        </SectionGroup>
       </div>
     </div>
   );

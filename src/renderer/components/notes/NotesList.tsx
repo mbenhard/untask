@@ -23,6 +23,7 @@ import {
   selectSelectedListNoteId,
   useNotesStore,
 } from '../../stores/notesStore';
+import { NotesListSkeleton } from '../ui/loadingShells';
 import { Button } from '../ui/button';
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -452,15 +453,11 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
   }, []);
 
   if (isLoading && activeNotes.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading notes...</p>
-      </div>
-    );
+    return <NotesListSkeleton />;
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden" aria-busy={false}>
       <header className="flex items-center justify-between px-3 py-2">
         <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Notes

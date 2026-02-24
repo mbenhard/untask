@@ -5,12 +5,23 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui';
+import {
+  ChatPanelSkeleton,
+  NotesViewSkeleton,
+  SearchModalSkeleton,
+  SettingsViewSkeleton,
+  TaskViewSkeleton,
+} from '../ui/loadingShells';
 import { useTheme } from '../providers/ThemeProvider';
 
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
 import { createTaskRefreshCoalescer } from '../../lib/taskRefreshCoalescer';
+import {
+  cancelTargetedViewPrefetch,
+  scheduleTargetedViewPrefetch,
+} from '../../lib/viewPrefetch';
 import { cn } from '../../lib/utils';
 import {
   selectActiveView,
@@ -33,6 +44,7 @@ import {
   selectChatIsLoadingConversations,
   useChatStore,
 } from '../../stores/chatStore';
+import { selectSearchIsOpen, useSearchStore } from '../../stores/searchStore';
 import { findTaskForNavigation, resolveTaskNavigationView } from './taskNavigation';
 import { ToastContainer } from '../ui/Toast';
 import { TitleBar } from './TitleBar';
@@ -121,6 +133,7 @@ export const AppShell = () => {
   const openChatOverlay = useAppStore((state) => state.openChatOverlay);
   const peekChatOverlay = useAppStore((state) => state.peekChatOverlay);
   const setChatView = useAppStore((state) => state.setChatView);
+  const isSearchOpen = useSearchStore(selectSearchIsOpen);
 
   const fetchTasks = useTaskStore((state) => state.fetchTasks);
   const fetchStatusConfig = useTaskStatusConfigStore((s) => s.fetchConfig);
@@ -247,6 +260,13 @@ export const AppShell = () => {
 
   useMenuActions();
 
+  useEffect(() => {
+    scheduleTargetedViewPrefetch();
+    return () => {
+      cancelTargetedViewPrefetch();
+    };
+  }, []);
+
   // F-4: Place focus on primary element when view changes
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -278,7 +298,7 @@ export const AppShell = () => {
   const activeViewComponent = useMemo(() => {
     if (activeView === 'today') {
       return (
-        <Suspense fallback={null}>
+        <Suspense fallback={<TaskViewSkeleton />}>
           <LazyTodayView allTasks={tasks} isLoading={isLoading} error={error} />
         </Suspense>
       );
@@ -286,7 +306,7 @@ export const AppShell = () => {
 
     if (activeView === 'tasks') {
       return (
-        <Suspense fallback={null}>
+        <Suspense fallback={<TaskViewSkeleton />}>
           <LazyTasksView allTasks={tasks} isLoading={isLoading} error={error} />
         </Suspense>
       );
@@ -294,7 +314,7 @@ export const AppShell = () => {
 
     if (activeView === 'notes') {
       return (
-        <Suspense fallback={null}>
+        <Suspense fallback={<NotesViewSkeleton />}>
           <LazyNotesView />
         </Suspense>
       );
@@ -302,14 +322,14 @@ export const AppShell = () => {
 
     if (activeView === 'settings') {
       return (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SettingsViewSkeleton />}>
           <LazySettingsView />
         </Suspense>
       );
     }
 
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<TaskViewSkeleton />}>
         <LazyInboxView allTasks={tasks} isLoading={isLoading} error={error} />
       </Suspense>
     );
@@ -520,7 +540,7 @@ export const AppShell = () => {
                           transition={{ duration: 0 }}
                           className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
-                          <Suspense fallback={<div className="min-h-0 flex-1" />}>
+                          <Suspense fallback={<ChatPanelSkeleton variant="threads" className="min-h-0 flex-1" />}>
                             <LazyThreadListView
                               conversations={conversations}
                               activeConversationId={activeConversationId}
@@ -549,12 +569,12 @@ export const AppShell = () => {
                           className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
                           <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
-                            <Suspense fallback={<div className="h-full w-full" />}>
+                            <Suspense fallback={<ChatPanelSkeleton variant="conversation" className="h-full w-full" />}>
                               <LazyChatView onSuggestionClick={handleSuggestionClick} />
                             </Suspense>
                           </div>
                           <div className="border-t border-dashed border-border/50">
-                            <Suspense fallback={<div className="h-[84px]" />}>
+                            <Suspense fallback={<ChatPanelSkeleton variant="input" className="h-[84px]" />}>
                               <LazyChatInput
                                 inputRef={inputRef}
                                 value={chatInputValue}
@@ -619,8 +639,8 @@ export const AppShell = () => {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <LazySearchModal />
+      <Suspense fallback={isSearchOpen ? <SearchModalSkeleton /> : null}>
+        {isSearchOpen ? <LazySearchModal /> : null}
       </Suspense>
       <ToastContainer />
     </div>

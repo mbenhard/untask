@@ -5,6 +5,7 @@ import { Archive, Plus, Search, Trash2 } from 'lucide-react';
 import type { ChatConversationSummary } from '../../../types/chat';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
+import { ChatPanelSkeleton } from '../ui/loadingShells';
 
 type ThreadListViewProps = {
   conversations: ChatConversationSummary[];
@@ -169,6 +170,7 @@ export const ThreadListView = ({
   return (
     <div
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      aria-busy={isLoading}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -228,7 +230,7 @@ export const ThreadListView = ({
 
       <div role="listbox" aria-label="Threads" className="flex-1 overflow-y-auto p-1.5">
         {isLoading ? (
-          <p className="px-2 py-4 text-center text-xs text-muted-foreground">Loading threads...</p>
+          <ChatPanelSkeleton variant="threads-list" />
         ) : grouped.length === 0 ? (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">No matching threads.</p>
         ) : (

@@ -123,12 +123,8 @@ export const BlockEditor = ({
   const handleSurfaceMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       const target = event.target as HTMLElement;
-      const shouldFocus =
-        target === event.currentTarget ||
-        target.classList.contains('bn-container') ||
-        target.classList.contains('bn-editor');
-
-      if (!shouldFocus) {
+      // Let ProseMirror handle clicks on actual block content (text, images, files, etc.)
+      if (target.closest('.bn-block-content')) {
         return;
       }
 
@@ -232,7 +228,13 @@ export const BlockEditor = ({
         theme={resolvedTheme}
         onChange={handleChange}
         editable={editable}
+        linkToolbar={false}
         slashMenu={false}
+        sideMenu={false}
+        filePanel={false}
+        tableHandles={false}
+        emojiPicker={false}
+        comments={false}
         formattingToolbar={false}
       >
         <SuggestionMenuController

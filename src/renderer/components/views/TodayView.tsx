@@ -5,6 +5,7 @@ import { TERMINAL_STATUSES } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { TaskViewSkeleton } from '../ui/loadingShells';
 import { SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 
@@ -55,8 +56,12 @@ export const TodayView = ({
     }
   }, [allTasks, selectedTaskId]);
 
+  if (isLoading) {
+    return <TaskViewSkeleton />;
+  }
+
   return (
-    <div className="h-full overflow-y-auto p-3 pb-14">
+    <div className="h-full overflow-y-auto p-3 pb-14" aria-busy={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error ? (
           <p className="text-[11px] text-destructive">
@@ -64,52 +69,50 @@ export const TodayView = ({
           </p>
         ) : null}
 
-        {!isLoading ? (
-          <>
-            <SectionGroup
-              sectionId="today-active"
-              label="Today"
-              count={activeTodayTasks.length}
-              isCollapsed={isTodayCollapsed}
-              onToggle={() => setIsTodayCollapsed((c) => !c)}
-              addTaskConfig={{
-                defaultStatus: 'active',
-                defaultToday: true,
-                showMetadata: true,
-                placeholder: 'Add to today...',
-              }}
-              triggerAdd={activeView === 'today' ? newTaskTrigger : undefined}
-              onRequestFocus={() => setFocusedIndex(0)}
-            >
-              <TaskList
-                tasks={activeTodayTasks}
-                allTasks={allTasks}
-                emptyMessage="Nothing planned for today."
-                ariaLabel="Today tasks"
-                scopeId="today"
-                isPrimaryList
-                focusedIndex={focusedIndex}
-                onFocusedIndexChange={setFocusedIndex}
-              />
-            </SectionGroup>
+        <>
+          <SectionGroup
+            sectionId="today-active"
+            label="Today"
+            count={activeTodayTasks.length}
+            isCollapsed={isTodayCollapsed}
+            onToggle={() => setIsTodayCollapsed((c) => !c)}
+            addTaskConfig={{
+              defaultStatus: 'active',
+              defaultToday: true,
+              showMetadata: true,
+              placeholder: 'Add to today...',
+            }}
+            triggerAdd={activeView === 'today' ? newTaskTrigger : undefined}
+            onRequestFocus={() => setFocusedIndex(0)}
+          >
+            <TaskList
+              tasks={activeTodayTasks}
+              allTasks={allTasks}
+              emptyMessage="Nothing planned for today."
+              ariaLabel="Today tasks"
+              scopeId="today"
+              isPrimaryList
+              focusedIndex={focusedIndex}
+              onFocusedIndexChange={setFocusedIndex}
+            />
+          </SectionGroup>
 
-            <SectionGroup
-              sectionId="today-done"
-              label="Done today"
-              count={doneTodayTasks.length}
-              isCollapsed={isDoneCollapsed}
-              onToggle={() => setIsDoneCollapsed((c) => !c)}
-            >
-              <TaskList
-                tasks={doneTodayTasks}
-                allTasks={allTasks}
-                emptyMessage="No done tasks today."
-                ariaLabel="Done today tasks"
-                scopeId="today-done"
-              />
-            </SectionGroup>
-          </>
-        ) : null}
+          <SectionGroup
+            sectionId="today-done"
+            label="Done today"
+            count={doneTodayTasks.length}
+            isCollapsed={isDoneCollapsed}
+            onToggle={() => setIsDoneCollapsed((c) => !c)}
+          >
+            <TaskList
+              tasks={doneTodayTasks}
+              allTasks={allTasks}
+              emptyMessage="No done tasks today."
+              ariaLabel="Done today tasks"
+              scopeId="today-done"
+            />
+          </SectionGroup>
+        </>
       </div>
     </div>
   );

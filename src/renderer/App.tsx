@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { AppShell } from './components/layout/AppShell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { AppBootstrapSkeleton } from './components/ui/loadingShells';
 import { TooltipProvider } from './components/ui/tooltip';
 import { useAppStore } from './stores/appStore';
 
@@ -48,7 +49,7 @@ type BootstrapStatus = 'loading' | 'onboarding' | 'ready';
 
 const BOOTSTRAP_DONE_KEY = 'untask-bootstrap-done';
 
-const AppRoot = () => {
+export const AppRoot = () => {
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>(() =>
     localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1' ? 'ready' : 'loading',
   );
@@ -90,7 +91,7 @@ const AppRoot = () => {
   }, [setAiEnabled]);
 
   if (bootstrapStatus === 'loading') {
-    return null;
+    return <AppBootstrapSkeleton />;
   }
 
   if (bootstrapStatus === 'onboarding') {

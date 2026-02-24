@@ -20,6 +20,7 @@ import { isTerminalStatus, getStatusLabel } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { TaskViewSkeleton } from '../ui/loadingShells';
 import {
   useTaskStatusConfigStore,
   selectLaneOrder,
@@ -347,8 +348,12 @@ export const TasksView = ({
     ],
   );
 
+  if (isLoading) {
+    return <TaskViewSkeleton />;
+  }
+
   return (
-    <div className="h-full overflow-y-auto p-3 pb-14">
+    <div className="h-full overflow-y-auto p-3 pb-14" aria-busy={false}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error ? (
           <p className="text-[11px] text-destructive">
@@ -356,78 +361,76 @@ export const TasksView = ({
           </p>
         ) : null}
 
-        {!isLoading ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragCancel={() => setActiveDragId(null)}
-          >
-            <div className="space-y-2">
-              {laneOrder.map((key) => {
-                const tasks = groupedTasks[key] ?? [];
-                const isCollapsed = collapsedGroups[key] ?? false;
-                const isTerminal = isTerminalStatus(key);
-                const label = getStatusLabel(key);
-                const isPrimary = firstNonCollapsedLane === key;
-                const effectiveFocusedLane = focusedLane ?? firstNonCollapsedLane;
-                const isFocusedLane = effectiveFocusedLane === key;
-                const effectiveFocusedIndex = isFocusedLane 
-                  ? Math.min(Math.max(focusedIndex, 0), tasks.length - 1)
-                  : undefined;
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveDragId(null)}
+        >
+          <div className="space-y-2">
+            {laneOrder.map((key) => {
+              const tasks = groupedTasks[key] ?? [];
+              const isCollapsed = collapsedGroups[key] ?? false;
+              const isTerminal = isTerminalStatus(key);
+              const label = getStatusLabel(key);
+              const isPrimary = firstNonCollapsedLane === key;
+              const effectiveFocusedLane = focusedLane ?? firstNonCollapsedLane;
+              const isFocusedLane = effectiveFocusedLane === key;
+              const effectiveFocusedIndex = isFocusedLane
+                ? Math.min(Math.max(focusedIndex, 0), tasks.length - 1)
+                : undefined;
 
-                const handleFocusedIndexChange = (newIndex: number) => {
-                  setFocusedLane(key);
-                  setFocusedIndex(newIndex);
-                };
+              const handleFocusedIndexChange = (newIndex: number) => {
+                setFocusedLane(key);
+                setFocusedIndex(newIndex);
+              };
 
-                return (
-                  <StatusGroupSection
-                    key={key}
-                    laneKey={key}
-                    label={label}
-                    tasks={tasks}
-                    isCollapsed={isCollapsed}
-                    allTasks={allTasks}
-                    activeDragId={activeDragId}
-                    addTaskConfig={
-                      !isTerminal
-                        ? { defaultStatus: key as Exclude<TaskStatus, 'done'>, showMetadata: true, placeholder: 'Add task...' }
-                        : undefined
-                    }
-                    triggerAdd={
-                      key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
-                    }
-                    isPrimaryList={isPrimary}
-                    focusedIndex={effectiveFocusedIndex}
-                    onFocusedIndexChange={handleFocusedIndexChange}
-                    onNavigateNextGroup={() => handleNavigateNextGroup(key)}
-                    onNavigatePrevGroup={() => handleNavigatePrevGroup(key)}
-                    onRequestFocus={() => {
-                      setFocusedLane(key);
-                      setFocusedIndex(0);
-                    }}
-                    onToggle={() => {
-                      setCollapsedGroups((current) => ({
-                        ...current,
-                        [key]: !current[key],
-                      }));
-                    }}
-                  />
-                );
-              })}
-            </div>
+              return (
+                <StatusGroupSection
+                  key={key}
+                  laneKey={key}
+                  label={label}
+                  tasks={tasks}
+                  isCollapsed={isCollapsed}
+                  allTasks={allTasks}
+                  activeDragId={activeDragId}
+                  addTaskConfig={
+                    !isTerminal
+                      ? { defaultStatus: key as Exclude<TaskStatus, 'done'>, showMetadata: true, placeholder: 'Add task...' }
+                      : undefined
+                  }
+                  triggerAdd={
+                    key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
+                  }
+                  isPrimaryList={isPrimary}
+                  focusedIndex={effectiveFocusedIndex}
+                  onFocusedIndexChange={handleFocusedIndexChange}
+                  onNavigateNextGroup={() => handleNavigateNextGroup(key)}
+                  onNavigatePrevGroup={() => handleNavigatePrevGroup(key)}
+                  onRequestFocus={() => {
+                    setFocusedLane(key);
+                    setFocusedIndex(0);
+                  }}
+                  onToggle={() => {
+                    setCollapsedGroups((current) => ({
+                      ...current,
+                      [key]: !current[key],
+                    }));
+                  }}
+                />
+              );
+            })}
+          </div>
 
-            <DragOverlay dropAnimation={SHARED_DROP_ANIMATION}>
-              {activeDragTask ? (
-                <div className="min-h-9 bg-background/90 px-2 py-1 text-[12px] text-foreground/90">
-                  {activeDragTask.title}
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        ) : null}
+          <DragOverlay dropAnimation={SHARED_DROP_ANIMATION}>
+            {activeDragTask ? (
+              <div className="min-h-9 bg-background/90 px-2 py-1 text-[12px] text-foreground/90">
+                {activeDragTask.title}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </div>
   );
