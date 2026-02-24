@@ -10,6 +10,7 @@ import {
   SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react';
+import { Link as TiptapLink } from '@tiptap/extension-link';
 import '@blocknote/react/style.css';
 
 import { FileContextMenu } from './FileContextMenu';
@@ -18,6 +19,7 @@ import { UntaskSlashMenu } from './UntaskSlashMenu';
 
 import { useTheme } from '../providers/ThemeProvider';
 import { resolveInitialEditorContent } from './editorUtils';
+import { shouldOpenExternalLink } from './linkBehavior';
 
 export type BlockEditorProps = {
   /** JSON blocks string or legacy markdown */
@@ -45,6 +47,14 @@ export type BlockEditorSlashMenuParams = {
 };
 
 const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50 MB
+const CustomLinkExtension = TiptapLink.extend({
+  inclusive: false,
+}).configure({
+  autolink: false,
+  linkOnPaste: true,
+  openOnClick: false,
+  defaultProtocol: 'https',
+});
 
 export const BlockEditor = ({
   content,
@@ -62,6 +72,10 @@ export const BlockEditor = ({
   const initialLegacyMarkdownRef = useRef(initialContentResolutionRef.current.legacyMarkdown);
   const editor = useCreateBlockNote({
     initialContent: initialContentResolutionRef.current.initialBlocks,
+    disableExtensions: ['link'],
+    _tiptapOptions: {
+      extensions: [CustomLinkExtension],
+    },
     uploadFile: async (file: File) => {
       if (file.size > MAX_ATTACHMENT_SIZE) {
         throw new Error('File exceeds 50MB limit');
@@ -142,27 +156,41 @@ export const BlockEditor = ({
     [editor],
   );
 
-  // Open file attachments with system default app on click
-  const handleFileClick = useCallback(
+  // Open file attachments and modifier-clicked links with system default app on click.
+  const handleSurfaceClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       const target = event.target as HTMLElement;
       const fileRow = target.closest('.bn-file-name-with-icon');
-      if (!fileRow) return;
+      if (fileRow) {
+        const blockEl = target.closest('[data-id]');
+        if (!blockEl) return;
 
-      const blockEl = target.closest('[data-id]');
-      if (!blockEl) return;
+        const blockId = blockEl.getAttribute('data-id');
+        if (!blockId) return;
 
-      const blockId = blockEl.getAttribute('data-id');
-      if (!blockId) return;
+        const block = editor.getBlock(blockId);
+        const url = (block?.props as Record<string, unknown>)?.url;
+        if (typeof url !== 'string' || !url.startsWith('untask-file://')) return;
 
-      const block = editor.getBlock(blockId);
-      const url = (block?.props as Record<string, unknown>)?.url;
-      if (typeof url !== 'string' || !url.startsWith('untask-file://')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const id = url.slice('untask-file://'.length);
+        window.untask?.attachments.open({ id });
+        return;
+      }
 
+      const anchor = target.closest<HTMLAnchorElement>('.bn-inline-content a[href]');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href') ?? '';
       event.preventDefault();
       event.stopPropagation();
-      const id = url.slice('untask-file://'.length);
-      window.untask?.attachments.open({ id });
+
+      if (!shouldOpenExternalLink(href, event.nativeEvent)) {
+        return;
+      }
+
+      void window.untask?.shell.openExternal(href);
     },
     [editor],
   );
@@ -222,7 +250,7 @@ export const BlockEditor = ({
     <div
       className={className}
       onMouseDown={handleSurfaceMouseDown}
-      onClick={handleFileClick}
+      onClick={handleSurfaceClick}
       onContextMenu={handleFileContextMenu}
       onFocus={onFocus}
       onBlur={onBlur}

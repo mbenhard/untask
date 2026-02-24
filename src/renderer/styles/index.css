@@ -27,6 +27,8 @@
   --input: #E3E3E3;
   --ring: #737373;
   --radius: 0.375rem;
+  --editor-link: #0b65d9;
+  --editor-link-hover: #084ea8;
   --foreground-muted: rgba(23, 23, 23, 0.25);
   --skeleton-base: rgba(23, 23, 23, 0.04);
   --skeleton-highlight: rgba(23, 23, 23, 0.07);
@@ -56,6 +58,8 @@
   --border: #2A2A2A;
   --input: #2A2A2A;
   --ring: #8A8A8A;
+  --editor-link: #7db4ff;
+  --editor-link-hover: #9bc7ff;
   --foreground-muted: rgba(245, 245, 245, 0.35);
   --skeleton-base: rgba(245, 245, 245, 0.035);
   --skeleton-highlight: rgba(245, 245, 245, 0.065);
@@ -451,6 +455,35 @@
 /* Reduce block outer margins for compact layout */
 .untask-task-editor .bn-block-outer {
   margin: 0 !important;
+}
+
+/* Shared inline-link treatment for note and task editors */
+.untask-notes-editor .bn-inline-content a,
+.untask-task-editor .bn-inline-content a {
+  color: var(--editor-link) !important;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--editor-link) 72%, transparent);
+  border-radius: 2px;
+  transition:
+    color 120ms ease,
+    text-decoration-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.untask-notes-editor .bn-inline-content a:hover,
+.untask-task-editor .bn-inline-content a:hover {
+  color: var(--editor-link-hover) !important;
+  text-decoration-color: var(--editor-link-hover);
+  background-color: color-mix(in srgb, var(--editor-link) 14%, transparent);
+}
+
+.untask-notes-editor .bn-inline-content a:focus-visible,
+.untask-task-editor .bn-inline-content a:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: 2px;
+  background-color: color-mix(in srgb, var(--editor-link) 18%, transparent);
 }
 
 /* ──────────────────────────────────────────────
