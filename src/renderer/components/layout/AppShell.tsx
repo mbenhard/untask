@@ -282,7 +282,7 @@ export const AppShell = () => {
   // F-4: Place focus on primary element when view changes
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('[data-primary-focusable]')?.focus();
+      document.querySelector<HTMLElement>('[data-primary-focusable]')?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frameId);
   }, [activeView]);

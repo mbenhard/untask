@@ -194,7 +194,7 @@ export const TaskList = ({
       const focusIsUnowned = isPrimaryList && (!activeEl || activeEl === document.body);
       if (!focusIsUnowned && !container.contains(activeEl)) return;
 
-      nextFocused.focus();
+      nextFocused.focus(focusIsUnowned ? { preventScroll: true } : undefined);
     });
 
     return () => cancelAnimationFrame(rafId);
