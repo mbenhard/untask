@@ -160,6 +160,18 @@ export const TasksView = ({
     });
   }, [laneOrder]);
 
+  const firstNonTerminalLane = useMemo(
+    () => laneOrder.find((key) => !isTerminalStatus(key)) ?? null,
+    [laneOrder],
+  );
+
+  const newTaskTargetLane = useMemo(() => {
+    if (focusedLane && !isTerminalStatus(focusedLane as PredefinedStatusId)) {
+      return focusedLane;
+    }
+    return firstNonTerminalLane;
+  }, [focusedLane, firstNonTerminalLane]);
+
   const firstNonCollapsedLane = useMemo(() => {
     for (const key of laneOrder) {
       const isCollapsed = collapsedGroups[key] ?? false;
@@ -401,7 +413,7 @@ export const TasksView = ({
                       : undefined
                   }
                   triggerAdd={
-                    key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
+                    key === newTaskTargetLane && activeView === 'tasks' ? newTaskTrigger : undefined
                   }
                   isPrimaryList={isPrimary}
                   focusedIndex={effectiveFocusedIndex}
