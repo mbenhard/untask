@@ -389,6 +389,17 @@ export const TaskItem = ({
                 align="start"
                 sideOffset={4}
                 onClick={(event) => event.stopPropagation()}
+                onOpenAutoFocus={(event) => {
+                  event.preventDefault();
+                  completeConfirmAllButtonRef.current?.focus();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onCompleteWithChildren(task.id);
+                  setCompleteConfirmOpen(false);
+                }}
               >
                 <div className="flex flex-col gap-1.5 px-1 py-1.5">
                   <p className="text-xs text-muted-foreground">
