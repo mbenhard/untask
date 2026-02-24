@@ -1,5 +1,4 @@
 export type BlockEditorPreset = 'notes' | 'task';
-export type BlockEditorInteractionMode = 'notion_like';
 
 export type BlockEditorUiConfig = {
   linkToolbar: boolean;
@@ -25,12 +24,7 @@ const BASE_UI_CONFIG: BlockEditorUiConfig = {
 
 export const resolveEditorUiConfig = (
   preset: BlockEditorPreset,
-  interactionMode: BlockEditorInteractionMode,
 ): BlockEditorUiConfig => {
-  if (interactionMode !== 'notion_like') {
-    return BASE_UI_CONFIG;
-  }
-
   if (preset === 'notes') {
     return {
       ...BASE_UI_CONFIG,

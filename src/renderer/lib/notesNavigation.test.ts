@@ -45,7 +45,9 @@ describe('navigateToNotes', () => {
     await Promise.resolve();
 
     expect(isExplicitNotesNavigationInFlight()).toBe(true);
-    resolveCreate?.();
+    expect(typeof resolveCreate).toBe('function');
+    const completeCreate = resolveCreate as () => void;
+    completeCreate();
     await createPromise;
     expect(useAppStore.getState().activeView).toBe('notes');
     expect(createNote).toHaveBeenCalledTimes(1);

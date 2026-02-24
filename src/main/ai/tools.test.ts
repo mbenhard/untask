@@ -209,6 +209,54 @@ describe('create_task tool', () => {
       expect(second.output.message).toContain('Skipped duplicate create_task call in the same turn.');
     }
   });
+
+  it('blocks duplicate mutation retries after an identical failure in the same turn', async () => {
+    isMutationToolMock.mockReturnValue(true);
+    getTaskByIdMock.mockReturnValue({
+      id: 'task-upd-fail-1',
+      title: 'Strategy parent',
+      status: 'active',
+      today: false,
+    } as never);
+    updateTaskMock.mockImplementation(() => {
+      throw new Error(
+        'Cannot move a task with subtasks under another parent. Move or complete subtasks first.',
+      );
+    });
+
+    const mutationSignatures = new Set<string>();
+    const mutationOutcomes = new Map<string, 'success' | 'error' | 'confirmation_required'>();
+
+    const first = await executeToolCall(
+      {
+        name: 'update_task',
+        input: {
+          id: 'task-upd-fail-1',
+          parentId: 'parent-2',
+        },
+      },
+      { mutationSignatures, mutationOutcomes },
+    );
+
+    const second = await executeToolCall(
+      {
+        name: 'update_task',
+        input: {
+          id: 'task-upd-fail-1',
+          parentId: 'parent-2',
+        },
+      },
+      { mutationSignatures, mutationOutcomes },
+    );
+
+    expect(first.ok).toBe(false);
+    expect(second.ok).toBe(true);
+    expect(updateTaskMock).toHaveBeenCalledTimes(1);
+    if (second.ok) {
+      expect(second.output.status).toBe('error');
+      expect(second.output.message).toContain('Skipped duplicate update_task call');
+    }
+  });
 });
 
 describe('emit_chips tool', () => {

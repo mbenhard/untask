@@ -25,6 +25,15 @@ describe('parseExplicitFallbackToolCall', () => {
       },
     });
   });
+
+  it('parses explicit list notes requests even when phrased as questions', () => {
+    expect(
+      parseExplicitFallbackToolCall('can you see what notes do I have?'),
+    ).toEqual({
+      name: 'list_notes',
+      input: {},
+    });
+  });
 });
 
 describe('shouldRetryStreamAttempt', () => {
@@ -109,6 +118,15 @@ describe('shouldRequireToolChoice', () => {
     expect(
       shouldRequireToolChoice({
         userMessage: 'create task: Call Acme',
+        history: [],
+      }),
+    ).toBe(true);
+  });
+
+  it('requires tool choice for explicit list notes requests', () => {
+    expect(
+      shouldRequireToolChoice({
+        userMessage: 'show my notes',
         history: [],
       }),
     ).toBe(true);

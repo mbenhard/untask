@@ -349,8 +349,9 @@ describe('notesStore', () => {
     await useNotesStore.getState().enterNotesView();
 
     expect(api.list).not.toHaveBeenCalled();
-    expect(resolveGet).not.toBeNull();
-    resolveGet?.(noteB);
+    expect(typeof resolveGet).toBe('function');
+    const finishGet = resolveGet as (note: Note) => void;
+    finishGet(noteB);
 
     await openPromise;
     expect(useNotesStore.getState().activeNoteId).toBe('note-b');

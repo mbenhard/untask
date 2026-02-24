@@ -425,7 +425,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
             onChange={handleChange}
             className="untask-notes-editor"
             preset="notes"
-            interactionMode="notion_like"
+            contextMenuMode="notes_contextual"
             getSlashMenuItems={getSlashMenuItems}
             editorRef={editorRef}
             onEditorReady={handleEditorReady}

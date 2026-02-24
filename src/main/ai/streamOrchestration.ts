@@ -25,7 +25,7 @@ import {
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
-import { loadPendingActions } from './autonomy';
+import { loadPendingActions, removePendingAction, requeuePendingAction } from './autonomy';
 import { classifyChatError, shouldRetryStreamAttempt } from './errorClassification';
 import { maybeAutoTitleConversation } from './autoTitle';
 
@@ -329,6 +329,8 @@ export const generateToolCallDescription = (
       return 'Attaching chips';
     case 'list_tasks':
       return input.search ? `Searching tasks for "${truncate(String(input.search), 40)}"` : 'Listing tasks';
+    case 'list_notes':
+      return 'Listing notes';
     default:
       return `Running ${toolName}`;
   }
@@ -352,12 +354,29 @@ const normalizeFallbackTaskTitle = (rawTitle: string): string =>
 const looksLikeQuestion = (message: string): boolean =>
   message.includes('?') || /^(can|could|would|will|should|please)\b/i.test(message);
 
+const EXPLICIT_LIST_NOTES_PATTERN =
+  /\b(?:list|show|see|check|review|what(?:'s| is)?|which)\b[\s\w'"’,-]{0,40}\bnotes?\b|\bnotes?\b[\s\w'"’,-]{0,24}\b(?:do\s+i\s+have|i\s+have|have)\b/i;
+
+const isExplicitListNotesIntent = (message: string): boolean =>
+  EXPLICIT_LIST_NOTES_PATTERN.test(message);
+
 export const parseExplicitFallbackToolCall = (
   userMessage: string,
 ): AiToolCall | null => {
   const normalized = userMessage.trim();
 
-  if (normalized.length === 0 || looksLikeQuestion(normalized)) {
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  if (isExplicitListNotesIntent(normalized)) {
+    return {
+      name: 'list_notes',
+      input: {},
+    };
+  }
+
+  if (looksLikeQuestion(normalized)) {
     return null;
   }
 
@@ -406,6 +425,73 @@ export const parseExplicitFallbackToolCall = (
 
 const CONFIRMATION_PATTERN =
   /^(yes|yeah|yep|do it|go ahead|sure|ok|okay|confirmed|approve|please|absolutely|definitely)\s*[.!]?\s*$/i;
+const REJECTION_PATTERN =
+  /^(no|nope|cancel|stop|abort|reject|don't|do not|never mind|not now)\s*[.!]?\s*$/i;
+
+type PendingActionDecision = 'approve' | 'reject' | null;
+
+const parsePendingActionDecision = (message: string): PendingActionDecision => {
+  const normalized = message.trim();
+  if (CONFIRMATION_PATTERN.test(normalized)) {
+    return 'approve';
+  }
+  if (REJECTION_PATTERN.test(normalized)) {
+    return 'reject';
+  }
+  return null;
+};
+
+const formatListNotesAssistantText = (envelope: ToolExecutionEnvelope): string => {
+  if (envelope.status !== 'success') {
+    return envelope.message;
+  }
+
+  const data = envelope.data as {
+    active?: Array<{ title?: unknown }>;
+    archived?: Array<{ title?: unknown }>;
+  } | undefined;
+
+  const active = Array.isArray(data?.active) ? data.active : null;
+  const archived = Array.isArray(data?.archived) ? data.archived : null;
+
+  if (!active || !archived) {
+    return envelope.message;
+  }
+
+  if (active.length === 0 && archived.length === 0) {
+    return 'You do not have any notes yet.';
+  }
+
+  const lines: string[] = [];
+  if (active.length > 0) {
+    lines.push('Active notes:');
+    active.slice(0, 20).forEach((note) => {
+      const title = typeof note.title === 'string' && note.title.trim().length > 0
+        ? note.title.trim()
+        : 'Untitled note';
+      lines.push(`- ${title}`);
+    });
+  } else {
+    lines.push('Active notes: none.');
+  }
+
+  if (archived.length > 0) {
+    lines.push('');
+    lines.push(`Archived notes: ${archived.length}.`);
+  }
+
+  return lines.join('\n');
+};
+
+const formatFallbackAssistantText = (
+  toolName: string,
+  envelope: ToolExecutionEnvelope,
+): string => {
+  if (toolName === 'list_notes') {
+    return formatListNotesAssistantText(envelope);
+  }
+  return envelope.message;
+};
 
 export const shouldRequireToolChoice = (input: {
   userMessage: string;
@@ -457,6 +543,7 @@ export const runAssistantStream = async (
   const actionCards: PersistedChatToolMetadata['actionCards'] = [];
   const toolExecutions: ChatToolExecutionSummary[] = [];
   const mutationSignatures = new Set<string>();
+  const mutationOutcomes = new Map<string, 'success' | 'error' | 'confirmation_required'>();
   const telemetry: ChatTurnTelemetry = {
     startedAt: new Date().toISOString(),
     attemptCount: 0,
@@ -475,15 +562,254 @@ export const runAssistantStream = async (
   let reasoningText = '';
   const stepDescriptions: string[] = [];
   let finalizedTextFromModel = '';
+  let forcedFallbackText: string | null = null;
   let emittedChips: ChipAction[] | undefined;
   let cachedPrompt: ReturnType<typeof buildSystemPrompt> | null = null;
 
   try {
+    const explicitFallback = parseExplicitFallbackToolCall(input.userMessage);
+    const pendingDecision = parsePendingActionDecision(input.userMessage);
+    const pendingActions = loadPendingActions();
+
+    if (
+      explicitFallback?.name === 'list_notes' ||
+      (pendingDecision !== null && pendingActions.length > 0)
+    ) {
+      telemetry.attemptCount = 1;
+
+      let deterministicResponseText = '';
+
+      if (explicitFallback?.name === 'list_notes') {
+        const deterministicToolCallId = `deterministic-${randomUUID()}`;
+        const description = generateToolCallDescription(explicitFallback.name, explicitFallback.input);
+        stepDescriptions.push(description);
+
+        emit({
+          type: 'tool_call_started',
+          requestId: input.requestId,
+          toolName: explicitFallback.name,
+          toolCallId: deterministicToolCallId,
+          description,
+        });
+
+        const deterministicResult = await executeToolCall(explicitFallback, {
+          toolCallId: deterministicToolCallId,
+          onActionCard: (card) => {
+            actionCards.push(card);
+          },
+          activeNoteId: input.noteContext?.noteId,
+          attachedNoteContext: input.noteContext,
+          mutationSignatures,
+          mutationOutcomes,
+        });
+
+        if (chatState.isCanceled(input.requestId)) {
+          return;
+        }
+
+        if (deterministicResult.ok) {
+          const actionCard = deterministicResult.output.actionCard;
+          const summary = generateToolCallSummary(deterministicResult.toolName, deterministicResult.output);
+
+          toolExecutions.push({
+            toolName: deterministicResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: deterministicResult.output.status,
+            message: deterministicResult.output.message,
+            actionCardId: actionCard?.id,
+          });
+
+          emit({
+            type: 'tool_call_completed',
+            requestId: input.requestId,
+            toolName: deterministicResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: deterministicResult.output.status,
+            message: deterministicResult.output.message,
+            summary,
+            actionCard,
+          });
+
+          deterministicResponseText = formatFallbackAssistantText(
+            deterministicResult.toolName,
+            deterministicResult.output,
+          );
+        } else {
+          toolExecutions.push({
+            toolName: deterministicResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: 'error',
+            message: deterministicResult.error.message,
+          });
+
+          emit({
+            type: 'tool_call_completed',
+            requestId: input.requestId,
+            toolName: deterministicResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: 'error',
+            message: deterministicResult.error.message,
+            summary: deterministicResult.error.message,
+          });
+
+          deterministicResponseText = `I couldn't list your notes: ${deterministicResult.error.message}`;
+        }
+      } else if (pendingActions.length > 1) {
+        deterministicResponseText = [
+          `You have ${pendingActions.length} pending approvals.`,
+          'Approve or reject a specific card so I can resolve the correct action.',
+        ].join(' ');
+      } else if (pendingDecision === 'reject') {
+        const pending = pendingActions[0];
+        removePendingAction(pending.actionId);
+        deterministicResponseText = 'Understood. I did not apply that change.';
+      } else if (pendingDecision === 'approve') {
+        const pending = pendingActions[0];
+        removePendingAction(pending.actionId);
+
+        const deterministicToolCallId = `approve-${pending.actionId}`;
+        const description = generateToolCallDescription(pending.toolName, pending.input);
+        stepDescriptions.push(description);
+
+        emit({
+          type: 'tool_call_started',
+          requestId: input.requestId,
+          toolName: pending.toolName,
+          toolCallId: deterministicToolCallId,
+          description,
+        });
+
+        const approvedResult = await executeToolCall(
+          { name: pending.toolName, input: pending.input },
+          {
+            toolCallId: deterministicToolCallId,
+            autonomyBypass: true,
+            onActionCard: (card) => {
+              actionCards.push(card);
+            },
+            activeNoteId: input.noteContext?.noteId,
+            attachedNoteContext: input.noteContext,
+            mutationSignatures,
+            mutationOutcomes,
+          },
+        );
+
+        if (chatState.isCanceled(input.requestId)) {
+          return;
+        }
+
+        if (approvedResult.ok) {
+          const resolvedActionCard = approvedResult.output.actionCard
+            ? {
+                ...approvedResult.output.actionCard,
+                actionId: pending.actionId,
+                lifecycle: 'executed' as const,
+              }
+            : undefined;
+
+          if (resolvedActionCard) {
+            const existingIndex = actionCards.findIndex((card) => card.id === resolvedActionCard.id);
+            if (existingIndex === -1) {
+              actionCards.push(resolvedActionCard);
+            } else {
+              actionCards[existingIndex] = resolvedActionCard;
+            }
+          }
+
+          const summary = generateToolCallSummary(approvedResult.toolName, approvedResult.output);
+
+          toolExecutions.push({
+            toolName: approvedResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: approvedResult.output.status,
+            message: approvedResult.output.message,
+            actionCardId: resolvedActionCard?.id,
+          });
+
+          emit({
+            type: 'tool_call_completed',
+            requestId: input.requestId,
+            toolName: approvedResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: approvedResult.output.status,
+            message: approvedResult.output.message,
+            summary,
+            actionCard: resolvedActionCard,
+          });
+
+          deterministicResponseText = approvedResult.output.message;
+        } else {
+          requeuePendingAction(pending);
+          toolExecutions.push({
+            toolName: approvedResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: 'error',
+            message: approvedResult.error.message,
+          });
+
+          emit({
+            type: 'tool_call_completed',
+            requestId: input.requestId,
+            toolName: approvedResult.toolName,
+            toolCallId: deterministicToolCallId,
+            status: 'error',
+            message: approvedResult.error.message,
+            summary: approvedResult.error.message,
+          });
+
+          deterministicResponseText =
+            `I couldn't complete that approved action yet: ${approvedResult.error.message}`;
+        }
+      }
+
+      const metadata: PersistedChatToolMetadata = {
+        requestId: input.requestId,
+        modelId: input.modelId,
+        actionCards,
+        toolExecutions,
+        telemetry: {
+          ...telemetry,
+          completedAt: new Date().toISOString(),
+        },
+        ...(stepDescriptions.length > 0 ? { stepDescriptions } : {}),
+      };
+
+      if (chatState.isCanceled(input.requestId)) {
+        return;
+      }
+
+      const assistantMessage = saveChatMessage({
+        conversationId: input.conversationId,
+        role: 'assistant',
+        content:
+          deterministicResponseText.trim().length > 0
+            ? deterministicResponseText.trim()
+            : 'Done.',
+        toolCalls: JSON.stringify(metadata),
+        chips: null,
+      });
+
+      void maybeAutoTitleConversation({
+        conversationId: input.conversationId,
+        userMessage: input.userMessage,
+      });
+
+      emit({
+        type: 'assistant_done',
+        requestId: input.requestId,
+        assistantMessage,
+        actionCards,
+      });
+
+      return;
+    }
+
     let streamCompleted = false;
 
     for (let attempt = 1; attempt <= STREAM_MAX_ATTEMPTS; attempt += 1) {
       telemetry.attemptCount = attempt;
       let attemptHadToolExecution = false;
+      forcedFallbackText = null;
 
       try {
         const ollamaSlim = OLLAMA_SLIM_MODE && isOllamaProvider();
@@ -712,6 +1038,7 @@ export const runAssistantStream = async (
               activeNoteId: input.noteContext?.noteId,
               attachedNoteContext: input.noteContext,
               mutationSignatures,
+              mutationOutcomes,
             }, effectiveAllowedTools);
 
             // Use AI SDK provider-defined tool shape to avoid unsupported raw tool injection.
@@ -1022,6 +1349,7 @@ export const runAssistantStream = async (
               activeNoteId: input.noteContext?.noteId,
               attachedNoteContext: input.noteContext,
               mutationSignatures,
+              mutationOutcomes,
             });
 
             if (chatState.isCanceled(input.requestId)) {
@@ -1050,6 +1378,11 @@ export const runAssistantStream = async (
                 summary: fallbackSummary,
                 actionCard,
               });
+
+              forcedFallbackText = formatFallbackAssistantText(
+                fallbackResult.toolName,
+                fallbackResult.output,
+              );
             } else {
               toolExecutions.push({
                 toolName: fallbackResult.toolName,
@@ -1072,6 +1405,9 @@ export const runAssistantStream = async (
         }
 
         finalizedTextFromModel = (await result.text).trim() || assistantText.trim();
+        if (forcedFallbackText && forcedFallbackText.trim().length > 0) {
+          finalizedTextFromModel = forcedFallbackText;
+        }
         if (finalizedTextFromModel.length === 0 && toolExecutions.length === 0) {
           throw new Error('Provider returned empty response.');
         }

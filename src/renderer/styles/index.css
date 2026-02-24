@@ -401,6 +401,7 @@
   border-color: color-mix(in srgb, var(--ring) 30%, transparent);
 }
 
+.untask-editor-context-menu,
 .untask-editor-file-menu {
   border: 1px solid var(--untask-editor-chrome-border) !important;
 }

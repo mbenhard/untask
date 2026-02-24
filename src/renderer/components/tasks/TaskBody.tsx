@@ -836,7 +836,7 @@ export const TaskBody = ({
             onBlur={handleBlur}
             className="untask-task-editor"
             preset="task"
-            interactionMode="notion_like"
+            contextMenuMode="off"
             editorRef={editorRef}
             getSlashMenuItems={getAttachmentSlashMenuItems}
           />

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { resolveEditorUiConfig } from './editorUiConfig';
 
 describe('resolveEditorUiConfig', () => {
-  it('enables core notion-like controls for notes preset', () => {
-    expect(resolveEditorUiConfig('notes', 'notion_like')).toEqual({
+  it('enables contextual controls for notes preset', () => {
+    expect(resolveEditorUiConfig('notes')).toEqual({
       linkToolbar: true,
       slashMenu: false,
       sideMenu: true,
@@ -17,7 +17,7 @@ describe('resolveEditorUiConfig', () => {
   });
 
   it('keeps compact controls for task preset', () => {
-    expect(resolveEditorUiConfig('task', 'notion_like')).toEqual({
+    expect(resolveEditorUiConfig('task')).toEqual({
       linkToolbar: false,
       slashMenu: false,
       sideMenu: false,

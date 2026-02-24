@@ -222,6 +222,32 @@ export const executeToolCall = async (
     mutationSignature &&
     context.mutationSignatures?.has(mutationSignature)
   ) {
+    const previousOutcome = context.mutationOutcomes?.get(mutationSignature);
+
+    if (previousOutcome === 'error') {
+      return {
+        ok: true,
+        toolName: rawToolName,
+        output: {
+          status: 'error',
+          message:
+            `Skipped duplicate ${rawToolName} call: the same payload already failed in this turn. ` +
+            'Change the input before retrying.',
+        },
+      };
+    }
+
+    if (previousOutcome === 'confirmation_required') {
+      return {
+        ok: true,
+        toolName: rawToolName,
+        output: {
+          status: 'confirmation_required',
+          message: `This ${rawToolName} action is already waiting for confirmation.`,
+        },
+      };
+    }
+
     return {
       ok: true,
       toolName: rawToolName,
@@ -266,6 +292,7 @@ export const executeToolCall = async (
       emitActionCard(context, actionCard);
       if (mutationSignature) {
         context.mutationSignatures?.add(mutationSignature);
+        context.mutationOutcomes?.set(mutationSignature, 'confirmation_required');
       }
 
       return {
@@ -291,6 +318,7 @@ export const executeToolCall = async (
     const output = await definition.execute(parsed.data, execContext);
     if (mutationSignature) {
       context.mutationSignatures?.add(mutationSignature);
+      context.mutationOutcomes?.set(mutationSignature, output.status);
     }
 
     return {
@@ -299,6 +327,11 @@ export const executeToolCall = async (
       output,
     };
   } catch (error) {
+    if (mutationSignature) {
+      context.mutationSignatures?.add(mutationSignature);
+      context.mutationOutcomes?.set(mutationSignature, 'error');
+    }
+
     return {
       ok: false,
       toolName: rawToolName,
@@ -326,6 +359,7 @@ export const PROACTIVE_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
 export const OLLAMA_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
   'create_task',
   'list_tasks',
+  'list_notes',
   'update_task',
   'complete_task',
   'emit_chips',

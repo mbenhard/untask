@@ -13,12 +13,18 @@ import {
 import { Link as TiptapLink } from '@tiptap/extension-link';
 import '@blocknote/ariakit/style.css';
 
-import { FileContextMenu } from './FileContextMenu';
+import {
+  EditorContextMenu,
+  resolveEditorContextTarget,
+  shouldUseNativeContextMenu,
+  type EditorContextMenuMode,
+  type EditorContextMenuTarget,
+  type NativeContextFallbackModifier,
+} from './EditorContextMenu';
 import { UntaskFormattingToolbar } from './UntaskFormattingToolbar';
 import { UntaskSlashMenu } from './UntaskSlashMenu';
 import {
   resolveEditorUiConfig,
-  type BlockEditorInteractionMode,
   type BlockEditorPreset,
 } from './editorUiConfig';
 
@@ -37,7 +43,8 @@ export type BlockEditorProps = {
   className?: string;
   editable?: boolean;
   preset?: BlockEditorPreset;
-  interactionMode?: BlockEditorInteractionMode;
+  contextMenuMode?: EditorContextMenuMode;
+  nativeContextFallbackModifier?: NativeContextFallbackModifier;
   /** Custom slash-menu items. If omitted, BlockNote defaults are used. */
   getSlashMenuItems?: (params: BlockEditorSlashMenuParams) => BlockEditorSlashMenuItem[];
   /** Ref to access the editor instance from parent components. */
@@ -88,15 +95,16 @@ export const BlockEditor = ({
   className,
   editable = true,
   preset = 'task',
-  interactionMode = 'notion_like',
+  contextMenuMode = 'off',
+  nativeContextFallbackModifier = 'shift',
   getSlashMenuItems,
   editorRef,
   onEditorReady,
 }: BlockEditorProps) => {
   const { resolvedTheme } = useTheme();
   const uiConfig = useMemo(
-    () => resolveEditorUiConfig(preset, interactionMode),
-    [preset, interactionMode],
+    () => resolveEditorUiConfig(preset),
+    [preset],
   );
   const initialContentResolutionRef = useRef(resolveInitialEditorContent(content));
   const initialLegacyMarkdownRef = useRef(initialContentResolutionRef.current.legacyMarkdown);
@@ -170,7 +178,11 @@ export const BlockEditor = ({
 
   const handleSurfaceMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      const target = event.target as HTMLElement;
+      const rawTarget = event.target;
+      if (!(rawTarget instanceof HTMLElement)) {
+        return;
+      }
+      const target = rawTarget;
       if (target.closest(EDITOR_CHROME_SELECTOR)) {
         return;
       }
@@ -203,7 +215,12 @@ export const BlockEditor = ({
   // Open file attachments and modifier-clicked links with system default app on click.
   const handleSurfaceClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      const target = event.target as HTMLElement;
+      setContextMenu(null);
+      const rawTarget = event.target;
+      if (!(rawTarget instanceof HTMLElement)) {
+        return;
+      }
+      const target = rawTarget;
       const fileRow = target.closest('.bn-file-name-with-icon');
       if (fileRow) {
         const blockEl = target.closest('[data-id]');
@@ -238,38 +255,42 @@ export const BlockEditor = ({
     [editor],
   );
 
-  // Right-click context menu for file attachment blocks
-  const [fileMenu, setFileMenu] = useState<{
+  const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    blockId: string;
-    attachmentId: string;
+    target: EditorContextMenuTarget;
   } | null>(null);
 
-  const handleFileContextMenu = useCallback(
+  const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      const target = event.target as HTMLElement;
-      const fileArea =
-        target.closest('.bn-file-name-with-icon') ??
-        target.closest('.bn-file-block-content-wrapper');
-      if (!fileArea) return;
+      if (shouldUseNativeContextMenu(nativeContextFallbackModifier, event.nativeEvent)) {
+        return;
+      }
 
-      const blockEl = target.closest('[data-id]');
-      if (!blockEl) return;
-
-      const blockId = blockEl.getAttribute('data-id');
-      if (!blockId) return;
-
-      const block = editor.getBlock(blockId);
-      const url = (block?.props as Record<string, unknown>)?.url;
-      if (typeof url !== 'string' || !url.startsWith('untask-file://')) return;
+      const rawTarget = event.target;
+      if (!(rawTarget instanceof HTMLElement)) {
+        return;
+      }
+      const target = rawTarget;
+      const resolvedTarget = resolveEditorContextTarget(
+        editor,
+        target,
+        contextMenuMode,
+      );
+      if (!resolvedTarget) {
+        return;
+      }
 
       event.preventDefault();
       event.stopPropagation();
-      const id = url.slice('untask-file://'.length);
-      setFileMenu({ x: event.clientX, y: event.clientY, blockId, attachmentId: id });
+
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        target: resolvedTarget,
+      });
     },
-    [editor],
+    [contextMenuMode, editor, nativeContextFallbackModifier],
   );
 
   const customSlashMenuItems = useMemo(() => {
@@ -294,7 +315,7 @@ export const BlockEditor = ({
       className={className}
       onMouseDown={handleSurfaceMouseDown}
       onClick={handleSurfaceClick}
-      onContextMenu={handleFileContextMenu}
+      onContextMenu={handleSurfaceContextMenu}
       onFocus={onFocus}
       onBlur={onBlur}
     >
@@ -322,23 +343,13 @@ export const BlockEditor = ({
         />
       </BlockNoteView>
 
-      {fileMenu && (
-        <FileContextMenu
-          x={fileMenu.x}
-          y={fileMenu.y}
-          onOpen={() => {
-            window.untask?.attachments.open({ id: fileMenu.attachmentId });
-            setFileMenu(null);
-          }}
-          onReveal={() => {
-            window.untask?.attachments.reveal({ id: fileMenu.attachmentId });
-            setFileMenu(null);
-          }}
-          onDelete={() => {
-            editor.removeBlocks([fileMenu.blockId]);
-            setFileMenu(null);
-          }}
-          onClose={() => setFileMenu(null)}
+      {contextMenu && (
+        <EditorContextMenu
+          editor={editor}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          target={contextMenu.target}
+          onClose={() => setContextMenu(null)}
         />
       )}
     </div>

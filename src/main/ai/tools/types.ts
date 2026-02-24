@@ -21,6 +21,7 @@ export type ToolExecutionContext = {
   activeNoteId?: string;
   attachedNoteContext?: ChatNoteContext;
   mutationSignatures?: Set<string>;
+  mutationOutcomes?: Map<string, ChatToolStatus>;
 };
 
 export type ToolInputSchema = z.ZodTypeAny;
