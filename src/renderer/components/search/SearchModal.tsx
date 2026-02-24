@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 import { Search, FileText } from 'lucide-react';
+import { getDisplayTitle } from '../../lib/noteUtils';
 
 import type { SearchResultItem, TaskSearchResultItem, NoteSearchResultItem } from '../../../types/ipc';
 import {
@@ -202,6 +203,7 @@ export const SearchModal = () => {
                 {results.filter((r): r is NoteSearchResultItem => r.type === 'note').map((result) => {
                   const globalIdx = results.findIndex((r) => r.id === result.id);
                   const isSelected = globalIdx === selectedIndex;
+                  const displayTitle = getDisplayTitle(result.title, result.content);
 
                   return (
                     <button
@@ -210,14 +212,22 @@ export const SearchModal = () => {
                       role="option"
                       aria-selected={isSelected}
                       data-selected={isSelected}
-                      className={`flex w-full items-center gap-2 px-2.5 py-1 text-left ${isSelected ? 'bg-accent' : ''}`}
+                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left ${isSelected ? 'bg-accent' : ''}`}
                       onClick={() => navigateToResult(result)}
                       onMouseEnter={() => useSearchStore.setState({ selectedIndex: globalIdx })}
                     >
-                      <FileText aria-hidden="true" className="h-3 w-3 shrink-0 text-muted-foreground/50" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
-                        {result.title}
-                      </span>
+                      <FileText aria-hidden="true" className="h-3 w-3 shrink-0 self-start mt-0.5 text-muted-foreground/50" />
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] text-foreground">
+                          {displayTitle}
+                        </span>
+                        {result.snippet && (
+                          <span
+                            className="block truncate text-[11px] text-muted-foreground/50"
+                            dangerouslySetInnerHTML={{ __html: result.snippet }}
+                          />
+                        )}
+                      </div>
                     </button>
                   );
                 })}

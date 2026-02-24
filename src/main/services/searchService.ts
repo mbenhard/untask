@@ -53,6 +53,7 @@ export type SearchChatQueryResult = {
 export type NoteSearchResultItem = {
   id: string;
   title: string;
+  content: string;
   snippet: string;
 };
 
@@ -263,7 +264,7 @@ function executeNoteSearch(sanitized: string, limit: number): { results: NoteSea
     .prepare(
       `
       SELECT
-        n.id, n.title,
+        n.id, n.title, n.content,
         snippet(notes_fts, 0, '<mark>', '</mark>', '...', 32) AS snippet
       FROM notes_fts
       JOIN notes n ON n.rowid = notes_fts.rowid
@@ -276,12 +277,14 @@ function executeNoteSearch(sanitized: string, limit: number): { results: NoteSea
     .all(sanitized, limit) as Array<{
     id: string;
     title: string;
+    content: string;
     snippet: string;
   }>;
 
   const results: NoteSearchResultItem[] = rows.map((row) => ({
     id: row.id,
     title: row.title,
+    content: row.content,
     snippet: row.snippet,
   }));
 

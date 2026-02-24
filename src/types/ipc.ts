@@ -391,6 +391,7 @@ export type NoteSearchResultItem = {
   type: 'note';
   id: string;
   title: string;
+  content: string;
   snippet: string;
 };
 
