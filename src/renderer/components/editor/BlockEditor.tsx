@@ -7,9 +7,11 @@ import {
   getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
   FormattingToolbarController,
+  SideMenuController,
   SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react';
+import { offset } from '@floating-ui/react';
 import { Link as TiptapLink } from '@tiptap/extension-link';
 import '@blocknote/ariakit/style.css';
 
@@ -317,6 +319,18 @@ export const BlockEditor = ({
     return filterSuggestionItems(customSlashMenuItems, query);
   }, [customSlashMenuItems]);
 
+  const notesSideMenuFloatingOptions = useMemo(() => {
+    if (preset !== 'notes' || !uiConfig.sideMenu) {
+      return undefined;
+    }
+
+    return {
+      useFloatingOptions: {
+        middleware: [offset({ mainAxis: -12 })],
+      },
+    };
+  }, [preset, uiConfig.sideMenu]);
+
   return (
     <div
       className={className}
@@ -333,7 +347,7 @@ export const BlockEditor = ({
         editable={editable}
         linkToolbar={uiConfig.linkToolbar}
         slashMenu={uiConfig.slashMenu}
-        sideMenu={uiConfig.sideMenu}
+        sideMenu={preset === 'notes' ? false : uiConfig.sideMenu}
         filePanel={uiConfig.filePanel}
         tableHandles={uiConfig.tableHandles}
         emojiPicker={uiConfig.emojiPicker}
@@ -348,6 +362,11 @@ export const BlockEditor = ({
         <FormattingToolbarController
           formattingToolbar={UntaskFormattingToolbar}
         />
+        {preset === 'notes' && uiConfig.sideMenu && (
+          <SideMenuController
+            floatingUIOptions={notesSideMenuFloatingOptions}
+          />
+        )}
       </BlockNoteView>
 
       {contextMenu && (
