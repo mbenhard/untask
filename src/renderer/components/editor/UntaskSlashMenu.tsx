@@ -50,7 +50,7 @@ export const UntaskSlashMenu = ({
   return (
     <div
       ref={containerRef}
-      className="min-w-[200px] max-h-[280px] rounded-md border border-border/60 bg-popover p-1 overflow-y-auto"
+      className="untask-editor-slash-menu min-w-[220px] max-h-[300px] overflow-y-auto rounded-md border border-border/60 bg-popover/95 p-1 backdrop-blur-sm"
     >
       {loadingState === 'loading-initial' && (
         <div className="px-2 py-3 text-center text-xs text-muted-foreground/50">
@@ -82,7 +82,7 @@ export const UntaskSlashMenu = ({
                 type="button"
                 data-index={idx}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs transition-colors duration-100',
+                  'untask-editor-slash-item flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs transition-colors duration-100',
                   isSelected
                     ? 'bg-accent text-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',

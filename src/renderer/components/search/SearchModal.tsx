@@ -16,8 +16,8 @@ import {
   useSearchStore,
 } from '../../stores/searchStore';
 import { useAppStore } from '../../stores/appStore';
+import { navigateToNotes } from '../../lib/notesNavigation';
 import { useTaskStore } from '../../stores/taskStore';
-import { useNotesStore } from '../../stores/notesStore';
 import { resolveSearchResultView } from './searchRouting';
 
 const DEBOUNCE_MS = 250;
@@ -47,7 +47,6 @@ export const SearchModal = () => {
 
   const setView = useAppStore((s) => s.setView);
   const selectTask = useTaskStore((s) => s.selectTask);
-  const openNote = useNotesStore((s) => s.openNote);
 
   const showHeaders = types.length > 1;
 
@@ -82,14 +81,13 @@ export const SearchModal = () => {
     (result: SearchResultItem) => {
       close();
       if (result.type === 'note') {
-        setView('notes');
-        void openNote(result.id);
+        void navigateToNotes({ type: 'open', noteId: result.id });
       } else {
         setView(resolveSearchResultView(result));
         selectTask(result.id);
       }
     },
-    [close, openNote, selectTask, setView],
+    [close, selectTask, setView],
   );
 
   const handleKeyDown = useCallback(

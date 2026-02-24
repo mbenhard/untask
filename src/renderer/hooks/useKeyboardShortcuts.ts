@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
 import { getUntask } from '../lib/untask';
+import { navigateToNotes } from '../lib/notesNavigation';
 import { useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNotesStore } from '../stores/notesStore';
@@ -93,16 +94,14 @@ export const useKeyboardShortcuts = ({
 
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
-        setView('notes');
-        void useNotesStore.getState().createNote();
+        void navigateToNotes({ type: 'create' });
         return;
       }
 
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
         if (activeViewRef.current === 'notes') {
-          setView('notes');
-          void useNotesStore.getState().createNote();
+          void navigateToNotes({ type: 'create' });
         } else {
           triggerNewTask();
         }
@@ -128,7 +127,7 @@ export const useKeyboardShortcuts = ({
         }
         if (event.code === 'Digit4') {
           event.preventDefault();
-          setView('notes');
+          void navigateToNotes({ type: 'default' });
           return;
         }
         if (event.code === 'Comma') {

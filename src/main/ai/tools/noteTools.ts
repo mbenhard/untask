@@ -30,6 +30,27 @@ const resolveNoteId = (noteId?: string, activeNoteId?: string): string => {
   return active[0].id;
 };
 
+const getAttachedNoteSnapshot = (
+  context: ToolExecutionContext,
+  noteId: string,
+): { id: string; title: string; markdown: string } | null => {
+  const attached = context.attachedNoteContext;
+  if (!attached || attached.noteId !== noteId) {
+    return null;
+  }
+
+  const markdown = attached.markdown.trim();
+  if (markdown.length === 0) {
+    return null;
+  }
+
+  return {
+    id: attached.noteId,
+    title: attached.title.trim() || 'Untitled note',
+    markdown,
+  };
+};
+
 // ─── Tool definitions ───────────────────────────────────────────
 
 export const listNotesTool = {
@@ -63,7 +84,31 @@ export const readNoteTool = {
   execute: async (input: { noteId?: string }, context: ToolExecutionContext): Promise<ToolExecutionEnvelope> => {
     const id = resolveNoteId(input.noteId, context.activeNoteId);
     const note = getNote(id);
-    if (!note) throw new Error(`Note ${id} not found.`);
+    if (!note) {
+      const attachedSnapshot = getAttachedNoteSnapshot(context, id);
+      if (!attachedSnapshot) {
+        throw new Error(`Note ${id} not found.`);
+      }
+
+      const now = new Date().toISOString();
+      return {
+        status: 'success',
+        message: `Using attached snapshot for "${attachedSnapshot.title}" because the original note is no longer available.`,
+        data: {
+          note: {
+            id: attachedSnapshot.id,
+            title: attachedSnapshot.title,
+            content: attachedSnapshot.markdown,
+            status: 'active',
+            isPinned: false,
+            createdAt: now,
+            updatedAt: now,
+            fromAttachedContext: true,
+          },
+        },
+      };
+    }
+
     const displayTitle = getDisplayTitle(note);
     const markdown = blockNoteToMarkdown(note.content);
     const hasContent = markdown.trim().length > 0;
@@ -85,7 +130,13 @@ export const editNoteTool = {
   execute: async (input: z.infer<typeof editNoteToolInputSchema>, context: ToolExecutionContext): Promise<ToolExecutionEnvelope> => {
     const id = resolveNoteId(input.noteId, context.activeNoteId);
     const current = getNote(id);
-    if (!current) throw new Error(`Note ${id} not found.`);
+    if (!current) {
+      const attachedSnapshot = getAttachedNoteSnapshot(context, id);
+      if (attachedSnapshot) {
+        throw new Error('The attached note was deleted after it was shared. I can still analyze the attached snapshot, but I cannot apply edits until the note is restored or recreated.');
+      }
+      throw new Error(`Note ${id} not found.`);
+    }
     const beforeContent = current.content;
 
     if (input.action === 'append') {

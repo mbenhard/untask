@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import type {
   ChatActionCard,
   ChatToolStatus,
+  ChatNoteContext,
 } from '../../../types/chat';
 
 export type ToolExecutionEnvelope = {
@@ -18,6 +19,7 @@ export type ToolExecutionContext = {
   autonomyBypass?: boolean;
   skipInternalConfirmation?: boolean;
   activeNoteId?: string;
+  attachedNoteContext?: ChatNoteContext;
   mutationSignatures?: Set<string>;
 };
 

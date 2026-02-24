@@ -268,7 +268,7 @@ export const ChatInput = ({
             onPaste={handlePaste}
             placeholder={
               pendingNoteContext
-                ? `Ask Untask about "${pendingNoteContext.title}"...`
+                ? 'Ask about note...'
                 : 'Ask Untask...'
             }
             aria-label="Chat input"

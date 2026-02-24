@@ -835,6 +835,8 @@ export const TaskBody = ({
             onFocus={handleFocus}
             onBlur={handleBlur}
             className="untask-task-editor"
+            preset="task"
+            interactionMode="notion_like"
             editorRef={editorRef}
             getSlashMenuItems={getAttachmentSlashMenuItems}
           />

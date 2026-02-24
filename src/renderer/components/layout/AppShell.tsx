@@ -267,6 +267,12 @@ export const AppShell = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (activeView !== 'notes') {
+      clearPendingNoteContext();
+    }
+  }, [activeView, clearPendingNoteContext]);
+
   // F-4: Place focus on primary element when view changes
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {

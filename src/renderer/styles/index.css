@@ -241,12 +241,17 @@
 .untask-notes-editor {
   min-height: 100%;
   cursor: text;
+  --untask-editor-chrome-bg: color-mix(in srgb, var(--accent) 42%, transparent);
+  --untask-editor-chrome-hover-bg: color-mix(in srgb, var(--accent) 68%, transparent);
+  --untask-editor-chrome-border: color-mix(in srgb, var(--border) 74%, transparent);
+  --untask-editor-chrome-icon: color-mix(in srgb, var(--muted-foreground) 88%, transparent);
 }
 
 .untask-notes-editor .bn-container {
   --bn-colors-editor-background: transparent;
   background-color: transparent;
   min-height: 100%;
+  padding: 6px 0 16px;
 }
 
 .untask-notes-editor .bn-editor,
@@ -258,6 +263,18 @@
 .untask-notes-editor .bn-editor {
   min-height: 100%;
   cursor: text;
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 0 12px;
+}
+
+.untask-notes-editor .bn-block-outer {
+  border-radius: 6px;
+  transition: background-color 120ms ease;
+}
+
+.untask-notes-editor .bn-block-outer:hover {
+  background-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 /* Notes view: compact heading sizes (industrial, not document-editor) */
@@ -283,14 +300,22 @@
 
 /* Compact side menu icons (+ / drag handle) */
 .untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root:not(.mantine-Menu-item), .bn-button) svg {
-  height: 16px !important;
-  width: 16px !important;
-  color: var(--muted-foreground) !important;
-  opacity: 0.4;
+  height: 14px !important;
+  width: 14px !important;
+  color: var(--untask-editor-chrome-icon) !important;
+  opacity: 0.95;
 }
 
-.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover svg {
-  opacity: 0.8;
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button) {
+  background-color: var(--untask-editor-chrome-bg);
+  border: 1px solid var(--untask-editor-chrome-border);
+  border-radius: 5px;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover {
+  background-color: var(--untask-editor-chrome-hover-bg);
+  border-color: color-mix(in srgb, var(--ring) 30%, var(--untask-editor-chrome-border));
 }
 
 /* Side menu heights aligned to reduced heading sizes */
@@ -348,6 +373,215 @@
   font-size: var(--prev-level) !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
+}
+
+/* Link toolbar and contextual chrome in notes editor */
+.untask-notes-editor .bn-link-toolbar,
+.untask-notes-editor .bn-table-handle {
+  border: 1px solid var(--untask-editor-chrome-border) !important;
+  background-color: color-mix(in srgb, var(--popover) 92%, transparent) !important;
+  box-shadow: 0 6px 20px -16px rgba(0, 0, 0, 0.5) !important;
+}
+
+.untask-editor-toolbar {
+  border: 1px solid var(--untask-editor-chrome-border) !important;
+  box-shadow: 0 8px 22px -18px rgba(0, 0, 0, 0.5);
+}
+
+.untask-editor-slash-menu {
+  border: 1px solid var(--untask-editor-chrome-border) !important;
+  box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.58);
+}
+
+.untask-editor-slash-item {
+  border: 1px solid transparent;
+}
+
+.untask-editor-slash-item:hover {
+  border-color: color-mix(in srgb, var(--ring) 30%, transparent);
+}
+
+.untask-editor-file-menu {
+  border: 1px solid var(--untask-editor-chrome-border) !important;
+}
+
+/* Ariakit-backed block menus (drag handle / table / colors) tuned to app chrome */
+.bn-ariakit .bn-menu-dropdown,
+.bn-ariakit .bn-ak-menu,
+.bn-ariakit .bn-table-handle-menu,
+.bn-ariakit .bn-color-picker-dropdown {
+  min-width: 188px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent) !important;
+  border-radius: 6px !important;
+  background-color: color-mix(in srgb, var(--popover) 94%, transparent) !important;
+  box-shadow: 0 12px 30px -20px rgba(0, 0, 0, 0.65) !important;
+  padding: 4px !important;
+}
+
+.bn-ariakit .bn-menu-item,
+.bn-ariakit .bn-ak-menu-item {
+  border-radius: 4px !important;
+  color: color-mix(in srgb, var(--muted-foreground) 90%, transparent);
+  font-size: 12px !important;
+  line-height: 1.15;
+  padding: 7px 8px !important;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.bn-ariakit .bn-menu-item:hover,
+.bn-ariakit .bn-menu-item[data-active-item],
+.bn-ariakit .bn-ak-menu-item:hover,
+.bn-ariakit .bn-ak-menu-item[data-active-item],
+.bn-ariakit .bn-ak-menu-item[aria-selected="true"],
+.bn-ariakit .bn-menu-item[aria-selected="true"] {
+  background-color: color-mix(in srgb, var(--accent) 92%, transparent) !important;
+  color: var(--foreground) !important;
+}
+
+.bn-ariakit .bn-ak-group-label {
+  color: color-mix(in srgb, var(--muted-foreground) 72%, transparent);
+  font-size: 10px !important;
+  letter-spacing: 0.08em;
+  padding: 5px 8px 3px !important;
+  text-transform: uppercase;
+}
+
+.bn-ariakit .bn-ak-separator {
+  border-color: color-mix(in srgb, var(--border) 72%, transparent) !important;
+  margin: 4px 2px !important;
+}
+
+.bn-ariakit .bn-color-picker-dropdown {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.bn-ariakit .bn-drag-handle-menu > .bn-menu-item:first-child {
+  color: color-mix(in srgb, var(--destructive) 80%, var(--muted-foreground));
+}
+
+.bn-ariakit .bn-drag-handle-menu > .bn-menu-item:first-child:hover,
+.bn-ariakit .bn-drag-handle-menu > .bn-menu-item:first-child[data-active-item] {
+  background-color: color-mix(in srgb, var(--destructive) 14%, transparent) !important;
+  color: var(--destructive) !important;
+}
+
+/* Checklist controls: replace native browser checkbox look with app-native chrome */
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0 8px 0 4px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 3px;
+  background-color: color-mix(in srgb, var(--background) 68%, var(--accent));
+  cursor: pointer;
+  position: relative;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"]:hover {
+  border-color: color-mix(in srgb, var(--ring) 32%, var(--border));
+  background-color: color-mix(in srgb, var(--accent) 84%, var(--background));
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: 2px;
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"]:active {
+  transform: scale(0.96);
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 6px;
+  height: 3px;
+  border-left: 1.7px solid var(--background);
+  border-bottom: 1.7px solid var(--background);
+  transform: rotate(-45deg) scale(0);
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"]:checked {
+  background-color: var(--foreground);
+  border-color: color-mix(in srgb, var(--foreground) 72%, var(--border));
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="checkListItem"] > div > input[type="checkbox"]:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+/* File panel upload control: keep native behavior, align visual language */
+.bn-ariakit .bn-file-input {
+  width: 100%;
+  border: 1px dashed color-mix(in srgb, var(--border) 82%, transparent) !important;
+  border-radius: 5px !important;
+  background-color: color-mix(in srgb, var(--accent) 56%, transparent) !important;
+  color: color-mix(in srgb, var(--muted-foreground) 90%, transparent) !important;
+  font-size: 12px !important;
+  line-height: 1.15;
+  padding: 7px 8px !important;
+}
+
+.bn-ariakit .bn-file-input::file-selector-button {
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--background) 84%, transparent);
+  color: var(--foreground);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  margin-right: 8px;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.bn-ariakit .bn-file-input:hover::file-selector-button {
+  background-color: color-mix(in srgb, var(--accent) 90%, var(--background));
+  border-color: color-mix(in srgb, var(--ring) 24%, var(--border));
+}
+
+/* Code block language selector: avoid default browser select chrome */
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="codeBlock"] > div > select {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.32) !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 10px) calc(50% - 1px),
+    calc(100% - 6px) calc(50% - 1px);
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  color: rgba(245, 245, 245, 0.9) !important;
+  font-family: var(--font-mono);
+  font-size: 10px !important;
+  letter-spacing: 0.04em;
+  padding: 3px 18px 3px 7px !important;
+  top: 6px !important;
+  left: 12px !important;
+}
+
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="codeBlock"]:hover > div > select,
+:is(.untask-notes-editor, .untask-task-editor) .bn-block-content[data-content-type="codeBlock"] > div > select:focus-visible {
+  opacity: 0.95 !important;
 }
 
 /* ──────────────────────────────────────────────

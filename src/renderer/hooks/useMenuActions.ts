@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { useAppStore } from '../stores/appStore';
-import { useNotesStore } from '../stores/notesStore';
+import { navigateToNotes } from '../lib/notesNavigation';
 
 export function useMenuActions(): void {
   useEffect(() => {
@@ -11,8 +11,7 @@ export function useMenuActions(): void {
     });
 
     const unsubNote = window.untask?.app.onMenuNewNote(() => {
-      useAppStore.getState().setView('notes');
-      void useNotesStore.getState().createNote();
+      void navigateToNotes({ type: 'create' });
     });
 
     return () => {

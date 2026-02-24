@@ -182,7 +182,7 @@ export const createMessageActions = (
     }
     const images = [...get().pendingImages];
     const noteContext = get().pendingNoteContext ?? undefined;
-    set({ pendingImages: [], pendingNoteContext: null });
+    set({ pendingImages: [] });
 
     // Inject images from the currently selected task's attachments
     const taskState = useTaskStore.getState();

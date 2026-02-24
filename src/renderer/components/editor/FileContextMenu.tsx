@@ -65,7 +65,7 @@ export const FileContextMenu = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[160px] rounded-md border border-border/60 bg-popover p-1 shadow-md"
+      className="untask-editor-file-menu fixed z-50 min-w-[168px] rounded-md border border-border/60 bg-popover/95 p-1 shadow-md backdrop-blur-sm"
       style={{ left: x, top: y }}
     >
       <button type="button" className={itemClass} onClick={onOpen}>

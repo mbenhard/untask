@@ -77,15 +77,18 @@ type ToolRiskHint = {
 };
 
 const HARD_OVERRIDE_TOOLS: ReadonlySet<string> = new Set(['delete_task']);
+const isNoteRewrite = (hint: ToolRiskHint): boolean =>
+  hint.toolName === 'edit_note' && hint.input.action === 'rewrite';
 
 export const classifyRisk = (hint: ToolRiskHint): RiskLevel => {
   if (HARD_OVERRIDE_TOOLS.has(hint.toolName)) return 'critical';
+  if (isNoteRewrite(hint)) return 'high';
   return 'low';
 };
 
 export const requiresHardConfirmation = (hint: ToolRiskHint): boolean => {
-  // Only delete_task requires hard confirmation regardless of autonomy mode
-  return HARD_OVERRIDE_TOOLS.has(hint.toolName);
+  // Destructive mutations always require explicit confirmation.
+  return HARD_OVERRIDE_TOOLS.has(hint.toolName) || isNoteRewrite(hint);
 };
 
 // ─── Mode gating decision ────────────────────────────────────

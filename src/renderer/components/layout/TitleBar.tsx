@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { navigateToNotes } from '../../lib/notesNavigation';
 import {
   type AppView,
   selectActiveView,
@@ -37,7 +38,13 @@ export const TitleBar = () => {
             <button
               key={view}
               type="button"
-              onClick={() => setView(view)}
+              onClick={() => {
+                if (view === 'notes') {
+                  void navigateToNotes({ type: 'default' });
+                  return;
+                }
+                setView(view);
+              }}
               className={cn(
                 'no-drag relative rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] outline-none transition-colors',
                 isActive

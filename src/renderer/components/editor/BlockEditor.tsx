@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
+import { BlockNoteView } from '@blocknote/ariakit';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
 import {
-  BlockNoteViewRaw as BlockNoteView,
   getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
   FormattingToolbarController,
@@ -11,11 +11,16 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react';
 import { Link as TiptapLink } from '@tiptap/extension-link';
-import '@blocknote/react/style.css';
+import '@blocknote/ariakit/style.css';
 
 import { FileContextMenu } from './FileContextMenu';
 import { UntaskFormattingToolbar } from './UntaskFormattingToolbar';
 import { UntaskSlashMenu } from './UntaskSlashMenu';
+import {
+  resolveEditorUiConfig,
+  type BlockEditorInteractionMode,
+  type BlockEditorPreset,
+} from './editorUiConfig';
 
 import { useTheme } from '../providers/ThemeProvider';
 import { resolveInitialEditorContent } from './editorUtils';
@@ -31,6 +36,8 @@ export type BlockEditorProps = {
   /** Wrapper CSS class (e.g. 'untask-task-editor') */
   className?: string;
   editable?: boolean;
+  preset?: BlockEditorPreset;
+  interactionMode?: BlockEditorInteractionMode;
   /** Custom slash-menu items. If omitted, BlockNote defaults are used. */
   getSlashMenuItems?: (params: BlockEditorSlashMenuParams) => BlockEditorSlashMenuItem[];
   /** Ref to access the editor instance from parent components. */
@@ -55,6 +62,23 @@ const CustomLinkExtension = TiptapLink.extend({
   openOnClick: false,
   defaultProtocol: 'https',
 });
+const EDITOR_CHROME_SELECTOR = [
+  '.bn-side-menu',
+  '.bn-formatting-toolbar',
+  '.bn-link-toolbar',
+  '.bn-file-panel',
+  '.bn-table-handle',
+  '.bn-suggestion-menu',
+  '.bn-slash-menu',
+  'button',
+  'a',
+  'input',
+  'textarea',
+  'select',
+  '[role="button"]',
+  '[role="menuitem"]',
+  '[contenteditable="false"]',
+].join(', ');
 
 export const BlockEditor = ({
   content,
@@ -63,11 +87,17 @@ export const BlockEditor = ({
   onBlur,
   className,
   editable = true,
+  preset = 'task',
+  interactionMode = 'notion_like',
   getSlashMenuItems,
   editorRef,
   onEditorReady,
 }: BlockEditorProps) => {
   const { resolvedTheme } = useTheme();
+  const uiConfig = useMemo(
+    () => resolveEditorUiConfig(preset, interactionMode),
+    [preset, interactionMode],
+  );
   const initialContentResolutionRef = useRef(resolveInitialEditorContent(content));
   const initialLegacyMarkdownRef = useRef(initialContentResolutionRef.current.legacyMarkdown);
   const editor = useCreateBlockNote({
@@ -141,8 +171,22 @@ export const BlockEditor = ({
   const handleSurfaceMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       const target = event.target as HTMLElement;
+      if (target.closest(EDITOR_CHROME_SELECTOR)) {
+        return;
+      }
+
       // Let ProseMirror handle clicks on actual block content (text, images, files, etc.)
       if (target.closest('.bn-block-content')) {
+        return;
+      }
+
+      const shouldFocusSurface =
+        target === event.currentTarget
+        || target.classList.contains('bn-container')
+        || target.classList.contains('bn-editor')
+        || target.classList.contains('bn-root')
+        || target.closest('.bn-container') !== null;
+      if (!shouldFocusSurface) {
         return;
       }
 
@@ -183,13 +227,12 @@ export const BlockEditor = ({
       if (!anchor) return;
 
       const href = anchor.getAttribute('href') ?? '';
-      event.preventDefault();
-      event.stopPropagation();
-
       if (!shouldOpenExternalLink(href, event.nativeEvent)) {
         return;
       }
 
+      event.preventDefault();
+      event.stopPropagation();
       void window.untask?.shell.openExternal(href);
     },
     [editor],
@@ -260,14 +303,14 @@ export const BlockEditor = ({
         theme={resolvedTheme}
         onChange={handleChange}
         editable={editable}
-        linkToolbar={false}
-        slashMenu={false}
-        sideMenu={false}
-        filePanel={false}
-        tableHandles={false}
-        emojiPicker={false}
-        comments={false}
-        formattingToolbar={false}
+        linkToolbar={uiConfig.linkToolbar}
+        slashMenu={uiConfig.slashMenu}
+        sideMenu={uiConfig.sideMenu}
+        filePanel={uiConfig.filePanel}
+        tableHandles={uiConfig.tableHandles}
+        emojiPicker={uiConfig.emojiPicker}
+        comments={uiConfig.comments}
+        formattingToolbar={uiConfig.formattingToolbar}
       >
         <SuggestionMenuController
           triggerCharacter="/"

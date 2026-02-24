@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { classifyRisk, evaluateGate, isMutationTool } from './autonomy';
 
 describe('autonomy risk classification', () => {
-  it('classifies edit_note as low risk regardless of action', () => {
+  it('classifies edit_note rewrite as high risk', () => {
     expect(
       classifyRisk({
         toolName: 'edit_note',
         input: { action: 'rewrite' },
       }),
-    ).toBe('low');
+    ).toBe('high');
+  });
+
+  it('classifies non-rewrite note edits as low risk', () => {
     expect(
       classifyRisk({
         toolName: 'edit_note',

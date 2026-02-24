@@ -78,6 +78,7 @@ type NotesStore = {
 };
 
 const NOTES_LAST_OPENED_ID_SETTING_KEY = 'notes.last_opened_id';
+const NOTES_LAST_SUB_VIEW_SETTING_KEY = 'notes.last_sub_view';
 
 const editorLayout = (): NotesLayoutMode => 'focus';
 
@@ -98,7 +99,25 @@ const persistLastOpenedNoteId = async (noteId: string | null): Promise<void> => 
   }
 };
 
+const readPersistedSubView = async (): Promise<NotesSubView | null> => {
+  try {
+    const value = await getUntask().settings.get(NOTES_LAST_SUB_VIEW_SETTING_KEY);
+    return value === 'list' || value === 'editor' ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistSubView = async (subView: NotesSubView): Promise<void> => {
+  try {
+    await getUntask().settings.set(NOTES_LAST_SUB_VIEW_SETTING_KEY, subView);
+  } catch {
+    // Settings persistence should never block core notes flows.
+  }
+};
+
 let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+let enterNotesViewPromise: Promise<void> | null = null;
 
 const clearNoticeTimer = (): void => {
   if (noticeTimer) {
@@ -272,48 +291,105 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   notice: null,
 
   enterNotesView: async () => {
-    let activeNotes = get().activeNotes;
-    try {
-      const { active, archived } = await getUntask().notes.list();
-      set((state) => {
-        const selectedStillExists =
-          state.selectedListNoteId !== null
-          && active.some((note) => note.id === state.selectedListNoteId);
+    if (enterNotesViewPromise) {
+      await enterNotesViewPromise;
+      return;
+    }
 
-        return {
-          activeNotes: active,
-          archivedNotes: archived,
-          selectedListNoteId: selectedStillExists ? state.selectedListNoteId : (active[0]?.id ?? null),
-          isListLoading: false,
+    enterNotesViewPromise = (async () => {
+      if (get().isLoading) {
+        return;
+      }
+
+      const stateBeforeEnter = get();
+      let activeNotes = get().activeNotes;
+      try {
+        const { active, archived } = await getUntask().notes.list();
+        set((state) => {
+          const selectedStillExists =
+            state.selectedListNoteId !== null
+            && active.some((note) => note.id === state.selectedListNoteId);
+
+          return {
+            activeNotes: active,
+            archivedNotes: archived,
+            selectedListNoteId: selectedStillExists ? state.selectedListNoteId : (active[0]?.id ?? null),
+            isListLoading: false,
+            error: null,
+          };
+        });
+        activeNotes = active;
+      } catch (error) {
+        set({ error: toErrorMessage(error, 'Notes operation failed.') });
+        return;
+      }
+
+      if (activeNotes.length === 0) {
+        await get().createNote();
+        return;
+      }
+
+      const state = get();
+      if (
+        stateBeforeEnter.subView === 'list'
+        && stateBeforeEnter.activeNoteId === null
+        && stateBeforeEnter.activeNotes.length > 0
+      ) {
+        set({
+          ...NOTES_LIST_RESET_STATE,
+          selectedListNoteId: stateBeforeEnter.selectedListNoteId ?? activeNotes[0]?.id ?? null,
           error: null,
-        };
-      });
-      activeNotes = active;
-    } catch (error) {
-      set({ error: toErrorMessage(error, 'Notes operation failed.') });
-      return;
+        });
+        await persistSubView('list');
+        return;
+      }
+
+      const activeId = state.activeNoteId;
+      if (activeId && activeNotes.some((note) => note.id === activeId)) {
+        set({
+          subView: 'editor',
+          layoutMode: editorLayout(),
+          selectedListNoteId: activeId,
+          error: null,
+        });
+        await persistLastOpenedNoteId(activeId);
+        await persistSubView('editor');
+        return;
+      }
+
+      const persistedLastOpenedId = await readPersistedLastOpenedNoteId();
+      const target = persistedLastOpenedId
+        ? activeNotes.find((note) => note.id === persistedLastOpenedId)
+        : null;
+
+      const persistedSubView = await readPersistedSubView();
+      if (persistedSubView === 'list') {
+        set({
+          ...NOTES_LIST_RESET_STATE,
+          selectedListNoteId:
+            stateBeforeEnter.selectedListNoteId ?? target?.id ?? activeNotes[0]?.id ?? null,
+          error: null,
+        });
+        return;
+      }
+
+      if (target) {
+        await get().openNote(target.id);
+        return;
+      }
+
+      if (persistedLastOpenedId) {
+        await persistLastOpenedNoteId(null);
+      }
+
+      await get().openNote(activeNotes[0].id);
+    })();
+
+    try {
+      await enterNotesViewPromise;
+    } finally {
+      enterNotesViewPromise = null;
     }
-
-    if (activeNotes.length === 0) {
-      await get().createNote();
-      return;
-    }
-
-    const persistedLastOpenedId = await readPersistedLastOpenedNoteId();
-    const target = persistedLastOpenedId
-      ? activeNotes.find((note) => note.id === persistedLastOpenedId)
-      : null;
-
-    if (target) {
-      await get().openNote(target.id);
-      return;
-    }
-
-    if (persistedLastOpenedId) {
-      await persistLastOpenedNoteId(null);
-    }
-
-    await get().openNote(activeNotes[0].id);
   },
 
   loadList: async (preferredSelectedId) => {
@@ -362,6 +438,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         error: null,
       });
       await persistLastOpenedNoteId(note.id);
+      await persistSubView('editor');
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
@@ -399,6 +476,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         error: null,
       });
       await persistLastOpenedNoteId(note.id);
+      await persistSubView('editor');
     } catch (error) {
       set({ isLoading: false, error: toErrorMessage(error, 'Notes operation failed.') });
     }
@@ -449,6 +527,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       ...NOTES_LIST_RESET_STATE,
       selectedListNoteId: state.selectedListNoteId ?? state.activeNotes[0]?.id ?? null,
     }));
+    await persistSubView('list');
 
     // Refresh list to pick up any changes.
     void get().loadList();
@@ -512,6 +591,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
           selectedListNoteId: nextSelectedId,
         });
         await persistLastOpenedNoteId(null);
+        await persistSubView('list');
       } else if (get().selectedListNoteId === id) {
         set({ selectedListNoteId: nextSelectedId });
       }
@@ -533,6 +613,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       if (get().activeNoteId === id) {
         set(NOTES_LIST_RESET_STATE);
+        await persistSubView('list');
       }
 
       get().setNotice({ kind: 'success', message: 'Note restored.' });
@@ -559,6 +640,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
           selectedListNoteId: nextSelectedId,
         });
         await persistLastOpenedNoteId(null);
+        await persistSubView('list');
       } else if (get().selectedListNoteId === id) {
         set({ selectedListNoteId: nextSelectedId });
       }
@@ -642,7 +724,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
     let promptContent = (markdownOverride?.trim() ?? serializeNoteForProcessing(content)).trim();
     if (!promptContent) {
-      const message = 'Add content before processing.';
+      const message = 'Add content before sending to AI.';
       set({ error: message });
       get().setNotice({ kind: 'error', message });
       return { ok: false, reason: 'empty_note' };
@@ -654,7 +736,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       if (isDirty) {
         const persisted = await get().save();
         if (!persisted) {
-          get().setNotice({ kind: 'error', message: 'Save failed before processing.' });
+          get().setNotice({ kind: 'error', message: 'Save failed before sending to AI.' });
           set({ isProcessing: false });
           return { ok: false, reason: 'save_failed' };
         }
@@ -662,7 +744,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         if (!markdownOverride) {
           promptContent = serializeNoteForProcessing(get().content).trim();
           if (!promptContent) {
-            const message = 'Add content before processing.';
+            const message = 'Add content before sending to AI.';
             set({ isProcessing: false, error: message });
             get().setNotice({ kind: 'error', message });
             return { ok: false, reason: 'empty_note' };
@@ -672,21 +754,24 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       // Stage note context for the next chat turn; user provides the first instruction.
       const noteTitle = deriveAutoTitle(get().content) || 'Untitled note';
-      useChatStore.getState().stageNoteContext({
+      const chatStore = useChatStore.getState();
+      chatStore.stageNoteContext({
         noteId: activeNoteId,
         title: noteTitle,
         markdown: promptContent,
       });
+      await chatStore.createConversation();
       useAppStore.getState().openChatOverlay();
+      useAppStore.getState().setChatView('conversation');
 
       set({ isProcessing: false });
       get().setNotice({
         kind: 'info',
-        message: 'Note attached in chat. Tell Untask what to do next.',
+        message: 'Note attached in a new chat. Tell Untask what to do next.',
       }, 5000);
       return { ok: true, reason: 'staged' };
     } catch (error) {
-      const message = toErrorMessage(error, 'Failed to process with AI.');
+      const message = toErrorMessage(error, 'Failed to send note to AI.');
       set({
         isProcessing: false,
         error: message,
@@ -711,6 +796,8 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         subView: nextSubView,
       };
     });
+    const nextMode = get().activeNoteId ? mode : 'list';
+    void persistSubView(nextMode === 'list' ? 'list' : 'editor');
   },
 
   setSelectedListNoteId: (id) => {

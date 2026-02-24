@@ -1,4 +1,6 @@
-import { Bold, Code, Italic, Link, Strikethrough } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+
+import { Bold, Check, Code, Italic, Link, Strikethrough } from 'lucide-react';
 
 import {
   useBlockNoteEditor,
@@ -7,6 +9,17 @@ import {
 } from '@blocknote/react';
 
 import { cn } from '../../lib/utils';
+import { Input, Popover, PopoverContent } from '../ui';
+
+const normalizeLinkUrl = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const hasProtocol = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed);
+  return hasProtocol ? trimmed : `https://${trimmed}`;
+};
 
 /**
  * Compact formatting toolbar matching Untask's industrial aesthetic.
@@ -17,6 +30,21 @@ import { cn } from '../../lib/utils';
 export const UntaskFormattingToolbar = () => {
   const editor = useBlockNoteEditor();
   const blocks = useSelectedBlocks(editor);
+  const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const linkInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isLinkPopoverOpen) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      linkInputRef.current?.focus();
+      linkInputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [isLinkPopoverOpen]);
 
   // Track which styles are currently active on the selection
   const activeStyles = useEditorState({
@@ -43,6 +71,8 @@ export const UntaskFormattingToolbar = () => {
   }
 
   const ICON_SIZE = 14;
+  const buttonClassName =
+    'size-7 flex items-center justify-center rounded-sm transition-colors duration-100';
 
   const buttons: Array<{
     key: string;
@@ -82,16 +112,17 @@ export const UntaskFormattingToolbar = () => {
   ];
 
   return (
-    <div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-popover p-0.5">
+    <div className="untask-editor-toolbar flex items-center gap-0.5 rounded-md border border-border/60 bg-popover/95 p-0.5 backdrop-blur-sm">
       {buttons.map((btn) => (
         <button
           key={btn.key}
           type="button"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={btn.action}
           aria-label={btn.label}
           aria-pressed={btn.active}
           className={cn(
-            'size-7 flex items-center justify-center rounded-sm transition-colors duration-100',
+            buttonClassName,
             btn.active
               ? 'bg-accent text-foreground'
               : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -104,19 +135,62 @@ export const UntaskFormattingToolbar = () => {
       {/* Separator */}
       <div className="h-4 w-px bg-border/40 mx-0.5" aria-hidden="true" />
 
-      <button
-        type="button"
-        onClick={() => {
-          const url = prompt('Enter URL');
-          if (url) {
-            editor.createLink(url);
-          }
-        }}
-        aria-label="Link"
-        className="size-7 flex items-center justify-center rounded-sm text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
-      >
-        <Link size={ICON_SIZE} aria-hidden="true" />
-      </button>
+      <Popover.Root open={isLinkPopoverOpen} onOpenChange={setIsLinkPopoverOpen}>
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setIsLinkPopoverOpen(true)}
+            aria-label="Link"
+            className={cn(
+              buttonClassName,
+              'text-muted-foreground hover:bg-accent hover:text-foreground',
+            )}
+          >
+            <Link size={ICON_SIZE} aria-hidden="true" />
+          </button>
+        </Popover.Trigger>
+
+        <PopoverContent
+          align="end"
+          sideOffset={6}
+          className="w-72 border-border/60 bg-popover/95 p-2 backdrop-blur-sm"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+        >
+          <form
+            className="flex items-center gap-1.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const normalizedUrl = normalizeLinkUrl(linkInput);
+              if (!normalizedUrl) {
+                setIsLinkPopoverOpen(false);
+                setLinkInput('');
+                return;
+              }
+
+              editor.createLink(normalizedUrl);
+              setIsLinkPopoverOpen(false);
+              setLinkInput('');
+            }}
+          >
+            <Input
+              ref={linkInputRef}
+              value={linkInput}
+              onChange={(event) => setLinkInput(event.target.value)}
+              placeholder="Paste or type URL"
+              autoComplete="off"
+              className="h-8 border-border/60 bg-background/60 px-2 text-[12px]"
+            />
+            <button
+              type="submit"
+              className="flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Apply link"
+            >
+              <Check size={13} aria-hidden="true" />
+            </button>
+          </form>
+        </PopoverContent>
+      </Popover.Root>
     </div>
   );
 };

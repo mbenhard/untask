@@ -34,6 +34,16 @@ describe('shouldOpenExternalLink', () => {
     ).toBe(false);
   });
 
+  it('denies modifier click for unsafe URLs', () => {
+    expect(
+      shouldOpenExternalLink('javascript:alert(1)', {
+        button: 0,
+        metaKey: true,
+        ctrlKey: false,
+      }),
+    ).toBe(false);
+  });
+
   it('denies right and middle clicks', () => {
     expect(
       shouldOpenExternalLink('https://example.com', {

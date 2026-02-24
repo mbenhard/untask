@@ -451,6 +451,68 @@ describe('note tools', () => {
     }
   });
 
+  it('falls back to attached snapshot when note is deleted after attach', async () => {
+    getNoteMock.mockReturnValue(undefined as never);
+
+    const result = await executeToolCall(
+      {
+        name: 'read_note',
+        input: {},
+      },
+      {
+        activeNoteId: 'note-stale',
+        attachedNoteContext: {
+          noteId: 'note-stale',
+          title: 'Call notes',
+          markdown: '- confirm scope',
+        },
+      },
+    );
+
+    expect(getNoteMock).toHaveBeenCalledWith('note-stale');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+      expect(result.output.message).toContain('attached snapshot');
+      expect(result.output.data).toEqual({
+        note: expect.objectContaining({
+          id: 'note-stale',
+          title: 'Call notes',
+          content: '- confirm scope',
+          fromAttachedContext: true,
+        }),
+      });
+    }
+  });
+
+  it('returns actionable error when attached note was deleted before edit', async () => {
+    getNoteMock.mockReturnValue(undefined as never);
+
+    const result = await executeToolCall(
+      {
+        name: 'edit_note',
+        input: {
+          action: 'append',
+          content: 'add this',
+        },
+      },
+      {
+        activeNoteId: 'note-stale',
+        attachedNoteContext: {
+          noteId: 'note-stale',
+          title: 'Call notes',
+          markdown: '- confirm scope',
+        },
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOOL_EXECUTION_FAILED');
+      expect(result.error.message).toContain('cannot apply edits');
+    }
+  });
+
   it('returns replace diff summary when editing a note', async () => {
     getNoteMock.mockReturnValue({
       id: 'note-1',
@@ -485,4 +547,3 @@ describe('note tools', () => {
     }
   });
 });
-

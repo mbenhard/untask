@@ -33,6 +33,7 @@ export const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
 const HISTORY_WINDOW_LIMIT = 20;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
+const NOTE_CONTEXT_CHAR_LIMIT = 12_000;
 
 // ─── Ollama slim mode ───────────────────────────────────────
 // When true, Ollama gets fewer tools, shorter prompt, reduced history.
@@ -506,15 +507,27 @@ export const runAssistantStream = async (
         const provider = getActiveProvider();
         const model = provider.languageModel(input.modelId);
         const webSearchConfig = getModelWebSearchConfig(input.modelId);
+        const normalizedNoteMarkdown = input.noteContext?.markdown.trim() ?? '';
+        const hasAttachedNoteContext =
+          input.noteContext != null
+          && input.noteContext.noteId.trim().length > 0
+          && normalizedNoteMarkdown.length > 0;
+        const attachedNoteContext = hasAttachedNoteContext
+          ? input.noteContext
+          : null;
+        const truncatedNoteMarkdown =
+          normalizedNoteMarkdown.length > NOTE_CONTEXT_CHAR_LIMIT
+            ? `${normalizedNoteMarkdown.slice(0, NOTE_CONTEXT_CHAR_LIMIT).trimEnd()}\n\n[Attached note content truncated for context window.]`
+            : normalizedNoteMarkdown;
         const noteContextPrompt =
-          input.noteContext &&
-          input.noteContext.noteId.trim().length > 0 &&
-          input.noteContext.markdown.trim().length > 0
+          attachedNoteContext
             ? [
                 '<user_note_context>',
-                `note_id: ${input.noteContext.noteId}`,
-                `title: ${input.noteContext.title}`,
-                input.noteContext.markdown,
+                'Use this attached note content directly for analysis.',
+                'Do not call read_note unless the user explicitly asks for the latest saved note state.',
+                `note_id: ${attachedNoteContext.noteId}`,
+                `title: ${attachedNoteContext.title}`,
+                truncatedNoteMarkdown,
                 '</user_note_context>',
               ].join('\n')
             : null;
@@ -697,6 +710,7 @@ export const runAssistantStream = async (
                 actionCards.push(card);
               },
               activeNoteId: input.noteContext?.noteId,
+              attachedNoteContext: input.noteContext,
               mutationSignatures,
             }, effectiveAllowedTools);
 
@@ -1006,6 +1020,7 @@ export const runAssistantStream = async (
                 actionCards.push(card);
               },
               activeNoteId: input.noteContext?.noteId,
+              attachedNoteContext: input.noteContext,
               mutationSignatures,
             });
 

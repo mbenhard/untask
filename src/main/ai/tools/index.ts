@@ -359,7 +359,7 @@ export const createSdkTools = (
 
         return {
           status: 'error' as const,
-          message: `${result.error.message} — Do not retry this tool. Tell the user what happened.`,
+          message: result.error.message,
         };
       },
     });

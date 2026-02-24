@@ -58,7 +58,10 @@ const createMockNotesApi = (): MockNotesApi => ({
 });
 
 const createMockSettingsApi = (): MockSettingsApi => ({
-  get: vi.fn(async (_key: string) => null),
+  get: vi.fn(async (key: string) => {
+    void key;
+    return null;
+  }),
   set: vi.fn(async (key: string, value: string) => ({ key, value })),
 });
 
@@ -88,12 +91,15 @@ describe('notesStore', () => {
       activeView: 'today',
       manualNavigationVersion: 0,
       chatOverlayState: 'peek',
+      chatView: 'threads',
       unreadProactive: false,
       newTaskTrigger: 0,
     });
 
+    const createConversation = vi.fn(async () => undefined);
     useChatStore.setState({
       pendingNoteContext: null,
+      createConversation: createConversation as never,
     });
 
     useNotesStore.setState({
@@ -147,6 +153,8 @@ describe('notesStore', () => {
     expect(noteContext?.markdown).toContain('## Kickoff');
     expect(noteContext?.markdown).toContain('- Send recap');
     expect(useAppStore.getState().chatOverlayState).toBe('open');
+    expect(useAppStore.getState().chatView).toBe('conversation');
+    expect(useChatStore.getState().createConversation).toHaveBeenCalledTimes(1);
   });
 
   it('returns explicit empty-note result when processing empty content', async () => {
@@ -160,7 +168,7 @@ describe('notesStore', () => {
     const result = await useNotesStore.getState().processWithAI();
 
     expect(result).toEqual({ ok: false, reason: 'empty_note' });
-    expect(useNotesStore.getState().error).toBe('Add content before processing.');
+    expect(useNotesStore.getState().error).toBe('Add content before sending to AI.');
   });
 
   it('does not switch notes when flush save fails', async () => {
@@ -221,6 +229,131 @@ describe('notesStore', () => {
     const state = useNotesStore.getState();
     expect(state.activeNoteId).toBe('note-b');
     expect(state.layoutMode).toBe('focus');
+  });
+
+  it('enterNotesView keeps the list view when list was already loaded in-memory', async () => {
+    const api = getMockApi();
+    const settings = getMockSettingsApi();
+    const noteA = mockNote({ id: 'note-a' });
+    const noteB = mockNote({ id: 'note-b' });
+
+    useNotesStore.setState({
+      subView: 'list',
+      layoutMode: 'list',
+      activeNoteId: null,
+      activeNotes: [noteA, noteB],
+      selectedListNoteId: 'note-b',
+    });
+
+    api.list.mockResolvedValue({ active: [noteA, noteB], archived: [] });
+    settings.get.mockImplementation(async (key: string) => {
+      if (key === 'notes.last_opened_id') {
+        return 'note-b';
+      }
+      if (key === 'notes.last_sub_view') {
+        return 'editor';
+      }
+      return null;
+    });
+
+    await useNotesStore.getState().enterNotesView();
+
+    const state = useNotesStore.getState();
+    expect(state.subView).toBe('list');
+    expect(state.activeNoteId).toBeNull();
+    expect(state.selectedListNoteId).toBe('note-b');
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('enterNotesView restores list view when persisted sub-view is list', async () => {
+    const api = getMockApi();
+    const settings = getMockSettingsApi();
+    const noteA = mockNote({ id: 'note-a' });
+    const noteB = mockNote({ id: 'note-b' });
+
+    api.list.mockResolvedValue({ active: [noteA, noteB], archived: [] });
+    settings.get.mockImplementation(async (key: string) => {
+      if (key === 'notes.last_sub_view') {
+        return 'list';
+      }
+      if (key === 'notes.last_opened_id') {
+        return 'note-b';
+      }
+      return null;
+    });
+
+    await useNotesStore.getState().enterNotesView();
+
+    const state = useNotesStore.getState();
+    expect(state.subView).toBe('list');
+    expect(state.layoutMode).toBe('list');
+    expect(state.activeNoteId).toBeNull();
+    expect(state.selectedListNoteId).toBe('note-b');
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('enterNotesView is idempotent when called concurrently', async () => {
+    const api = getMockApi();
+    const settings = getMockSettingsApi();
+    const noteA = mockNote({ id: 'note-a' });
+
+    api.list.mockResolvedValue({ active: [noteA], archived: [] });
+    api.get.mockResolvedValue(noteA);
+    settings.get.mockResolvedValue(null);
+
+    await Promise.all([
+      useNotesStore.getState().enterNotesView(),
+      useNotesStore.getState().enterNotesView(),
+    ]);
+
+    expect(api.list).toHaveBeenCalledTimes(1);
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('enterNotesView keeps the currently open active note when still available', async () => {
+    const api = getMockApi();
+    const settings = getMockSettingsApi();
+    const noteA = mockNote({ id: 'note-a', content: 'a' });
+    const noteB = mockNote({ id: 'note-b', content: 'b' });
+
+    useNotesStore.setState({
+      subView: 'editor',
+      layoutMode: 'focus',
+      activeNoteId: 'note-a',
+      selectedListNoteId: 'note-a',
+      content: 'draft-a',
+    });
+
+    api.list.mockResolvedValue({ active: [noteA, noteB], archived: [] });
+    settings.get.mockResolvedValue('note-b');
+
+    await useNotesStore.getState().enterNotesView();
+
+    expect(api.get).not.toHaveBeenCalled();
+    expect(useNotesStore.getState().activeNoteId).toBe('note-a');
+    expect(useNotesStore.getState().selectedListNoteId).toBe('note-a');
+  });
+
+  it('enterNotesView does not override explicit note open while loading', async () => {
+    const api = getMockApi();
+    const noteB = mockNote({ id: 'note-b', content: 'body-b' });
+    let resolveGet: ((note: Note) => void) | null = null;
+    const getPromise = new Promise<Note>((resolve) => {
+      resolveGet = resolve;
+    });
+    api.get.mockReturnValueOnce(getPromise);
+
+    const openPromise = useNotesStore.getState().openNote('note-b');
+    await Promise.resolve();
+
+    await useNotesStore.getState().enterNotesView();
+
+    expect(api.list).not.toHaveBeenCalled();
+    expect(resolveGet).not.toBeNull();
+    resolveGet?.(noteB);
+
+    await openPromise;
+    expect(useNotesStore.getState().activeNoteId).toBe('note-b');
   });
 
   it('enterNotesView creates note when no active notes exist', async () => {

@@ -47,7 +47,7 @@ const formatEditedTime = (iso: string | null): string => {
 // ─── Slash menu items ──────────────────────────────────────
 
 const createProcessItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
-  title: 'Process with AI',
+  title: 'Send note to AI',
   onItemClick: () => {
     const markdown = editor.blocksToMarkdownLossy(editor.document);
     void useNotesStore.getState().processWithAI(markdown);
@@ -55,18 +55,24 @@ const createProcessItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem =>
   aliases: ['process', 'ai'],
   group: 'Untask',
   icon: <Sparkles size={18} />,
-  subtext: 'Open AI chat with this note as context',
+  subtext: 'Start a new AI chat with this note attached',
 });
 
 const getSlashMenuItems = ({
   editor,
   defaultItems,
 }: BlockEditorSlashMenuParams): BlockEditorSlashMenuItem[] => [
-  ...defaultItems.map((item) =>
-    item.title === 'Check List'
-      ? { ...item, aliases: [...(item.aliases ?? []), 'todo'] }
-      : item,
-  ),
+  ...defaultItems
+    .filter((item) => {
+      const titleIsEmoji = item.title.trim().toLowerCase() === 'emoji';
+      const aliasIsEmoji = (item.aliases ?? []).some((alias) => alias.toLowerCase() === 'emoji');
+      return !(titleIsEmoji || aliasIsEmoji);
+    })
+    .map((item) =>
+      item.title === 'Check List'
+        ? { ...item, aliases: [...(item.aliases ?? []), 'todo'] }
+        : item,
+    ),
   createProcessItem(editor),
 ];
 
@@ -364,10 +370,10 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
             className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={handleProcess}
             disabled={isProcessing}
-            title="Process with AI (⌘↵)"
+            title="Send note to AI (⌘↵)"
           >
             <Sparkles size={12} />
-            {isProcessing ? 'processing' : 'process'}
+            {isProcessing ? 'sending' : 'send to ai'}
           </Button>
 
           {isArchived ? (
@@ -418,6 +424,8 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
             content={content}
             onChange={handleChange}
             className="untask-notes-editor"
+            preset="notes"
+            interactionMode="notion_like"
             getSlashMenuItems={getSlashMenuItems}
             editorRef={editorRef}
             onEditorReady={handleEditorReady}

@@ -27,6 +27,7 @@ const HookHarness = ({ inputRef, inputValue, clearInput }: HarnessProps): null =
 };
 
 const defaultNotesActions = {
+  enterNotesView: useNotesStore.getState().enterNotesView,
   processWithAI: useNotesStore.getState().processWithAI,
   archiveNote: useNotesStore.getState().archiveNote,
   deleteNote: useNotesStore.getState().deleteNote,
@@ -129,7 +130,10 @@ describe('useKeyboardShortcuts', () => {
       },
       notes: {
         list: vi.fn(async () => ({ active: [], archived: [] })),
-        get: vi.fn(async (_id: string) => null),
+        get: vi.fn(async (id: string) => {
+          void id;
+          return null;
+        }),
         create: vi.fn(async () => ({
           id: 'note-created',
           title: '',
@@ -139,10 +143,17 @@ describe('useKeyboardShortcuts', () => {
           createdAt: null,
           updatedAt: null,
         })),
-        save: vi.fn(async (_id: string, _content: string) => null),
+        save: vi.fn(async (id: string, content: string) => {
+          void id;
+          void content;
+          return null;
+        }),
       },
       settings: {
-        get: vi.fn(async (_key: string) => null),
+        get: vi.fn(async (key: string) => {
+          void key;
+          return null;
+        }),
         set: vi.fn(async (key: string, value: string) => ({ key, value })),
       },
     };
@@ -155,7 +166,12 @@ describe('useKeyboardShortcuts', () => {
     vi.restoreAllMocks();
   });
 
-  it('maps Cmd+4 to Notes view', () => {
+  it('maps Cmd+4 to Notes view and triggers deterministic notes entry', () => {
+    const enterNotesView = vi.fn(async () => undefined);
+    useNotesStore.setState({
+      enterNotesView: enterNotesView as never,
+    });
+
     const inputRef = {
       current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
     };
@@ -174,6 +190,7 @@ describe('useKeyboardShortcuts', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit4', key: '4', metaKey: true }));
     });
     expect(useAppStore.getState().activeView).toBe('notes');
+    expect(enterNotesView).toHaveBeenCalledTimes(1);
   });
 
   it('maps Cmd+N to trigger new task', () => {
