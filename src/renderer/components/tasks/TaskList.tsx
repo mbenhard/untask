@@ -395,7 +395,7 @@ export const TaskList = ({
   const handleCycleStatus = useCallback(
     (taskId: string): void => {
       const currentTask = tasks.find((candidate) => candidate.id === taskId);
-      if (!currentTask) {
+      if (!currentTask || currentTask.parentId !== null) {
         return;
       }
 
