@@ -87,6 +87,16 @@ const EDITOR_CHROME_SELECTOR = [
   '[contenteditable="false"]',
 ].join(', ');
 
+const resolveEventTargetElement = (eventTarget: EventTarget | null): HTMLElement | null => {
+  if (eventTarget instanceof HTMLElement) {
+    return eventTarget;
+  }
+  if (eventTarget instanceof Node) {
+    return eventTarget.parentElement;
+  }
+  return null;
+};
+
 export const BlockEditor = ({
   content,
   onChange,
@@ -178,11 +188,10 @@ export const BlockEditor = ({
 
   const handleSurfaceMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      const rawTarget = event.target;
-      if (!(rawTarget instanceof HTMLElement)) {
+      const target = resolveEventTargetElement(event.target);
+      if (!target) {
         return;
       }
-      const target = rawTarget;
       if (target.closest(EDITOR_CHROME_SELECTOR)) {
         return;
       }
@@ -216,11 +225,10 @@ export const BlockEditor = ({
   const handleSurfaceClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       setContextMenu(null);
-      const rawTarget = event.target;
-      if (!(rawTarget instanceof HTMLElement)) {
+      const target = resolveEventTargetElement(event.target);
+      if (!target) {
         return;
       }
-      const target = rawTarget;
       const fileRow = target.closest('.bn-file-name-with-icon');
       if (fileRow) {
         const blockEl = target.closest('[data-id]');
@@ -267,11 +275,10 @@ export const BlockEditor = ({
         return;
       }
 
-      const rawTarget = event.target;
-      if (!(rawTarget instanceof HTMLElement)) {
+      const target = resolveEventTargetElement(event.target);
+      if (!target) {
         return;
       }
-      const target = rawTarget;
       const resolvedTarget = resolveEditorContextTarget(
         editor,
         target,

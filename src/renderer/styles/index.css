@@ -241,6 +241,8 @@
 .untask-notes-editor {
   min-height: 100%;
   cursor: text;
+  --untask-notes-inline-gutter: clamp(20px, 3vw, 32px);
+  --untask-notes-left-rail-space: 8px;
   --untask-editor-chrome-bg: color-mix(in srgb, var(--accent) 42%, transparent);
   --untask-editor-chrome-hover-bg: color-mix(in srgb, var(--accent) 68%, transparent);
   --untask-editor-chrome-border: color-mix(in srgb, var(--border) 74%, transparent);
@@ -251,7 +253,7 @@
   --bn-colors-editor-background: transparent;
   background-color: transparent;
   min-height: 100%;
-  padding: 6px 0 16px;
+  padding: 8px var(--untask-notes-inline-gutter) 18px;
 }
 
 .untask-notes-editor .bn-editor,
@@ -265,7 +267,7 @@
   cursor: text;
   font-size: 14px;
   line-height: 1.45;
-  padding: 0 12px;
+  padding: 0 4px 0 var(--untask-notes-left-rail-space);
 }
 
 .untask-notes-editor .bn-block-outer {
@@ -299,6 +301,10 @@
 }
 
 /* Compact side menu icons (+ / drag handle) */
+.untask-notes-editor .bn-side-menu {
+  gap: 2px;
+}
+
 .untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root:not(.mantine-Menu-item), .bn-button) svg {
   height: 14px !important;
   width: 14px !important;
@@ -316,6 +322,11 @@
 .untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover {
   background-color: var(--untask-editor-chrome-hover-bg);
   border-color: color-mix(in srgb, var(--ring) 30%, var(--untask-editor-chrome-border));
+}
+
+/* Notes: hide the side-menu add button (+), keep only drag handle control */
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):has([data-test="dragHandleAdd"]) {
+  display: none !important;
 }
 
 /* Side menu heights aligned to reduced heading sizes */

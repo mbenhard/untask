@@ -10,6 +10,15 @@ vi.mock('./autonomy', () => ({
   isMutationTool: vi.fn(() => false),
 }));
 
+vi.mock('./runtimeFlags', () => ({
+  isDuplicateFailureGuardEnabled: vi.fn(() => true),
+  isPostMutationVerifyEnabled: vi.fn(() => false),
+}));
+
+vi.mock('./runtimeDiagnostics', () => ({
+  logRuntimeDiagnostic: vi.fn(),
+}));
+
 vi.mock('../services/taskService', () => {
   const createTaskSchema = z.object({
     title: z.string().min(1),
@@ -83,6 +92,7 @@ vi.mock('./memory', () => ({
 import * as taskService from '../services/taskService';
 import * as notesService from '../services/notesService';
 import * as autonomy from './autonomy';
+import * as runtimeFlags from './runtimeFlags';
 import { executeToolCall } from './tools';
 
 const createTaskMock = vi.mocked(taskService.createTask);
@@ -97,6 +107,7 @@ const saveNoteMock = vi.mocked(notesService.saveNote);
 const listNotesMock = vi.mocked(notesService.listNotes);
 const evaluateGateMock = vi.mocked(autonomy.evaluateGate);
 const isMutationToolMock = vi.mocked(autonomy.isMutationTool);
+const isPostMutationVerifyEnabledMock = vi.mocked(runtimeFlags.isPostMutationVerifyEnabled);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -112,6 +123,7 @@ beforeEach(() => {
   listNotesMock.mockReset();
   evaluateGateMock.mockReset();
   isMutationToolMock.mockReset();
+  isPostMutationVerifyEnabledMock.mockReset();
   getNoteMock.mockReturnValue({
     id: 'note-1',
     title: 'Test note',
@@ -134,6 +146,7 @@ beforeEach(() => {
   } as never);
   evaluateGateMock.mockReturnValue({ action: 'execute', reason: 'allowed' } as never);
   isMutationToolMock.mockReturnValue(false);
+  isPostMutationVerifyEnabledMock.mockReturnValue(false);
 });
 
 describe('create_task tool', () => {
@@ -411,6 +424,53 @@ describe('delete_task safety', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.output.status).toBe('success');
+    }
+  });
+});
+
+describe('post-mutation verification', () => {
+  it('returns error status when a parent move does not persist', async () => {
+    isPostMutationVerifyEnabledMock.mockReturnValue(true);
+
+    getTaskByIdMock
+      .mockReturnValueOnce({
+        id: 'task-move-1',
+        title: 'Move me',
+        status: 'active',
+        today: false,
+        parentId: null,
+      } as never)
+      .mockReturnValueOnce({
+        id: 'task-move-1',
+        title: 'Move me',
+        status: 'active',
+        today: false,
+        parentId: null,
+      } as never);
+
+    updateTaskMock.mockReturnValue({
+      id: 'task-move-1',
+      title: 'Move me',
+      status: 'active',
+      today: false,
+      parentId: null,
+      priority: 'medium',
+      dueDate: null,
+      client: null,
+    } as never);
+
+    const result = await executeToolCall({
+      name: 'update_task',
+      input: {
+        id: 'task-move-1',
+        parentId: 'parent-1',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('error');
+      expect(result.output.message).toContain("couldn't fully apply");
     }
   });
 });

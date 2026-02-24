@@ -59,6 +59,26 @@ Goal: Catch high-impact regressions quickly without full exploratory QA.
 - Open a note with content, run "process with AI", then confirm chat opens with staged note context; also try with unsaved/empty content edge cases.
 - Expected: non-empty note stages context and opens chat; empty content shows explicit guidance; failed save does not force view switch.
 
+13. Typed yes with one pending action
+- Trigger a confirmation-required action in chat, then reply with typed `yes` in the same thread.
+- Expected: exactly one action executes, pending card resolves, no second confirmation loop.
+
+14. Typed yes with multiple pending actions
+- Create two pending confirmations in the same thread, then reply with typed `yes`.
+- Expected: assistant asks to disambiguate; no mutation executes.
+
+15. Explicit notes listing in fresh thread
+- Open a new chat thread and send `show my notes`.
+- Expected: notes are listed deterministically even before broader conversation context builds.
+
+16. Failed parent move loop resistance
+- Attempt a known-invalid parent move (task with subtasks under another parent).
+- Expected: one clear failure, no repeated same-tool loop, and clear explanation.
+
+17. Delete confirmation verifies actual disappearance
+- Delete a task through approval flow and confirm.
+- Expected: success is shown only if task is actually gone from task list state.
+
 ## Bug Logging Rule
 
 For each bug found, log in `docs/bugs-and-edge-cases.md` with:

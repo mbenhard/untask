@@ -4,6 +4,7 @@ import { app } from 'electron';
 import { generateText, stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
+  ChatActionCard,
   ChipAction,
   ChatNoteContext,
   ChatStreamEvent,
@@ -25,9 +26,21 @@ import {
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
-import { loadPendingActions, removePendingAction, requeuePendingAction } from './autonomy';
+import {
+  loadPendingActions,
+  removePendingAction,
+  requeuePendingAction,
+  hasPendingActionScopeMetadata,
+  isPendingActionExpired,
+  type PendingAction,
+} from './autonomy';
 import { classifyChatError, shouldRetryStreamAttempt } from './errorClassification';
 import { maybeAutoTitleConversation } from './autoTitle';
+import {
+  isDeterministicRouterEnabled,
+  isPendingScopeGuardEnabled,
+} from './runtimeFlags';
+import { logRuntimeDiagnostic } from './runtimeDiagnostics';
 
 export const STREAM_MAX_ATTEMPTS = 2;
 const STREAM_RETRY_BASE_DELAY_MS = 400;
@@ -441,6 +454,27 @@ const parsePendingActionDecision = (message: string): PendingActionDecision => {
   return null;
 };
 
+const isEligibleForTypedDecision = (
+  action: PendingAction,
+  conversationId: string,
+  enforceScopeGuard: boolean,
+): boolean => {
+  // Legacy entries without full scope metadata must be resolved from explicit cards.
+  if (!hasPendingActionScopeMetadata(action)) {
+    return false;
+  }
+
+  if (action.conversationId !== conversationId) {
+    return false;
+  }
+
+  if (enforceScopeGuard && isPendingActionExpired(action)) {
+    return false;
+  }
+
+  return true;
+};
+
 const formatListNotesAssistantText = (envelope: ToolExecutionEnvelope): string => {
   if (envelope.status !== 'success') {
     return envelope.message;
@@ -497,6 +531,7 @@ export const shouldRequireToolChoice = (input: {
   userMessage: string;
   history: ConversationMessage[];
   allowWebSearchToolChoice?: boolean;
+  conversationId?: string;
 }): boolean => {
   const normalizedMessage = input.userMessage.trim();
   if (normalizedMessage.length === 0) {
@@ -512,9 +547,19 @@ export const shouldRequireToolChoice = (input: {
   // Follow-up confirmation when there are pending actions
   if (CONFIRMATION_PATTERN.test(normalizedMessage)) {
     const pending = loadPendingActions();
-    if (pending.length > 0) {
+    if (pending.length === 0) {
+      return false;
+    }
+
+    if (!input.conversationId) {
       return true;
     }
+    const conversationId = input.conversationId;
+
+    const enforceScopeGuard = isPendingScopeGuardEnabled();
+    return pending.some((action) =>
+      isEligibleForTypedDecision(action, conversationId, enforceScopeGuard),
+    );
   }
 
   return false;
@@ -571,15 +616,22 @@ export const runAssistantStream = async (
     const pendingDecision = parsePendingActionDecision(input.userMessage);
     const pendingActions = loadPendingActions();
 
+    const deterministicRouterEnabled = isDeterministicRouterEnabled();
+    const pendingScopeGuardEnabled = isPendingScopeGuardEnabled();
+
     if (
-      explicitFallback?.name === 'list_notes' ||
-      (pendingDecision !== null && pendingActions.length > 0)
+      deterministicRouterEnabled
+      && (
+        explicitFallback?.name === 'list_notes'
+        || (pendingDecision !== null && pendingActions.length > 0)
+      )
     ) {
       telemetry.attemptCount = 1;
 
       let deterministicResponseText = '';
 
       if (explicitFallback?.name === 'list_notes') {
+        logRuntimeDiagnostic('ai_runtime.router_hit', { intentClass: 'list_notes' });
         const deterministicToolCallId = `deterministic-${randomUUID()}`;
         const description = generateToolCallDescription(explicitFallback.name, explicitFallback.input);
         stepDescriptions.push(description);
@@ -594,6 +646,8 @@ export const runAssistantStream = async (
 
         const deterministicResult = await executeToolCall(explicitFallback, {
           toolCallId: deterministicToolCallId,
+          requestId: input.requestId,
+          conversationId: input.conversationId,
           onActionCard: (card) => {
             actionCards.push(card);
           },
@@ -654,111 +708,192 @@ export const runAssistantStream = async (
 
           deterministicResponseText = `I couldn't list your notes: ${deterministicResult.error.message}`;
         }
-      } else if (pendingActions.length > 1) {
-        deterministicResponseText = [
-          `You have ${pendingActions.length} pending approvals.`,
-          'Approve or reject a specific card so I can resolve the correct action.',
-        ].join(' ');
-      } else if (pendingDecision === 'reject') {
-        const pending = pendingActions[0];
-        removePendingAction(pending.actionId);
-        deterministicResponseText = 'Understood. I did not apply that change.';
-      } else if (pendingDecision === 'approve') {
-        const pending = pendingActions[0];
-        removePendingAction(pending.actionId);
+      } else if (pendingDecision !== null) {
+        logRuntimeDiagnostic('ai_runtime.router_hit', { intentClass: 'pending_decision' });
 
-        const deterministicToolCallId = `approve-${pending.actionId}`;
-        const description = generateToolCallDescription(pending.toolName, pending.input);
-        stepDescriptions.push(description);
-
-        emit({
-          type: 'tool_call_started',
-          requestId: input.requestId,
-          toolName: pending.toolName,
-          toolCallId: deterministicToolCallId,
-          description,
-        });
-
-        const approvedResult = await executeToolCall(
-          { name: pending.toolName, input: pending.input },
-          {
-            toolCallId: deterministicToolCallId,
-            autonomyBypass: true,
-            onActionCard: (card) => {
-              actionCards.push(card);
-            },
-            activeNoteId: input.noteContext?.noteId,
-            attachedNoteContext: input.noteContext,
-            mutationSignatures,
-            mutationOutcomes,
-          },
+        const expiredInConversation = pendingActions.filter(
+          (action) =>
+            hasPendingActionScopeMetadata(action)
+            && action.conversationId === input.conversationId
+            && isPendingActionExpired(action),
         );
 
-        if (chatState.isCanceled(input.requestId)) {
-          return;
+        if (pendingScopeGuardEnabled && expiredInConversation.length > 0) {
+          expiredInConversation.forEach((action) => {
+            removePendingAction(action.actionId);
+          });
+          logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+            reason: 'expired',
+            count: expiredInConversation.length,
+          });
         }
 
-        if (approvedResult.ok) {
-          const resolvedActionCard = approvedResult.output.actionCard
-            ? {
-                ...approvedResult.output.actionCard,
-                actionId: pending.actionId,
-                lifecycle: 'executed' as const,
-              }
-            : undefined;
+        const activePendingActions = pendingScopeGuardEnabled
+          ? pendingActions.filter(
+            (action) => !expiredInConversation.some((expired) => expired.actionId === action.actionId),
+          )
+          : pendingActions;
 
-          if (resolvedActionCard) {
-            const existingIndex = actionCards.findIndex((card) => card.id === resolvedActionCard.id);
-            if (existingIndex === -1) {
-              actionCards.push(resolvedActionCard);
-            } else {
-              actionCards[existingIndex] = resolvedActionCard;
-            }
+        const eligiblePendingActions = activePendingActions.filter((action) =>
+          isEligibleForTypedDecision(action, input.conversationId, pendingScopeGuardEnabled),
+        );
+
+        if (eligiblePendingActions.length > 1) {
+          logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+            reason: 'multiple_pending',
+            count: eligiblePendingActions.length,
+          });
+          deterministicResponseText = [
+            `You have ${eligiblePendingActions.length} pending approvals in this chat.`,
+            'Approve or reject a specific card so I can resolve the correct action.',
+          ].join(' ');
+        } else if (eligiblePendingActions.length === 0) {
+          const pendingWithMetadata = activePendingActions.filter(hasPendingActionScopeMetadata);
+          const inConversation = pendingWithMetadata.filter(
+            (action) => action.conversationId === input.conversationId,
+          );
+          const hasLegacyPending = activePendingActions.some(
+            (action) => !hasPendingActionScopeMetadata(action),
+          );
+
+          if (inConversation.length === 0 && pendingWithMetadata.length > 0) {
+            logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+              reason: 'scope_mismatch',
+            });
+            deterministicResponseText =
+              'I found approvals, but not for this chat thread. Open the original approval card to continue.';
+          } else if (hasLegacyPending) {
+            deterministicResponseText =
+              'This pending action was created before scope safety metadata was added. Approve or reject it from the card.';
+          } else if (pendingScopeGuardEnabled && expiredInConversation.length > 0) {
+            deterministicResponseText =
+              'That approval expired before your reply. Please run the action again if you still want it.';
+          } else {
+            deterministicResponseText =
+              'I could not match that yes/no reply to a pending action. Use the approval card to continue.';
+          }
+        } else if (pendingDecision === 'reject') {
+          const pending = eligiblePendingActions[0];
+          removePendingAction(pending.actionId);
+          const rejectedActionCard: ChatActionCard = {
+            id: `pending-rejected-${pending.actionId}`,
+            toolName: pending.toolName,
+            status: 'confirmation_required',
+            title: 'Action rejected',
+            detail: 'No changes were made.',
+            undoable: false,
+            createdAt: new Date().toISOString(),
+            actionId: pending.actionId,
+            riskLevel: pending.riskLevel,
+            rationale: pending.rationale,
+            lifecycle: 'rejected',
+          };
+          actionCards.push(rejectedActionCard);
+          deterministicResponseText = 'Understood. I did not apply that change.';
+        } else if (pendingDecision === 'approve') {
+          const pending = eligiblePendingActions[0];
+          removePendingAction(pending.actionId);
+
+          const deterministicToolCallId = `approve-${pending.actionId}`;
+          const description = generateToolCallDescription(pending.toolName, pending.input);
+          stepDescriptions.push(description);
+
+          emit({
+            type: 'tool_call_started',
+            requestId: input.requestId,
+            toolName: pending.toolName,
+            toolCallId: deterministicToolCallId,
+            description,
+          });
+
+          const approvedResult = await executeToolCall(
+            { name: pending.toolName, input: pending.input },
+            {
+              toolCallId: deterministicToolCallId,
+              requestId: input.requestId,
+              conversationId: input.conversationId,
+              autonomyBypass: true,
+              onActionCard: (card) => {
+                actionCards.push(card);
+              },
+              activeNoteId: input.noteContext?.noteId,
+              attachedNoteContext: input.noteContext,
+              mutationSignatures,
+              mutationOutcomes,
+            },
+          );
+
+          if (chatState.isCanceled(input.requestId)) {
+            return;
           }
 
-          const summary = generateToolCallSummary(approvedResult.toolName, approvedResult.output);
+          if (approvedResult.ok && approvedResult.output.status === 'success') {
+            const resolvedActionCard = approvedResult.output.actionCard
+              ? {
+                  ...approvedResult.output.actionCard,
+                  actionId: pending.actionId,
+                  lifecycle: 'executed' as const,
+                }
+              : undefined;
 
-          toolExecutions.push({
-            toolName: approvedResult.toolName,
-            toolCallId: deterministicToolCallId,
-            status: approvedResult.output.status,
-            message: approvedResult.output.message,
-            actionCardId: resolvedActionCard?.id,
-          });
+            if (resolvedActionCard) {
+              const existingIndex = actionCards.findIndex((card) => card.id === resolvedActionCard.id);
+              if (existingIndex === -1) {
+                actionCards.push(resolvedActionCard);
+              } else {
+                actionCards[existingIndex] = resolvedActionCard;
+              }
+            }
 
-          emit({
-            type: 'tool_call_completed',
-            requestId: input.requestId,
-            toolName: approvedResult.toolName,
-            toolCallId: deterministicToolCallId,
-            status: approvedResult.output.status,
-            message: approvedResult.output.message,
-            summary,
-            actionCard: resolvedActionCard,
-          });
+            const summary = generateToolCallSummary(approvedResult.toolName, approvedResult.output);
 
-          deterministicResponseText = approvedResult.output.message;
-        } else {
-          requeuePendingAction(pending);
-          toolExecutions.push({
-            toolName: approvedResult.toolName,
-            toolCallId: deterministicToolCallId,
-            status: 'error',
-            message: approvedResult.error.message,
-          });
+            toolExecutions.push({
+              toolName: approvedResult.toolName,
+              toolCallId: deterministicToolCallId,
+              status: approvedResult.output.status,
+              message: approvedResult.output.message,
+              actionCardId: resolvedActionCard?.id,
+            });
 
-          emit({
-            type: 'tool_call_completed',
-            requestId: input.requestId,
-            toolName: approvedResult.toolName,
-            toolCallId: deterministicToolCallId,
-            status: 'error',
-            message: approvedResult.error.message,
-            summary: approvedResult.error.message,
-          });
+            emit({
+              type: 'tool_call_completed',
+              requestId: input.requestId,
+              toolName: approvedResult.toolName,
+              toolCallId: deterministicToolCallId,
+              status: approvedResult.output.status,
+              message: approvedResult.output.message,
+              summary,
+              actionCard: resolvedActionCard,
+            });
 
-          deterministicResponseText =
-            `I couldn't complete that approved action yet: ${approvedResult.error.message}`;
+            deterministicResponseText = approvedResult.output.message;
+          } else {
+            requeuePendingAction(pending);
+            const failureMessage = approvedResult.ok
+              ? approvedResult.output.message
+              : approvedResult.error.message;
+            const failureStatus = approvedResult.ok ? approvedResult.output.status : 'error';
+
+            toolExecutions.push({
+              toolName: approvedResult.toolName,
+              toolCallId: deterministicToolCallId,
+              status: failureStatus,
+              message: failureMessage,
+            });
+
+            emit({
+              type: 'tool_call_completed',
+              requestId: input.requestId,
+              toolName: approvedResult.toolName,
+              toolCallId: deterministicToolCallId,
+              status: failureStatus,
+              message: failureMessage,
+              summary: failureMessage,
+            });
+
+            deterministicResponseText =
+              `I couldn't complete that approved action yet: ${failureMessage}`;
+          }
         }
       }
 
@@ -895,6 +1030,7 @@ export const runAssistantStream = async (
           userMessage: input.userMessage,
           history: conversationMessages,
           allowWebSearchToolChoice: false,
+          conversationId: input.conversationId,
         });
 
         // Build final messages, converting last user message to multimodal if images present
@@ -1032,6 +1168,8 @@ export const runAssistantStream = async (
                 : input.allowedTools;
 
             const sdkTools = createSdkTools({
+              requestId: input.requestId,
+              conversationId: input.conversationId,
               onActionCard: (card) => {
                 actionCards.push(card);
               },
@@ -1343,6 +1481,8 @@ export const runAssistantStream = async (
 
             const fallbackResult = await executeToolCall(fallbackCall, {
               toolCallId: fallbackToolCallId,
+              requestId: input.requestId,
+              conversationId: input.conversationId,
               onActionCard: (card) => {
                 actionCards.push(card);
               },

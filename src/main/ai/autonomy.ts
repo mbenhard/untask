@@ -25,6 +25,10 @@ export type PendingAction = {
   requiresHardConfirmation: boolean;
   createdAt: string;
   requestId?: string;
+  conversationId?: string;
+  createdByRequestId?: string;
+  fingerprint?: string;
+  expiresAt?: string;
   modeAtCreation: AutonomyMode;
   lifecycle: 'pending';
 };
@@ -39,6 +43,7 @@ export type ResolvedAction = Omit<PendingAction, 'lifecycle'> & {
 
 const SETTINGS_KEY_AUTONOMY_MODE = SETTING_KEY_AI_AUTONOMY_MODE;
 const SETTINGS_KEY_PENDING_ACTIONS = SETTING_KEY_AI_AUTONOMY_PENDING_ACTIONS;
+export const DEFAULT_PENDING_ACTION_TTL_MS = 30 * 60 * 1000;
 
 const VALID_MODES: ReadonlySet<AutonomyMode> = new Set(['auto', 'confirm']);
 
@@ -123,6 +128,10 @@ const pendingActionSchema = z.object({
   requiresHardConfirmation: z.boolean(),
   createdAt: z.string(),
   requestId: z.string().optional(),
+  conversationId: z.string().optional(),
+  createdByRequestId: z.string().optional(),
+  fingerprint: z.string().optional(),
+  expiresAt: z.string().optional(),
   modeAtCreation: z.enum(['auto', 'confirm', 'manual', 'safe', 'autopilot']),
   lifecycle: z.literal('pending'),
 });
@@ -142,6 +151,7 @@ export const loadPendingActions = (): PendingAction[] => {
     return actions.map((action) => ({
       ...action,
       modeAtCreation: MIGRATION_MAP[action.modeAtCreation] ?? action.modeAtCreation,
+      createdByRequestId: action.createdByRequestId ?? action.requestId,
     })) as PendingAction[];
   } catch {
     return [];
@@ -158,8 +168,19 @@ export const addPendingAction = (
   riskLevel: RiskLevel,
   rationale: string,
   hardOverride: boolean,
-  requestId?: string,
+  metadata?: string | {
+    requestId?: string;
+    conversationId?: string;
+    createdByRequestId?: string;
+    fingerprint?: string;
+    expiresAt?: string;
+  },
 ): PendingAction => {
+  const requestMetadata = typeof metadata === 'string'
+    ? { requestId: metadata, createdByRequestId: metadata }
+    : metadata ?? {};
+  const createdByRequestId = requestMetadata.createdByRequestId ?? requestMetadata.requestId;
+
   const mode = getAutonomyMode();
   const action: PendingAction = {
     actionId: randomUUID(),
@@ -169,7 +190,12 @@ export const addPendingAction = (
     rationale,
     requiresHardConfirmation: hardOverride,
     createdAt: new Date().toISOString(),
-    requestId,
+    requestId: requestMetadata.requestId ?? createdByRequestId,
+    conversationId: requestMetadata.conversationId,
+    createdByRequestId,
+    fingerprint: requestMetadata.fingerprint,
+    expiresAt: requestMetadata.expiresAt
+      ?? new Date(Date.now() + DEFAULT_PENDING_ACTION_TTL_MS).toISOString(),
     modeAtCreation: mode,
     lifecycle: 'pending',
   };
@@ -207,6 +233,36 @@ export const removePendingAction = (actionId: string): PendingAction | null => {
 export const getPendingAction = (actionId: string): PendingAction | null => {
   const queue = loadPendingActions();
   return queue.find((a) => a.actionId === actionId) ?? null;
+};
+
+export const hasPendingActionScopeMetadata = (
+  action: PendingAction,
+): action is PendingAction & {
+  conversationId: string;
+  fingerprint: string;
+  expiresAt: string;
+} =>
+  typeof action.conversationId === 'string' &&
+  action.conversationId.trim().length > 0 &&
+  typeof action.fingerprint === 'string' &&
+  action.fingerprint.trim().length > 0 &&
+  typeof action.expiresAt === 'string' &&
+  action.expiresAt.trim().length > 0;
+
+export const isPendingActionExpired = (
+  action: Pick<PendingAction, 'expiresAt'>,
+  now: Date = new Date(),
+): boolean => {
+  if (!action.expiresAt) {
+    return false;
+  }
+
+  const expiresAtMs = Date.parse(action.expiresAt);
+  if (Number.isNaN(expiresAtMs)) {
+    return true;
+  }
+
+  return now.getTime() >= expiresAtMs;
 };
 
 // ─── Non-mutation tools (skip autonomy gating) ──────────────

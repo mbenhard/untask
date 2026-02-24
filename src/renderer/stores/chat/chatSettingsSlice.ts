@@ -50,9 +50,12 @@ export const createSettingsActions = (
 
   approvePendingAction: async (actionId: string) => {
     try {
+      const pending = get().pendingActions.find((entry) => entry.actionId === actionId);
       const result = await getUntask().chat.resolvePendingAction({
         actionId,
         decision: 'approve',
+        conversationId: pending?.conversationId ?? get().activeConversationId ?? undefined,
+        expectedFingerprint: pending?.fingerprint,
       });
 
       if (result.ok) {
@@ -82,9 +85,12 @@ export const createSettingsActions = (
 
   rejectPendingAction: async (actionId: string) => {
     try {
+      const pending = get().pendingActions.find((entry) => entry.actionId === actionId);
       const result = await getUntask().chat.resolvePendingAction({
         actionId,
         decision: 'reject',
+        conversationId: pending?.conversationId ?? get().activeConversationId ?? undefined,
+        expectedFingerprint: pending?.fingerprint,
       });
 
       if (result.ok) {

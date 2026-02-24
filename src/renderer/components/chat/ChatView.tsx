@@ -695,7 +695,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
       {error ? (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <div className="min-w-0">
-            <p className="truncate">{error}</p>
+            <p className="whitespace-pre-wrap break-words">{error}</p>
             {lastStreamError ? (
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-destructive/80">
                 {lastStreamError.code.replaceAll('_', ' ')}

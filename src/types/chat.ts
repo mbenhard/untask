@@ -235,6 +235,10 @@ export type ChatPendingActionEntry = {
   requiresHardConfirmation: boolean;
   createdAt: string;
   requestId?: string;
+  conversationId?: string;
+  createdByRequestId?: string;
+  fingerprint?: string;
+  expiresAt?: string;
   modeAtCreation: AutonomyMode;
   lifecycle: 'pending';
 };
@@ -242,6 +246,8 @@ export type ChatPendingActionEntry = {
 export type ChatResolvePendingActionPayload = {
   actionId: string;
   decision: 'approve' | 'reject';
+  conversationId?: string;
+  expectedFingerprint?: string;
 };
 
 export type ChatResolvePendingActionResult = {
@@ -256,4 +262,3 @@ export type ChatResolvePendingActionResult = {
 export type ChatListPendingActionsResult = {
   actions: ChatPendingActionEntry[];
 };
-

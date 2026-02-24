@@ -18,6 +18,8 @@ import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/model
 import type { ChatViewIntent } from '../../../types/chat';
 import type { ToolRegistryEntry, ToolExecutionContext, ToolExecutionEnvelope } from './types';
 import { confirmationRequired, successResult } from './helpers';
+import { isPostMutationVerifyEnabled } from '../runtimeFlags';
+import { logRuntimeDiagnostic } from '../runtimeDiagnostics';
 
 const summarizeTask = (task: { title: string }): string => task.title;
 
@@ -34,6 +36,16 @@ const resolveTaskLensViewIntent = (task: {
   }
 
   return 'tasks';
+};
+
+const postVerifyEnabled = (): boolean => isPostMutationVerifyEnabled();
+
+const verificationError = (toolName: string, reason: string, message: string): ToolExecutionEnvelope => {
+  logRuntimeDiagnostic('ai_runtime.post_verify_failed', { toolName, reason });
+  return {
+    status: 'error',
+    message: `I couldn't fully apply that change: ${message}`,
+  };
 };
 
 // ─── Schemas ────────────────────────────────────────────────────
@@ -116,6 +128,20 @@ export const updateTaskTool = {
     const updatedTask = updateTask(input, 'ai');
     const event = getLastTaskEventForTask(updatedTask.id);
 
+    if (postVerifyEnabled() && Object.prototype.hasOwnProperty.call(input, 'parentId')) {
+      const verifiedTask = getTaskById(updatedTask.id);
+      const expectedParentId = input.parentId ?? null;
+      const actualParentId = verifiedTask?.parentId ?? null;
+
+      if (!verifiedTask || actualParentId !== expectedParentId) {
+        return verificationError(
+          'update_task',
+          'parent_mismatch',
+          'The requested parent move did not stick. Move or complete subtasks first, then retry.',
+        );
+      }
+    }
+
     return successResult(
       context,
       'update_task',
@@ -173,6 +199,54 @@ export const completeTaskTool = {
       completeChildren: input.completeChildren === true,
     });
     const event = getLastTaskEventForTask(completed.id);
+    const recurrenceExpected = Boolean(task.recurrence);
+
+    if (postVerifyEnabled()) {
+      const verifiedCompleted = getTaskById(completed.id);
+      if (
+        !verifiedCompleted ||
+        !TERMINAL_STATUSES.includes(verifiedCompleted.status as PredefinedStatusId)
+      ) {
+        return verificationError(
+          'complete_task',
+          'task_not_terminal',
+          'the task is still active after completion.',
+        );
+      }
+
+      if (input.completeChildren === true) {
+        const descendants = listTasks({ parentId: completed.id });
+        const activeDescendants = descendants.filter(
+          (child) => !TERMINAL_STATUSES.includes(child.status as PredefinedStatusId),
+        );
+        if (activeDescendants.length > 0) {
+          return verificationError(
+            'complete_task',
+            'descendants_not_terminal',
+            `${activeDescendants.length} subtask(s) are still active.`,
+          );
+        }
+      }
+
+      if (recurrenceExpected) {
+        if (!recurredTask) {
+          return verificationError(
+            'complete_task',
+            'recurrence_missing',
+            'the next recurring instance was not created.',
+          );
+        }
+
+        const recurrenceArtifact = getTaskById(recurredTask.id);
+        if (!recurrenceArtifact) {
+          return verificationError(
+            'complete_task',
+            'recurrence_artifact_missing',
+            'the recurring follow-up task is missing.',
+          );
+        }
+      }
+    }
 
     const summary = recurredTask
       ? `${summarizeTask(completed)}\nRecurring task regenerated: "${recurredTask.title}" — due ${recurredTask.dueDate ?? 'unset'}`
@@ -242,6 +316,17 @@ export const deleteTaskTool = {
     }
 
     deleteTask(input.id, 'ai', { cascade: input.cascade === true });
+
+    if (postVerifyEnabled()) {
+      const deleted = getTaskById(input.id);
+      if (deleted) {
+        return verificationError(
+          'delete_task',
+          'task_still_exists',
+          'the task still exists after delete.',
+        );
+      }
+    }
 
     return successResult(
       context,

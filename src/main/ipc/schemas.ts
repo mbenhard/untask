@@ -24,6 +24,8 @@ export const settingsReadJournalSchema = z.object({
 export const resolvePendingActionSchema = z.object({
   actionId: z.string().min(1),
   decision: z.enum(['approve', 'reject']),
+  conversationId: z.string().min(1).optional(),
+  expectedFingerprint: z.string().min(1).optional(),
 });
 
 export const taskDeleteRequestSchema = z.union([

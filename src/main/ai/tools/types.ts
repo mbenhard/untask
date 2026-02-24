@@ -15,6 +15,8 @@ export type ToolExecutionEnvelope = {
 
 export type ToolExecutionContext = {
   toolCallId?: string;
+  conversationId?: string;
+  requestId?: string;
   onActionCard?: (card: ChatActionCard) => void;
   autonomyBypass?: boolean;
   skipInternalConfirmation?: boolean;

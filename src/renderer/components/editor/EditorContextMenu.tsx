@@ -356,7 +356,7 @@ export const executeEditorContextAction = async (
     if (target.kind !== 'block') {
       return false;
     }
-    editor.setSelection(target.blockId, target.blockId);
+    editor.setTextCursorPosition(target.blockId, 'start');
     if (action.id === 'move_block_up') {
       editor.moveBlocksUp();
     } else {
@@ -555,7 +555,7 @@ export const EditorContextMenu = ({
 }: EditorContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const linkInputRef = useRef<HTMLInputElement | null>(null);
-  const [showTurnInto, setShowTurnInto] = useState(false);
+  const [showTurnIntoMenu, setShowTurnIntoMenu] = useState(false);
   const [showLinkEditor, setShowLinkEditor] = useState(false);
   const [linkInput, setLinkInput] = useState('');
   const [linkTextInput, setLinkTextInput] = useState('');
@@ -592,7 +592,7 @@ export const EditorContextMenu = ({
     if (rect.bottom > window.innerHeight) {
       el.style.top = `${Math.max(8, y - rect.height)}px`;
     }
-  }, [x, y]);
+  }, [x, y, showTurnIntoMenu, showLinkEditor, target.kind]);
 
   useEffect(() => {
     if (!showLinkEditor) {
@@ -625,16 +625,36 @@ export const EditorContextMenu = ({
 
   const isTableTarget = target.kind === 'table'
     || (target.kind === 'block' && target.blockType === 'table');
+  const isTableBlockTarget = target.kind === 'block' && target.blockType === 'table';
+  const showTurnInto = target.kind === 'block' && !isTableBlockTarget;
   const isBlockTarget = target.kind === 'block';
   const isTextTarget = target.kind === 'text_selection';
   const isLinkTarget = target.kind === 'link';
   const isFileTarget = target.kind === 'file';
+  const hasPrimaryActionSection = isFileTarget || isLinkTarget || isTextTarget;
+  const contextLinkUrl = target.kind === 'link'
+    ? target.href
+    : target.kind === 'text_selection'
+      ? target.selectedLinkUrl
+      : null;
+  const canOpenContextLink = contextLinkUrl ? isSafeExternalHttpUrl(contextLinkUrl) : false;
+  const disabledItemClass = 'cursor-not-allowed opacity-55 hover:bg-transparent hover:text-muted-foreground';
 
   return (
     <div
       ref={menuRef}
       className="untask-editor-context-menu fixed z-50 min-w-[220px] rounded-md border border-border/60 bg-popover/95 p-1 shadow-md backdrop-blur-sm"
       style={{ left: x, top: y }}
+      onMouseDown={(event) => {
+        event.stopPropagation();
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       {isFileTarget && (
         <>
@@ -660,7 +680,12 @@ export const EditorContextMenu = ({
 
       {isLinkTarget && (
         <>
-          <button type="button" className={itemClass} onClick={() => void run({ id: 'link_open' })}>
+          <button
+            type="button"
+            className={cn(itemClass, !canOpenContextLink && disabledItemClass)}
+            onClick={() => void run({ id: 'link_open' })}
+            disabled={!canOpenContextLink}
+          >
             <ExternalLink className="size-3.5" />
             <span>Open Link</span>
           </button>
@@ -701,6 +726,27 @@ export const EditorContextMenu = ({
             <SquarePen className="size-3.5" />
             <span>{target.selectedLinkUrl ? 'Edit Link' : 'Add Link'}</span>
           </button>
+          {target.selectedLinkUrl && (
+            <>
+              <button
+                type="button"
+                className={cn(itemClass, !canOpenContextLink && disabledItemClass)}
+                onClick={() => void run({ id: 'link_open' })}
+                disabled={!canOpenContextLink}
+              >
+                <ExternalLink className="size-3.5" />
+                <span>Open Link</span>
+              </button>
+              <button type="button" className={itemClass} onClick={() => void run({ id: 'link_copy' })}>
+                <Copy className="size-3.5" />
+                <span>Copy Link</span>
+              </button>
+              <button type="button" className={itemClass} onClick={() => void run({ id: 'link_remove' })}>
+                <Unlink className="size-3.5" />
+                <span>Remove Link</span>
+              </button>
+            </>
+          )}
           <button type="button" className={itemClass} onClick={() => void run({ id: 'text_clear' })}>
             <Minus className="size-3.5" />
             <span>Clear Formatting</span>
@@ -769,56 +815,60 @@ export const EditorContextMenu = ({
 
       {(isBlockTarget || isTableTarget) && (
         <>
-          <div className="my-1 h-px bg-border/60" />
+          {hasPrimaryActionSection && <div className="my-1 h-px bg-border/60" />}
           {isBlockTarget && (
             <>
-              <button type="button" className={itemClass} onClick={() => setShowTurnInto((prev) => !prev)}>
-                <FileText className="size-3.5" />
-                <span>Turn Into</span>
-              </button>
               {showTurnInto && (
-                <div className="mb-1 ml-1 rounded-sm border border-border/50 p-1">
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'paragraph' })}>
+                <>
+                  <button type="button" className={itemClass} onClick={() => setShowTurnIntoMenu((prev) => !prev)}>
                     <FileText className="size-3.5" />
-                    <span>Paragraph</span>
+                    <span>Turn Into</span>
                   </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'heading_1' })}>
-                    <Heading1 className="size-3.5" />
-                    <span>Heading 1</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'heading_2' })}>
-                    <Heading2 className="size-3.5" />
-                    <span>Heading 2</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'heading_3' })}>
-                    <Heading3 className="size-3.5" />
-                    <span>Heading 3</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'bullet_list' })}>
-                    <List className="size-3.5" />
-                    <span>Bullet List</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'numbered_list' })}>
-                    <ListOrdered className="size-3.5" />
-                    <span>Numbered List</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'check_list' })}>
-                    <CheckSquare className="size-3.5" />
-                    <span>Checklist</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'quote' })}>
-                    <Quote className="size-3.5" />
-                    <span>Quote</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'code_block' })}>
-                    <Code className="size-3.5" />
-                    <span>Code Block</span>
-                  </button>
-                  <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'divider' })}>
-                    <Minus className="size-3.5" />
-                    <span>Divider</span>
-                  </button>
-                </div>
+                  {showTurnIntoMenu && (
+                    <div className="mb-1 ml-1 rounded-sm border border-border/50 p-1">
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'paragraph' })}>
+                        <FileText className="size-3.5" />
+                        <span>Paragraph</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'heading_1' })}>
+                        <Heading1 className="size-3.5" />
+                        <span>Heading 1</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'heading_2' })}>
+                        <Heading2 className="size-3.5" />
+                        <span>Heading 2</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'heading_3' })}>
+                        <Heading3 className="size-3.5" />
+                        <span>Heading 3</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'bullet_list' })}>
+                        <List className="size-3.5" />
+                        <span>Bullet List</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'numbered_list' })}>
+                        <ListOrdered className="size-3.5" />
+                        <span>Numbered List</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'check_list' })}>
+                        <CheckSquare className="size-3.5" />
+                        <span>Checklist</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'quote' })}>
+                        <Quote className="size-3.5" />
+                        <span>Quote</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'code_block' })}>
+                        <Code className="size-3.5" />
+                        <span>Code Block</span>
+                      </button>
+                      <button type="button" className={itemClass} onClick={() => void run({ id: 'turn_into', value: 'divider' })}>
+                        <Minus className="size-3.5" />
+                        <span>Divider</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
               <button type="button" className={itemClass} onClick={() => void run({ id: 'move_block_up' })}>
                 <ArrowUp className="size-3.5" />

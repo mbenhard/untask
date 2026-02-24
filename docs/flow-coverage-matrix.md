@@ -14,6 +14,11 @@ Scope: high-signal core flows for a lean task/notes/chat app quality gate.
 | Chat stream event sequencing/state cleanup | `src/renderer/stores/chatStore.test.ts` | Checklist #8 | Covered |
 | Chat stream indicator phase behavior | `src/renderer/stores/chatStore.test.ts` | Checklist #8 | Covered |
 | Cross-thread/proactive chat completion guards | `src/renderer/stores/chatStore.test.ts` | Checklist #9 | Covered |
+| Deterministic notes routing (`show/list notes`) | `src/main/ai/streamOrchestration.test.ts` | Checklist #15 | Covered |
+| Typed pending approval routing + disambiguation | `src/main/ai/streamOrchestration.test.ts` | Checklist #13/#14 | Covered |
+| Duplicate mutation failure suppression | `src/main/ai/tools.test.ts` | Checklist #16 | Covered |
+| Pending approval scope/fingerprint/expiry guards | `src/main/ipc/chat.ts` (covered via integration/manual) | Checklist #13/#14/#17 | Partial (manual-heavy) |
+| Post-mutation verification before success wording | `src/main/ai/tools.test.ts` | Checklist #17 | Covered |
 | Notes -> AI handoff + failed-save guard | `src/renderer/stores/notesStore.test.ts` | Checklist #12 | Covered |
 | Quick-add summon/create/navigate cross-window flow | `src/main/clipboard.test.ts`, `src/main/shortcuts.test.ts`, `src/main/window/summonController.test.ts`, `src/main/window/quickAddWindow.test.ts` | Checklist #11 | Covered |
 | Startup/relaunch resilience | N/A | Checklist #10 | Manual only |

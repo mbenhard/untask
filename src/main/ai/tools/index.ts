@@ -11,6 +11,8 @@ import {
   isMutationTool,
 } from '../autonomy';
 import { getTaskById } from '../../services/taskService';
+import { isDuplicateFailureGuardEnabled } from '../runtimeFlags';
+import { logRuntimeDiagnostic } from '../runtimeDiagnostics';
 import { createActionCard, emitActionCard, normalizeForSummary } from './helpers';
 
 // ─── Re-export public types ─────────────────────────────────────
@@ -223,8 +225,13 @@ export const executeToolCall = async (
     context.mutationSignatures?.has(mutationSignature)
   ) {
     const previousOutcome = context.mutationOutcomes?.get(mutationSignature);
+    const duplicateFailureGuardEnabled = isDuplicateFailureGuardEnabled();
 
-    if (previousOutcome === 'error') {
+    if (duplicateFailureGuardEnabled && previousOutcome === 'error') {
+      logRuntimeDiagnostic('ai_runtime.duplicate_mutation_blocked', {
+        toolName: rawToolName,
+        reason: 'prior_error',
+      });
       return {
         ok: true,
         toolName: rawToolName,
@@ -237,7 +244,11 @@ export const executeToolCall = async (
       };
     }
 
-    if (previousOutcome === 'confirmation_required') {
+    if (duplicateFailureGuardEnabled && previousOutcome === 'confirmation_required') {
+      logRuntimeDiagnostic('ai_runtime.duplicate_mutation_blocked', {
+        toolName: rawToolName,
+        reason: 'already_pending_confirmation',
+      });
       return {
         ok: true,
         toolName: rawToolName,
@@ -275,6 +286,12 @@ export const executeToolCall = async (
         risk,
         rationale,
         hardOverride,
+        {
+          requestId: context.requestId,
+          createdByRequestId: context.requestId,
+          conversationId: context.conversationId,
+          fingerprint: mutationSignature ?? undefined,
+        },
       );
 
       const actionCard = createActionCard(

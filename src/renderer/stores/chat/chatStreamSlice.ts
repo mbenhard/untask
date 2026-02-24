@@ -135,6 +135,37 @@ const resolveFinalViewIntent = (
   return successfulIntents[successfulIntents.length - 1] ?? fallbackIntent;
 };
 
+const formatStreamErrorMessage = (
+  event: Extract<ChatStreamEvent, { type: 'error' }>,
+): string => {
+  const raw = event.message.trim();
+  const normalized = raw.toLowerCase();
+
+  if (
+    event.code === 'provider_error'
+    && (
+      normalized.includes('empty response')
+      || normalized.includes('returned empty')
+      || normalized.includes('provider returned empty')
+    )
+  ) {
+    return 'The AI provider returned an empty response. Nothing changed. Retry once, or switch model/provider in Settings > AI.';
+  }
+
+  if (
+    event.code === 'provider_error'
+    && (
+      normalized.includes('inactivity timeout')
+      || normalized.includes('no data received')
+      || normalized.includes('timed out')
+    )
+  ) {
+    return 'The model timed out before replying. Nothing changed. Retry now or use a faster model/provider.';
+  }
+
+  return raw.length > 0 ? raw : 'Chat request failed.';
+};
+
 // ─── Proactive inFlight bootstrap ───────────────────────────
 
 /**
@@ -482,6 +513,22 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
     };
   });
 
+  actionCards.forEach((card) => {
+    const actionId = card.actionId;
+    const lifecycle = card.lifecycle;
+    if (!actionId || !lifecycle || lifecycle === 'pending') {
+      return;
+    }
+
+    get().updateCardLifecycle(actionId, lifecycle, {
+      taskId: card.taskId,
+      taskEventId: card.taskEventId,
+      undoable: card.undoable,
+      title: card.title,
+      detail: card.detail,
+    });
+  });
+
   const resolvedViewIntent = resolveFinalViewIntent(
     actionCards,
     pendingViewSwitch?.pendingViewIntent ?? null,
@@ -506,6 +553,7 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
 
 const handleError: StreamEventHandler = ({ set, get, event }) => {
   if (event.type !== 'error') return;
+  const userFacingMessage = formatStreamErrorMessage(event);
 
   const errorInFlight = get().inFlightByRequestId[event.requestId];
   if (errorInFlight?.safetyTimeoutId) {
@@ -524,7 +572,7 @@ const handleError: StreamEventHandler = ({ set, get, event }) => {
             content:
               message.content.trim().length > 0
                 ? message.content
-                : `Error: ${event.message}`,
+                : `Error: ${userFacingMessage}`,
           }
           : message,
       )
@@ -543,12 +591,12 @@ const handleError: StreamEventHandler = ({ set, get, event }) => {
       conversationIdByRequestId: cleanup.conversationIdByRequestId,
       assistantMessageIdByRequestId: cleanup.assistantMessageIdByRequestId,
       isSending: !cleanup.noMoreInFlight,
-      error: event.message,
+      error: userFacingMessage,
       lastStreamError: {
         requestId: event.requestId,
         code: event.code,
         retryable: event.retryable,
-        message: event.message,
+        message: userFacingMessage,
       },
     };
   });

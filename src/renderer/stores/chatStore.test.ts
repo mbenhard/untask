@@ -1475,4 +1475,86 @@ describe('chatStore stream reliability', () => {
     });
     expect(useChatStore.getState().pendingNoteContext).toBeNull();
   });
+
+  it('approves pending action using the pending action conversation scope and fingerprint', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
+
+    useChatStore.setState({
+      activeConversationId: 'thread-foreign',
+      pendingActions: [
+        {
+          actionId: 'pending-scope-1',
+          toolName: 'delete_task',
+          input: { id: 'task-1' },
+          riskLevel: 'critical',
+          rationale: 'Delete task "task-1".',
+          requiresHardConfirmation: true,
+          createdAt: new Date().toISOString(),
+          conversationId: 'thread-origin',
+          fingerprint: 'delete_task:{"id":"task-1"}',
+          modeAtCreation: 'auto',
+          lifecycle: 'pending',
+        },
+      ],
+    });
+
+    mockChatApi.resolvePendingAction.mockResolvedValue({
+      ok: false,
+      actionId: 'pending-scope-1',
+      lifecycle: 'pending',
+      message: 'blocked for test',
+    });
+
+    await useChatStore.getState().approvePendingAction('pending-scope-1');
+
+    expect(mockChatApi.resolvePendingAction).toHaveBeenCalledWith({
+      actionId: 'pending-scope-1',
+      decision: 'approve',
+      conversationId: 'thread-origin',
+      expectedFingerprint: 'delete_task:{"id":"task-1"}',
+    });
+  });
+
+  it('rejects pending action using the pending action conversation scope and fingerprint', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
+
+    useChatStore.setState({
+      activeConversationId: 'thread-foreign',
+      pendingActions: [
+        {
+          actionId: 'pending-scope-2',
+          toolName: 'update_task',
+          input: { id: 'task-2', title: 'Updated' },
+          riskLevel: 'low',
+          rationale: 'Update task "task-2".',
+          requiresHardConfirmation: false,
+          createdAt: new Date().toISOString(),
+          conversationId: 'thread-origin-2',
+          fingerprint: 'update_task:{"id":"task-2","title":"Updated"}',
+          modeAtCreation: 'auto',
+          lifecycle: 'pending',
+        },
+      ],
+    });
+
+    mockChatApi.resolvePendingAction.mockResolvedValue({
+      ok: false,
+      actionId: 'pending-scope-2',
+      lifecycle: 'pending',
+      message: 'blocked for test',
+    });
+
+    await useChatStore.getState().rejectPendingAction('pending-scope-2');
+
+    expect(mockChatApi.resolvePendingAction).toHaveBeenCalledWith({
+      actionId: 'pending-scope-2',
+      decision: 'reject',
+      conversationId: 'thread-origin-2',
+      expectedFingerprint: 'update_task:{"id":"task-2","title":"Updated"}',
+    });
+  });
 });

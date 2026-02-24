@@ -12,6 +12,10 @@ export const SETTING_KEY_AI_PROVIDER = 'ai_provider' as const;
 export const SETTING_KEY_AI_OPENAI_KEY = 'ai_openai_key' as const;
 export const SETTING_KEY_AI_ANTHROPIC_KEY = 'ai_anthropic_key' as const;
 export const SETTING_KEY_AI_OLLAMA_BASE_URL = 'ai_ollama_base_url' as const;
+export const SETTING_KEY_AI_RUNTIME_DETERMINISTIC_ROUTER = 'ai_runtime_deterministic_router' as const;
+export const SETTING_KEY_AI_RUNTIME_PENDING_SCOPE_GUARD = 'ai_runtime_pending_scope_guard' as const;
+export const SETTING_KEY_AI_RUNTIME_DUPLICATE_FAILURE_GUARD = 'ai_runtime_duplicate_failure_guard' as const;
+export const SETTING_KEY_AI_RUNTIME_POST_MUTATION_VERIFY = 'ai_runtime_post_mutation_verify' as const;
 export const SETTING_KEY_CHAT_RETENTION_MODE = 'chat_retention_mode' as const;
 export const SETTING_KEY_WINDOW_DISMISS_MODE = 'app.windowDismissMode' as const;
 export const SETTING_KEY_SHORTCUT_TOGGLE_WINDOW = 'shortcut.toggleWindow' as const;
@@ -52,6 +56,10 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_AI_OPENAI_KEY]: '',
   [SETTING_KEY_AI_ANTHROPIC_KEY]: '',
   [SETTING_KEY_AI_OLLAMA_BASE_URL]: 'http://localhost:11434',
+  [SETTING_KEY_AI_RUNTIME_DETERMINISTIC_ROUTER]: 'true',
+  [SETTING_KEY_AI_RUNTIME_PENDING_SCOPE_GUARD]: 'false',
+  [SETTING_KEY_AI_RUNTIME_DUPLICATE_FAILURE_GUARD]: 'true',
+  [SETTING_KEY_AI_RUNTIME_POST_MUTATION_VERIFY]: 'false',
   [SETTING_KEY_CHAT_RETENTION_MODE]: '30d',
   [SETTING_KEY_WINDOW_DISMISS_MODE]: 'persistent',
   [SETTING_KEY_SHORTCUT_TOGGLE_WINDOW]: 'CommandOrControl+Shift+Space',

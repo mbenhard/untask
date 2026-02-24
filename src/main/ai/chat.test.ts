@@ -96,7 +96,8 @@ describe('classifyChatError', () => {
     expect(classifyChatError(new Error('Provider returned empty response.'))).toEqual({
       code: 'provider_error',
       retryable: true,
-      message: 'Provider returned empty response.',
+      message:
+        'The AI provider returned an empty response. Nothing changed. Retry once, and if it repeats switch model/provider in Settings > AI.',
     });
   });
 
@@ -108,7 +109,8 @@ describe('classifyChatError', () => {
     ).toEqual({
       code: 'provider_error',
       retryable: true,
-      message: 'Stream inactivity timeout: no data received for 90 seconds.',
+      message:
+        'The model timed out before replying. Nothing changed. Retry now or try a faster model/provider.',
     });
   });
 });

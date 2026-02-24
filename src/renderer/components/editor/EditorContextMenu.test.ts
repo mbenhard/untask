@@ -20,7 +20,7 @@ type EditorMock = {
   updateBlock: ReturnType<typeof vi.fn>;
   insertBlocks: ReturnType<typeof vi.fn>;
   removeBlocks: ReturnType<typeof vi.fn>;
-  setSelection: ReturnType<typeof vi.fn>;
+  setTextCursorPosition: ReturnType<typeof vi.fn>;
   moveBlocksUp: ReturnType<typeof vi.fn>;
   moveBlocksDown: ReturnType<typeof vi.fn>;
   toggleStyles: ReturnType<typeof vi.fn>;
@@ -81,7 +81,7 @@ const createEditor = (): { editor: BlockNoteEditor; mock: EditorMock; extensions
     updateBlock: vi.fn(),
     insertBlocks: vi.fn(() => []),
     removeBlocks: vi.fn(() => []),
-    setSelection: vi.fn(),
+    setTextCursorPosition: vi.fn(),
     moveBlocksUp: vi.fn(),
     moveBlocksDown: vi.fn(),
     toggleStyles: vi.fn(),
@@ -273,7 +273,7 @@ describe('executeEditorContextAction', () => {
 
     expect(mock.updateBlock).toHaveBeenCalled();
     expect(mock.insertBlocks).toHaveBeenCalled();
-    expect(mock.setSelection).toHaveBeenCalledWith('block-1', 'block-1');
+    expect(mock.setTextCursorPosition).toHaveBeenCalledWith('block-1', 'start');
     expect(mock.moveBlocksUp).toHaveBeenCalled();
     expect(mock.removeBlocks).toHaveBeenCalledWith(['block-1']);
   });
@@ -336,6 +336,52 @@ describe('executeEditorContextAction', () => {
     expect(copyText).toHaveBeenCalledWith('https://example.com');
     expect(extensions.link.deleteLink).toHaveBeenCalledWith(8);
     expect(extensions.link.editLink).toHaveBeenCalledWith('https://edited.com', 'Edited', 8);
+  });
+
+  it('executes selection-based link actions and rejects unsafe open', async () => {
+    const { editor, extensions } = createEditor();
+    const target: EditorContextMenuTarget = {
+      kind: 'text_selection',
+      selectedText: 'Selected',
+      selectedLinkUrl: 'https://example.com',
+    };
+    const unsafeTarget: EditorContextMenuTarget = {
+      kind: 'text_selection',
+      selectedText: 'Selected',
+      selectedLinkUrl: 'javascript:alert(1)',
+    };
+    const openExternal = vi.fn();
+    const copyText = vi.fn();
+
+    await executeEditorContextAction(
+      editor,
+      target,
+      { id: 'link_open' },
+      { openExternal, copyText },
+    );
+    await executeEditorContextAction(
+      editor,
+      target,
+      { id: 'link_copy' },
+      { openExternal, copyText },
+    );
+    await executeEditorContextAction(
+      editor,
+      target,
+      { id: 'link_remove' },
+      { openExternal, copyText },
+    );
+    const openedUnsafe = await executeEditorContextAction(
+      editor,
+      unsafeTarget,
+      { id: 'link_open' },
+      { openExternal, copyText },
+    );
+
+    expect(openExternal).toHaveBeenCalledWith('https://example.com');
+    expect(copyText).toHaveBeenCalledWith('https://example.com');
+    expect(extensions.link.deleteLink).toHaveBeenCalledWith(undefined);
+    expect(openedUnsafe).toBe(false);
   });
 
   it('executes file actions', async () => {

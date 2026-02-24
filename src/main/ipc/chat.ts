@@ -60,8 +60,11 @@ import {
   requeuePendingAction,
   removePendingAction,
   getPendingAction,
+  isPendingActionExpired,
 } from '../ai/autonomy';
 import { executeToolCall } from '../ai/tools';
+import { isPendingScopeGuardEnabled } from '../ai/runtimeFlags';
+import { logRuntimeDiagnostic } from '../ai/runtimeDiagnostics';
 
 export const registerChatHandlers = (): void => {
   ipcMain.handle(
@@ -331,6 +334,7 @@ export const registerChatHandlers = (): void => {
       'CHAT_RESOLVE_PENDING_ACTION',
       async (_event: Electron.IpcMainInvokeEvent, request: ChatResolvePendingActionRequest): Promise<ChatResolvePendingActionResponse> => {
         const validatedRequest = resolvePendingActionSchema.parse(request ?? {});
+        const enforceScopeGuard = isPendingScopeGuardEnabled();
 
         const pending = getPendingAction(validatedRequest.actionId);
         if (!pending) {
@@ -339,6 +343,59 @@ export const registerChatHandlers = (): void => {
             actionId: validatedRequest.actionId,
             lifecycle: 'rejected',
             message: 'Pending action not found (may have already been resolved).',
+          };
+        }
+
+        if (enforceScopeGuard && isPendingActionExpired(pending)) {
+          removePendingAction(validatedRequest.actionId);
+          logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+            reason: 'expired',
+            actionId: pending.actionId,
+            toolName: pending.toolName,
+          });
+          return {
+            ok: false,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'rejected',
+            message: 'This approval expired. Please run the action again if you still want to proceed.',
+          };
+        }
+
+        if (
+          enforceScopeGuard &&
+          validatedRequest.conversationId &&
+          pending.conversationId &&
+          validatedRequest.conversationId !== pending.conversationId
+        ) {
+          logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+            reason: 'scope_mismatch',
+            actionId: pending.actionId,
+            toolName: pending.toolName,
+          });
+          return {
+            ok: false,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'pending',
+            message: 'That approval belongs to another chat thread. Open the original card to resolve it.',
+          };
+        }
+
+        if (
+          enforceScopeGuard &&
+          validatedRequest.expectedFingerprint &&
+          pending.fingerprint &&
+          validatedRequest.expectedFingerprint !== pending.fingerprint
+        ) {
+          logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+            reason: 'fingerprint_mismatch',
+            actionId: pending.actionId,
+            toolName: pending.toolName,
+          });
+          return {
+            ok: false,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'pending',
+            message: 'Approval context changed, so this action was not executed. Please use the current card.',
           };
         }
 
@@ -362,6 +419,8 @@ export const registerChatHandlers = (): void => {
             {
               toolCallId: `autonomy-approve-${validatedRequest.actionId}`,
               autonomyBypass: true,
+              conversationId: pending.conversationId,
+              requestId: pending.createdByRequestId ?? pending.requestId,
             },
           );
         } catch (execError) {
@@ -370,7 +429,7 @@ export const registerChatHandlers = (): void => {
           throw execError;
         }
 
-        if (result.ok) {
+        if (result.ok && result.output.status === 'success') {
           return {
             ok: true,
             actionId: validatedRequest.actionId,
@@ -381,8 +440,18 @@ export const registerChatHandlers = (): void => {
           };
         }
 
-        // Execution returned an error -- restore pending action for retry
+        // Execution failed or still requires confirmation -- restore pending action for retry
         requeuePendingAction(pending);
+
+        if (result.ok) {
+          return {
+            ok: false,
+            actionId: validatedRequest.actionId,
+            lifecycle: 'pending',
+            message: result.output.message,
+            actionCard: result.output.actionCard,
+          };
+        }
 
         return {
           ok: false,

@@ -113,6 +113,31 @@ export const classifyChatError = (error: unknown): ClassifiedChatError => {
   }
 
   if (
+    normalized.includes('empty response') ||
+    normalized.includes('returned empty') ||
+    normalized.includes('provider returned empty')
+  ) {
+    return {
+      code: 'provider_error',
+      retryable: true,
+      message:
+        'The AI provider returned an empty response. Nothing changed. Retry once, and if it repeats switch model/provider in Settings > AI.',
+    };
+  }
+
+  if (
+    normalized.includes('inactivity timeout') ||
+    normalized.includes('no data received for 90 seconds')
+  ) {
+    return {
+      code: 'provider_error',
+      retryable: true,
+      message:
+        'The model timed out before replying. Nothing changed. Retry now or try a faster model/provider.',
+    };
+  }
+
+  if (
     normalized.includes('429') ||
     normalized.includes('rate limit') ||
     normalized.includes('overloaded') ||
