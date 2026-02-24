@@ -17,6 +17,7 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
+import { isTaskRefreshSuppressed } from '../../lib/editorSaveGuard';
 import { createTaskRefreshCoalescer } from '../../lib/taskRefreshCoalescer';
 import {
   cancelTargetedViewPrefetch,
@@ -231,7 +232,12 @@ export const AppShell = () => {
     );
 
     const unsubscribe = window.untask?.tasks.onTaskDataChanged(() => {
-      coalescer.notifyChange();
+      // Skip refresh when the change originated from an editor body auto-save
+      // in this window — the editor already has the correct content and a
+      // full store refresh would steal focus from the BlockNote editor.
+      if (!isTaskRefreshSuppressed()) {
+        coalescer.notifyChange();
+      }
     });
 
     return () => {

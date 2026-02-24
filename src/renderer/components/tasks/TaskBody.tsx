@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import { Paperclip } from 'lucide-react';
@@ -8,6 +8,7 @@ import { PREDEFINED_STATUSES } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
+import { suppressTaskRefresh, unsuppressTaskRefresh } from '../../lib/editorSaveGuard';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
 import { PRIORITY_DOT as SHARED_PRIORITY_DOT, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { useAppStore } from '../../stores/appStore';
@@ -664,12 +665,17 @@ export const TaskBody = ({
   onBodyEditModeChange,
 }: TaskBodyProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
-  const allTasks = useTaskStore((state) => state.tasks);
+  const parentTask = useTaskStore(
+    useCallback(
+      (state: { tasks: Task[] }) =>
+        task.parentId
+          ? state.tasks.find((t) => t.id === task.parentId) ?? null
+          : null,
+      [task.parentId],
+    ),
+  );
   const selectTask = useTaskStore((state) => state.selectTask);
   const setView = useAppStore((state) => state.setView);
-  const parentTask = task.parentId
-    ? allTasks.find((t) => t.id === task.parentId) ?? null
-    : null;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBodyRef = useRef<string | null>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
@@ -693,7 +699,7 @@ export const TaskBody = ({
     return undefined;
   }, []);
 
-  const attachmentCount = useMemo(() => countAttachments(task.body), [task.body]);
+  const [attachmentCount, setAttachmentCount] = useState(() => countAttachments(task.body));
 
   const handleAttach = useCallback(async () => {
     const result = await window.untask?.attachments.pickAndSave();
@@ -738,6 +744,9 @@ export const TaskBody = ({
       }
       pendingBodyRef.current = json;
 
+      const newCount = countAttachments(json);
+      setAttachmentCount((prev) => (prev !== newCount ? newCount : prev));
+
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
@@ -746,10 +755,16 @@ export const TaskBody = ({
         saveTimerRef.current = null;
         const body = isEmptyDocument(json) ? null : json;
         pendingBodyRef.current = null;
-        void updateTask({ id: task.id, body });
+        // Persist directly via IPC — bypass Zustand to avoid re-render/focus loss.
+        // Suppress the TASK_DATA_CHANGED refresh so the broadcast from the main
+        // process doesn't trigger a full store reload that steals editor focus.
+        suppressTaskRefresh();
+        void getUntask().tasks.update({ id: task.id, body }).finally(() => {
+          setTimeout(unsuppressTaskRefresh, 200);
+        });
       }, 2000);
     },
-    [task.id, updateTask],
+    [task.id],
   );
 
   useEffect(() => {
