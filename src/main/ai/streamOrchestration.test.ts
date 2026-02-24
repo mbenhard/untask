@@ -3,17 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runAssistantStream } from './streamOrchestration';
 
 const {
+  generateTextMock,
   executeToolCallMock,
   saveChatMessageMock,
   loadPendingActionsMock,
+  removeLegacyPendingActionsMock,
   removePendingActionMock,
   requeuePendingActionMock,
   deterministicRouterEnabledMock,
   streamTextMock,
 } = vi.hoisted(() => ({
+  generateTextMock: vi.fn(async () => ({ text: '{}' })),
   executeToolCallMock: vi.fn(),
   saveChatMessageMock: vi.fn(),
   loadPendingActionsMock: vi.fn(),
+  removeLegacyPendingActionsMock: vi.fn(() => 0),
   removePendingActionMock: vi.fn(),
   requeuePendingActionMock: vi.fn(),
   deterministicRouterEnabledMock: vi.fn(() => true),
@@ -21,7 +25,7 @@ const {
 }));
 
 vi.mock('ai', () => ({
-  generateText: vi.fn(async () => ({ text: '{}' })),
+  generateText: generateTextMock,
   stepCountIs: vi.fn((steps: number) => steps),
   streamText: streamTextMock,
 }));
@@ -64,6 +68,7 @@ const buildStreamResult = (parts: Array<Record<string, unknown>>, text: string) 
 beforeEach(() => {
   vi.clearAllMocks();
   deterministicRouterEnabledMock.mockReturnValue(true);
+  removeLegacyPendingActionsMock.mockReturnValue(0);
   loadPendingActionsMock.mockReturnValue([]);
   streamTextMock.mockReturnValue(buildStreamResult([], 'Model reply.'));
   saveChatMessageMock.mockImplementation((input: {
@@ -82,6 +87,7 @@ vi.mock('./tools', () => ({
 
 vi.mock('./autonomy', () => ({
   loadPendingActions: loadPendingActionsMock,
+  removeLegacyPendingActions: removeLegacyPendingActionsMock,
   removePendingAction: removePendingActionMock,
   requeuePendingAction: requeuePendingActionMock,
   hasPendingActionScopeMetadata: vi.fn((action: {
@@ -186,6 +192,35 @@ describe('runAssistantStream deterministic routing', () => {
     expect(saveChatMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
         content: 'I can help with that.',
+      }),
+    );
+  });
+
+  it('forces required tool choice when semantic probe detects actionable task intent', async () => {
+    deterministicRouterEnabledMock.mockReturnValue(false);
+    generateTextMock.mockResolvedValue({ text: '{"needsToolAction":true}' });
+    streamTextMock.mockReturnValue(
+      buildStreamResult(
+        [{ type: 'text-delta', text: 'I can help with that.' }],
+        'I can help with that.',
+      ),
+    );
+
+    await runAssistantStream(
+      {
+        requestId: 'req-semantic-required-1',
+        conversationId: 'thread-1',
+        requestOrigin: 'user',
+        userMessage: 'remove kkot task',
+        modelId: 'openai/gpt-5-mini',
+        emit: () => {},
+      },
+      chatState,
+    );
+
+    expect(streamTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolChoice: 'required',
       }),
     );
   });
@@ -469,20 +504,9 @@ describe('runAssistantStream deterministic routing', () => {
     );
   });
 
-  it('requires card-based resolution for legacy pending actions missing scope metadata', async () => {
-    loadPendingActionsMock.mockReturnValue([
-      {
-        actionId: 'legacy-1',
-        toolName: 'delete_task',
-        input: { id: 'task-legacy' },
-        riskLevel: 'critical',
-        rationale: 'Delete task.',
-        requiresHardConfirmation: true,
-        createdAt: '2026-02-24T10:00:00.000Z',
-        modeAtCreation: 'auto',
-        lifecycle: 'pending',
-      },
-    ]);
+  it('clears legacy pending approvals and asks user to rerun the action', async () => {
+    removeLegacyPendingActionsMock.mockReturnValue(1);
+    loadPendingActionsMock.mockReturnValue([]);
 
     await runAssistantStream(
       {
@@ -500,7 +524,7 @@ describe('runAssistantStream deterministic routing', () => {
     expect(removePendingActionMock).not.toHaveBeenCalled();
     expect(saveChatMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: expect.stringContaining('Approve or reject it from the card'),
+        content: expect.stringContaining('cleared 1 outdated pending approval'),
       }),
     );
   });

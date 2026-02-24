@@ -30,6 +30,7 @@ import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
 import {
   loadPendingActions,
   removePendingAction,
+  removeLegacyPendingActions,
   requeuePendingAction,
   hasPendingActionScopeMetadata,
   isPendingActionExpired,
@@ -455,6 +456,63 @@ const parsePendingActionDecision = (message: string): PendingActionDecision => {
   return null;
 };
 
+const shouldSkipSemanticToolIntentProbe = (message: string): boolean => {
+  const normalized = message.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return true;
+  }
+
+  // Skip obvious social chatter where tools are not expected.
+  return /^(hi|hello|hey|thanks|thank you|ok|okay|cool|nice|great|how are you)\b/.test(normalized);
+};
+
+const parseSemanticToolIntent = (raw: string): boolean => {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim();
+
+  if (cleaned.length === 0) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(cleaned) as { needsToolAction?: unknown };
+    return parsed.needsToolAction === true;
+  } catch {
+    return false;
+  }
+};
+
+const shouldForceToolChoiceBySemanticIntent = async (input: {
+  model: Parameters<typeof generateText>[0]['model'];
+  userMessage: string;
+}): Promise<boolean> => {
+  if (shouldSkipSemanticToolIntentProbe(input.userMessage)) {
+    return false;
+  }
+
+  try {
+    const { text } = await generateText({
+      model: input.model,
+      system: [
+        'You are an intent classifier for a local productivity app.',
+        'Decide whether the latest user message requires a TASK/NOTE tool action.',
+        'Return STRICT JSON only: {"needsToolAction": true|false}',
+        'True when user asks to create/update/delete/complete/find/list/read tasks or notes,',
+        'including indirect references and multilingual phrasing.',
+        'False for small talk or non-productivity conversation.',
+      ].join('\n'),
+      messages: [{ role: 'user', content: input.userMessage }],
+    });
+
+    return parseSemanticToolIntent(text);
+  } catch {
+    return false;
+  }
+};
+
 const isEligibleForTypedDecision = (
   action: PendingAction,
   conversationId: string,
@@ -620,6 +678,17 @@ export const runAssistantStream = async (
   let cachedPrompt: ReturnType<typeof buildSystemPrompt> | null = null;
 
   try {
+    let legacyPendingRemovedCount = 0;
+    if (input.requestOrigin === 'user') {
+      legacyPendingRemovedCount = removeLegacyPendingActions();
+      if (legacyPendingRemovedCount > 0) {
+        logRuntimeDiagnostic('ai_runtime.approval_blocked', {
+          reason: 'legacy_pending_removed',
+          count: legacyPendingRemovedCount,
+        });
+      }
+    }
+
     const explicitFallback = parseExplicitFallbackToolCall(input.userMessage);
     const pendingDecision = parsePendingActionDecision(input.userMessage);
     const pendingActions = loadPendingActions();
@@ -633,7 +702,7 @@ export const runAssistantStream = async (
     const shouldHandleTypedPendingDecision =
       input.requestOrigin === 'user'
       && pendingDecision !== null
-      && pendingActions.length > 0;
+      && (pendingActions.length > 0 || legacyPendingRemovedCount > 0);
 
     if (shouldHandleDeterministicListNotes || shouldHandleTypedPendingDecision) {
       telemetry.attemptCount = 1;
@@ -768,7 +837,10 @@ export const runAssistantStream = async (
             (action) => !hasPendingActionScopeMetadata(action),
           );
 
-          if (inConversation.length === 0 && pendingWithMetadata.length > 0) {
+          if (legacyPendingRemovedCount > 0 && activePendingActions.length === 0) {
+            const plural = legacyPendingRemovedCount === 1 ? '' : 's';
+            deterministicResponseText = `I cleared ${legacyPendingRemovedCount} outdated pending approval${plural} from an older app version. Please run the action again so I can create a fresh approval card.`;
+          } else if (inConversation.length === 0 && pendingWithMetadata.length > 0) {
             logRuntimeDiagnostic('ai_runtime.approval_blocked', {
               reason: 'scope_mismatch',
             });
@@ -1041,7 +1113,7 @@ export const runAssistantStream = async (
           })),
           userMessage: input.userMessage,
         });
-        const requireToolChoice = shouldRequireToolChoice({
+        let requireToolChoice = shouldRequireToolChoice({
           userMessage: input.userMessage,
           history: conversationMessages,
           allowWebSearchToolChoice: false,
@@ -1049,6 +1121,20 @@ export const runAssistantStream = async (
           requestOrigin: input.requestOrigin,
           deterministicRouterEnabled,
         });
+
+        if (!requireToolChoice && input.requestOrigin === 'user') {
+          const semanticToolChoice = await shouldForceToolChoiceBySemanticIntent({
+            model,
+            userMessage: input.userMessage,
+          });
+
+          if (semanticToolChoice) {
+            requireToolChoice = true;
+            logRuntimeDiagnostic('ai_runtime.router_hit', {
+              intentClass: 'semantic_tool_required',
+            });
+          }
+        }
 
         // Build final messages, converting last user message to multimodal if images present
         const images = input.images ?? [];

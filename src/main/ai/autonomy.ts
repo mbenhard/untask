@@ -265,6 +265,18 @@ export const isPendingActionExpired = (
   return now.getTime() >= expiresAtMs;
 };
 
+export const removeLegacyPendingActions = (): number => {
+  const queue = loadPendingActions();
+  const retained = queue.filter((action) => hasPendingActionScopeMetadata(action));
+  const removedCount = queue.length - retained.length;
+
+  if (removedCount > 0) {
+    persistPendingActions(retained);
+  }
+
+  return removedCount;
+};
+
 // ─── Non-mutation tools (skip autonomy gating) ──────────────
 
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
