@@ -156,19 +156,8 @@ export const TaskItem = ({
   } = useSortable({
     id: task.id,
     transition: SORTABLE_TRANSITION,
-    animateLayoutChanges: (args) => {
-      // If sorting or dragging, use standard dnd-kit behavior (which animates moves and container changes)
-      if (args.isSorting || args.wasDragging) {
-        return true;
-      }
-      // If moving between containers without dragging (e.g., button click to Complete),
-      // DO NOT animate, otherwise the item visually flies across the screen.
-      if (args.previousContainerId && args.containerId !== args.previousContainerId) {
-        return false;
-      }
-      // Animate sibling items shifting up/down
-      return true;
-    },
+    animateLayoutChanges: (args) =>
+      args.isSorting || args.wasDragging,
   });
 
   const style: CSSProperties = {
