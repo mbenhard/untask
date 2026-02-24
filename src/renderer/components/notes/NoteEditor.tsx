@@ -92,7 +92,7 @@ const createTaskItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem => ({
   aliases: ['task'],
   group: 'Untask',
   icon: <CheckSquare size={18} />,
-  subtext: 'Create a task from selection or nearby text',
+  subtext: 'Type /task <title> or use the line above',
 });
 
 const getSlashMenuItems = ({

@@ -19,7 +19,7 @@ type TaskTitleEditor = Pick<
 
 const MARKDOWN_PREFIX_PATTERN =
   /^(?:-\s*\[[ xX]\]\s+|\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+|#{1,6}\s+)/;
-const SLASH_COMMAND_PATTERN = /^\/(?:task|todo|process)\b[:\s-]*/i;
+const SLASH_COMMAND_PATTERN = /^\/(?:task|process)\b[:\s-]*/i;
 const GENERIC_SLASH_PATTERN = /^\/\w+\b[:\s-]*/;
 
 export const normalizeTaskTitle = (raw: string): string =>
