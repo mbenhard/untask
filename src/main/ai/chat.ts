@@ -129,6 +129,7 @@ export const startChatTurn = async (
       {
         requestId,
         conversationId: conversation.id,
+        requestOrigin: 'user',
         userMessage: content,
         modelId,
         images,
@@ -178,6 +179,7 @@ export const startProactiveTurn = async (
     {
       requestId,
       conversationId: conversation.id,
+      requestOrigin: 'proactive',
       userMessage: input.triggerMessage,
       modelId,
       emit: input.emit,

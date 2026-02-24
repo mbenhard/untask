@@ -5,6 +5,7 @@ import type {
   ActionLifecycle,
   AutonomyMode,
   ChatActionCard,
+  ChatRequestOrigin,
   ChatNoteContext,
   ChipAction,
   ChatConversationSummary,
@@ -27,6 +28,7 @@ export type ChatUiMessage = {
   role: 'user' | 'assistant';
   content: string;
   createdAt: string | null;
+  origin?: ChatRequestOrigin;
   isStreaming?: boolean;
   streamPhase?: 'sending' | 'thinking';
   actionCards: ChatActionCard[];
@@ -231,10 +233,14 @@ export const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata
     }
 
     const normalizedMetadataChips = normalizeChips(parsed.chips);
+    const normalizedOrigin = parsed.origin === 'user' || parsed.origin === 'proactive'
+      ? parsed.origin
+      : undefined;
 
     return {
       requestId: typeof parsed.requestId === 'string' ? parsed.requestId : '',
       modelId: typeof parsed.modelId === 'string' ? parsed.modelId : '',
+      ...(normalizedOrigin ? { origin: normalizedOrigin } : {}),
       actionCards: parsed.actionCards,
       toolExecutions: Array.isArray(parsed.toolExecutions)
         ? parsed.toolExecutions
@@ -376,6 +382,8 @@ export const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
   const metadata = parseToolMetadata(message.toolCalls);
   const imageCount = metadata?.imageCount ?? parseImageCount(message.toolCalls);
   const chips = parseChips(message.chips) ?? metadata?.chips;
+  const origin = metadata?.origin
+    ?? (metadata?.requestId.startsWith('proactive-') ? 'proactive' : undefined);
 
   return {
     id: message.id,
@@ -383,6 +391,7 @@ export const mapMessageToUi = (message: ChatMessage): ChatUiMessage => {
     role: message.role,
     content: message.content,
     createdAt: message.createdAt,
+    ...(origin ? { origin } : {}),
     actionCards: dedupeActionCards(metadata?.actionCards ?? []),
     steps: message.role === 'assistant'
       ? collapseConsecutiveTextSteps(reconstructStepsFromMetadata(metadata, message.content))

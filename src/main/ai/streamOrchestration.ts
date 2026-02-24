@@ -7,6 +7,7 @@ import type {
   ChatActionCard,
   ChipAction,
   ChatNoteContext,
+  ChatRequestOrigin,
   ChatStreamEvent,
   ChatTurnTelemetry,
   ChatToolExecutionSummary,
@@ -532,15 +533,21 @@ export const shouldRequireToolChoice = (input: {
   history: ConversationMessage[];
   allowWebSearchToolChoice?: boolean;
   conversationId?: string;
+  requestOrigin?: ChatRequestOrigin;
+  deterministicRouterEnabled?: boolean;
 }): boolean => {
   const normalizedMessage = input.userMessage.trim();
   if (normalizedMessage.length === 0) {
     return false;
   }
 
+  if (input.requestOrigin === 'proactive') {
+    return false;
+  }
+
   // Only force tool use for very explicit, unambiguous commands
   const explicitCommand = parseExplicitFallbackToolCall(normalizedMessage);
-  if (explicitCommand) {
+  if (input.deterministicRouterEnabled !== false && explicitCommand) {
     return true;
   }
 
@@ -571,6 +578,7 @@ export const runAssistantStream = async (
   input: {
     requestId: string;
     conversationId: string;
+    requestOrigin: ChatRequestOrigin;
     userMessage: string;
     modelId: string;
     images?: string[];
@@ -618,19 +626,21 @@ export const runAssistantStream = async (
 
     const deterministicRouterEnabled = isDeterministicRouterEnabled();
     const pendingScopeGuardEnabled = isPendingScopeGuardEnabled();
+    const shouldHandleDeterministicListNotes =
+      input.requestOrigin === 'user'
+      && deterministicRouterEnabled
+      && explicitFallback?.name === 'list_notes';
+    const shouldHandleTypedPendingDecision =
+      input.requestOrigin === 'user'
+      && pendingDecision !== null
+      && pendingActions.length > 0;
 
-    if (
-      deterministicRouterEnabled
-      && (
-        explicitFallback?.name === 'list_notes'
-        || (pendingDecision !== null && pendingActions.length > 0)
-      )
-    ) {
+    if (shouldHandleDeterministicListNotes || shouldHandleTypedPendingDecision) {
       telemetry.attemptCount = 1;
 
       let deterministicResponseText = '';
 
-      if (explicitFallback?.name === 'list_notes') {
+      if (shouldHandleDeterministicListNotes && explicitFallback?.name === 'list_notes') {
         logRuntimeDiagnostic('ai_runtime.router_hit', { intentClass: 'list_notes' });
         const deterministicToolCallId = `deterministic-${randomUUID()}`;
         const description = generateToolCallDescription(explicitFallback.name, explicitFallback.input);
@@ -648,6 +658,8 @@ export const runAssistantStream = async (
           toolCallId: deterministicToolCallId,
           requestId: input.requestId,
           conversationId: input.conversationId,
+          requestOrigin: input.requestOrigin,
+          allowedTools: input.allowedTools,
           onActionCard: (card) => {
             actionCards.push(card);
           },
@@ -708,7 +720,7 @@ export const runAssistantStream = async (
 
           deterministicResponseText = `I couldn't list your notes: ${deterministicResult.error.message}`;
         }
-      } else if (pendingDecision !== null) {
+      } else if (shouldHandleTypedPendingDecision && pendingDecision !== null) {
         logRuntimeDiagnostic('ai_runtime.router_hit', { intentClass: 'pending_decision' });
 
         const expiredInConversation = pendingActions.filter(
@@ -812,6 +824,8 @@ export const runAssistantStream = async (
               toolCallId: deterministicToolCallId,
               requestId: input.requestId,
               conversationId: input.conversationId,
+              requestOrigin: input.requestOrigin,
+              allowedTools: input.allowedTools,
               autonomyBypass: true,
               onActionCard: (card) => {
                 actionCards.push(card);
@@ -900,6 +914,7 @@ export const runAssistantStream = async (
       const metadata: PersistedChatToolMetadata = {
         requestId: input.requestId,
         modelId: input.modelId,
+        origin: input.requestOrigin,
         actionCards,
         toolExecutions,
         telemetry: {
@@ -1031,6 +1046,8 @@ export const runAssistantStream = async (
           history: conversationMessages,
           allowWebSearchToolChoice: false,
           conversationId: input.conversationId,
+          requestOrigin: input.requestOrigin,
+          deterministicRouterEnabled,
         });
 
         // Build final messages, converting last user message to multimodal if images present
@@ -1170,6 +1187,8 @@ export const runAssistantStream = async (
             const sdkTools = createSdkTools({
               requestId: input.requestId,
               conversationId: input.conversationId,
+              requestOrigin: input.requestOrigin,
+              allowedTools: effectiveAllowedTools,
               onActionCard: (card) => {
                 actionCards.push(card);
               },
@@ -1462,10 +1481,18 @@ export const runAssistantStream = async (
           return;
         }
 
-        if (toolExecutions.length === 0) {
+        if (
+          toolExecutions.length === 0
+          && input.requestOrigin === 'user'
+          && deterministicRouterEnabled
+        ) {
           const fallbackCall = parseExplicitFallbackToolCall(input.userMessage);
 
           if (fallbackCall) {
+            logRuntimeDiagnostic('ai_runtime.fallback_hit', {
+              toolName: fallbackCall.name,
+              reason: 'no_tool_executed',
+            });
             attemptHadToolExecution = true;
             const fallbackToolCallId = `heuristic-${randomUUID()}`;
             const fallbackDescription = generateToolCallDescription(fallbackCall.name, fallbackCall.input);
@@ -1483,6 +1510,8 @@ export const runAssistantStream = async (
               toolCallId: fallbackToolCallId,
               requestId: input.requestId,
               conversationId: input.conversationId,
+              requestOrigin: input.requestOrigin,
+              allowedTools: input.allowedTools,
               onActionCard: (card) => {
                 actionCards.push(card);
               },
@@ -1624,6 +1653,7 @@ export const runAssistantStream = async (
     const metadata: PersistedChatToolMetadata = {
       requestId: input.requestId,
       modelId: input.modelId,
+      origin: input.requestOrigin,
       actionCards,
       toolExecutions,
       telemetry: {

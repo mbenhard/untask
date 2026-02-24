@@ -160,6 +160,12 @@ export const buildSystemPrompt = (
 
   const todaySection = buildTodaySection(input.liveContext, now, slim ? 5 : 10);
 
+  const toolingRules = [
+    '## Tooling Rules',
+    'If the user asks to read or change tasks or notes, call the relevant tool first instead of guessing.',
+    'Never claim an action was completed unless the corresponding tool returned success.',
+  ].join('\n');
+
   const formatRules = '## Formatting Rules\nNever mention internal IDs (like task, event, or subtask IDs) in chat responses. Humans do not understand them. Use human-readable names and titles instead.';
 
   const compiledSections = [
@@ -176,6 +182,8 @@ export const buildSystemPrompt = (
     todaySection,
     '</user_tasks>',
     '---',
+    toolingRules,
+    '---',
     formatRules,
   ].join('\n\n');
 
@@ -186,7 +194,7 @@ export const buildSystemPrompt = (
     timezone,
     tokenBudget: estimatedTotalTokens,
     estimatedTotalTokens,
-    sectionOrder: ['now', 'identity', 'knowledge', 'today', 'formatting'],
+    sectionOrder: ['now', 'identity', 'knowledge', 'today', 'tooling', 'formatting'],
     sections: [
       {
         id: 'now',
@@ -216,6 +224,14 @@ export const buildSystemPrompt = (
         id: 'today',
         title: 'Today',
         estimatedTokens: estimateTokens(todaySection),
+        included: true,
+        truncated: false,
+        snippetIds: [],
+      },
+      {
+        id: 'tooling',
+        title: 'Tooling Rules',
+        estimatedTokens: estimateTokens(toolingRules),
         included: true,
         truncated: false,
         snippetIds: [],

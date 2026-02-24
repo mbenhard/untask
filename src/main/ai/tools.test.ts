@@ -150,6 +150,24 @@ beforeEach(() => {
 });
 
 describe('create_task tool', () => {
+  it('blocks tool execution when runtime allowedTools policy disallows the tool', async () => {
+    const result = await executeToolCall(
+      {
+        name: 'create_task',
+        input: { title: 'Blocked task' },
+      },
+      {
+        allowedTools: new Set(['emit_chips']),
+        requestOrigin: 'proactive',
+      },
+    );
+
+    expect(createTaskMock).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toContain('blocked by runtime policy');
+    }
+  });
 
   it('creates a task for explicit actionable titles', async () => {
     createTaskMock.mockReturnValue({

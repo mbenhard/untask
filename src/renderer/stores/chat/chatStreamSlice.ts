@@ -194,6 +194,7 @@ const bootstrapProactiveInFlight = (
     role: 'assistant',
     content: '',
     createdAt: new Date().toISOString(),
+    origin: 'proactive',
     isStreaming: true,
     streamPhase: 'sending',
     actionCards: [],

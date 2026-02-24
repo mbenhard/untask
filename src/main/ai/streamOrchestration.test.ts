@@ -8,12 +8,22 @@ const {
   loadPendingActionsMock,
   removePendingActionMock,
   requeuePendingActionMock,
+  deterministicRouterEnabledMock,
+  streamTextMock,
 } = vi.hoisted(() => ({
   executeToolCallMock: vi.fn(),
   saveChatMessageMock: vi.fn(),
   loadPendingActionsMock: vi.fn(),
   removePendingActionMock: vi.fn(),
   requeuePendingActionMock: vi.fn(),
+  deterministicRouterEnabledMock: vi.fn(() => true),
+  streamTextMock: vi.fn(),
+}));
+
+vi.mock('ai', () => ({
+  generateText: vi.fn(async () => ({ text: '{}' })),
+  stepCountIs: vi.fn((steps: number) => steps),
+  streamText: streamTextMock,
 }));
 
 vi.mock('electron', () => ({
@@ -42,9 +52,20 @@ const buildAssistantMessage = (input: {
   createdAt: new Date().toISOString(),
 });
 
+const buildStreamResult = (parts: Array<Record<string, unknown>>, text: string) => ({
+  fullStream: (async function* streamGenerator() {
+    for (const part of parts) {
+      yield part;
+    }
+  })(),
+  text: Promise.resolve(text),
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  deterministicRouterEnabledMock.mockReturnValue(true);
   loadPendingActionsMock.mockReturnValue([]);
+  streamTextMock.mockReturnValue(buildStreamResult([], 'Model reply.'));
   saveChatMessageMock.mockImplementation((input: {
     conversationId: string;
     role: 'assistant';
@@ -73,8 +94,50 @@ vi.mock('./autonomy', () => ({
 }));
 
 vi.mock('./runtimeFlags', () => ({
-  isDeterministicRouterEnabled: vi.fn(() => true),
+  isDeterministicRouterEnabled: deterministicRouterEnabledMock,
   isPendingScopeGuardEnabled: vi.fn(() => true),
+}));
+
+vi.mock('./providers', () => ({
+  getActiveProvider: vi.fn(() => ({
+    languageModel: vi.fn(() => ({})),
+    tools: {},
+  })),
+}));
+
+vi.mock('./models', () => ({
+  getModelWebSearchConfig: vi.fn(() => ({
+    supportsWebSearch: false,
+    webSearchMethod: null,
+  })),
+  isOllamaProvider: vi.fn(() => false),
+  modelSupportsVision: vi.fn(() => false),
+}));
+
+vi.mock('./contextBuilder', () => ({
+  buildCanonicalRuntimeContext: vi.fn(() => ({
+    liveContext: {
+      tasks: [],
+      inboxCount: 0,
+      now: '2026-02-24T10:00:00.000Z',
+      timezone: 'UTC',
+    },
+  })),
+}));
+
+vi.mock('./systemPrompt', () => ({
+  buildSystemPrompt: vi.fn(() => ({
+    modelInputPrompt: 'sys',
+    contextSnapshot: {
+      generatedAt: '2026-02-24T10:00:00.000Z',
+      timezone: 'UTC',
+      tokenBudget: 0,
+      estimatedTotalTokens: 0,
+      sectionOrder: [],
+      sections: [],
+      compiledPrompt: 'sys',
+    },
+  })),
 }));
 
 vi.mock('./autoTitle', () => ({
@@ -92,6 +155,71 @@ const chatState = {
 };
 
 describe('runAssistantStream deterministic routing', () => {
+  it('does not run parser-driven routing or fallback when deterministic router is disabled', async () => {
+    deterministicRouterEnabledMock.mockReturnValue(false);
+    streamTextMock.mockReturnValue(
+      buildStreamResult(
+        [{ type: 'text-delta', text: 'I can help with that.' }],
+        'I can help with that.',
+      ),
+    );
+
+    await runAssistantStream(
+      {
+        requestId: 'req-notes-ai-1',
+        conversationId: 'thread-1',
+        requestOrigin: 'user',
+        userMessage: 'show my notes',
+        modelId: 'openai/gpt-5-mini',
+        emit: () => {},
+      },
+      chatState,
+    );
+
+    expect(streamTextMock).toHaveBeenCalledTimes(1);
+    expect(streamTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolChoice: 'auto',
+      }),
+    );
+    expect(executeToolCallMock).not.toHaveBeenCalled();
+    expect(saveChatMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: 'I can help with that.',
+      }),
+    );
+  });
+
+  it('does not run deterministic parser routing for proactive requests', async () => {
+    deterministicRouterEnabledMock.mockReturnValue(true);
+    streamTextMock.mockReturnValue(
+      buildStreamResult(
+        [{ type: 'text-delta', text: 'Reminder: task is due now.' }],
+        'Reminder: task is due now.',
+      ),
+    );
+
+    await runAssistantStream(
+      {
+        requestId: 'proactive-notes-1',
+        conversationId: 'thread-1',
+        requestOrigin: 'proactive',
+        userMessage: 'show my notes',
+        modelId: 'openai/gpt-5-mini',
+        emit: () => {},
+      },
+      chatState,
+    );
+
+    expect(streamTextMock).toHaveBeenCalledTimes(1);
+    expect(executeToolCallMock).not.toHaveBeenCalled();
+    expect(saveChatMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: 'Reminder: task is due now.',
+      }),
+    );
+  });
+
   it('routes explicit note listing intent without model-dependent tool choice', async () => {
     executeToolCallMock.mockResolvedValue({
       ok: true,
@@ -111,6 +239,7 @@ describe('runAssistantStream deterministic routing', () => {
       {
         requestId: 'req-notes-1',
         conversationId: 'thread-1',
+        requestOrigin: 'user',
         userMessage: 'show my notes',
         modelId: 'openai/gpt-5-mini',
         emit: (event) => {
@@ -173,6 +302,7 @@ describe('runAssistantStream deterministic routing', () => {
       {
         requestId: 'req-approve-1',
         conversationId: 'thread-1',
+        requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
         emit: () => {},
@@ -189,6 +319,54 @@ describe('runAssistantStream deterministic routing', () => {
         conversationId: 'thread-1',
       }),
     );
+    expect(saveChatMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'Task deleted.' }),
+    );
+  });
+
+  it('keeps typed pending approval path active even when deterministic router is disabled', async () => {
+    deterministicRouterEnabledMock.mockReturnValue(false);
+    loadPendingActionsMock.mockReturnValue([
+      {
+        actionId: 'pending-keep-1',
+        toolName: 'delete_task',
+        input: { id: 'task-keep-1' },
+        riskLevel: 'critical',
+        rationale: 'Delete task.',
+        requiresHardConfirmation: true,
+        createdAt: '2026-02-24T10:00:00.000Z',
+        requestId: 'req-origin-keep-1',
+        createdByRequestId: 'req-origin-keep-1',
+        conversationId: 'thread-1',
+        fingerprint: 'delete_task:{"id":"task-keep-1"}',
+        expiresAt: '2026-02-24T10:30:00.000Z',
+        modeAtCreation: 'auto',
+        lifecycle: 'pending',
+      },
+    ]);
+
+    executeToolCallMock.mockResolvedValue({
+      ok: true,
+      toolName: 'delete_task',
+      output: {
+        status: 'success',
+        message: 'Task deleted.',
+      },
+    });
+
+    await runAssistantStream(
+      {
+        requestId: 'req-approve-keep-1',
+        conversationId: 'thread-1',
+        requestOrigin: 'user',
+        userMessage: 'yes',
+        modelId: 'openai/gpt-5-mini',
+        emit: () => {},
+      },
+      chatState,
+    );
+
+    expect(executeToolCallMock).toHaveBeenCalledTimes(1);
     expect(saveChatMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({ content: 'Task deleted.' }),
     );
@@ -234,6 +412,7 @@ describe('runAssistantStream deterministic routing', () => {
       {
         requestId: 'req-approve-2',
         conversationId: 'thread-1',
+        requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
         emit: () => {},
@@ -273,6 +452,7 @@ describe('runAssistantStream deterministic routing', () => {
       {
         requestId: 'req-reject-1',
         conversationId: 'thread-1',
+        requestOrigin: 'user',
         userMessage: 'no',
         modelId: 'openai/gpt-5-mini',
         emit: () => {},
@@ -308,6 +488,7 @@ describe('runAssistantStream deterministic routing', () => {
       {
         requestId: 'req-approve-legacy',
         conversationId: 'thread-1',
+        requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
         emit: () => {},

@@ -773,6 +773,20 @@ describe('chatStore stream reliability', () => {
     expect(mockChatApi.listThreads).toHaveBeenCalledTimes(1);
   });
 
+  it('marks proactive placeholders with proactive origin metadata', () => {
+    useChatStore.getState().applyStreamEvent({
+      type: 'token',
+      requestId: 'proactive-origin-1',
+      text: 'Reminder text',
+    });
+
+    const placeholder = useChatStore
+      .getState()
+      .messages.find((message) => message.id === 'assistant-stream-proactive-origin-1');
+
+    expect(placeholder?.origin).toBe('proactive');
+  });
+
   it('collapses adjacent duplicate text steps on assistant_done', () => {
     const now = new Date().toISOString();
     const assistantMessage: ChatMessage = {
@@ -1096,6 +1110,35 @@ describe('chatStore stream reliability', () => {
       expect(toolStep?.toolName).toBe('create_task');
       expect(toolStep?.actionCard?.viewIntent).toBe('inbox');
     });
+  });
+
+  it('hydrates proactive origin from persisted chat metadata', async () => {
+    const historicalMessage: ChatMessage = {
+      id: 'msg-proactive-origin',
+      conversationId: 'thread-1',
+      role: 'assistant',
+      content: 'Reminder',
+      toolCalls: JSON.stringify({
+        requestId: 'proactive-hydrate-1',
+        modelId: 'openai/gpt-5-mini',
+        origin: 'proactive',
+        actionCards: [],
+        toolExecutions: [],
+      }),
+      chips: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
+
+    mockChatApi.history.mockResolvedValue([historicalMessage]);
+
+    await useChatStore.getState().initialize();
+
+    const message = useChatStore.getState().messages.find((m) => m.id === 'msg-proactive-origin');
+    expect(message?.origin).toBe('proactive');
   });
 
   it('hydrates chips from the dedicated chat column', async () => {

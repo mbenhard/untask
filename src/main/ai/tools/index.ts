@@ -199,6 +199,23 @@ export const executeToolCall = async (
     };
   }
 
+  if (context.allowedTools && !context.allowedTools.has(rawToolName)) {
+    logRuntimeDiagnostic('ai_runtime.policy_blocked', {
+      toolName: rawToolName,
+      reason: 'tool_not_allowed',
+      requestOrigin: context.requestOrigin ?? 'user',
+    });
+
+    return {
+      ok: false,
+      toolName: rawToolName,
+      error: {
+        code: 'TOOL_EXECUTION_FAILED',
+        message: `Tool ${rawToolName} is blocked by runtime policy for this request.`,
+      },
+    };
+  }
+
   const definition = AI_TOOL_REGISTRY[rawToolName] as ToolRegistryEntryGeneric;
   const parsed = definition.schema.safeParse(call.input);
 
@@ -363,10 +380,6 @@ export const executeToolCall = async (
 // ─── PROACTIVE_ALLOWED_TOOLS ────────────────────────────────────
 
 export const PROACTIVE_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
-  'create_task',
-  'update_task',
-  'complete_task',
-  'list_tasks',
   'emit_chips',
 ]);
 

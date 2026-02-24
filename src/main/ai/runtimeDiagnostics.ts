@@ -1,6 +1,8 @@
 export type RuntimeDiagnosticEvent =
   | 'ai_runtime.router_hit'
+  | 'ai_runtime.fallback_hit'
   | 'ai_runtime.approval_blocked'
+  | 'ai_runtime.policy_blocked'
   | 'ai_runtime.duplicate_mutation_blocked'
   | 'ai_runtime.post_verify_failed';
 
@@ -13,4 +15,3 @@ export const logRuntimeDiagnostic = (
     : '';
   console.info(`[${event}]${serializedPayload}`);
 };
-

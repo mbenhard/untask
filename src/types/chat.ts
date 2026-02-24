@@ -1,6 +1,7 @@
 import type { ChatMessage, Conversation } from './models';
 
 export type ChatToolStatus = 'success' | 'error' | 'confirmation_required';
+export type ChatRequestOrigin = 'user' | 'proactive';
 export type ChatStreamErrorCode =
   | 'config_error'
   | 'provider_error'
@@ -64,6 +65,7 @@ export type ChatTurnTelemetry = {
 export type PersistedChatToolMetadata = {
   requestId: string;
   modelId: string;
+  origin?: ChatRequestOrigin;
   actionCards: ChatActionCard[];
   toolExecutions: ChatToolExecutionSummary[];
   telemetry?: ChatTurnTelemetry;

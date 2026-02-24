@@ -134,6 +134,26 @@ describe('shouldRequireToolChoice', () => {
     ).toBe(true);
   });
 
+  it('does not force parser-driven tool choice when deterministic router is disabled', () => {
+    expect(
+      shouldRequireToolChoice({
+        userMessage: 'show my notes',
+        history: [],
+        deterministicRouterEnabled: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not force parser-driven tool choice for proactive turns', () => {
+    expect(
+      shouldRequireToolChoice({
+        userMessage: 'show my notes',
+        history: [],
+        requestOrigin: 'proactive',
+      }),
+    ).toBe(false);
+  });
+
   it('does not require tool choice for follow-up detail messages without explicit command', () => {
     expect(
       shouldRequireToolChoice({

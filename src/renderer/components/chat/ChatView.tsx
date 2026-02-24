@@ -323,6 +323,12 @@ const ChipBar = ({ chips, disabled, onChipClick }: ChipBarProps) => {
   );
 };
 
+const ProactiveBadge = () => (
+  <span className="self-start rounded-full border border-border/60 bg-card/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+    Proactive reminder
+  </span>
+);
+
 export const SUGGESTIONS = [
   { label: 'Create a task', prefill: 'Create a task: ' },
   { label: "What's due today?", prefill: "What's due today?" },
@@ -572,6 +578,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
               <div className="flex w-full max-w-[88%] items-start gap-2">
                 <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  {message.origin === 'proactive' ? <ProactiveBadge /> : null}
                   {message.steps.map((step, index) => {
                     if (step.kind === 'thinking') {
                       // Only show reasoning disclosure after streaming is done
@@ -636,12 +643,16 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             ) : isAssistant && isPendingAssistantPlaceholder ? (
               <div className="flex w-full max-w-[88%] items-center gap-2">
                 <AvatarIcon size={16} className="shrink-0 text-muted-foreground/40" />
-                <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  {message.origin === 'proactive' ? <ProactiveBadge /> : null}
+                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
+                </div>
               </div>
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
                 <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  {message.origin === 'proactive' ? <ProactiveBadge /> : null}
                   <div
                     className={cn(
                       'rounded-xl border px-3 py-2 text-sm',
