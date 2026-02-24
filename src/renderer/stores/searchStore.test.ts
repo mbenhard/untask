@@ -90,9 +90,10 @@ describe('searchStore', () => {
       isOpen: true,
       query: 'task',
       results: [
-        { id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
-        { id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
+      types: ['task'],
       total: 2,
       selectedIndex: 0,
     });
@@ -113,9 +114,10 @@ describe('searchStore', () => {
   it('getSelectedResult returns correct item', () => {
     useSearchStore.setState({
       results: [
-        { id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
-        { id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
       ],
+      types: ['task'],
       total: 2,
       selectedIndex: 0,
     });

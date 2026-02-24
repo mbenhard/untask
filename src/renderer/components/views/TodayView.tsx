@@ -24,6 +24,7 @@ export const TodayView = ({
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
   const [isTodayCollapsed, setIsTodayCollapsed] = useState(false);
   const [isDoneCollapsed, setIsDoneCollapsed] = useState(true);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
   const activeTodayTasks = useMemo(
     () => allTasks.filter(
@@ -57,10 +58,6 @@ export const TodayView = ({
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading today list...</p>
-        ) : null}
-
         {error ? (
           <p className="text-[11px] text-destructive">
             {error}
@@ -82,6 +79,7 @@ export const TodayView = ({
                 placeholder: 'Add to today...',
               }}
               triggerAdd={activeView === 'today' ? newTaskTrigger : undefined}
+              onRequestFocus={() => setFocusedIndex(0)}
             >
               <TaskList
                 tasks={activeTodayTasks}
@@ -89,6 +87,9 @@ export const TodayView = ({
                 emptyMessage="Nothing planned for today."
                 ariaLabel="Today tasks"
                 scopeId="today"
+                isPrimaryList
+                focusedIndex={focusedIndex}
+                onFocusedIndexChange={setFocusedIndex}
               />
             </SectionGroup>
 

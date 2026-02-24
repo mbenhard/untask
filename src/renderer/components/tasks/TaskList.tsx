@@ -18,12 +18,14 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
-import type { Task } from '../../../types/models';
-import { isTerminalStatus } from '../../../types/models';
+import { isTerminalStatus, PREDEFINED_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { cn } from '../../lib/utils';
-import { useTaskStore } from '../../stores/taskStore';
+import { getUntask } from '../../lib/untask';
+import { useAppStore } from '../../stores/appStore';
+import { useTaskStore, getStableKey } from '../../stores/taskStore';
+import { useToastStore } from '../../stores/toastStore';
 import {
   useTaskStatusConfigStore,
   selectEnabledNonTerminal,
@@ -38,6 +40,8 @@ import { reconcileScopedReorder } from './statusLaneDrag';
 import { TaskBody } from './TaskBody';
 import { TaskItem } from './TaskItem';
 
+const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
+
 export interface TaskListProps {
   tasks: Task[];
   allTasks: Task[];
@@ -48,6 +52,12 @@ export interface TaskListProps {
   indentPx?: number;
   dndMode?: 'local' | 'shared';
   sharedActiveDragId?: string | null;
+  autoFocus?: boolean;
+  isPrimaryList?: boolean;
+  focusedIndex?: number;
+  onFocusedIndexChange?: (index: number) => void;
+  onNavigateNextGroup?: () => void;
+  onNavigatePrevGroup?: () => void;
 }
 
 export const TaskList = ({
@@ -60,11 +70,17 @@ export const TaskList = ({
   indentPx = 0,
   dndMode = 'local',
   sharedActiveDragId = null,
+  isPrimaryList = false,
+  focusedIndex: controlledFocusedIndex,
+  onFocusedIndexChange: controlledOnFocusedIndexChange,
+  onNavigateNextGroup,
+  onNavigatePrevGroup,
 }: TaskListProps) => {
   const completeTask = useTaskStore((state) => state.completeTask);
   const reopenTask = useTaskStore((state) => state.reopenTask);
   const createTask = useTaskStore((state) => state.createTask);
   const updateTask = useTaskStore((state) => state.updateTask);
+  const deleteTask = useTaskStore((state) => state.deleteTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
@@ -74,12 +90,20 @@ export const TaskList = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
-  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [internalFocusedIndex, setInternalFocusedIndex] = useState(() => 
+    isPrimaryList ? 0 : -1
+  );
   const [isAnyBodyEditing, setIsAnyBodyEditing] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [editingTitleTaskId, setEditingTitleTaskId] = useState<string | null>(null);
   const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
+  const [completeConfirmTrigger, setCompleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
+  const [deleteConfirmTrigger, setDeleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
+
+  const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
+  const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
 
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const effectiveActiveDragId = dndMode === 'shared' ? sharedActiveDragId : activeDragId;
@@ -88,14 +112,23 @@ export const TaskList = ({
     [effectiveActiveDragId, tasks],
   );
 
+  const prevTasksLengthRef = useRef(tasks.length);
+
   useEffect(() => {
-    setFocusedIndex((previous) => {
-      if (tasks.length === 0) {
-        return 0;
+    const prevLength = prevTasksLengthRef.current;
+    const currentLength = tasks.length;
+
+    // Only adjust focusedIndex when tasks are removed, not when added
+    // This prevents focusing the newly added task
+    if (currentLength < prevLength && controlledFocusedIndex === undefined) {
+      const newIndex = Math.min(internalFocusedIndex, currentLength > 0 ? currentLength - 1 : 0);
+      if (newIndex !== internalFocusedIndex) {
+        setInternalFocusedIndex(newIndex);
       }
-      return Math.min(previous, tasks.length - 1);
-    });
-  }, [tasks.length]);
+    }
+
+    prevTasksLengthRef.current = currentLength;
+  }, [tasks.length, controlledFocusedIndex, internalFocusedIndex]);
 
   useEffect(() => {
     if (expandedTaskId && !taskIds.includes(expandedTaskId)) {
@@ -104,38 +137,56 @@ export const TaskList = ({
     }
   }, [expandedTaskId, taskIds]);
 
+  // Focus task when focusedIndex changes (user navigation)
   useEffect(() => {
     const focusedTaskId = tasks[focusedIndex]?.id;
     if (!focusedTaskId) {
       return;
     }
 
-    const activeElement = document.activeElement;
-    const container = containerRef.current;
-    if (!container || !activeElement || !container.contains(activeElement)) {
-      return;
-    }
+    // Use rAF to let the DOM settle after view transitions before checking focus ownership.
+    const rafId = requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (!container) return;
 
-    const nextFocused = container.querySelector<HTMLElement>(
-      `[data-task-id="${focusedTaskId}"]`,
-    );
-    if (!nextFocused || nextFocused === activeElement) {
-      return;
-    }
+      const nextFocused = container.querySelector<HTMLElement>(
+        `[data-task-id="${focusedTaskId}"]`,
+      );
+      if (!nextFocused) return;
 
-    // Don't steal focus from interactive elements inside the focused task
-    // (e.g. metadata selects, inputs, date pickers in the expanded body).
-    if (nextFocused.contains(activeElement)) {
-      return;
-    }
+      // If focus is already on the target, do nothing
+      if (nextFocused === document.activeElement) return;
 
-    nextFocused.focus();
-  }, [focusedIndex, tasks]);
+      const activeEl = document.activeElement;
+
+      // Don't steal focus from a nested TaskList (subtask list).
+      // Check if the focused element belongs to a deeper [role="listbox"]
+      // container — if so, this parent should not interfere.
+      if (
+        activeEl instanceof HTMLElement &&
+        container.contains(activeEl) &&
+        activeEl.closest('[role="listbox"]') !== container
+      ) {
+        return;
+      }
+
+      // Primary lists can claim focus when nothing meaningful owns it
+      // (e.g. after view switch or inline input dismiss).
+      const focusIsUnowned = isPrimaryList && (!activeEl || activeEl === document.body);
+      if (!focusIsUnowned && !container.contains(activeEl)) return;
+
+      nextFocused.focus();
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [focusedIndex, isPrimaryList, tasks]);
 
   useEffect(() => {
     if (!selectedTaskId) {
       return;
     }
+    let pulseFrameId: number | null = null;
+    let focusFrameId: number | null = null;
 
     const selectedIndex = tasks.findIndex((task) => task.id === selectedTaskId);
 
@@ -146,7 +197,11 @@ export const TaskList = ({
       setExpandedTaskId(selectedTaskId);
       setIsAnyBodyEditing(false);
 
-      requestAnimationFrame(() => {
+      // Trigger navigation pulse. Clear first to restart animation if same task.
+      setNavigatedTaskId(null);
+      pulseFrameId = requestAnimationFrame(() => setNavigatedTaskId(selectedTaskId));
+
+      focusFrameId = requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
         const target = container.querySelector<HTMLElement>(
@@ -156,7 +211,14 @@ export const TaskList = ({
         target.scrollIntoView({ block: 'nearest' });
         target.focus();
       });
-      return;
+      return () => {
+        if (pulseFrameId !== null) {
+          cancelAnimationFrame(pulseFrameId);
+        }
+        if (focusFrameId !== null) {
+          cancelAnimationFrame(focusFrameId);
+        }
+      };
     }
 
     // Not a direct task — check if it's a subtask whose parent is in this list.
@@ -170,7 +232,22 @@ export const TaskList = ({
     setFocusedIndex(parentIndex);
     setExpandedTaskId(subtask.parentId);
     setIsAnyBodyEditing(false);
-  }, [allTasks, selectTask, selectedTaskId, tasks]);
+    return () => {
+      if (pulseFrameId !== null) {
+        cancelAnimationFrame(pulseFrameId);
+      }
+      if (focusFrameId !== null) {
+        cancelAnimationFrame(focusFrameId);
+      }
+    };
+  }, [allTasks, selectTask, selectedTaskId, tasks, setFocusedIndex]);
+
+  // Clear navigated highlight after animation completes
+  useEffect(() => {
+    if (!navigatedTaskId) return;
+    const timer = setTimeout(() => setNavigatedTaskId(null), 1200);
+    return () => clearTimeout(timer);
+  }, [navigatedTaskId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -212,11 +289,93 @@ export const TaskList = ({
     [completeTask, expandedTaskId, firstEnabledNonTerminal, reopenTask, tasks, updateTask],
   );
 
+  const handleRequestCompleteConfirm = useCallback(
+    (taskId: string): void => {
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) {
+        return;
+      }
+
+      const nextStatus = getStatusAfterToggleComplete(
+        currentTask.status,
+        firstEnabledNonTerminal,
+      );
+      if (nextStatus === 'done') {
+        const subtasks = allTasks.filter((t) => t.parentId === taskId);
+        const activeChildren = subtasks.filter(
+          (t) => !isTerminalStatus(t.status as never),
+        ).length;
+        if (activeChildren > 0) {
+          setCompleteConfirmTrigger({ taskId, ts: Date.now() });
+          return;
+        }
+        void completeTask(taskId);
+      } else if (isTerminalStatus(currentTask.status as never)) {
+        void reopenTask(taskId);
+      } else {
+        void updateTask({ id: taskId, status: nextStatus });
+      }
+
+      if (expandedTaskId === taskId) {
+        setExpandedTaskId(null);
+      }
+    },
+    [allTasks, completeTask, expandedTaskId, firstEnabledNonTerminal, reopenTask, tasks, updateTask],
+  );
+
+  const handleCompleteWithChildren = useCallback(
+    (taskId: string): void => {
+      void completeTask(taskId, { completeChildren: true });
+      if (expandedTaskId === taskId) {
+        setExpandedTaskId(null);
+      }
+    },
+    [completeTask, expandedTaskId],
+  );
+
+  const handleCompleteConfirmTriggerHandled = useCallback((taskId: string): void => {
+    setCompleteConfirmTrigger((current) => (
+      current?.taskId === taskId ? null : current
+    ));
+  }, []);
+
+  const handleDeleteConfirmTriggerHandled = useCallback((taskId: string): void => {
+    setDeleteConfirmTrigger((current) => (
+      current?.taskId === taskId ? null : current
+    ));
+  }, []);
+
+  const handleDelete = useCallback(
+    (taskId: string): void => {
+      const currentTask = tasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) return;
+      const subtasks = allTasks.filter((t) => t.parentId === taskId);
+      const activeChildren = subtasks.filter(
+        (t) => !isTerminalStatus(t.status as never),
+      ).length;
+      if (activeChildren > 0) {
+        setDeleteConfirmTrigger({ taskId, ts: Date.now() });
+        return;
+      }
+      void deleteTask(taskId, false);
+    },
+    [allTasks, deleteTask, tasks],
+  );
+
   const handleToggleToday = useCallback(
     (taskId: string): void => {
+      const currentTask = tasks.find((t) => t.id === taskId);
+      const wasToday = currentTask?.today;
       void toggleToday(taskId);
+      // Only show toast when removing from Today while viewing Today (task leaves view)
+      if (wasToday && useAppStore.getState().activeView === 'today') {
+        useToastStore.getState().showToast('Removed from Today', async () => {
+          await getUntask().tasks.undoLastUserAction();
+          await useTaskStore.getState().refreshTasks();
+        });
+      }
     },
-    [toggleToday],
+    [tasks, toggleToday],
   );
 
   const handleCyclePriority = useCallback(
@@ -246,6 +405,11 @@ export const TaskList = ({
       );
 
       void updateTask({ id: taskId, status: nextStatus });
+      const label = statusLabelMap.get(nextStatus as PredefinedStatusId) ?? nextStatus;
+      useToastStore.getState().showToast(`Moved to ${label}`, async () => {
+        await getUntask().tasks.undoLastUserAction();
+        await useTaskStore.getState().refreshTasks();
+      });
     },
     [enabledNonTerminal, tasks, updateTask],
   );
@@ -289,13 +453,49 @@ export const TaskList = ({
     [allTasks, reorderTasks, taskIds],
   );
 
+  const handleMoveUp = useCallback(
+    (taskId: string): void => {
+      const currentIndex = taskIds.indexOf(taskId);
+      if (currentIndex <= 0) return;
+
+      const reorderedScopedIds = arrayMove(taskIds, currentIndex, currentIndex - 1);
+      const fullOrderedIds = reconcileScopedReorder(
+        allTasks.map((task) => task.id),
+        taskIds,
+        reorderedScopedIds,
+      );
+
+      setFocusedIndex(currentIndex - 1);
+      void reorderTasks(fullOrderedIds);
+    },
+    [allTasks, reorderTasks, taskIds, setFocusedIndex],
+  );
+
+  const handleMoveDown = useCallback(
+    (taskId: string): void => {
+      const currentIndex = taskIds.indexOf(taskId);
+      if (currentIndex < 0 || currentIndex >= taskIds.length - 1) return;
+
+      const reorderedScopedIds = arrayMove(taskIds, currentIndex, currentIndex + 1);
+      const fullOrderedIds = reconcileScopedReorder(
+        allTasks.map((task) => task.id),
+        taskIds,
+        reorderedScopedIds,
+      );
+
+      setFocusedIndex(currentIndex + 1);
+      void reorderTasks(fullOrderedIds);
+    },
+    [allTasks, reorderTasks, taskIds, setFocusedIndex],
+  );
+
   const onKeyDown = useTaskListKeyboard({
     tasks,
     focusedIndex,
     onFocusedIndexChange: setFocusedIndex,
     expandedTaskId,
     onToggleExpand: handleToggleExpand,
-    onToggleComplete: handleComplete,
+    onToggleComplete: handleRequestCompleteConfirm,
     onToggleToday: handleToggleToday,
     onCyclePriority: handleCyclePriority,
     onCycleStatus: handleCycleStatus,
@@ -303,7 +503,12 @@ export const TaskList = ({
     isDragActive: effectiveActiveDragId !== null,
     containerRef,
     onStartTitleEdit: setEditingTitleTaskId,
+    onDelete: handleDelete,
+    onMoveUp: handleMoveUp,
+    onMoveDown: handleMoveDown,
     isEditingTitle: editingTitleTaskId !== null,
+    onNavigateNextGroup,
+    onNavigatePrevGroup,
   });
 
   if (tasks.length === 0) {
@@ -328,14 +533,15 @@ export const TaskList = ({
         aria-describedby={`${scopeId}-hint`}
         tabIndex={0}
         onKeyDown={onKeyDown}
-        className="space-y-1 outline-none"
+        className="outline-none"
+        {...(isPrimaryList ? { 'data-primary-focusable': '' } : undefined)}
       >
         <p id={`${scopeId}-hint`} className="sr-only">
-          Use Arrow Up and Arrow Down to move focus. Press Enter to expand.
-          Press Space to complete or reopen. Press T to toggle today.
+          Use Arrow Up and Arrow Down to move focus. Press Option+Arrow Up or Option+Arrow Down to reorder.
+          Press Enter to expand. Press Space to complete or reopen. Press T to toggle today.
           Press P to cycle priority. Press S to cycle status.
           In Tasks view, drag tasks between status groups or drop onto tasks for exact placement.
-          Press E to edit title.
+          Press E to edit title. Press Command+Backspace to delete.
         </p>
         {tasks.map((task, index) => {
           const isExpanded = expandedTaskId === task.id;
@@ -346,11 +552,12 @@ export const TaskList = ({
 
           return (
             <TaskItem
-              key={task.id}
+              key={getStableKey(task.id)}
               task={task}
               isExpanded={isExpanded}
               isFocused={focusedIndex === index}
               isEditingTitle={editingTitleTaskId === task.id}
+              isNavigatedTo={task.id === navigatedTaskId}
               hasChildren={subtasks.length > 0}
               childrenCount={subtasks.length}
               childrenDoneCount={subtasks.filter((s) => s.status === 'done').length}
@@ -358,13 +565,19 @@ export const TaskList = ({
               onEndTitleEdit={() => setEditingTitleTaskId(null)}
               onToggleExpand={handleToggleExpand}
               onComplete={handleComplete}
+              onCompleteWithChildren={handleCompleteWithChildren}
               onToggleToday={handleToggleToday}
               onFocus={() => setFocusedIndex(index)}
+              completeConfirmTrigger={completeConfirmTrigger}
+              deleteConfirmTrigger={deleteConfirmTrigger}
+              onCompleteConfirmTriggerHandled={handleCompleteConfirmTriggerHandled}
+              onDeleteConfirmTriggerHandled={handleDeleteConfirmTriggerHandled}
             >
               <TaskBody
                 task={task}
                 isExpanded={isExpanded}
                 subtaskCount={subtasks.length}
+                indentPx={indentPx}
                 onRequestAddSubtask={
                   canOwnSubtasks
                     ? () => setAddingSubtaskForId(task.id)
@@ -385,6 +598,21 @@ export const TaskList = ({
                         ariaLabel={`Subtasks for ${task.title}`}
                         scopeId={`subtasks:${task.id}`}
                         indentPx={8}
+                        onNavigatePrevGroup={() => {
+                          setFocusedIndex(index);
+                          requestAnimationFrame(() => {
+                            containerRef.current
+                              ?.querySelector<HTMLElement>(`[data-task-id="${task.id}"]`)
+                              ?.focus();
+                          });
+                        }}
+                        onNavigateNextGroup={() => {
+                          if (index < tasks.length - 1) {
+                            setFocusedIndex(index + 1);
+                          } else {
+                            onNavigateNextGroup?.();
+                          }
+                        }}
                       />
                     )}
                     {addingSubtaskForId === task.id && (
@@ -416,12 +644,20 @@ export const TaskList = ({
                             }
                           }}
                           onBlur={() => {
+                            if (newSubtaskTitle.trim()) {
+                              void createTask({
+                                title: newSubtaskTitle.trim(),
+                                parentId: task.id,
+                                status: 'active',
+                                priority: 'none',
+                              });
+                            }
                             setAddingSubtaskForId(null);
                             setNewSubtaskTitle('');
                           }}
                           onClick={(e) => e.stopPropagation()}
                           placeholder="New subtask..."
-                          className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/40"
+                          className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
                         />
                       </div>
                     )}

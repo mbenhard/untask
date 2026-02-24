@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { SearchResultItem } from '../../types/ipc';
+import { toErrorMessage } from '../lib/errors';
 import { getUntask } from '../lib/untask';
 
 type SearchStore = {
@@ -8,6 +9,7 @@ type SearchStore = {
   query: string;
   results: SearchResultItem[];
   total: number;
+  types: ('task' | 'note')[];
   isSearching: boolean;
   selectedIndex: number;
   error: string | null;
@@ -25,6 +27,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
   query: '',
   results: [],
   total: 0,
+  types: [],
   isSearching: false,
   selectedIndex: 0,
   error: null,
@@ -35,6 +38,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       query: '',
       results: [],
       total: 0,
+      types: [],
       selectedIndex: 0,
       error: null,
     }),
@@ -51,6 +55,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({
         results: [],
         total: 0,
+        types: [],
         selectedIndex: 0,
         error: null,
       });
@@ -68,13 +73,14 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       set({
         results: result.results,
         total: result.total,
+        types: result.types,
         isSearching: false,
         selectedIndex: 0,
       });
     } catch (error) {
       set({
         isSearching: false,
-        error: error instanceof Error ? error.message : 'Search failed.',
+        error: toErrorMessage(error, 'Search failed.'),
       });
     }
   },
@@ -103,3 +109,4 @@ export const selectSearchIsSearching = (state: SearchStore) => state.isSearching
 export const selectSearchTotal = (state: SearchStore) => state.total;
 export const selectSearchError = (state: SearchStore) => state.error;
 export const selectSearchSelectedIndex = (state: SearchStore) => state.selectedIndex;
+export const selectSearchTypes = (state: SearchStore) => state.types;

@@ -1,5 +1,4 @@
-import type { Task } from '../../../types/models';
-import type { PredefinedStatusId } from '../../../types/models';
+import type { PredefinedStatusId, Task } from '../../../types/models';
 
 export type StatusLaneKey = PredefinedStatusId;
 

@@ -1,7 +1,7 @@
-import type { SearchResultItem } from '../../../types/ipc';
+import type { TaskSearchResultItem } from '../../../types/ipc';
 import type { AppView } from '../../stores/appStore';
 
-export const resolveSearchResultView = (result: SearchResultItem): AppView => {
+export const resolveSearchResultView = (result: TaskSearchResultItem): AppView => {
   if (result.status === 'inbox') {
     return 'inbox';
   }

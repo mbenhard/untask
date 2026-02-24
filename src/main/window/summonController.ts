@@ -1,8 +1,8 @@
 import type { BrowserWindow } from 'electron';
 
-import { readClipboardForQuickAdd } from '../clipboard';
 import { getSetting, setSetting } from '../services/settingsService';
-import { IPC_CHANNELS } from '../../types/ipc';
+import { triggerRemindersPull } from '../services/remindersSync';
+import { showQuickAdd as showQuickAddWindow } from './quickAddWindow';
 
 import {
   parseBoundsJson,
@@ -20,11 +20,13 @@ const DEFAULT_WIDTH = 680;
 const DEFAULT_HEIGHT = 720;
 const BOUNDS_SAVE_DELAY_MS = 500;
 const BLUR_SUPPRESSION_MS = 150;
+const PULL_ON_FOCUS_MIN_INTERVAL_MS = 30_000; // Don't pull more than once every 30s on focus
 
 let win: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let boundsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let windowDismissMode: WindowDismissMode = sanitizeWindowDismissMode(null);
+let lastPullOnFocusAt = 0;
 
 export function restoreWindowBounds(window: BrowserWindow): void {
   const stored = parseBoundsJson(getSetting(BOUNDS_KEY));
@@ -33,6 +35,10 @@ export function restoreWindowBounds(window: BrowserWindow): void {
 }
 
 export function initSummonController(mainWindow: BrowserWindow): void {
+  if (boundsSaveTimer) {
+    clearTimeout(boundsSaveTimer);
+    boundsSaveTimer = null;
+  }
   win = mainWindow;
   windowDismissMode = getWindowDismissMode();
 
@@ -48,6 +54,14 @@ export function initSummonController(mainWindow: BrowserWindow): void {
     }
     if (mainWindow.isVisible() && !mainWindow.isDestroyed()) {
       mainWindow.hide();
+    }
+  });
+
+  mainWindow.on('focus', () => {
+    const now = Date.now();
+    if (now - lastPullOnFocusAt >= PULL_ON_FOCUS_MIN_INTERVAL_MS) {
+      lastPullOnFocusAt = now;
+      triggerRemindersPull();
     }
   });
 }
@@ -75,11 +89,7 @@ export function summonWindow(): void {
 }
 
 export function showQuickAdd(): void {
-  if (!win || win.isDestroyed()) return;
-
-  const payload = readClipboardForQuickAdd();
-  summonWindow();
-  win.webContents.send(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, payload);
+  showQuickAddWindow();
 }
 
 export function hideWindow(): void {

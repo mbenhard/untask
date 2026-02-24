@@ -7,14 +7,21 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { execSync } from 'child_process';
+import path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
+    appBundleId: 'com.untask.app',
     asar: true,
     icon: './assets/icons/icon',
-    extraResource: ['./drizzle', './assets/tray', './assets/icons/Assets.car'],
+    extraResource: ['./drizzle', './assets/tray', './assets/icons/Assets.car', './resources/bin/untask-helper'],
     extendInfo: {
       CFBundleIconName: 'icon',
+      NSRemindersFullAccessUsageDescription:
+        'Untask syncs your tasks with due dates to Reminders so you can check them off on your phone.',
+      NSRemindersUsageDescription:
+        'Untask syncs your tasks with due dates to Reminders so you can check them off on your phone.',
     },
     // Override the Vite plugin's default ignore to include native modules.
     // The Vite plugin excludes everything except /.vite, but better-sqlite3
@@ -28,6 +35,22 @@ const config: ForgeConfig = {
       if (file.startsWith('/node_modules/bindings')) return false;
       if (file.startsWith('/node_modules/file-uri-to-path')) return false;
       return true;
+    },
+  },
+  hooks: {
+    postPackage: async (_config, result) => {
+      if (result.platform !== 'darwin') return;
+      for (const outputPath of result.outputPaths) {
+        const appPath = outputPath.endsWith('.app')
+          ? outputPath
+          : path.join(outputPath, 'Untask.app');
+        // Re-sign with ad-hoc signature after FusesPlugin modifies the binary.
+        // This ensures the app has a valid signature with the correct bundle
+        // identifier, which macOS requires for notification registration.
+        console.log(`[postPackage] Ad-hoc signing: ${appPath}`);
+        execSync(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
+        execSync(`codesign --verify "${appPath}"`, { stdio: 'inherit' });
+      }
     },
   },
   rebuildConfig: {},
@@ -57,11 +80,22 @@ const config: ForgeConfig = {
           config: 'vite.preload.config.ts',
           target: 'preload',
         },
+        {
+          entry: {
+            'preload-quickadd': 'src/preload/quickadd.ts',
+          },
+          config: 'vite.preload.config.ts',
+          target: 'preload',
+        },
       ],
       renderer: [
         {
           name: 'main_window',
           config: 'vite.renderer.config.ts',
+        },
+        {
+          name: 'quick_add',
+          config: 'vite.quickadd-renderer.config.ts',
         },
       ],
     }),

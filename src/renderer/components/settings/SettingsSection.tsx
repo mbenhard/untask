@@ -12,7 +12,7 @@ export const SettingsSection = ({ title, description, children }: SettingsSectio
     {(title || description) && (
       <div className="px-0.5">
         {title && (
-          <h3 className="text-[12px] font-medium text-foreground">
+          <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
             {title}
           </h3>
         )}

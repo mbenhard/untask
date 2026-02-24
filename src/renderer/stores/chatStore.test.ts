@@ -502,6 +502,24 @@ describe('chatStore stream reliability', () => {
     };
 
     useChatStore.getState().applyStreamEvent(doneEvent);
+    useChatStore.setState({
+      requestPayloadByRequestId: {
+        'req-2': {
+          content: 'stale payload',
+          modelId: null,
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-2': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+      conversationIdByRequestId: {
+        'req-2': 'thread-1',
+      },
+      isSending: true,
+    });
     useChatStore.getState().applyStreamEvent(doneEvent);
 
     const state = useChatStore.getState();
@@ -510,6 +528,154 @@ describe('chatStore stream reliability', () => {
     );
     expect(assistantMessages).toHaveLength(1);
     expect(assistantMessages[0]?.actionCards).toHaveLength(1);
+    expect(state.requestPayloadByRequestId['req-2']).toBeUndefined();
+    expect(state.pendingViewSwitchByRequestId['req-2']).toBeUndefined();
+    expect(state.conversationIdByRequestId['req-2']).toBeUndefined();
+    expect(state.assistantMessageIdByRequestId['req-2']).toBe(assistantMessage.id);
+    expect(state.isSending).toBe(false);
+  });
+
+  it('replaces orphaned placeholder when assistant_done arrives without inFlight state', () => {
+    const assistantMessage: ChatMessage = {
+      id: 'assistant-late-final-1',
+      conversationId: 'thread-1',
+      role: 'assistant',
+      content: 'Final response.',
+      toolCalls: null,
+      chips: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-late-1',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: 'Partial response',
+          createdAt: new Date().toISOString(),
+          isStreaming: false,
+          actionCards: [],
+          steps: [{ kind: 'text', content: 'Partial response' }],
+        },
+      ],
+      inFlightByRequestId: {},
+      requestPayloadByRequestId: {
+        'req-late-1': {
+          content: 'original prompt',
+          modelId: 'moonshotai/kimi-k2.5',
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-late-1': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+      conversationIdByRequestId: {
+        'req-late-1': 'thread-1',
+      },
+      isSending: true,
+      error: 'previous stream error',
+      lastStreamError: {
+        requestId: 'req-late-1',
+        code: 'provider_error',
+        retryable: true,
+        message: 'temporary failure',
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'req-late-1',
+      assistantMessage,
+      actionCards: [],
+    });
+
+    const state = useChatStore.getState();
+    expect(state.messages.find((message) => message.id === 'assistant-stream-req-late-1')).toBeUndefined();
+    expect(state.messages.find((message) => message.id === 'assistant-late-final-1')).toBeDefined();
+    expect(state.requestPayloadByRequestId['req-late-1']).toBeUndefined();
+    expect(state.pendingViewSwitchByRequestId['req-late-1']).toBeUndefined();
+    expect(state.conversationIdByRequestId['req-late-1']).toBeUndefined();
+    expect(state.lastStreamError).toBeNull();
+    expect(state.error).toBeNull();
+    expect(state.isSending).toBe(false);
+  });
+
+  it('drops cross-thread assistant_done for proactive in-flight requests and cleans request state', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-proactive-foreign',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: 'partial',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [{ kind: 'text', content: 'partial' }],
+        },
+      ],
+      inFlightByRequestId: {
+        'proactive-foreign-1': {
+          placeholderId: 'assistant-stream-proactive-foreign',
+          actionCards: [],
+          steps: [{ kind: 'text', content: 'partial' }],
+        },
+      },
+      requestPayloadByRequestId: {
+        'proactive-foreign-1': {
+          content: 'stale payload',
+          modelId: null,
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'proactive-foreign-1': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+      conversationIdByRequestId: {
+        'proactive-foreign-1': 'thread-2',
+      },
+      assistantMessageIdByRequestId: {
+        'proactive-foreign-1': 'assistant-foreign-final',
+      },
+      isSending: true,
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'proactive-foreign-1',
+      assistantMessage: {
+        id: 'assistant-foreign-final',
+        conversationId: 'thread-2',
+        role: 'assistant',
+        content: 'foreign thread response',
+        toolCalls: null,
+        chips: null,
+        createdAt: new Date().toISOString(),
+      },
+      actionCards: [],
+    });
+
+    await Promise.resolve();
+
+    const state = useChatStore.getState();
+    expect(state.messages.find((message) => message.id === 'assistant-foreign-final')).toBeUndefined();
+    expect(state.messages.find((message) => message.id === 'assistant-stream-proactive-foreign')).toBeUndefined();
+    expect(state.inFlightByRequestId['proactive-foreign-1']).toBeUndefined();
+    expect(state.requestPayloadByRequestId['proactive-foreign-1']).toBeUndefined();
+    expect(state.pendingViewSwitchByRequestId['proactive-foreign-1']).toBeUndefined();
+    expect(state.conversationIdByRequestId['proactive-foreign-1']).toBeUndefined();
+    expect(state.assistantMessageIdByRequestId['proactive-foreign-1']).toBeUndefined();
+    expect(state.isSending).toBe(false);
+    expect(mockChatApi.listThreads).toHaveBeenCalledTimes(1);
   });
 
   it('collapses adjacent duplicate text steps on assistant_done', () => {
@@ -609,6 +775,53 @@ describe('chatStore stream reliability', () => {
       kind: 'thinking',
       content: 'Let me think about this...',
     });
+  });
+
+  it('does not switch stream phase back to thinking after text output has started', () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-phase',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: '',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-phase': {
+          placeholderId: 'assistant-stream-req-phase',
+          actionCards: [],
+          steps: [],
+        },
+      },
+    });
+
+    const store = useChatStore.getState();
+    store.applyStreamEvent({
+      type: 'token',
+      requestId: 'req-phase',
+      text: 'Hello',
+    });
+
+    store.applyStreamEvent({
+      type: 'reasoning',
+      requestId: 'req-phase',
+      text: 'post-text reasoning',
+    });
+
+    const message = useChatStore
+      .getState()
+      .messages.find((m) => m.id === 'assistant-stream-req-phase');
+
+    expect(message?.streamPhase).toBeUndefined();
+    expect(message?.steps).toEqual([
+      { kind: 'text', content: 'Hello' },
+      { kind: 'thinking', content: 'post-text reasoning' },
+    ]);
   });
 
   it('accumulates mixed event sequence into ordered steps', () => {
@@ -900,6 +1113,168 @@ describe('chatStore stream reliability', () => {
 
     expect(mockChatApi.getSelectedModel).not.toHaveBeenCalled();
     expect(mockChatApi.send).not.toHaveBeenCalled();
+  });
+
+  it('waits for in-flight image processing to finish before sending', async () => {
+    const mockChatApi = ((globalThis as { window?: unknown }).window as {
+      untask: { chat: ReturnType<typeof createMockChatApi> };
+    }).untask.chat;
+
+    mockChatApi.getSelectedModel.mockResolvedValue({ modelId: 'moonshotai/kimi-k2.5' });
+    mockChatApi.send.mockResolvedValue({
+      requestId: 'req-send-after-processing',
+      conversationId: 'thread-1',
+      userMessage: {
+        id: 'user-msg-processing',
+        conversationId: 'thread-1',
+        role: 'user',
+        content: 'after processing',
+        toolCalls: null,
+        chips: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    useChatStore.setState({ processingImageCount: 1 });
+
+    const sendPromise = useChatStore.getState().sendMessage('after processing');
+    await Promise.resolve();
+
+    expect(mockChatApi.getSelectedModel).not.toHaveBeenCalled();
+    expect(mockChatApi.send).not.toHaveBeenCalled();
+
+    useChatStore.getState().decrementProcessingImages();
+    await sendPromise;
+
+    expect(mockChatApi.getSelectedModel).toHaveBeenCalledTimes(1);
+    expect(mockChatApi.send).toHaveBeenCalledWith({
+      content: 'after processing',
+      modelId: 'moonshotai/kimi-k2.5',
+      conversationId: 'thread-1',
+    });
+  });
+
+  it('clears assistant message mapping on retryable stream error while keeping retry payload', () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-error-1',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: '',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-error-1': {
+          placeholderId: 'assistant-stream-req-error-1',
+          actionCards: [],
+          steps: [],
+        },
+      },
+      requestPayloadByRequestId: {
+        'req-error-1': {
+          content: 'retry me',
+          modelId: 'moonshotai/kimi-k2.5',
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-error-1': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+      conversationIdByRequestId: {
+        'req-error-1': 'thread-1',
+      },
+      assistantMessageIdByRequestId: {
+        'req-error-1': 'assistant-final-error-1',
+      },
+      isSending: true,
+      error: null,
+      lastStreamError: null,
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'error',
+      requestId: 'req-error-1',
+      code: 'provider_error',
+      retryable: true,
+      message: 'temporary provider issue',
+    });
+
+    const state = useChatStore.getState();
+    expect(state.inFlightByRequestId['req-error-1']).toBeUndefined();
+    expect(state.requestPayloadByRequestId['req-error-1']).toEqual({
+      content: 'retry me',
+      modelId: 'moonshotai/kimi-k2.5',
+    });
+    expect(state.conversationIdByRequestId['req-error-1']).toBe('thread-1');
+    expect(state.pendingViewSwitchByRequestId['req-error-1']).toBeUndefined();
+    expect(state.assistantMessageIdByRequestId['req-error-1']).toBeUndefined();
+    expect(state.lastStreamError).toEqual({
+      requestId: 'req-error-1',
+      code: 'provider_error',
+      retryable: true,
+      message: 'temporary provider issue',
+    });
+    expect(state.isSending).toBe(false);
+  });
+
+  it('clears request payload state when cancelling an in-flight stream', async () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-cancel-1',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: 'Partial response',
+          createdAt: new Date().toISOString(),
+          isStreaming: true,
+          actionCards: [],
+          steps: [{ kind: 'text', content: 'Partial response' }],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-cancel-1': {
+          placeholderId: 'assistant-stream-cancel-1',
+          actionCards: [],
+          steps: [{ kind: 'text', content: 'Partial response' }],
+        },
+      },
+      requestPayloadByRequestId: {
+        'req-cancel-1': {
+          content: 'Write update',
+          modelId: 'moonshotai/kimi-k2.5',
+        },
+      },
+      pendingViewSwitchByRequestId: {
+        'req-cancel-1': {
+          manualNavigationVersionAtStart: 0,
+          pendingViewIntent: null,
+        },
+      },
+      conversationIdByRequestId: {
+        'req-cancel-1': 'thread-1',
+      },
+      assistantMessageIdByRequestId: {
+        'req-cancel-1': 'assistant-msg-cancel-1',
+      },
+      isSending: true,
+    });
+
+    await useChatStore.getState().cancelStream();
+
+    const state = useChatStore.getState();
+    expect(state.inFlightByRequestId).toEqual({});
+    expect(state.requestPayloadByRequestId).toEqual({});
+    expect(state.pendingViewSwitchByRequestId).toEqual({});
+    expect(state.conversationIdByRequestId).toEqual({});
+    expect(state.assistantMessageIdByRequestId).toEqual({});
+    expect(state.isSending).toBe(false);
   });
 
   it('attaches staged note context on the next outgoing message', async () => {

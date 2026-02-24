@@ -7,8 +7,13 @@ export type SettingsSelectOption = {
   label: string;
 };
 
-export type SettingsSelectProps = {
+export type SettingsSelectGroup = {
+  label: string;
   options: SettingsSelectOption[];
+};
+
+export type SettingsSelectProps = {
+  options: (SettingsSelectOption | SettingsSelectGroup)[];
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -39,11 +44,25 @@ export const SettingsSelect = ({
         className,
       )}
     >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
+      {options.map((optOrGroup, i) => {
+        if ('options' in optOrGroup) {
+          return (
+            <optgroup key={`group-${i}-${optOrGroup.label}`} label={optOrGroup.label}>
+              {optOrGroup.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </optgroup>
+          );
+        }
+
+        return (
+          <option key={optOrGroup.value} value={optOrGroup.value}>
+            {optOrGroup.label}
+          </option>
+        );
+      })}
     </select>
   );
 };

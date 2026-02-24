@@ -1,16 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+import { Check } from 'lucide-react';
 
 import { getUntask } from '../../lib/untask';
+import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { getCuratedModelsForProvider, buildModelOptions } from '../settings/ModelCatalogView';
 
 type Provider = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
 
-const PROVIDER_OPTIONS: { value: Provider; label: string }[] = [
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'ollama', label: 'Ollama (local)' },
+const PROVIDER_OPTIONS: { value: Provider; label: string; monogram: string }[] = [
+  { value: 'openrouter', label: 'OpenRouter', monogram: 'OR' },
+  { value: 'openai', label: 'OpenAI', monogram: 'OA' },
+  { value: 'anthropic', label: 'Anthropic', monogram: 'AN' },
+  { value: 'ollama', label: 'Ollama (local)', monogram: 'OL' },
 ];
 
 const PROVIDER_HINTS: Record<Provider, string> = {
@@ -28,7 +32,7 @@ const PROVIDER_PLACEHOLDERS: Record<Provider, string> = {
 };
 
 type OnboardingProviderProps = {
-  onNext: (provider: Provider, keyOrUrl: string) => void;
+  onNext: (provider: Provider, keyOrUrl: string, modelId: string) => void;
   onSkip: () => void;
 };
 
@@ -36,6 +40,7 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   const [provider, setProvider] = useState<Provider>('openrouter');
   const [keyInput, setKeyInput] = useState('');
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+  const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [isValidating, setIsValidating] = useState(false);
   const [validationState, setValidationState] = useState<'idle' | 'valid' | 'error'>('idle');
   const [validationError, setValidationError] = useState('');
@@ -44,14 +49,37 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   const effectiveValue = isOllama ? ollamaUrl : keyInput;
   const canValidate = !isOllama && keyInput.trim().length > 0;
   const canContinue = isOllama
-    ? ollamaUrl.trim().length > 0
-    : keyInput.trim().length > 0;
+    ? ollamaUrl.trim().length > 0 && selectedModelId.trim().length > 0
+    : keyInput.trim().length > 0 && selectedModelId.trim().length > 0;
+
+  useEffect(() => {
+    const models = getCuratedModelsForProvider(provider);
+    const defaultModel = models.find((m) => m.id === 'anthropic/claude-haiku-4-5') ?? models[0];
+    setSelectedModelId(defaultModel?.id ?? '');
+  }, [provider]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && canContinue) {
+        e.preventDefault();
+        onNext(provider, effectiveValue.trim(), selectedModelId);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onSkip();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canContinue, provider, effectiveValue, selectedModelId, onNext, onSkip]);
 
   const handleProviderChange = (next: Provider) => {
     setProvider(next);
     setKeyInput('');
     setValidationState('idle');
     setValidationError('');
+    const models = getCuratedModelsForProvider(next);
+    const defaultModel = models.find((m) => m.id === 'anthropic/claude-haiku-4-5') ?? models[0];
+    setSelectedModelId(defaultModel?.id ?? '');
   };
 
   const handleValidate = async () => {
@@ -79,15 +107,15 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   };
 
   const handleContinue = () => {
-    onNext(provider, effectiveValue.trim());
+    onNext(provider, effectiveValue.trim(), selectedModelId);
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">Connect AI provider</h2>
         <p className="text-xs text-muted-foreground">
-          Choose where the AI assistant gets its intelligence.
+          Choose where the AI assistant gets its intelligence. Key stored locally.
         </p>
       </div>
 
@@ -100,80 +128,132 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
                 key={opt.value}
                 type="button"
                 onClick={() => handleProviderChange(opt.value)}
-                className={[
-                  'rounded-md border px-3 py-2 text-xs font-medium transition-colors text-left',
+                className={cn(
+                  'flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors text-left',
                   provider === opt.value
                     ? 'border-foreground/30 bg-accent text-foreground'
                     : 'border-border bg-transparent text-muted-foreground hover:text-foreground',
-                ].join(' ')}
+                )}
               >
-                {opt.label}
+                <span className="font-mono text-[10px] opacity-40">{opt.monogram}</span>
+                <span>{opt.label}</span>
+                {opt.value === 'openrouter' && (
+                  <span className="ml-auto text-[10px] text-muted-foreground/60">Recommended</span>
+                )}
               </button>
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[provider]}</p>
         </div>
 
-        {isOllama ? (
-          <div className="flex flex-col gap-2">
-            <label htmlFor="onboarding-ollama-url" className="text-xs font-medium text-foreground">
-              Ollama base URL
-            </label>
-            <Input
-              id="onboarding-ollama-url"
-              type="text"
-              value={ollamaUrl}
-              onChange={(e) => setOllamaUrl(e.target.value)}
-              placeholder="http://localhost:11434"
-              className="h-9 text-sm"
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <label htmlFor="onboarding-api-key" className="text-xs font-medium text-foreground">
-              API key
-            </label>
-            <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-4">
+          {isOllama ? (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="onboarding-ollama-url" className="text-xs font-medium text-foreground">
+                Ollama URL
+              </label>
               <Input
-                id="onboarding-api-key"
-                type="password"
-                value={keyInput}
-                onChange={(e) => {
-                  setKeyInput(e.target.value);
-                  setValidationState('idle');
-                  setValidationError('');
-                }}
-                placeholder={PROVIDER_PLACEHOLDERS[provider]}
-                className="h-9 flex-1 text-sm"
-                autoComplete="off"
+                id="onboarding-ollama-url"
+                type="text"
+                value={ollamaUrl}
+                onChange={(e) => setOllamaUrl(e.target.value)}
+                placeholder="http://localhost:11434"
+                className="h-9 text-sm"
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void handleValidate()}
-                disabled={!canValidate || isValidating}
-                className="h-9 shrink-0 text-xs"
-              >
-                {isValidating ? 'Checking...' : 'Validate'}
-              </Button>
             </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="onboarding-api-key" className="text-xs font-medium text-foreground">
+                API key
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="onboarding-api-key"
+                  type="password"
+                  value={keyInput}
+                  onChange={(e) => {
+                    setKeyInput(e.target.value);
+                    setValidationState('idle');
+                    setValidationError('');
+                  }}
+                  placeholder={PROVIDER_PLACEHOLDERS[provider]}
+                  className={cn(
+                    'h-9 flex-1 text-sm',
+                    validationState === 'valid' && 'border-green-500/50 dark:border-green-400/50',
+                    validationState === 'error' && 'border-destructive/50',
+                  )}
+                  autoComplete="off"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleValidate()}
+                  disabled={!canValidate || isValidating}
+                  className="h-9 shrink-0 text-xs"
+                >
+                  {isValidating ? 'Checking...' : 'Validate'}
+                </Button>
+              </div>
 
-            {validationState === 'valid' ? (
-              <p className="text-[11px] text-green-500 dark:text-green-400">
-                Key is valid.
-              </p>
-            ) : validationState === 'error' ? (
-              <p className="text-[11px] text-destructive">
-                {validationError}
-              </p>
+              {validationState === 'valid' ? (
+                <p className="flex items-center gap-1 text-[11px] text-green-500 dark:text-green-400">
+                  <Check className="size-3" />
+                  Key is valid
+                </p>
+              ) : validationState === 'error' ? (
+                <p className="text-[11px] text-destructive">
+                  {validationError}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="onboarding-model" className="text-xs font-medium text-foreground">
+              Model
+            </label>
+            {isOllama ? (
+              <select
+                id="onboarding-model"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              >
+                <option value="" disabled>
+                  Select a model
+                </option>
+                <option value="llama3.1:8b">llama3.1:8b · 8B</option>
+                <option value="mistral:7b">mistral:7b · 7B</option>
+                <option value="qwen3:8b">qwen3:8b · 8B</option>
+                <option value="qwen3:14b">qwen3:14b · 14B</option>
+              </select>
             ) : (
-              <p className="text-[11px] text-muted-foreground">
-                Your key is stored securely on your device.
-              </p>
+              <select
+                id="onboarding-model"
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              >
+                {buildModelOptions(provider, selectedModelId).map((group, idx) => (
+                  'options' in group ? (
+                    <optgroup key={idx} label={group.label}>
+                      {group.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    <option key={group.value} value={group.value}>
+                      {group.label}
+                    </option>
+                  )
+                ))}
+              </select>
             )}
           </div>
-        )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

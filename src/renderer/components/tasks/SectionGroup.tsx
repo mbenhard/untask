@@ -24,6 +24,8 @@ export type SectionGroupProps = {
   addTaskConfig?: AddTaskConfig;
   /** External signal to open the add input (e.g. keyboard shortcut `n`) */
   triggerAdd?: number;
+  /** Callback when focus should move to the task list */
+  onRequestFocus?: () => void;
   children: ReactNode;
 };
 
@@ -37,6 +39,7 @@ export const SectionGroup = ({
   dropRef,
   addTaskConfig,
   triggerAdd,
+  onRequestFocus,
   children,
 }: SectionGroupProps) => {
   const [isAdding, setIsAdding] = useState(false);
@@ -78,7 +81,8 @@ export const SectionGroup = ({
 
   const handleDismiss = useCallback(() => {
     setIsAdding(false);
-  }, []);
+    onRequestFocus?.();
+  }, [onRequestFocus]);
 
   return (
     <section
@@ -97,6 +101,7 @@ export const SectionGroup = ({
           aria-controls={`section-${sectionId}`}
         >
           <ChevronRight
+            aria-hidden="true"
             className={cn(
               'size-3.5 text-muted-foreground transition-transform',
               !isCollapsed && 'rotate-90',
@@ -117,7 +122,7 @@ export const SectionGroup = ({
             className="ml-1.5 inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground/40 transition-colors hover:text-foreground"
             aria-label={`Add to ${label}`}
           >
-            <Plus className="size-3" />
+            <Plus className="size-3" aria-hidden="true" />
           </button>
         ) : null}
       </div>

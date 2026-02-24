@@ -53,28 +53,28 @@ export const UntaskFormattingToolbar = () => {
   }> = [
     {
       key: 'bold',
-      icon: <Bold size={ICON_SIZE} />,
+      icon: <Bold size={ICON_SIZE} aria-hidden="true" />,
       active: activeStyles.bold,
       label: 'Bold',
       action: () => editor.toggleStyles({ bold: true }),
     },
     {
       key: 'italic',
-      icon: <Italic size={ICON_SIZE} />,
+      icon: <Italic size={ICON_SIZE} aria-hidden="true" />,
       active: activeStyles.italic,
       label: 'Italic',
       action: () => editor.toggleStyles({ italic: true }),
     },
     {
       key: 'strike',
-      icon: <Strikethrough size={ICON_SIZE} />,
+      icon: <Strikethrough size={ICON_SIZE} aria-hidden="true" />,
       active: activeStyles.strike,
       label: 'Strikethrough',
       action: () => editor.toggleStyles({ strike: true }),
     },
     {
       key: 'code',
-      icon: <Code size={ICON_SIZE} />,
+      icon: <Code size={ICON_SIZE} aria-hidden="true" />,
       active: activeStyles.code,
       label: 'Code',
       action: () => editor.toggleStyles({ code: true }),
@@ -115,7 +115,7 @@ export const UntaskFormattingToolbar = () => {
         aria-label="Link"
         className="size-7 flex items-center justify-center rounded-sm text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
       >
-        <Link size={ICON_SIZE} />
+        <Link size={ICON_SIZE} aria-hidden="true" />
       </button>
     </div>
   );

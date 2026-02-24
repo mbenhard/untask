@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -21,15 +21,20 @@ const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string; hint: s
 ];
 
 const buildIdentityString = (
+  userName: string,
   role: Role | null,
   style: CommunicationStyle | null,
   focus: string,
 ): string => {
   const parts: string[] = [];
 
-  if (role) {
+  if (userName.trim().length > 0) {
+    parts.push(`The user's name is ${userName.trim()}.`);
+  }
+
+  if (role && role !== 'other') {
     const roleLabel = ROLE_OPTIONS.find((o) => o.value === role)?.label.toLowerCase() ?? role;
-    parts.push(`The user is a ${roleLabel}.`);
+    parts.push(`They are a ${roleLabel}.`);
   }
 
   if (style) {
@@ -45,21 +50,41 @@ const buildIdentityString = (
 };
 
 type OnboardingIdentityProps = {
-  onNext: (identityString: string) => void;
+  userName: string;
+  onNext: (
+    identityString: string,
+    roleValue: Role | null,
+    styleValue: CommunicationStyle | null,
+    focusValue: string,
+  ) => void;
   onSkip: () => void;
 };
 
-export const OnboardingIdentity = ({ onNext, onSkip }: OnboardingIdentityProps) => {
+export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdentityProps) => {
   const [role, setRole] = useState<Role | null>(null);
   const [style, setStyle] = useState<CommunicationStyle | null>(null);
   const [focus, setFocus] = useState('');
 
   const canContinue = role !== null || style !== null || focus.trim().length > 0;
 
-  const handleContinue = () => {
-    const identity = buildIdentityString(role, style, focus);
-    onNext(identity);
-  };
+  const handleContinue = useCallback(() => {
+    const identity = buildIdentityString(userName, role, style, focus);
+    onNext(identity, role, style, focus);
+  }, [focus, onNext, role, style, userName]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && canContinue) {
+        e.preventDefault();
+        handleContinue();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onSkip();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canContinue, handleContinue, onSkip]);
 
   return (
     <div className="flex flex-col gap-6">

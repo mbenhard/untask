@@ -90,22 +90,67 @@ export const blockNoteToMarkdown = (raw: string): string => {
 
 const EMPTY_NOTE_TTL_MS = 60_000; // 1 minute
 
-export function createNote(title?: string): Note {
+/**
+ * One-time migration: prepend stored titles into note content as a heading block,
+ * then clear the title field. This allows titles to be derived purely from content.
+ * Safe to call multiple times — only affects notes with non-empty titles.
+ */
+export function migrateNoteTitlesToContent(): void {
+  const db = getDb();
+  const withTitles = db
+    .select()
+    .from(notes)
+    .where(and(
+      // SQLite: title != '' AND title IS NOT NULL
+      // drizzle-orm doesn't have a neq('') helper, so we use a raw filter
+    ))
+    .all()
+    .filter((n) => n.title.length > 0);
+
+  for (const note of withTitles) {
+    let newContent: string;
+
+    try {
+      const blocks = JSON.parse(note.content);
+      if (Array.isArray(blocks)) {
+        // Prepend the title as a heading block into the BlockNote JSON
+        const titleBlock = {
+          id: crypto.randomUUID(),
+          type: 'heading',
+          props: {
+            textColor: 'default',
+            backgroundColor: 'default',
+            textAlignment: 'left',
+            level: 1,
+          },
+          content: [{ type: 'text', text: note.title, styles: {} }],
+          children: [],
+        };
+        newContent = JSON.stringify([titleBlock, ...blocks]);
+      } else {
+        // Non-array JSON — prepend as markdown heading
+        newContent = `# ${note.title}\n\n${note.content}`;
+      }
+    } catch {
+      // Legacy markdown or plain text — prepend as heading
+      const content = note.content.trim();
+      newContent = content ? `# ${note.title}\n\n${content}` : `# ${note.title}`;
+    }
+
+    db.update(notes)
+      .set({ title: '', content: newContent })
+      .where(eq(notes.id, note.id))
+      .run();
+  }
+}
+
+export function createNote(): Note {
   const db = getDb();
   const now = new Date().toISOString();
-  const autoTitle =
-    title ??
-    new Date().toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
 
   const [created] = db
     .insert(notes)
-    .values({ title: autoTitle, content: '', status: 'active', updatedAt: now })
+    .values({ title: '', content: '', status: 'active', updatedAt: now })
     .returning()
     .all();
   return created;
@@ -121,19 +166,13 @@ export function getNote(id: string): Note | undefined {
   return note;
 }
 
-export function saveNote(
-  id: string,
-  content: string,
-  title?: string,
-): Note | undefined {
+export function saveNote(id: string, content: string): Note | undefined {
   const db = getDb();
   const now = new Date().toISOString();
-  const set: Record<string, string> = { content, updatedAt: now };
-  if (title !== undefined) set.title = title;
 
   const [updated] = db
     .update(notes)
-    .set(set)
+    .set({ content, updatedAt: now })
     .where(eq(notes.id, id))
     .returning()
     .all();
@@ -151,9 +190,98 @@ export function archiveNote(id: string): Note | undefined {
   return updated;
 }
 
+export function restoreNote(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ status: 'active', updatedAt: new Date().toISOString() })
+    .where(eq(notes.id, id))
+    .returning()
+    .all();
+  return updated;
+}
+
 export function deleteNote(id: string): void {
   const db = getDb();
   db.delete(notes).where(eq(notes.id, id)).run();
+}
+
+export function pinNote(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ isPinned: true })
+    .where(eq(notes.id, id))
+    .returning()
+    .all();
+  return updated;
+}
+
+export function unpinNote(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ isPinned: false })
+    .where(eq(notes.id, id))
+    .returning()
+    .all();
+  return updated;
+}
+
+export function duplicateNote(id: string): Note | undefined {
+  const db = getDb();
+  const original = getNote(id);
+  if (!original) return undefined;
+  const now = new Date().toISOString();
+  const [created] = db
+    .insert(notes)
+    .values({
+      title: '',
+      content: original.content,
+      status: 'active',
+      isPinned: false,
+      updatedAt: now,
+    })
+    .returning()
+    .all();
+  return created;
+}
+
+/**
+ * Derive a display title for a note. When the stored title is empty,
+ * extract the first non-empty text from BlockNote JSON content.
+ * Used by the renderer (list) and AI tools so they see meaningful titles.
+ */
+export function getDisplayTitle(note: Note): string {
+  if (note.title) return note.title;
+  return deriveAutoTitle(note.content);
+}
+
+/**
+ * Extract a display title from BlockNote JSON content.
+ * Returns the text of the first non-empty text block, capped at 120 characters.
+ */
+export function deriveAutoTitle(content: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    // Legacy markdown — use first non-empty line
+    const firstLine = content.split('\n').find((l) => l.trim());
+    if (!firstLine) return '';
+    const cleaned = firstLine.replace(/^#+\s*/, '').trim();
+    return cleaned.length > 120 ? cleaned.slice(0, 120) + '…' : cleaned;
+  }
+
+  if (!Array.isArray(parsed)) return '';
+
+  for (const block of parsed as BlockNoteBlock[]) {
+    // Skip non-text blocks (image, file)
+    if (block.type === 'image' || block.type === 'file') continue;
+    const text = blockContentToText(block.content).trim();
+    if (text) return text.length > 120 ? text.slice(0, 120) + '…' : text;
+  }
+  return '';
 }
 
 export function listNotes(): { active: Note[]; archived: Note[] } {
@@ -174,7 +302,7 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   const all = db
     .select()
     .from(notes)
-    .orderBy(desc(notes.createdAt))
+    .orderBy(desc(notes.isPinned), desc(notes.updatedAt))
     .all();
 
   const active: Note[] = [];

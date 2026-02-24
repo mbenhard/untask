@@ -13,6 +13,8 @@ import { getDb } from '../db';
 import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
 import { calculateNextOccurrence } from './recurrenceEngine';
 import { getSetting, setSetting } from './settingsService';
+import { getMainWindow } from '../window/summonController';
+import { IPC_CHANNELS } from '../../types/ipc';
 
 // ─── Validation schemas ─────────────────────────────────────
 export const createTaskSchema = z.object({
@@ -28,6 +30,7 @@ export const createTaskSchema = z.object({
   effort: z.enum(['unknown', 'tiny', 'small', 'medium', 'deep']).optional(),
   recurrence: z.string().nullable().optional(),
   recurrenceSourceId: z.string().nullable().optional(),
+  reminderOffset: z.enum(['at_due', '15m', '1h', '1d']).nullable().optional(),
   order: z.number().optional(),
 });
 
@@ -44,18 +47,78 @@ export type CompleteTaskOptions = {
   completeChildren?: boolean;
 };
 
-export type TaskChangeListener = () => void;
+export type TaskChangeEvent = {
+  taskId: string;
+  action: 'create' | 'update' | 'complete' | 'cancel' | 'delete' | 'reopen';
+};
+
+export type TaskChangeListener = (event: TaskChangeEvent) => void;
 
 const taskChangeListeners = new Set<TaskChangeListener>();
 
-const emitTaskChange = (): void => {
+const emitTaskChange = (event: TaskChangeEvent): void => {
   for (const listener of [...taskChangeListeners]) {
     try {
-      listener();
+      listener(event);
     } catch {
       // Ignore listener failures so task mutations always complete.
     }
   }
+
+  // Broadcast to the main window renderer so it can refresh its task store.
+  // This is essential for cross-window mutations (e.g. quick add creating tasks).
+  const mainWin = getMainWindow();
+  if (mainWin && !mainWin.isDestroyed()) {
+    mainWin.webContents.send(IPC_CHANNELS.TASK_DATA_CHANGED);
+  }
+};
+
+const USER_UNDO_STACK_SIZE = 20;
+const userUndoStack: string[] = [];
+
+// Maps a parent event ID -> child event IDs so recursive user actions can undo atomically.
+const cascadeUndoGroups = new Map<string, string[]>();
+
+const pushUserUndoEvent = (eventId: string): void => {
+  userUndoStack.unshift(eventId);
+  if (userUndoStack.length > USER_UNDO_STACK_SIZE) {
+    const evicted = userUndoStack.pop();
+    if (evicted) cascadeUndoGroups.delete(evicted);
+  }
+};
+
+const popUserUndoEvent = (): string | null => {
+  return userUndoStack.shift() ?? null;
+};
+
+const groupNewUserUndoEvents = (stackLenBefore: number): void => {
+  const newEventCount = userUndoStack.length - stackLenBefore;
+  if (newEventCount <= 1) {
+    return;
+  }
+
+  const parentEventId = userUndoStack[0];
+  if (!parentEventId) {
+    return;
+  }
+  const childEventIds = userUndoStack.splice(1, newEventCount - 1);
+  cascadeUndoGroups.set(parentEventId, childEventIds);
+};
+
+const undoGroupedChildEvents = (eventId: string, source: TaskEventSource): void => {
+  const childEventIds = cascadeUndoGroups.get(eventId);
+  if (!childEventIds) {
+    return;
+  }
+
+  for (const childEventId of childEventIds) {
+    try {
+      undoTaskEvent(childEventId, source);
+    } catch {
+      // Child may have been restored/updated by other means; skip.
+    }
+  }
+  cascadeUndoGroups.delete(eventId);
 };
 
 export const subscribeTaskChanges = (
@@ -67,11 +130,13 @@ export const subscribeTaskChanges = (
   };
 };
 
+type TaskEventSource = 'user' | 'ai' | 'undo';
+
 // ─── Service functions ──────────────────────────────────────
 function logTaskEvent(
   taskId: string,
   action: 'create' | 'update' | 'move' | 'complete' | 'cancel' | 'delete',
-  source: 'user' | 'ai',
+  source: TaskEventSource,
   before: Task | null,
   after: Task | null,
 ): TaskEvent {
@@ -83,6 +148,11 @@ function logTaskEvent(
     before: before ? JSON.stringify(before) : null,
     after: after ? JSON.stringify(after) : null,
   }).returning().all();
+
+  if (source === 'user') {
+    pushUserUndoEvent(created.id);
+  }
+
   return created;
 }
 
@@ -229,8 +299,8 @@ export function clearStaleTodayFlags(): number {
     .returning()
     .all();
 
-  if (result.length > 0) {
-    emitTaskChange();
+  for (const task of result) {
+    emitTaskChange({ taskId: task.id, action: 'update' });
   }
 
   return result.length;
@@ -275,7 +345,7 @@ export type UndoTaskEventResult = {
 
 export function undoTaskEvent(
   eventId: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): UndoTaskEventResult {
   const db = getDb();
   const [targetEvent] = db
@@ -312,7 +382,7 @@ export function undoTaskEvent(
       null,
     );
 
-    emitTaskChange();
+    emitTaskChange({ taskId: targetEvent.taskId, action: 'delete' });
     return {
       undone: true,
       targetTaskId: targetEvent.taskId,
@@ -344,7 +414,10 @@ export function undoTaskEvent(
       restored,
     );
 
-    emitTaskChange();
+    // Also restore grouped child events (e.g., cascade delete) so undo is atomic.
+    undoGroupedChildEvents(eventId, source);
+
+    emitTaskChange({ taskId: targetEvent.taskId, action: 'create' });
     return {
       undone: true,
       targetTaskId: targetEvent.taskId,
@@ -375,7 +448,10 @@ export function undoTaskEvent(
     restored,
   );
 
-  emitTaskChange();
+  // Also restore grouped child events (e.g., completeChildren) so undo is atomic.
+  undoGroupedChildEvents(eventId, source);
+
+  emitTaskChange({ taskId: targetEvent.taskId, action: 'update' });
   return {
     undone: true,
     targetTaskId: targetEvent.taskId,
@@ -386,7 +462,7 @@ export function undoTaskEvent(
 }
 
 export function undoLastAiTaskEvent(
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): UndoTaskEventResult | null {
   const latestAiEvent = getLastAiTaskEvent();
   if (!latestAiEvent) {
@@ -396,16 +472,42 @@ export function undoLastAiTaskEvent(
   return undoTaskEvent(latestAiEvent.id, source);
 }
 
+export function undoLastUserTaskEvent(): UndoTaskEventResult | null {
+  const eventId = popUserUndoEvent();
+  if (!eventId) {
+    return null;
+  }
+
+  return undoTaskEvent(eventId, 'undo');
+}
+
 export function createTask(
   input: z.infer<typeof createTaskSchema>,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const validated = createTaskSchema.parse(input);
   const db = getDb();
-  let parentTask: Task | null = null;
-
   if (validated.parentId) {
-    parentTask = assertTopLevelParentExists(db, validated.parentId);
+    assertTopLevelParentExists(db, validated.parentId);
+  }
+
+  // When no order is provided, choose a position automatically:
+  // - Subtasks: append to bottom (max + 1) so new items appear next to the input
+  // - Top-level tasks: prepend to top (min - 1) so they appear first in the list
+  if (validated.order === undefined || validated.order === null) {
+    if (validated.parentId) {
+      const [row] = db
+        .select({ maxOrder: sql<number>`MAX(${tasks.order})` })
+        .from(tasks)
+        .all();
+      validated.order = row?.maxOrder != null ? row.maxOrder + 1 : 0;
+    } else {
+      const [row] = db
+        .select({ minOrder: sql<number>`MIN(${tasks.order})` })
+        .from(tasks)
+        .all();
+      validated.order = row?.minOrder != null ? row.minOrder - 1 : 0;
+    }
   }
 
   const [created] = db
@@ -416,24 +518,13 @@ export function createTask(
 
   logTaskEvent(created.id, 'create', source, null, created);
 
-  if (parentTask && parentTask.status === 'inbox') {
-    const [promotedParent] = db
-      .update(tasks)
-      .set({ status: 'active' })
-      .where(eq(tasks.id, parentTask.id))
-      .returning()
-      .all();
-
-    logTaskEvent(parentTask.id, 'update', source, parentTask, promotedParent);
-  }
-
-  emitTaskChange();
+  emitTaskChange({ taskId: created.id, action: 'create' });
   return created;
 }
 
 export function updateTask(
   input: z.infer<typeof updateTaskSchema>,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const validated = updateTaskSchema.parse(input);
   const { id, ...updates } = validated;
@@ -465,9 +556,6 @@ export function updateTask(
       );
     }
 
-    if (nextParentId !== null && updates.status === undefined && before.status === 'inbox') {
-      updates.status = 'active';
-    }
   }
 
   const [updated] = db
@@ -478,13 +566,13 @@ export function updateTask(
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'update' });
   return updated;
 }
 
 const deleteTaskRecursive = (
   id: string,
-  source: 'user' | 'ai',
+  source: TaskEventSource,
   cascade: boolean,
   visited: Set<string>,
 ): void => {
@@ -537,16 +625,24 @@ const deleteTaskRecursive = (
 
 export function deleteTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
   options?: DeleteTaskOptions,
 ): void {
+  const stackLenBefore = userUndoStack.length;
   deleteTaskRecursive(id, source, options?.cascade === true, new Set<string>());
-  emitTaskChange();
+
+  // Group cascade-deleted child events with the parent for atomic undo.
+  // After cascade, the stack is [parent_event, ...child_events, ...old_events].
+  if (source === 'user') {
+    groupNewUserUndoEvents(stackLenBefore);
+  }
+
+  emitTaskChange({ taskId: id, action: 'delete' });
 }
 
 const completeTaskRecursive = (
   id: string,
-  source: 'user' | 'ai',
+  source: TaskEventSource,
   completeChildren: boolean,
   visited: Set<string>,
 ): Task => {
@@ -596,9 +692,10 @@ export type CompleteTaskResult = {
 
 export function completeTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
   options?: CompleteTaskOptions,
 ): CompleteTaskResult {
+  const stackLenBefore = source === 'user' ? userUndoStack.length : 0;
   const completed = completeTaskRecursive(
     id,
     source,
@@ -606,16 +703,21 @@ export function completeTask(
     new Set<string>(),
   );
 
+  // Group completeChildren descendant events with the parent for atomic undo.
+  if (source === 'user' && options?.completeChildren === true) {
+    groupNewUserUndoEvents(stackLenBefore);
+  }
+
   // Spawn next recurring instance if applicable
   const recurredTask = spawnRecurringInstance(completed, source);
 
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'complete' });
   return { completed, recurredTask };
 }
 
 function spawnRecurringInstance(
   completedTask: Task,
-  source: 'user' | 'ai',
+  source: TaskEventSource,
 ): Task | null {
   if (!completedTask.recurrence) return null;
 
@@ -641,7 +743,7 @@ function spawnRecurringInstance(
   );
 }
 
-export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
+export function toggleToday(id: string, source: TaskEventSource = 'user'): Task {
   const db = getDb();
 
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
@@ -655,7 +757,7 @@ export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'update' });
   return updated;
 }
 
@@ -663,7 +765,7 @@ export function toggleToday(id: string, source: 'user' | 'ai' = 'user'): Task {
 
 export function cancelTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const db = getDb();
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
@@ -677,13 +779,13 @@ export function cancelTask(
     .all();
 
   logTaskEvent(id, 'cancel', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'cancel' });
   return updated;
 }
 
 export function reopenTask(
   id: string,
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): Task {
   const db = getDb();
   const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
@@ -702,7 +804,7 @@ export function reopenTask(
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
-  emitTaskChange();
+  emitTaskChange({ taskId: id, action: 'reopen' });
   return updated;
 }
 
@@ -735,7 +837,7 @@ export function ensureDefaultTaskStatusConfig(): void {
 
 export function reorderTasks(
   orderedIds: string[],
-  source: 'user' | 'ai' = 'user',
+  source: TaskEventSource = 'user',
 ): void {
   const validatedIds = reorderTaskIdsSchema.parse(orderedIds);
   const db = getDb();
@@ -793,5 +895,8 @@ export function reorderTasks(
         .run();
     }
   });
-  emitTaskChange();
+  // Reorder is a bulk operation — emit update for the first task to trigger rescan
+  if (validatedIds.length > 0) {
+    emitTaskChange({ taskId: validatedIds[0], action: 'update' });
+  }
 }

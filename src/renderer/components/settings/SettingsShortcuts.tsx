@@ -33,7 +33,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
   {
     key: 'shortcut.quickAdd',
     label: 'Quick add',
-    defaultAccelerator: 'CommandOrControl+Shift+Q',
+    defaultAccelerator: 'CommandOrControl+Shift+A',
     action: 'Open quick add and prefill from clipboard when available.',
   },
 ];
@@ -42,102 +42,48 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
   {
     title: 'App-wide',
     entries: [
-      { keys: 'Cmd/Ctrl + K', action: 'Toggle chat overlay and focus chat input.' },
-      { keys: 'Cmd/Ctrl + F', action: 'Open or close Search.' },
-      { keys: 'Cmd/Ctrl + N', action: 'Create a new task.' },
-      { keys: 'Cmd/Ctrl + Shift + N', action: 'Create a new note and open it.' },
-      {
-        keys: 'Cmd/Ctrl + Z',
-        action: 'Undo the last assistant action.',
-        context: 'Only when chat overlay is open and you are not typing in an input.',
-      },
-      {
-        keys: 'Escape',
-        action: 'Layered dismiss: search → notes editor back-to-list → clear chat input → leave settings → close chat overlay.',
-      },
-      { keys: 'Cmd/Ctrl + 1', action: 'Go to Today view.' },
-      { keys: 'Cmd/Ctrl + 2', action: 'Go to Tasks view.' },
-      { keys: 'Cmd/Ctrl + 3', action: 'Go to Inbox view.' },
-      { keys: 'Cmd/Ctrl + 4', action: 'Go to Notes view.' },
-      { keys: 'Cmd/Ctrl + ,', action: 'Open Settings view.' },
-      { keys: 'Cmd/Ctrl + Shift + L', action: 'Toggle light/dark theme.' },
+      { keys: '⌘ K', action: 'Toggle chat overlay' },
+      { keys: '⌘ F', action: 'Search' },
+      { keys: '⌘ N', action: 'New task (or note in Notes view)' },
+      { keys: '⌘ ⇧ N', action: 'New note' },
+      { keys: '⌘ 1', action: 'Today view' },
+      { keys: '⌘ 2', action: 'Tasks view' },
+      { keys: '⌘ 3', action: 'Inbox view' },
+      { keys: '⌘ 4', action: 'Notes view' },
+      { keys: '⌘ ,', action: 'Settings' },
+      { keys: '⌘ ⇧ L', action: 'Toggle theme' },
+      { keys: '⌘ Z', action: 'Undo assistant action', context: 'When chat is open' },
+      { keys: 'Escape', action: 'Dismiss current layer (search, input, overlay)' },
     ],
   },
   {
-    title: 'Notes',
+    title: 'Notes editor',
     entries: [
-      {
-        keys: 'Cmd/Ctrl + Enter',
-        action: 'Process active note with AI.',
-        context: 'Only in Notes editor.',
-      },
-      {
-        keys: 'Cmd/Ctrl + Shift + A',
-        action: 'Archive active note.',
-        context: 'Only in Notes editor.',
-      },
-      {
-        keys: 'Alt + Arrow Up / Arrow Down',
-        action: 'Open previous or next active note.',
-        context: 'Only in Notes editor.',
-      },
-      {
-        keys: 'Escape',
-        action: 'Return from note editor to notes list.',
-        context: 'Only in Notes editor while chat overlay is peeked.',
-      },
-      {
-        keys: 'Arrow Up / Arrow Down',
-        action: 'Move selected note up or down in the list.',
-        context: 'When notes list is focused.',
-      },
-      {
-        keys: 'Enter',
-        action: 'Open the currently selected note.',
-        context: 'When notes list is focused.',
-      },
+      { keys: '⌘ Enter', action: 'Process with AI' },
+      { keys: '⌘ ⌫', action: 'Archive' },
+      { keys: '⌥ ↑ / ↓', action: 'Prev/next note' },
     ],
   },
   {
-    title: 'Task list',
+    title: 'Task list (when focused)',
     entries: [
-      { keys: 'Arrow Up / Arrow Down', action: 'Move focus between tasks.' },
-      { keys: 'Enter', action: 'Expand or collapse focused task.' },
-      { keys: 'Space', action: 'Toggle complete or reopen focused task.' },
-      { keys: 'T', action: 'Toggle Today flag on focused task.' },
-      { keys: 'P', action: 'Cycle focused task priority.' },
-      { keys: 'S', action: 'Cycle focused task status.' },
-      { keys: 'E', action: 'Edit focused task title.' },
-      { keys: 'Escape', action: 'Collapse expanded task, then blur list focus.' },
-    ],
-  },
-  {
-    title: 'Search modal',
-    entries: [
-      { keys: 'Arrow Up / Arrow Down', action: 'Move selected result.' },
-      { keys: 'Enter', action: 'Open the selected result.' },
-      { keys: 'Escape', action: 'Close Search.' },
-    ],
-  },
-  {
-    title: 'Input actions',
-    entries: [
-      { keys: 'Enter', action: 'Send chat message from chat input.' },
-      { keys: 'Shift + Enter', action: 'Insert newline in chat input.' },
-      { keys: 'Enter', action: 'Submit inline task input.' },
-      { keys: 'Escape', action: 'Cancel inline task input.' },
-      { keys: 'Enter', action: 'Save task title/client inline edits.' },
-      { keys: 'Escape', action: 'Cancel task title/client inline edits.' },
+      { keys: '↑ / ↓', action: 'Navigate' },
+      { keys: 'Enter', action: 'Expand' },
+      { keys: 'Space', action: 'Complete' },
+      { keys: 'T', action: 'Today flag' },
+      { keys: 'P', action: 'Cycle priority' },
+      { keys: 'S', action: 'Cycle status' },
+      { keys: 'E', action: 'Edit title' },
     ],
   },
 ];
 
 const formatAccelerator = (value: string): string =>
   value
-    .replace(/CommandOrControl/g, 'Cmd/Ctrl')
-    .replace(/Command/g, 'Cmd')
-    .replace(/Control/g, 'Ctrl')
-    .replace(/\+/g, ' + ');
+    .replace(/CommandOrControl/g, '⌘')
+    .replace(/Command/g, '⌘')
+    .replace(/Control/g, '⌘')
+    .replace(/\+/g, ' ');
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift']);
 
@@ -254,7 +200,7 @@ const ShortcutRecorder = ({
 
       const accelerator = keyEventToAccelerator(event);
       if (!accelerator) {
-        setError('Include at least one modifier (Cmd, Ctrl, Alt, or Shift).');
+        setError('Include at least one modifier (⌘, ⌥, or ⇧).');
         return;
       }
 
@@ -300,7 +246,7 @@ const ShortcutRecorder = ({
           {pending ? formatAccelerator(pending) : 'Press a shortcut\u2026'}
         </div>
         {error ? (
-          <span className="text-[10px] text-destructive">{error}</span>
+          <span role="alert" className="text-[10px] text-destructive">{error}</span>
         ) : null}
         {pending ? (
           <button
@@ -355,6 +301,7 @@ type SettingsShortcutsProps = {
 
 export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
   const [resolvedShortcuts, setResolvedShortcuts] = useState<Record<string, string>>({});
+  const [registrationStatus, setRegistrationStatus] = useState<Record<string, boolean>>({});
   const [isLoadingShortcuts, setIsLoadingShortcuts] = useState(false);
 
   const loadShortcuts = useCallback(async () => {
@@ -368,6 +315,8 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
           stored && stored.trim().length > 0 ? stored : entry.defaultAccelerator;
       }
       setResolvedShortcuts(resolved);
+      const status = await getUntask().shortcuts.getRegistrationStatus();
+      setRegistrationStatus(status.status);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load shortcuts.');
     } finally {
@@ -386,6 +335,8 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
         await getUntask().settings.set(key, accelerator);
         await getUntask().shortcuts.reRegister();
         setResolvedShortcuts((prev) => ({ ...prev, [key]: accelerator }));
+        const status = await getUntask().shortcuts.getRegistrationStatus();
+        setRegistrationStatus(status.status);
       } catch (saveError) {
         setError(saveError instanceof Error ? saveError.message : 'Failed to save shortcut.');
       }
@@ -406,19 +357,27 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
       <SettingsSection title="Global (system)">
         {GLOBAL_SHORTCUT_SETTINGS.map((entry) => {
           const activeValue = resolvedShortcuts[entry.key] ?? entry.defaultAccelerator;
+          const isRegistered = registrationStatus[entry.key] ?? true;
           return (
             <SettingsRow
               key={entry.key}
               label={entry.label}
               hint={entry.action}
             >
-              <ShortcutRecorder
-                settingKey={entry.key}
-                currentAccelerator={activeValue}
-                defaultAccelerator={entry.defaultAccelerator}
-                allResolvedShortcuts={resolvedShortcuts}
-                onSave={(key, acc) => void handleSaveShortcut(key, acc)}
-              />
+              <div className="flex flex-col gap-0.5">
+                <ShortcutRecorder
+                  settingKey={entry.key}
+                  currentAccelerator={activeValue}
+                  defaultAccelerator={entry.defaultAccelerator}
+                  allResolvedShortcuts={resolvedShortcuts}
+                  onSave={(key, acc) => void handleSaveShortcut(key, acc)}
+                />
+                {!isRegistered && (
+                  <span className="text-[11px] text-destructive">
+                    Shortcut may conflict with system or another app
+                  </span>
+                )}
+              </div>
             </SettingsRow>
           );
         })}

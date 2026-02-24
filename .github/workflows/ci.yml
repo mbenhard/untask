@@ -19,5 +19,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install
+        env:
+          SKIP_ELECTRON_REBUILD: "1"
       - run: pnpm typecheck
       - run: pnpm test

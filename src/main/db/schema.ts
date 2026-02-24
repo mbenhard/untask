@@ -34,6 +34,7 @@ export const tasks = sqliteTable(
     }).default('unknown'),
     recurrence: text('recurrence'),
     recurrenceSourceId: text('recurrence_source_id'),
+    reminderOffset: text('reminder_offset').default('at_due'),
     order: integer('order').default(0),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     completedAt: text('completed_at'),
@@ -59,6 +60,7 @@ export const notes = sqliteTable(
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
+    isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     updatedAt: text('updated_at'),
   },
@@ -128,7 +130,7 @@ export const taskEvents = sqliteTable(
     }).notNull(),
     before: text('before'),
     after: text('after'),
-    source: text('source', { enum: ['user', 'ai'] }).notNull(),
+    source: text('source', { enum: ['user', 'ai', 'undo'] }).notNull(),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
   },
   (table) => [
@@ -168,6 +170,22 @@ export const aiJournalArchive = sqliteTable(
   (table) => [
     index('ai_journal_archive_created_at_idx').on(table.createdAt),
     index('ai_journal_archive_archived_at_idx').on(table.archivedAt),
+  ],
+);
+
+// ─── reminders_mapping ─────────────────────────────────────
+export const remindersMappings = sqliteTable(
+  'reminders_mapping',
+  {
+    taskId: text('task_id').primaryKey(),
+    reminderId: text('reminder_id').notNull(),
+    externalId: text('external_id'),
+    lastSyncedAt: text('last_synced_at'),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index('idx_reminders_mapping_reminder_id').on(table.reminderId),
+    index('idx_reminders_mapping_external_id').on(table.externalId),
   ],
 );
 
@@ -220,3 +238,6 @@ export type NewAiJournalArchive = typeof aiJournalArchive.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type MemoryEvent = typeof memoryEvents.$inferSelect;
 export type NewMemoryEvent = typeof memoryEvents.$inferInsert;
+
+export type RemindersMapping = typeof remindersMappings.$inferSelect;
+export type NewRemindersMapping = typeof remindersMappings.$inferInsert;

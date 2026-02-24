@@ -1,6 +1,6 @@
-export type SansFontId = 'geist' | 'inter' | 'ibm-plex-sans';
-export type MonoFontId = 'geist-mono' | 'jetbrains-mono' | 'ibm-plex-mono';
-export type TypographyPresetId = 'balanced' | 'classic' | 'plex';
+export type SansFontId = 'geist' | 'inter' | 'ibm-plex-sans' | 'dm-sans' | 'manrope';
+export type MonoFontId = 'geist-mono' | 'jetbrains-mono' | 'ibm-plex-mono' | 'fira-code';
+export type TypographyPresetId = 'balanced' | 'warm' | 'focus';
 
 type SansFontOption = {
   id: SansFontId;
@@ -47,6 +47,18 @@ const SANS_FONT_CATALOG: Record<SansFontId, SansFontOption> = {
     stack:
       '"IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
+  'dm-sans': {
+    id: 'dm-sans',
+    label: 'DM Sans',
+    stack:
+      '"DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+  manrope: {
+    id: 'manrope',
+    label: 'Manrope',
+    stack:
+      '"Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
 };
 
 const MONO_FONT_CATALOG: Record<MonoFontId, MonoFontOption> = {
@@ -65,6 +77,11 @@ const MONO_FONT_CATALOG: Record<MonoFontId, MonoFontOption> = {
     label: 'IBM Plex Mono',
     stack: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   },
+  'fira-code': {
+    id: 'fira-code',
+    label: 'Fira Code',
+    stack: '"Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace',
+  },
 };
 
 export const SANS_FONT_OPTIONS: ReadonlyArray<SansFontOption> = Object.values(
@@ -79,14 +96,14 @@ export const TYPOGRAPHY_PRESET_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { id: 'balanced', label: 'Balanced' },
-  { id: 'classic', label: 'Classic' },
-  { id: 'plex', label: 'Plex' },
+  { id: 'warm', label: 'Warm' },
+  { id: 'focus', label: 'Focus' },
 ];
 
 const TYPOGRAPHY_PRESETS: Record<TypographyPresetId, TypographySelection> = {
   balanced: { sansId: 'geist', monoId: 'geist-mono' },
-  classic: { sansId: 'inter', monoId: 'jetbrains-mono' },
-  plex: { sansId: 'ibm-plex-sans', monoId: 'ibm-plex-mono' },
+  warm: { sansId: 'dm-sans', monoId: 'ibm-plex-mono' },
+  focus: { sansId: 'manrope', monoId: 'fira-code' },
 };
 
 const hasOwnKey = <T extends object>(value: T, key: PropertyKey): key is keyof T =>

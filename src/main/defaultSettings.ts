@@ -22,17 +22,27 @@ export const SETTING_KEY_APP_BOOTSTRAP_COMPLETED = 'app.bootstrap_completed' as 
 export const SETTING_KEY_APP_LAUNCH_AT_LOGIN = 'app.launchAtLogin' as const;
 export const SETTING_KEY_AI_ENABLED = 'ai.enabled' as const;
 export const SETTING_KEY_AI_SHOW_ALL_MODELS = 'ai_show_all_models' as const;
+export const SETTING_KEY_USER_ROLE = 'user.role' as const;
+export const SETTING_KEY_COMMUNICATION_STYLE = 'communication.style' as const;
+export const SETTING_KEY_USER_FOCUS = 'user.focus' as const;
+export const SETTING_KEY_REMINDERS_SYNC_ENABLED = 'reminders.sync_enabled' as const;
+export const SETTING_KEY_REMINDERS_LIST_ID = 'reminders.list_id' as const;
+export const SETTING_KEY_REMINDERS_SYNC_FILTER = 'reminders.sync_filter' as const;
+export const SETTING_KEY_REMINDERS_IMPORT_ENABLED = 'reminders.import_enabled' as const;
+export const SETTING_KEY_NOTIFICATIONS_ENABLED = 'notifications.enabled' as const;
+export const SETTING_KEY_NOTIFICATIONS_DEFAULT_OFFSET = 'notifications.default_offset' as const;
+export const SETTING_KEY_NOTIFICATIONS_SOUND = 'notifications.sound' as const;
 
 // ─── Default values ───────────────────────────────────────────────────────────
 // Single source of truth for all persisted setting defaults.
 //
-// Note: `ai_identity` default is `SEED_IDENTITY_DOCUMENT` defined in
-// `ai/memory.ts`. It is a complex multi-line string that belongs there; its
-// entry below is intentionally an empty string to signal "use the seed document
-// at runtime". The `getIdentity()` accessor in memory.ts handles the fallback.
+// Note: `ai_identity` default is built by `buildSeedIdentityDocument()` in
+// `ai/memory.ts`, personalized with the user's name. The entry below is
+// intentionally empty to signal "use the seed at runtime". The `getIdentity()`
+// accessor in memory.ts handles the fallback.
 
 export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
-  [SETTING_KEY_AI_MODEL]: 'openai/gpt-4o-mini',
+  [SETTING_KEY_AI_MODEL]: 'openai/gpt-5-mini',
   [SETTING_KEY_AI_IDENTITY]: '',
   [SETTING_KEY_AI_MEMORY]: '',
   [SETTING_KEY_AI_AUTONOMY_MODE]: 'auto',
@@ -52,4 +62,10 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_APP_LAUNCH_AT_LOGIN]: 'false',
   [SETTING_KEY_AI_ENABLED]: 'true',
   [SETTING_KEY_AI_SHOW_ALL_MODELS]: 'false',
+  [SETTING_KEY_REMINDERS_SYNC_ENABLED]: 'false',
+  [SETTING_KEY_REMINDERS_SYNC_FILTER]: 'due_date_only',
+  [SETTING_KEY_REMINDERS_IMPORT_ENABLED]: 'true',
+  [SETTING_KEY_NOTIFICATIONS_ENABLED]: 'true',
+  [SETTING_KEY_NOTIFICATIONS_DEFAULT_OFFSET]: 'at_due',
+  [SETTING_KEY_NOTIFICATIONS_SOUND]: 'true',
 };

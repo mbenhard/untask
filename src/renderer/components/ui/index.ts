@@ -3,6 +3,7 @@ export { Calendar } from './calendar';
 export { Input } from './input';
 export { Popover, PopoverContent } from './popover';
 export { Textarea } from './textarea';
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 export {
   Card,
   CardHeader,

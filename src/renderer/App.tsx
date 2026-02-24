@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 
 import { AppShell } from './components/layout/AppShell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { TooltipProvider } from './components/ui/tooltip';
+import { useAppStore } from './stores/appStore';
 
 type AppErrorBoundaryState = {
   error: Error | null;
@@ -44,8 +46,13 @@ class AppErrorBoundary extends React.Component<
 
 type BootstrapStatus = 'loading' | 'onboarding' | 'ready';
 
+const BOOTSTRAP_DONE_KEY = 'untask-bootstrap-done';
+
 const AppRoot = () => {
-  const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('loading');
+  const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>(() =>
+    localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1' ? 'ready' : 'loading',
+  );
+  const setAiEnabled = useAppStore((state) => state.setAiEnabled);
 
   useEffect(() => {
     const untask = window.untask;
@@ -55,16 +62,32 @@ const AppRoot = () => {
       return;
     }
 
+    // Load AI enabled setting (runs even when bootstrap is cached)
+    untask.settings
+      .getAiEnabled()
+      .then((result) => setAiEnabled(result.enabled))
+      .catch(() => setAiEnabled(true));
+
+    // Skip IPC round-trip if we already know onboarding completed
+    if (localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1') {
+      return;
+    }
+
     untask.settings
       .getBootstrapCompleted()
       .then((result) => {
-        setBootstrapStatus(result.completed ? 'ready' : 'onboarding');
+        if (result.completed) {
+          localStorage.setItem(BOOTSTRAP_DONE_KEY, '1');
+          setBootstrapStatus('ready');
+        } else {
+          setBootstrapStatus('onboarding');
+        }
       })
       .catch(() => {
         // On error, skip onboarding to avoid blocking the app
         setBootstrapStatus('ready');
       });
-  }, []);
+  }, [setAiEnabled]);
 
   if (bootstrapStatus === 'loading') {
     return null;
@@ -73,7 +96,20 @@ const AppRoot = () => {
   if (bootstrapStatus === 'onboarding') {
     return (
       <OnboardingFlow
-        onComplete={() => setBootstrapStatus('ready')}
+        onComplete={async () => {
+          // Sync AI enabled setting from onboarding to store
+          try {
+            const untask = window.untask;
+            if (untask) {
+              const aiEnabledResult = await untask.settings.getAiEnabled();
+              setAiEnabled(aiEnabledResult.enabled);
+            }
+          } catch {
+            // Use default if loading fails
+          }
+          localStorage.setItem(BOOTSTRAP_DONE_KEY, '1');
+          setBootstrapStatus('ready');
+        }}
       />
     );
   }
@@ -83,7 +119,9 @@ const AppRoot = () => {
 
 const App = () => (
   <AppErrorBoundary>
-    <AppRoot />
+    <TooltipProvider delayDuration={75}>
+      <AppRoot />
+    </TooltipProvider>
   </AppErrorBoundary>
 );
 

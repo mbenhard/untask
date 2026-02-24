@@ -7,6 +7,7 @@ import remarkBreaks from 'remark-breaks';
 
 import type { ChipAction, TurnStep } from '../../../types/chat';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
 import { BirdMascot } from './BirdMascot';
 
 const AvatarIcon = ({ size, className }: { size: number; className?: string }) => (
@@ -31,10 +32,11 @@ import {
   selectChatIsSending,
   selectChatLastStreamError,
   selectChatMessages,
+  selectChatSelectedModelId,
   selectFocusMessageId,
   selectPendingNoteContext,
   useChatStore,
-} from '../../stores/chatStore';
+} from '../../stores/chat';
 import { Button } from '../ui/button';
 
 const formatTimestamp = (createdAt: string | null): string => {
@@ -56,15 +58,15 @@ const formatTimestamp = (createdAt: string | null): string => {
 const toolStatusIcon = (status: string) => {
   switch (status) {
     case 'running':
-      return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+      return <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden="true" />;
     case 'success':
-      return <Check className="size-3 text-emerald-400" />;
+      return <Check className="size-3 text-emerald-400" aria-hidden="true" />;
     case 'error':
-      return <X className="size-3 text-destructive" />;
+      return <X className="size-3 text-destructive" aria-hidden="true" />;
     case 'confirmation_required':
-      return <AlertTriangle className="size-3 text-amber-400" />;
+      return <AlertTriangle className="size-3 text-amber-400" aria-hidden="true" />;
     default:
-      return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+      return <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden="true" />;
   }
 };
 
@@ -83,6 +85,7 @@ const ThinkingStep = ({ content }: ThinkingStepProps) => {
         className="flex items-center gap-1 text-muted-foreground/30 hover:text-muted-foreground/50 transition-colors"
       >
         <ChevronRight
+          aria-hidden="true"
           className={cn(
             'size-2.5 transition-transform duration-150',
             expanded && 'rotate-90',
@@ -159,9 +162,9 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
     <div className={cn(
       'flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs',
       step.status === 'error' ? 'border-destructive/30 bg-destructive/5' :
-      (step.status === 'confirmation_required' && !resolving) ? 'border-border/60 bg-card/40' :
-      isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
-      'border-border/60 bg-card/40',
+        (step.status === 'confirmation_required' && !resolving) ? 'border-border/60 bg-card/40' :
+          isUndone ? 'border-muted-foreground/20 bg-muted/10 opacity-60' :
+            'border-border/60 bg-card/40',
     )}>
       <div className="mt-0.5 shrink-0">
         {toolStatusIcon(isUndone ? 'success' : resolving ? 'success' : step.status)}
@@ -193,7 +196,7 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
                 }
               }}
             >
-              <Check className="size-3" />
+              <Check className="size-3" aria-hidden="true" />
               Approve
             </Button>
             <Button
@@ -207,14 +210,14 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
                 }
               }}
             >
-              <X className="size-3" />
+              <X className="size-3" aria-hidden="true" />
             </Button>
           </>
         ) : null}
 
         {showApprovedBadge ? (
           <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
-            <Check className="size-2.5" />
+            <Check className="size-2.5" aria-hidden="true" />
             Approved
           </span>
         ) : null}
@@ -233,7 +236,7 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
             onClick={() => onUndo(card.taskEventId)}
             className="shrink-0"
           >
-            <Undo2 className="size-3" />
+            <Undo2 className="size-3" aria-hidden="true" />
             Undo
           </Button>
         ) : null}
@@ -244,21 +247,50 @@ const ToolStep = ({ step, onUndo, onApprove, onReject }: ToolStepProps) => {
 
 type StreamingIndicatorProps = {
   prefersReducedMotion: boolean;
+  phase?: 'sending' | 'thinking';
+  isOllama?: boolean;
 };
 
-const StreamingIndicator = ({ prefersReducedMotion }: StreamingIndicatorProps) => (
-  <div className="py-0.5 pl-1" role="status" aria-label="Untask is thinking">
-    <span
-      className={cn(
-        'font-mono text-[11px] tracking-normal',
-        prefersReducedMotion ? 'text-muted-foreground/40' : 'thinking-shimmer',
-      )}
-    >
-      Thinking&hellip;
-    </span>
-    <span className="sr-only">Untask is thinking</span>
-  </div>
-);
+const StreamingIndicator = ({ prefersReducedMotion, phase, isOllama }: StreamingIndicatorProps) => {
+  const [showLoadingModel, setShowLoadingModel] = useState(false);
+
+  useEffect(() => {
+    if (phase !== 'sending' || !isOllama) {
+      setShowLoadingModel(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setShowLoadingModel(true), 2000);
+    return () => clearTimeout(timer);
+  }, [phase, isOllama]);
+
+  let label: string;
+  let ariaLabel: string;
+  if (phase === 'sending' && showLoadingModel) {
+    label = 'Loading model\u2026';
+    ariaLabel = 'Loading model';
+  } else if (phase === 'sending') {
+    label = 'Sending\u2026';
+    ariaLabel = 'Sending message';
+  } else {
+    label = 'Thinking\u2026';
+    ariaLabel = 'Untask is thinking';
+  }
+
+  return (
+    <div className="py-0.5 pl-1" role="status" aria-label={ariaLabel}>
+      <span
+        className={cn(
+          'font-mono text-[11px] tracking-normal',
+          prefersReducedMotion ? 'text-muted-foreground/40' : 'thinking-shimmer',
+        )}
+      >
+        {label}
+      </span>
+      <span className="sr-only">{ariaLabel}</span>
+    </div>
+  );
+};
 
 type ChipBarProps = {
   chips: ChipAction[];
@@ -335,6 +367,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const lastStreamError = useChatStore(selectChatLastStreamError);
   const focusMessageId = useChatStore(selectFocusMessageId);
   const pendingNoteContext = useChatStore(selectPendingNoteContext);
+  const selectedModelId = useChatStore(selectChatSelectedModelId);
 
   const undoAction = useChatStore((state) => state.undoAction);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
@@ -371,6 +404,72 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
     scrollToBottom();
   }, [scrollToBottom]);
 
+  const [isOllama, setIsOllama] = useState(false);
+
+  // Refresh selected model when provider changes (handles switching from OpenRouter to Ollama)
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshModel = async () => {
+      try {
+        const selected = await getUntask().chat.getSelectedModel();
+        if (cancelled) return;
+        if (selected?.modelId) {
+          useChatStore.setState({ selectedModelId: selected.modelId });
+        }
+      } catch {
+        // Best-effort refresh
+      }
+    };
+
+    void refreshModel();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Preload Ollama model when chat view opens (eliminates cold-start latency)
+  useEffect(() => {
+    if (!selectedModelId) return;
+
+    let cancelled = false;
+
+    const maybeWarmup = async () => {
+      try {
+        const provider = await getUntask().settings.get('ai_provider');
+        if (cancelled) return;
+        const ollamaProvider = provider === 'ollama';
+        setIsOllama(ollamaProvider);
+        if (!ollamaProvider) return;
+
+        // Validate model exists in Ollama before warming up
+        const ollamaStatus = await getUntask().chat.getOllamaStatus();
+        if (cancelled) return;
+
+        const availableModels = ollamaStatus.models.map((m) => m.name);
+        const modelExists = availableModels.some(
+          (name) => name === selectedModelId || name.startsWith(`${selectedModelId}:`),
+        );
+
+        if (!modelExists) {
+          console.log(`[ollama-warmup] skip: model=${selectedModelId} not found in Ollama`);
+          return;
+        }
+
+        void getUntask().chat.warmupOllama({ modelId: selectedModelId });
+      } catch {
+        // Warmup is best-effort — don't surface errors
+      }
+    };
+
+    void maybeWarmup();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModelId]);
+
   // Auto-scroll when messages change (new messages or streaming tokens)
   useEffect(() => {
     if (isNearBottomRef.current) {
@@ -403,42 +502,12 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
     clearFocusMessageId();
   }, [focusMessageId, messages, prefersReducedMotion, clearFocusMessageId]);
 
-  const [confirmationTarget, setConfirmationTarget] = useState<{
-    actionId: string;
-    rationale: string;
-    riskLevel: string;
-  } | null>(null);
-
   const handleApprove = useCallback(
     (actionId: string) => {
-      const card = messages
-        .flatMap((m) => m.actionCards)
-        .find((c) => c.actionId === actionId);
-
-      if (card?.riskLevel === 'high' || card?.riskLevel === 'critical') {
-        // Use task title and action detail for human-readable rationale
-        const readableRationale = card.title
-          ? card.title
-          : card.detail ?? 'This action requires confirmation.';
-        setConfirmationTarget({
-          actionId,
-          rationale: readableRationale,
-          riskLevel: card.riskLevel,
-        });
-        return;
-      }
-
       void approvePendingAction(actionId);
     },
-    [messages, approvePendingAction],
+    [approvePendingAction],
   );
-
-  const handleConfirmApprove = useCallback(() => {
-    if (confirmationTarget) {
-      void approvePendingAction(confirmationTarget.actionId);
-      setConfirmationTarget(null);
-    }
-  }, [confirmationTarget, approvePendingAction]);
 
   const sendMessage = useChatStore((state) => state.sendMessage);
   const triggerNotePrompt = useCallback(
@@ -467,7 +536,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
       const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
       const lastAssistantMessageId = [...messages].reverse().find((m) => m.role === 'assistant')?.id ?? null;
 
-      return messages.map((message, _messageIndex) => {
+      return messages.map((message) => {
         const isAssistant = message.role === 'assistant';
         const timestamp = formatTimestamp(message.createdAt);
         const hasSteps = isAssistant && message.steps.length > 0;
@@ -502,95 +571,95 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             {isAssistant && hasSteps ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
                 <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                {message.steps.map((step, index) => {
-                  if (step.kind === 'thinking') {
-                    // Only show reasoning disclosure after streaming is done
-                    if (message.isStreaming) return null;
-                    return (
-                      <ThinkingStep
-                        key={`thinking-${index}`}
-                        content={step.content}
-                      />
-                    );
-                  }
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  {message.steps.map((step, index) => {
+                    if (step.kind === 'thinking') {
+                      // Only show reasoning disclosure after streaming is done
+                      if (message.isStreaming) return null;
+                      return (
+                        <ThinkingStep
+                          key={`thinking-${index}`}
+                          content={step.content}
+                        />
+                      );
+                    }
 
-                  if (step.kind === 'text') {
-                    return (
-                      <div
-                        key={`text-${index}`}
-                        className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm"
-                      >
-                        <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                          <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
+                    if (step.kind === 'text') {
+                      return (
+                        <div
+                          key={`text-${index}`}
+                          className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm"
+                        >
+                          <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  }
+                      );
+                    }
 
-                  if (step.kind === 'tool') {
-                    // Hide emit_chips and read-only tool steps
-                    if (step.toolName === 'emit_chips') return null;
-                    if (!isVisibleToolStep(step)) return null;
+                    if (step.kind === 'tool') {
+                      // Hide emit_chips and read-only tool steps
+                      if (step.toolName === 'emit_chips') return null;
+                      if (!isVisibleToolStep(step)) return null;
 
-                    return (
-                      <ToolStep
-                        key={step.toolCallId || `tool-${index}`}
-                        step={step}
-                        onUndo={(taskEventId) => {
-                          void undoAction(taskEventId);
-                        }}
-                        onApprove={handleApprove}
-                        onReject={(actionId) => {
-                          void rejectPendingAction(actionId);
-                        }}
-                      />
-                    );
-                  }
+                      return (
+                        <ToolStep
+                          key={step.toolCallId || `tool-${index}`}
+                          step={step}
+                          onUndo={(taskEventId) => {
+                            void undoAction(taskEventId);
+                          }}
+                          onApprove={handleApprove}
+                          onReject={(actionId) => {
+                            void rejectPendingAction(actionId);
+                          }}
+                        />
+                      );
+                    }
 
-                  return null;
-                })}
+                    return null;
+                  })}
 
-                {Boolean(message.isStreaming) && (
-                  <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
-                )}
+                  {Boolean(message.isStreaming) && (
+                    <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
+                  )}
 
-                {message.chips && message.chips.length > 0 ? (
-                  <ChipBar
-                    chips={message.chips}
-                    disabled={message.id !== lastAssistantMessageId || isSending}
-                    onChipClick={(chip) => handleChipClick(message.id, chip)}
-                  />
-                ) : null}
-              </div>
+                  {message.chips && message.chips.length > 0 ? (
+                    <ChipBar
+                      chips={message.chips}
+                      disabled={message.id !== lastAssistantMessageId || isSending}
+                      onChipClick={(chip) => handleChipClick(message.id, chip)}
+                    />
+                  ) : null}
+                </div>
               </div>
             ) : isAssistant && isPendingAssistantPlaceholder ? (
               <div className="flex w-full max-w-[88%] items-center gap-2">
                 <AvatarIcon size={16} className="shrink-0 text-muted-foreground/40" />
-                <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} />
+                <StreamingIndicator prefersReducedMotion={Boolean(prefersReducedMotion)} phase={message.streamPhase} isOllama={isOllama} />
               </div>
             ) : isAssistant ? (
               <div className="flex w-full max-w-[88%] items-start gap-2">
                 <AvatarIcon size={16} className="mt-0.5 shrink-0 text-muted-foreground/40" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div
-                  className={cn(
-                    'rounded-xl border px-3 py-2 text-sm',
-                    'border-border bg-card/80 text-foreground',
-                  )}
-                >
-                  <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                    <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <div
+                    className={cn(
+                      'rounded-xl border px-3 py-2 text-sm',
+                      'border-border bg-card/80 text-foreground',
+                    )}
+                  >
+                    <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
+                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
+                    </div>
                   </div>
+                  {message.chips && message.chips.length > 0 ? (
+                    <ChipBar
+                      chips={message.chips}
+                      disabled={message.id !== lastAssistantMessageId || isSending}
+                      onChipClick={(chip) => handleChipClick(message.id, chip)}
+                    />
+                  ) : null}
                 </div>
-                {message.chips && message.chips.length > 0 ? (
-                  <ChipBar
-                    chips={message.chips}
-                    disabled={message.id !== lastAssistantMessageId || isSending}
-                    onChipClick={(chip) => handleChipClick(message.id, chip)}
-                  />
-                ) : null}
-              </div>
               </div>
             ) : (
               <div className="max-w-[88%] rounded-xl border border-border/70 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
@@ -601,13 +670,16 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
             {/* Image attachment indicator for history messages */}
             {!isAssistant && message.imageCount && message.imageCount > 0 && (
               <span className="flex items-center gap-1 px-1 text-[10px] text-muted-foreground/60">
-                <ImageIcon className="size-2.5" />
+                <ImageIcon className="size-2.5" aria-hidden="true" />
                 {message.imageCount} image{message.imageCount > 1 ? 's' : ''} attached
               </span>
             )}
 
             {timestamp ? (
-              <time className="px-1 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80">
+              <time className={cn(
+                "px-1 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground/80",
+                isAssistant && "ml-6",
+              )}>
                 {timestamp}
               </time>
             ) : null}
@@ -615,13 +687,13 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         );
       });
     },
-    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion],
+    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion, isOllama],
   );
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-3">
       {error ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <div className="min-w-0">
             <p className="truncate">{error}</p>
             {lastStreamError ? (
@@ -695,44 +767,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
 
       </div>
 
-      <AnimatePresence>
-        {confirmationTarget ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0.05 : 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-            aria-describedby="confirm-dialog-desc"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: prefersReducedMotion ? 0.05 : 0.15, ease: 'easeOut' }}
-              className="w-full max-w-xs rounded-xl border border-border bg-card p-4 shadow-lg"
-            >
-              <h3 id="confirm-dialog-title" className="text-sm font-medium text-foreground">
-                Confirm action
-              </h3>
-              <p id="confirm-dialog-desc" className="mt-2 text-sm text-muted-foreground">
-                {confirmationTarget.rationale}
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmationTarget(null)}>
-                  Cancel
-                </Button>
-                <Button type="button" variant="default" size="sm" onClick={handleConfirmApprove}>
-                  Do it
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+
     </div>
   );
 };

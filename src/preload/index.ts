@@ -28,6 +28,7 @@ import {
   type ChatResolvePendingActionResponse,
   type ChatListPendingActionsResponse,
   type ChatFocusMessagePayload,
+  type TaskNavigatePayload,
   IPC_CHANNELS,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -48,11 +49,11 @@ import {
   type BackupImportDialogResponse,
   type BackupListResponse,
   type BackupMetadataPayload,
-  type QuickAddPayload,
   type SearchQueryRequest,
   type SearchQueryResponse,
   type TaskDeleteRequestPayload,
   type TaskCompleteRequestPayload,
+  type TaskUndoResultPayload,
   type SettingsMemoryStatePayload,
   type SettingsMemoryHistoryRequestPayload,
   type SettingsMemoryHistoryResultPayload,
@@ -70,6 +71,17 @@ import {
   type AttachmentSaveRequest,
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
+  type NotificationPermissionResult,
+  type RemindersStatusResult,
+  type RemindersSyncStatusPayload,
+  type RemindersSyncFilter,
+  type ShortcutRegistrationStatusResult,
+  type OllamaStatusResult,
+  type OllamaPullRequest,
+  type OllamaPullResult,
+  type OllamaPullProgressPayload,
+  type OllamaWarmupRequest,
+  type OllamaWarmupResult,
 } from '../types/ipc';
 import type { Task, TaskStatusConfig } from '../types/models';
 import type { UntaskApi } from '../types/preload';
@@ -81,20 +93,6 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_REQUEST_HIDE),
     escapeLayerExit: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_ESCAPE_LAYER_EXIT),
-    onQuickAddPayload: (
-      listener: (payload: QuickAddPayload) => void,
-    ): (() => void) => {
-      const wrapped = (
-        _event: Electron.IpcRendererEvent,
-        payload: QuickAddPayload,
-      ) => listener(payload);
-
-      ipcRenderer.on(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
-
-      return () => {
-        ipcRenderer.removeListener(IPC_CHANNELS.APP_QUICK_ADD_PAYLOAD, wrapped);
-      };
-    },
     onBackupRestored: (listener: () => void): (() => void) => {
       const wrapped = (): void => listener();
 
@@ -116,6 +114,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_DOCK_MODE),
     setDockMode: (mode: DockMode): Promise<DockModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_DOCK_MODE, mode),
+    getVersion: (): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     onMenuNewTask: (listener: () => void): (() => void) => {
       const wrapped = () => listener();
       ipcRenderer.on(IPC_CHANNELS.APP_MENU_NEW_TASK, wrapped);
@@ -134,6 +134,13 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_CHECK_FOR_UPDATES),
     getUpdateInfo: (): Promise<UpdateInfo | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_UPDATE_INFO),
+    onUpdateAvailable: (listener: (info: UpdateInfo) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, info: UpdateInfo) => listener(info);
+      ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_AVAILABLE, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_UPDATE_AVAILABLE, wrapped);
+      };
+    },
   },
 
   getBootstrapState: (): Promise<SettingsBootstrapState> =>
@@ -187,10 +194,33 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_REOPEN, id),
     toggleToday: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_TOGGLE_TODAY, id),
+    onTaskNavigate: (
+      listener: (payload: TaskNavigatePayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: TaskNavigatePayload,
+      ) => listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.TASK_NAVIGATE, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.TASK_NAVIGATE, wrapped);
+      };
+    },
+    onTaskDataChanged: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.TASK_DATA_CHANGED, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.TASK_DATA_CHANGED, wrapped);
+      };
+    },
     getStatuses: (): Promise<TaskStatusConfig> =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_STATUSES),
     setStatuses: (config: TaskStatusConfig): Promise<TaskStatusConfig> =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_SET_STATUSES, config),
+    undoLastUserAction: (): Promise<TaskUndoResultPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_UNDO_LAST_USER_ACTION),
   },
   chat: {
     send: (message: ChatSendRequest): Promise<ChatSendResult> =>
@@ -263,6 +293,26 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_RESOLVE_PENDING_ACTION, payload),
     listPendingActions: (): Promise<ChatListPendingActionsResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.CHAT_LIST_PENDING_ACTIONS),
+    getOllamaStatus: (): Promise<OllamaStatusResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_STATUS),
+    pullOllamaModel: (request: OllamaPullRequest): Promise<OllamaPullResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL, request),
+    cancelOllamaPull: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_PULL_CANCEL),
+    warmupOllama: (request: OllamaWarmupRequest): Promise<OllamaWarmupResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OLLAMA_WARMUP, request),
+    onOllamaPullProgress: (
+      listener: (event: OllamaPullProgressPayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: OllamaPullProgressPayload,
+      ) => listener(payload);
+      ipcRenderer.on(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.OLLAMA_PULL_PROGRESS, wrapped);
+      };
+    },
   },
   backup: {
     list: (): Promise<BackupListResponse> =>
@@ -289,15 +339,21 @@ const untaskApi: UntaskApi = {
   notes: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES_LIST),
     get: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_GET, id),
-    create: (title?: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE, title),
-    save: (id: string, content: string, title?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content, title),
+    create: () => ipcRenderer.invoke(IPC_CHANNELS.NOTES_CREATE),
+    save: (id: string, content: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content),
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
+    restore: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RESTORE, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
+    pin: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_PIN, id),
+    unpin: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_UNPIN, id),
+    duplicate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DUPLICATE, id),
   },
   shortcuts: {
     reRegister: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SHORTCUT_UPDATE),
+    getRegistrationStatus: (): Promise<ShortcutRegistrationStatusResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHORTCUT_GET_REGISTRATION_STATUS),
   },
   settings: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
@@ -357,6 +413,48 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_READ, request),
     pickAndSave: (): Promise<AttachmentPickAndSaveResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE),
+  },
+  notifications: {
+    fireTest: (): Promise<NotificationPermissionResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATIONS_FIRE_TEST),
+    probePermission: (): Promise<NotificationPermissionResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATIONS_PROBE_PERMISSION),
+    openSettings: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOTIFICATIONS_OPEN_SETTINGS),
+  },
+  reminders: {
+    getStatus: (): Promise<RemindersStatusResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_GET_STATUS),
+    toggle: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_TOGGLE, enabled),
+    setFilter: (filter: RemindersSyncFilter): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_SET_FILTER, filter),
+    setImport: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_SET_IMPORT, enabled),
+    requestAccess: (): Promise<{ granted: boolean }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_REQUEST_ACCESS),
+    forceSync: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_FORCE_SYNC),
+    pullOnly: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.REMINDERS_PULL_ONLY),
+    onSyncStatus: (
+      listener: (payload: RemindersSyncStatusPayload) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: RemindersSyncStatusPayload,
+      ) => listener(payload);
+
+      ipcRenderer.on(IPC_CHANNELS.REMINDERS_SYNC_STATUS, wrapped);
+
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.REMINDERS_SYNC_STATUS, wrapped);
+      };
+    },
+  },
+  shell: {
+    openExternal: (url: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_EXTERNAL, url),
   },
 };
 

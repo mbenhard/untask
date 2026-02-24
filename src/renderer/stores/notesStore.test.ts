@@ -1,31 +1,60 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Note } from '../../types/models';
 import { useAppStore } from './appStore';
 import { useChatStore } from './chatStore';
 import { useNotesStore } from './notesStore';
 
-const createMockNotesApi = () => ({
-  list: vi.fn(async () => ({ active: [], archived: [] })),
-  get: vi.fn(async () => undefined),
-  create: vi.fn(async () => ({
-    id: 'note-new',
-    title: 'New note',
-    content: '',
-    status: 'active' as const,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  })),
-  save: vi.fn(async (_id: string, content: string, title?: string) => ({
-    id: 'note-1',
-    title: title ?? 'Note',
-    content,
-    status: 'active' as const,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  })),
-  archive: vi.fn(async () => undefined),
-  delete: vi.fn(async () => undefined),
+const mockNote = (overrides?: Partial<Note>): Note => ({
+  id: 'note-1',
+  title: '',
+  content: '',
+  status: 'active',
+  isPinned: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  ...overrides,
 });
+
+type MockNotesApi = {
+  list: ReturnType<typeof vi.fn<() => Promise<{ active: Note[]; archived: Note[] }>>>;
+  get: ReturnType<typeof vi.fn<(id: string) => Promise<Note | undefined>>>;
+  create: ReturnType<typeof vi.fn<() => Promise<Note>>>;
+  save: ReturnType<typeof vi.fn<(id: string, content: string) => Promise<Note>>>;
+  archive: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  restore: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  delete: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  pin: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  unpin: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  duplicate: ReturnType<typeof vi.fn<(id: string) => Promise<Note | undefined>>>;
+};
+
+const createMockNotesApi = (): MockNotesApi => ({
+  list: vi.fn(async () => ({ active: [] as Note[], archived: [] as Note[] })),
+  get: vi.fn(async (id: string) => {
+    void id;
+    return undefined as Note | undefined;
+  }),
+  create: vi.fn(async () => mockNote({ id: 'note-new' })),
+  save: vi.fn(async (id: string, content: string) => {
+    void id;
+    return mockNote({ content });
+  }),
+  archive: vi.fn(async () => undefined as void),
+  restore: vi.fn(async () => undefined as void),
+  delete: vi.fn(async () => undefined as void),
+  pin: vi.fn(async () => undefined as void),
+  unpin: vi.fn(async () => undefined as void),
+  duplicate: vi.fn(async (id: string) => {
+    void id;
+    return mockNote({ id: 'note-dup' }) as Note | undefined;
+  }),
+});
+
+const getMockApi = (): MockNotesApi =>
+  ((globalThis as { window?: unknown }).window as {
+    untask: { notes: MockNotesApi };
+  }).untask.notes;
 
 describe('notesStore', () => {
   beforeEach(() => {
@@ -58,7 +87,6 @@ describe('notesStore', () => {
       layoutMode: 'list',
       isWideViewport: false,
       activeNoteId: null,
-      activeNoteTitle: '',
       content: '',
       isLegacyMarkdown: false,
       isDirty: false,
@@ -75,7 +103,6 @@ describe('notesStore', () => {
       subView: 'editor',
       layoutMode: 'focus',
       activeNoteId: 'note-1',
-      activeNoteTitle: 'Client call',
       content: JSON.stringify([
         {
           type: 'heading',
@@ -94,7 +121,7 @@ describe('notesStore', () => {
     expect(result).toEqual({ ok: true, reason: 'staged' });
     const noteContext = useChatStore.getState().pendingNoteContext;
     expect(noteContext?.noteId).toBe('note-1');
-    expect(noteContext?.title).toBe('Client call');
+    expect(noteContext?.title).toBe('Kickoff');
     expect(noteContext?.markdown).toContain('## Kickoff');
     expect(noteContext?.markdown).toContain('- Send recap');
     expect(useAppStore.getState().chatOverlayState).toBe('open');
@@ -105,7 +132,6 @@ describe('notesStore', () => {
       subView: 'editor',
       layoutMode: 'focus',
       activeNoteId: 'note-empty',
-      activeNoteTitle: 'Empty note',
       content: '',
     });
 
@@ -116,17 +142,13 @@ describe('notesStore', () => {
   });
 
   it('does not switch notes when flush save fails', async () => {
-    const mockNotesApi = ((globalThis as { window?: unknown }).window as {
-      untask: { notes: ReturnType<typeof createMockNotesApi> };
-    }).untask.notes;
-
+    const mockNotesApi = getMockApi();
     mockNotesApi.save.mockRejectedValueOnce(new Error('save failed'));
 
     useNotesStore.setState({
       subView: 'editor',
       layoutMode: 'focus',
       activeNoteId: 'note-1',
-      activeNoteTitle: 'Draft',
       content: 'new content',
       isDirty: true,
     });
@@ -146,7 +168,6 @@ describe('notesStore', () => {
       layoutMode: 'focus',
       isWideViewport: false,
       activeNoteId: 'note-keep',
-      activeNoteTitle: 'Keep state',
       content: 'draft-content',
       isDirty: true,
     });
@@ -162,5 +183,102 @@ describe('notesStore', () => {
     expect(state.layoutMode).toBe('focus');
     expect(state.content).toBe('draft-content');
     expect(state.isDirty).toBe(true);
+  });
+
+  // ─── Pin / Unpin ──────────────────────────────────────────
+
+  it('pinNote calls IPC and refreshes the list', async () => {
+    const api = getMockApi();
+    api.list.mockResolvedValue({ active: [mockNote({ isPinned: true })], archived: [] });
+
+    await useNotesStore.getState().pinNote('note-1');
+
+    expect(api.pin).toHaveBeenCalledWith('note-1');
+    expect(api.list).toHaveBeenCalled();
+  });
+
+  it('unpinNote calls IPC and refreshes the list', async () => {
+    const api = getMockApi();
+    api.list.mockResolvedValue({ active: [mockNote()], archived: [] });
+
+    await useNotesStore.getState().unpinNote('note-1');
+
+    expect(api.unpin).toHaveBeenCalledWith('note-1');
+    expect(api.list).toHaveBeenCalled();
+  });
+
+  it('pinNote sets error on IPC failure', async () => {
+    const api = getMockApi();
+    api.pin.mockRejectedValueOnce(new Error('pin failed'));
+
+    await useNotesStore.getState().pinNote('note-1');
+
+    expect(useNotesStore.getState().error).toContain('pin failed');
+  });
+
+  // ─── Duplicate ────────────────────────────────────────────
+
+  it('duplicateNote creates copy, refreshes list, and opens the duplicate', async () => {
+    const api = getMockApi();
+    const dup = mockNote({ id: 'note-dup', content: 'dup content' });
+    api.duplicate.mockResolvedValue(dup);
+    api.get.mockResolvedValue(dup);
+    api.list.mockResolvedValue({ active: [dup], archived: [] });
+
+    await useNotesStore.getState().duplicateNote('note-1');
+
+    expect(api.duplicate).toHaveBeenCalledWith('note-1');
+    expect(api.list).toHaveBeenCalled();
+    // Should have opened the duplicate note
+    expect(api.get).toHaveBeenCalledWith('note-dup');
+    expect(useNotesStore.getState().notice?.message).toBe('Note duplicated.');
+  });
+
+  it('duplicateNote sets error on IPC failure', async () => {
+    const api = getMockApi();
+    api.duplicate.mockRejectedValueOnce(new Error('dup failed'));
+
+    await useNotesStore.getState().duplicateNote('note-1');
+
+    expect(useNotesStore.getState().error).toContain('dup failed');
+  });
+
+  // ─── Copy as Markdown ─────────────────────────────────────
+
+  it('copyAsMarkdown fetches note, serializes content, and copies to clipboard', async () => {
+    const api = getMockApi();
+    const note = mockNote({
+      id: 'note-md',
+      content: JSON.stringify([
+        { type: 'heading', props: { level: 1 }, content: [{ type: 'text', text: 'Title' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] },
+      ]),
+    });
+    api.get.mockResolvedValue(note);
+
+    const writeText = vi.fn<(text: string) => Promise<void>>(async () => undefined);
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { clipboard: { writeText } },
+      writable: true,
+      configurable: true,
+    });
+
+    await useNotesStore.getState().copyAsMarkdown('note-md');
+
+    expect(api.get).toHaveBeenCalledWith('note-md');
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const copied = writeText.mock.calls[0][0];
+    expect(copied).toContain('Title');
+    expect(copied).toContain('Body text');
+    expect(useNotesStore.getState().notice?.message).toBe('Copied as Markdown.');
+  });
+
+  it('copyAsMarkdown sets error on failure', async () => {
+    const api = getMockApi();
+    api.get.mockRejectedValueOnce(new Error('fetch failed'));
+
+    await useNotesStore.getState().copyAsMarkdown('note-1');
+
+    expect(useNotesStore.getState().error).toContain('fetch failed');
   });
 });

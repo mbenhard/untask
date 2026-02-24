@@ -48,6 +48,7 @@ vi.mock('../services/notesService', () => ({
     title: 'Test note',
     content: '',
     status: 'active',
+    isPinned: false,
     createdAt: '2026-02-16T00:00:00.000Z',
     updatedAt: '2026-02-16T00:00:00.000Z',
   })),
@@ -56,14 +57,16 @@ vi.mock('../services/notesService', () => ({
     title: 'Test note',
     content,
     status: 'active',
+    isPinned: false,
     createdAt: '2026-02-16T00:00:00.000Z',
     updatedAt: '2026-02-16T00:01:00.000Z',
   })),
   listNotes: vi.fn(() => ({
-    active: [{ id: 'note-1', title: 'Test note', content: '', status: 'active', createdAt: '2026-02-16T00:00:00.000Z', updatedAt: '2026-02-16T00:00:00.000Z' }],
+    active: [{ id: 'note-1', title: 'Test note', content: '', status: 'active', isPinned: false, createdAt: '2026-02-16T00:00:00.000Z', updatedAt: '2026-02-16T00:00:00.000Z' }],
     archived: [],
   })),
   blockNoteToMarkdown: vi.fn((raw: string) => raw),
+  getDisplayTitle: vi.fn((note: { title: string }) => note.title || 'Empty note'),
 }));
 
 vi.mock('./memory', () => ({
@@ -420,6 +423,7 @@ describe('note tools', () => {
       title: 'Test note',
       content: 'Draft notes for Tuesday.',
       status: 'active',
+      isPinned: false,
       createdAt: '2026-02-16T12:00:00.000Z',
       updatedAt: '2026-02-16T12:00:00.000Z',
     } as never);
@@ -439,6 +443,7 @@ describe('note tools', () => {
           title: 'Test note',
           content: 'Draft notes for Tuesday.',
           status: 'active',
+          isPinned: false,
           createdAt: '2026-02-16T12:00:00.000Z',
           updatedAt: '2026-02-16T12:00:00.000Z',
         },
@@ -452,6 +457,7 @@ describe('note tools', () => {
       title: 'Test note',
       content: 'One old sentence.\nAnother line.',
       status: 'active',
+      isPinned: false,
       createdAt: '2026-02-16T12:00:00.000Z',
       updatedAt: '2026-02-16T12:00:00.000Z',
     } as never);

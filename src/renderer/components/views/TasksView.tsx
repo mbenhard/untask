@@ -64,6 +64,12 @@ type StatusGroupSectionProps = {
   activeDragId: string | null;
   addTaskConfig?: AddTaskConfig;
   triggerAdd?: number;
+  isPrimaryList?: boolean;
+  focusedIndex?: number;
+  onFocusedIndexChange?: (index: number) => void;
+  onNavigateNextGroup?: () => void;
+  onNavigatePrevGroup?: () => void;
+  onRequestFocus?: () => void;
 };
 
 const StatusGroupSection = ({
@@ -76,6 +82,12 @@ const StatusGroupSection = ({
   activeDragId,
   addTaskConfig,
   triggerAdd,
+  isPrimaryList,
+  focusedIndex,
+  onFocusedIndexChange,
+  onNavigateNextGroup,
+  onNavigatePrevGroup,
+  onRequestFocus,
 }: StatusGroupSectionProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: getStatusLaneId(laneKey),
@@ -92,6 +104,7 @@ const StatusGroupSection = ({
       dropRef={setNodeRef}
       addTaskConfig={addTaskConfig}
       triggerAdd={triggerAdd}
+      onRequestFocus={onRequestFocus}
     >
       <TaskList
         tasks={tasks}
@@ -101,6 +114,11 @@ const StatusGroupSection = ({
         scopeId={`tasks-${laneKey}`}
         dndMode="shared"
         sharedActiveDragId={activeDragId}
+        isPrimaryList={isPrimaryList}
+        focusedIndex={focusedIndex}
+        onFocusedIndexChange={onFocusedIndexChange}
+        onNavigateNextGroup={onNavigateNextGroup}
+        onNavigatePrevGroup={onNavigatePrevGroup}
       />
     </SectionGroup>
   );
@@ -123,6 +141,8 @@ export const TasksView = ({
 
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [focusedLane, setFocusedLane] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
   // Initialize collapsed state for new lanes (terminal = collapsed, non-terminal = open)
   useEffect(() => {
@@ -138,6 +158,24 @@ export const TasksView = ({
       return changed ? next : current;
     });
   }, [laneOrder]);
+
+  const firstNonCollapsedLane = useMemo(() => {
+    for (const key of laneOrder) {
+      const isCollapsed = collapsedGroups[key] ?? false;
+      if (!isCollapsed) {
+        return key;
+      }
+    }
+    return null;
+  }, [collapsedGroups, laneOrder]);
+
+  // Initialize focused lane on first render
+  useEffect(() => {
+    if (firstNonCollapsedLane && focusedLane === null) {
+      setFocusedLane(firstNonCollapsedLane);
+      setFocusedIndex(0);
+    }
+  }, [firstNonCollapsedLane, focusedLane]);
 
   const groupedTasks = useMemo(() => {
     const groups: Record<string, Task[]> = {};
@@ -180,6 +218,37 @@ export const TasksView = ({
     () => allTasks.find((task) => task.id === activeDragId) ?? null,
     [activeDragId, allTasks],
   );
+
+  const handleNavigateNextGroup = useCallback((currentLane: StatusLaneKey) => {
+    const currentIndex = laneOrder.indexOf(currentLane);
+    if (currentIndex === -1 || currentIndex >= laneOrder.length - 1) return;
+
+    for (let i = currentIndex + 1; i < laneOrder.length; i++) {
+      const nextLane = laneOrder[i];
+      const isCollapsed = collapsedGroups[nextLane] ?? false;
+      if (!isCollapsed && groupedTasks[nextLane]?.length > 0) {
+        setFocusedLane(nextLane);
+        setFocusedIndex(0);
+        return;
+      }
+    }
+  }, [laneOrder, collapsedGroups, groupedTasks]);
+
+  const handleNavigatePrevGroup = useCallback((currentLane: StatusLaneKey) => {
+    const currentIndex = laneOrder.indexOf(currentLane);
+    if (currentIndex <= 0) return;
+
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      const prevLane = laneOrder[i];
+      const isCollapsed = collapsedGroups[prevLane] ?? false;
+      if (!isCollapsed && groupedTasks[prevLane]?.length > 0) {
+        setFocusedLane(prevLane);
+        const prevLaneTasks = groupedTasks[prevLane];
+        setFocusedIndex(prevLaneTasks ? prevLaneTasks.length - 1 : 0);
+        return;
+      }
+    }
+  }, [laneOrder, collapsedGroups, groupedTasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -281,10 +350,6 @@ export const TasksView = ({
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading tasks...</p>
-        ) : null}
-
         {error ? (
           <p className="text-[11px] text-destructive">
             {error}
@@ -305,6 +370,17 @@ export const TasksView = ({
                 const isCollapsed = collapsedGroups[key] ?? false;
                 const isTerminal = isTerminalStatus(key);
                 const label = getStatusLabel(key);
+                const isPrimary = firstNonCollapsedLane === key;
+                const effectiveFocusedLane = focusedLane ?? firstNonCollapsedLane;
+                const isFocusedLane = effectiveFocusedLane === key;
+                const effectiveFocusedIndex = isFocusedLane 
+                  ? Math.min(Math.max(focusedIndex, 0), tasks.length - 1)
+                  : undefined;
+
+                const handleFocusedIndexChange = (newIndex: number) => {
+                  setFocusedLane(key);
+                  setFocusedIndex(newIndex);
+                };
 
                 return (
                   <StatusGroupSection
@@ -323,6 +399,15 @@ export const TasksView = ({
                     triggerAdd={
                       key === 'active' && activeView === 'tasks' ? newTaskTrigger : undefined
                     }
+                    isPrimaryList={isPrimary}
+                    focusedIndex={effectiveFocusedIndex}
+                    onFocusedIndexChange={handleFocusedIndexChange}
+                    onNavigateNextGroup={() => handleNavigateNextGroup(key)}
+                    onNavigatePrevGroup={() => handleNavigatePrevGroup(key)}
+                    onRequestFocus={() => {
+                      setFocusedLane(key);
+                      setFocusedIndex(0);
+                    }}
                     onToggle={() => {
                       setCollapsedGroups((current) => ({
                         ...current,

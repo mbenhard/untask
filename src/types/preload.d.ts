@@ -26,6 +26,7 @@ import type {
   ChatResolvePendingActionResponse,
   ChatListPendingActionsResponse,
   ChatFocusMessagePayload,
+  TaskNavigatePayload,
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   LaunchAtLoginResult,
@@ -45,7 +46,6 @@ import type {
   BackupImportDialogResponse,
   BackupListResponse,
   BackupMetadataPayload,
-  QuickAddPayload,
   SearchQueryRequest,
   SearchQueryResponse,
   SettingsMemoryStatePayload,
@@ -59,6 +59,7 @@ import type {
   SettingsBootstrapState,
   TaskDeleteRequestPayload,
   TaskCompleteRequestPayload,
+  TaskUndoResultPayload,
   SettingsGetAiEnabledResult,
   SettingsSetAiEnabledResult,
   ApiKeysHasResult,
@@ -67,6 +68,17 @@ import type {
   AttachmentSaveRequest,
   AttachmentIdRequest,
   AttachmentPickAndSaveResult,
+  NotificationPermissionResult,
+  RemindersStatusResult,
+  RemindersSyncStatusPayload,
+  RemindersSyncFilter,
+  ShortcutRegistrationStatusResult,
+  OllamaStatusResult,
+  OllamaPullRequest,
+  OllamaPullResult,
+  OllamaPullProgressPayload,
+  OllamaWarmupRequest,
+  OllamaWarmupResult,
 } from './ipc';
 
 import type { Task, TaskStatusConfig, ChatMessage, Note, Setting } from './models';
@@ -76,7 +88,6 @@ export type UntaskApi = {
   app: {
     requestHide: () => Promise<void>;
     escapeLayerExit: () => Promise<void>;
-    onQuickAddPayload: (listener: (payload: QuickAddPayload) => void) => () => void;
     onBackupRestored: (listener: () => void) => () => void;
     getLaunchAtLogin: () => Promise<LaunchAtLoginResult>;
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
@@ -84,10 +95,12 @@ export type UntaskApi = {
     setWindowDismissMode: (mode: WindowDismissMode) => Promise<WindowDismissModeResult>;
     getDockMode: () => Promise<DockModeResult>;
     setDockMode: (mode: DockMode) => Promise<DockModeResult>;
+    getVersion: () => Promise<string>;
     onMenuNewTask: (listener: () => void) => () => void;
     onMenuNewNote: (listener: () => void) => () => void;
     checkForUpdates: () => Promise<UpdateInfo>;
     getUpdateInfo: () => Promise<UpdateInfo | null>;
+    onUpdateAvailable: (listener: (info: UpdateInfo) => void) => () => void;
   };
 
   // ─── Existing kernel APIs ───────────────────────────────
@@ -125,8 +138,11 @@ export type UntaskApi = {
     cancel: (id: string) => Promise<Task>;
     reopen: (id: string) => Promise<Task>;
     toggleToday: (id: string) => Promise<Task>;
+    onTaskNavigate: (listener: (payload: TaskNavigatePayload) => void) => () => void;
+    onTaskDataChanged: (listener: () => void) => () => void;
     getStatuses: () => Promise<TaskStatusConfig>;
     setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
+    undoLastUserAction: () => Promise<TaskUndoResultPayload>;
   };
   chat: {
     send: (message: ChatSendRequest) => Promise<ChatSendResult>;
@@ -154,6 +170,11 @@ export type UntaskApi = {
     setAutonomyMode: (payload: ChatSetAutonomyModeRequest) => Promise<ChatAutonomyModeResult>;
     resolvePendingAction: (payload: ChatResolvePendingActionRequest) => Promise<ChatResolvePendingActionResponse>;
     listPendingActions: () => Promise<ChatListPendingActionsResponse>;
+    getOllamaStatus: () => Promise<OllamaStatusResult>;
+    pullOllamaModel: (request: OllamaPullRequest) => Promise<OllamaPullResult>;
+    cancelOllamaPull: () => Promise<void>;
+    warmupOllama: (request: OllamaWarmupRequest) => Promise<OllamaWarmupResult>;
+    onOllamaPullProgress: (listener: (event: OllamaPullProgressPayload) => void) => () => void;
   };
   backup: {
     list: () => Promise<BackupListResponse>;
@@ -169,13 +190,18 @@ export type UntaskApi = {
   notes: {
     list: () => Promise<{ active: Note[]; archived: Note[] }>;
     get: (id: string) => Promise<Note | undefined>;
-    create: (title?: string) => Promise<Note>;
-    save: (id: string, content: string, title?: string) => Promise<Note | undefined>;
+    create: () => Promise<Note>;
+    save: (id: string, content: string) => Promise<Note | undefined>;
     archive: (id: string) => Promise<Note | undefined>;
+    restore: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;
+    pin: (id: string) => Promise<Note | undefined>;
+    unpin: (id: string) => Promise<Note | undefined>;
+    duplicate: (id: string) => Promise<Note | undefined>;
   };
   shortcuts: {
     reRegister: () => Promise<void>;
+    getRegistrationStatus: () => Promise<ShortcutRegistrationStatusResult>;
   };
   settings: {
     get: (key: string) => Promise<string | null>;
@@ -207,6 +233,24 @@ export type UntaskApi = {
     read: (request: AttachmentIdRequest) => Promise<string>;
     pickAndSave: () => Promise<AttachmentPickAndSaveResult>;
   };
+  notifications: {
+    fireTest: () => Promise<NotificationPermissionResult>;
+    probePermission: () => Promise<NotificationPermissionResult>;
+    openSettings: () => Promise<void>;
+  };
+  reminders: {
+    getStatus: () => Promise<RemindersStatusResult>;
+    toggle: (enabled: boolean) => Promise<void>;
+    setFilter: (filter: RemindersSyncFilter) => Promise<void>;
+    setImport: (enabled: boolean) => Promise<void>;
+    requestAccess: () => Promise<{ granted: boolean }>;
+    forceSync: () => Promise<void>;
+    pullOnly: () => Promise<void>;
+    onSyncStatus: (listener: (payload: RemindersSyncStatusPayload) => void) => () => void;
+  };
+  shell: {
+    openExternal: (url: string) => Promise<void>;
+  };
 };
 
 declare global {
@@ -215,4 +259,4 @@ declare global {
   }
 }
 
-export {};
+export { };

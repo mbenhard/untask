@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { SearchResultItem } from '../../../types/ipc';
+import type { TaskSearchResultItem } from '../../../types/ipc';
 import { resolveSearchResultView } from './searchRouting';
 
-const baseResult: SearchResultItem = {
+const baseResult: TaskSearchResultItem = {
+  type: 'task',
   id: 'task-1',
   parentId: null,
   title: 'Test',

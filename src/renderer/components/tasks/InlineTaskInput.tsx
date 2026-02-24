@@ -7,26 +7,8 @@ import { cn } from '../../lib/utils';
 import { useTaskStore } from '../../stores/taskStore';
 import { formatDueDateDisplay } from './dueDate';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
+import { PRIORITY_DOT, PRIORITY_LABEL, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { getNextPriority } from './taskInteraction';
-
-// Shared styling constants (matching TaskBody.tsx metadata segments)
-const SEGMENT =
-  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
-const SEGMENT_EMPTY = 'text-muted-foreground/50';
-
-const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
-  none: 'bg-foreground/15',
-  low: 'bg-emerald-500',
-  medium: 'bg-amber-500',
-  high: 'bg-rose-500',
-};
-
-const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
-  none: 'priority',
-  low: 'Low',
-  medium: 'Med',
-  high: 'High',
-};
 
 type InlineTaskInputProps = {
   parentId?: string | null;
@@ -56,9 +38,9 @@ export const InlineTaskInput = ({
   const createTask = useTaskStore((state) => state.createTask);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSeenTriggerRef = useRef<number | undefined>(triggerOpen);
+  const isCreatingRef = useRef(false);
   const [isOpen, setIsOpen] = useState(alwaysOpen || onDismiss !== undefined);
   const [title, setTitle] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
 
   // Metadata state
   const [priority, setPriority] = useState<NonNullable<Task['priority']>>('none');
@@ -100,11 +82,11 @@ export const InlineTaskInput = ({
 
   const handleSubmit = useCallback(async (): Promise<void> => {
     const normalizedTitle = title.trim();
-    if (normalizedTitle.length === 0 || isCreating) {
+    if (normalizedTitle.length === 0 || isCreatingRef.current) {
       return;
     }
 
-    setIsCreating(true);
+    isCreatingRef.current = true;
     const created = await createTask({
       title: normalizedTitle,
       parentId: parentId ?? undefined,
@@ -113,7 +95,7 @@ export const InlineTaskInput = ({
       today: today || defaultToday,
       dueDate,
     });
-    setIsCreating(false);
+    isCreatingRef.current = false;
 
     if (!created) {
       return;
@@ -121,7 +103,9 @@ export const InlineTaskInput = ({
 
     setTitle('');
     resetMetadata();
-  }, [createTask, defaultStatus, defaultToday, dueDate, isCreating, parentId, priority, resetMetadata, title, today]);
+    // Re-focus is immediate — no disabled state to interfere.
+    inputRef.current?.focus();
+  }, [createTask, defaultStatus, defaultToday, dueDate, parentId, priority, resetMetadata, title, today]);
 
   if (!isOpen && !alwaysOpen) {
     return null;
@@ -157,7 +141,11 @@ export const InlineTaskInput = ({
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             onBlur={() => {
-              if (showMetadata) return;
+              const trimmed = title.trim();
+              if (trimmed.length > 0 || hasMetadataSet) {
+                void handleSubmit();
+                return;
+              }
 
               if (title.trim().length === 0 && !hasMetadataSet) {
                 if (onDismiss) {
@@ -186,13 +174,8 @@ export const InlineTaskInput = ({
                 }
               }
             }}
-            placeholder={
-              isCreating
-                ? 'Creating...'
-                : (placeholder ?? 'Type and press Enter')
-            }
-            disabled={isCreating}
-            className="min-w-0 w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/30"
+            placeholder={placeholder ?? 'Type and press Enter'}
+            className="min-w-0 w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
             aria-label={label}
           />
         </div>

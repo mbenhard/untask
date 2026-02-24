@@ -21,68 +21,72 @@ export function isEncryptionAvailable(): boolean {
 /**
  * Encrypt and persist an API key for the given provider.
  *
- * The key is **always** stored in the plaintext slot (`ai_{provider}_key`) so
- * retrieval can never fail due to Keychain issues.  When OS-level encryption
- * is available the key is *also* stored encrypted under
- * `encrypted_ai_{provider}_key`; `getApiKey` will prefer the encrypted slot
- * and fall back to plaintext automatically.
+ * When OS-level encryption is available (macOS Keychain), the key is stored
+ * only in the encrypted slot and any legacy plaintext copy is removed.
+ * Plaintext storage is used only as a last resort when encryption is
+ * unavailable (e.g. unsigned dev builds without Keychain access).
  */
 export function storeApiKey(provider: string, key: string): void {
-  // Always persist plaintext so the key is retrievable regardless of Keychain state.
-  setSetting(plaintextKey(provider), key);
-
   if (!isEncryptionAvailable()) {
     // eslint-disable-next-line no-console
     console.warn(
       `[keyStorage] safeStorage encryption is not available — stored "${provider}" key as plaintext only.`,
     );
+    setSetting(plaintextKey(provider), key);
     return;
   }
 
   try {
     const encrypted = safeStorage.encryptString(key);
     setSetting(encryptedKey(provider), encrypted.toString('base64'));
+    // Encryption succeeded — remove any legacy plaintext copy.
+    deleteSetting(plaintextKey(provider));
   } catch (err) {
-    // Encryption failed but plaintext was already persisted — log and move on.
+    // Encryption failed — fall back to plaintext as last resort.
     // eslint-disable-next-line no-console
-    console.error(`[keyStorage] Failed to encrypt API key for "${provider}" (plaintext fallback in use):`, err);
+    console.error(`[keyStorage] Failed to encrypt API key for "${provider}" — falling back to plaintext:`, err);
+    setSetting(plaintextKey(provider), key);
   }
 }
 
 /**
  * Retrieve and decrypt the API key for the given provider.
- * Returns null when no key has been stored.
+ * Returns null when no key has been stored or when decryption fails
+ * (the user will need to re-enter the key).
  */
 export function getApiKey(provider: string): string | null {
-  // Try the encrypted slot first
+  // Try the encrypted slot first.
   const encryptedBase64 = getSetting(encryptedKey(provider));
 
   if (encryptedBase64 !== null) {
     if (!isEncryptionAvailable()) {
-      // Encryption backend unavailable (e.g. Keychain auth failed for unsigned
-      // builds) — fall through to plaintext instead of returning null.
+      // Encryption backend unavailable — cannot decrypt. Return null so the
+      // user is prompted to re-enter rather than silently falling back.
       // eslint-disable-next-line no-console
       console.warn(
-        `[keyStorage] safeStorage unavailable for "${provider}" — falling through to plaintext.`,
+        `[keyStorage] safeStorage unavailable — cannot decrypt "${provider}" key. Please re-enter in Settings.`,
       );
-    } else {
-      try {
-        const buffer = Buffer.from(encryptedBase64, 'base64');
-        const decrypted = safeStorage.decryptString(buffer);
-        if (decrypted.length > 0) {
-          return decrypted;
-        }
-        // Decrypted to empty string — fall through to plaintext
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error(`[keyStorage] Failed to decrypt "${provider}" key:`, err);
-        // Fall through to plaintext slot as last resort
-      }
+      return null;
     }
+
+    try {
+      const buffer = Buffer.from(encryptedBase64, 'base64');
+      const decrypted = safeStorage.decryptString(buffer);
+      if (decrypted.length > 0) {
+        return decrypted;
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[keyStorage] Failed to decrypt "${provider}" key:`, err);
+    }
+
+    // Encrypted slot exists but decryption failed — return null rather than
+    // falling back to plaintext.
+    return null;
   }
 
-  // Fall back to plaintext slot (covers: no encrypted slot, encryption
-  // unavailable, decryption failure, or decrypted-to-empty-string).
+  // No encrypted slot — check for legacy plaintext key (pre-migration or
+  // environments where encryption was never available).
   return getSetting(plaintextKey(provider));
 }
 
@@ -122,7 +126,7 @@ export function migrateApiKeysToSafeStorage(): void {
     return;
   }
 
-  const providers = ['openrouter'] as const;
+  const providers = ['openrouter', 'openai', 'anthropic'] as const;
 
   for (const provider of providers) {
     const legacyValue = getSetting(plaintextKey(provider));
@@ -133,8 +137,8 @@ export function migrateApiKeysToSafeStorage(): void {
         `[keyStorage] Migrating plaintext API key for "${provider}" to encrypted storage.`,
       );
 
-      // storeApiKey now always keeps the plaintext slot as a reliable
-      // fallback, so we just call it and let it handle both slots.
+      // storeApiKey will encrypt and remove the plaintext slot when
+      // encryption is available.
       storeApiKey(provider, legacyValue);
     }
   }

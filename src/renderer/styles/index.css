@@ -18,7 +18,7 @@
   --secondary: #F7F7F7;
   --secondary-foreground: #262626;
   --muted: #F7F7F7;
-  --muted-foreground: #737373;
+  --muted-foreground: #636363;
   --accent: #F1F1F1;
   --accent-foreground: #262626;
   --destructive: #DC2626;
@@ -45,7 +45,7 @@
   --secondary: #161616;
   --secondary-foreground: #F5F5F5;
   --muted: #161616;
-  --muted-foreground: #8A8A8A;
+  --muted-foreground: #999999;
   --accent: #1E1E1E;
   --accent-foreground: #F5F5F5;
   --destructive: #7F1D1D;
@@ -231,14 +231,14 @@
 }
 
 /* Compact side menu icons (+ / drag handle) */
-.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:not(.mantine-Menu-item) svg {
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root:not(.mantine-Menu-item), .bn-button) svg {
   height: 16px !important;
   width: 16px !important;
   color: var(--muted-foreground) !important;
   opacity: 0.4;
 }
 
-.untask-notes-editor .bn-side-menu .mantine-UnstyledButton-root:hover svg {
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover svg {
   opacity: 0.8;
 }
 
@@ -549,8 +549,67 @@
   100% { transform: scaleX(1); opacity: 0.35; }
 }
 
+/* ──────────────────────────────────────────────
+   Onboarding: dot-grid background + radial glow
+   ────────────────────────────────────────────── */
+.onboarding-dot-grid {
+  position: relative;
+}
+
+.onboarding-dot-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--foreground) 0.5px, transparent 0.5px);
+  background-size: 24px 24px;
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.onboarding-dot-grid::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 300px;
+  height: 300px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--foreground) 0%, transparent 70%);
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ──────────────────────────────────────────────
+   Task navigation pulse — transient "you are here" signal
+   when navigating to a task via search or subtask breadcrumb.
+   ────────────────────────────────────────────── */
+@keyframes task-navigate-pulse {
+  0%   { background-color: color-mix(in srgb, var(--foreground) 8%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.task-navigated {
+  animation: task-navigate-pulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes field-changed-pulse {
+  0%   { background-color: color-mix(in srgb, var(--foreground) 12%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.field-changed-pulse {
+  animation: field-changed-pulse 400ms ease-out forwards;
+  border-radius: 2px;
+}
+
 /* Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
+  .task-navigated,
+  .field-changed-pulse {
+    animation: none;
+  }
   .bird-float,
   .bird-bop,
   .bird-wobble,

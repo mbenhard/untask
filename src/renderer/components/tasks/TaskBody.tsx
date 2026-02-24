@@ -1,40 +1,55 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
-import {
-  type DefaultReactSuggestionItem,
-  getDefaultReactSlashMenuItems,
-} from '@blocknote/react';
 import { Paperclip } from 'lucide-react';
 
 import type { Task, PredefinedStatusId } from '../../../types/models';
 import { PREDEFINED_STATUSES } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
+import { useFlashHighlight } from '../../hooks/useFlashHighlight';
+import { PRIORITY_DOT as SHARED_PRIORITY_DOT, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { useAppStore } from '../../stores/appStore';
+import { useToastStore } from '../../stores/toastStore';
 import { type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
 import {
   useTaskStatusConfigStore,
   selectEnabledNonTerminal,
   selectEnabledTerminal,
 } from '../../stores/taskStatusConfigStore';
-import { BlockEditor } from '../editor/BlockEditor';
 import { isEmptyDocument } from '../editor/editorUtils';
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { getNextPriority } from './taskInteraction';
+import type { BlockEditorSlashMenuItem, BlockEditorSlashMenuParams } from '../editor/BlockEditor';
+
+const LazyBlockEditor = lazy(async () => {
+  const module = await import('../editor/BlockEditor');
+  return { default: module.BlockEditor };
+});
 
 // ─── Types & Constants ──────────────────────────────────────
 
 type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
+type DevLatencyApi = {
+  start: (flow: string, key: string | number) => void;
+  end: (flow: string, key: string | number) => number | null;
+  cancel: (flow: string, key: string | number) => void;
+};
+
+const NOOP_DEV_LATENCY: DevLatencyApi = {
+  start: () => undefined,
+  end: () => null,
+  cancel: () => undefined,
+};
+
 const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
 const PRIORITY_DOT: Record<NonNullable<Task['priority']>, string> = {
+  ...SHARED_PRIORITY_DOT,
   none: '',
-  low: 'bg-emerald-500',
-  medium: 'bg-amber-500',
-  high: 'bg-rose-500',
 };
 
 const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
@@ -44,17 +59,12 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
   high: 'High',
 };
 
-const SEGMENT =
-  'inline-flex items-center py-1 -my-1 cursor-pointer transition-colors duration-150 hover:text-foreground focus-visible:bg-accent/30 focus-visible:rounded-sm focus-visible:px-1 focus-visible:-mx-1 outline-none';
-
-const SEGMENT_EMPTY = 'text-muted-foreground/50';
-
 const UNSUPPORTED_MEDIA_ITEMS = new Set(['Video', 'Audio']);
 
 const getAttachmentSlashMenuItems = (
-  editor: BlockNoteEditor,
-): DefaultReactSuggestionItem[] =>
-  getDefaultReactSlashMenuItems(editor).filter(
+  { defaultItems }: BlockEditorSlashMenuParams,
+): BlockEditorSlashMenuItem[] =>
+  defaultItems.filter(
     (item) => !UNSUPPORTED_MEDIA_ITEMS.has(item.title),
   );
 
@@ -79,9 +89,20 @@ const PrioritySegment = ({
   const dot = PRIORITY_DOT[priority];
   const label = PRIORITY_LABEL[priority];
   const isEmpty = priority === 'none';
+  const ref = useRef<HTMLButtonElement>(null);
+  const flash = useFlashHighlight(ref);
+  const prevPriority = useRef(priority);
+
+  useEffect(() => {
+    if (priority !== prevPriority.current) {
+      prevPriority.current = priority;
+      flash();
+    }
+  }, [priority, flash]);
 
   return (
     <button
+      ref={ref}
       type="button"
       tabIndex={0}
       onClick={(e) => {
@@ -110,16 +131,35 @@ const DueDateSegment = ({
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
-}) => (
-  <TaskDueDatePicker
-    dueDate={task.dueDate}
-    emptyLabel="+ due date"
-    variant="segment"
-    onChange={(nextDueDate) => {
-      void onUpdate({ id: task.id, dueDate: nextDueDate });
-    }}
-  />
-);
+}) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const flash = useFlashHighlight(ref);
+  const prevDueDate = useRef(task.dueDate);
+
+  useEffect(() => {
+    if (task.dueDate !== prevDueDate.current) {
+      prevDueDate.current = task.dueDate;
+      flash();
+    }
+  }, [task.dueDate, flash]);
+
+  return (
+    <span ref={ref}>
+      <TaskDueDatePicker
+        dueDate={task.dueDate}
+        emptyLabel="+ due date"
+        variant="segment"
+        reminderOffset={(task.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined}
+        onChange={(nextDueDate) => {
+          void onUpdate({ id: task.id, dueDate: nextDueDate });
+        }}
+        onReminderOffsetChange={(offset) => {
+          void onUpdate({ id: task.id, reminderOffset: offset });
+        }}
+      />
+    </span>
+  );
+};
 
 // ─── Client Segment ─────────────────────────────────────────
 
@@ -218,7 +258,7 @@ const StatusSegment = ({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className={SEGMENT}
-          aria-label="Status"
+          aria-label={`Status: ${label}`}
         >
           {label}
         </button>
@@ -234,6 +274,10 @@ const StatusSegment = ({
           type="button"
           onClick={() => {
             void onUpdate({ id: task.id, status: 'inbox' });
+            useToastStore.getState().showToast('Moved to Inbox', async () => {
+              await getUntask().tasks.undoLastUserAction();
+              await useTaskStore.getState().refreshTasks();
+            });
             setOpen(false);
           }}
           className={cn(
@@ -250,6 +294,10 @@ const StatusSegment = ({
             type="button"
             onClick={() => {
               void onUpdate({ id: task.id, status: id });
+              useToastStore.getState().showToast(`Moved to ${statusLabelMap.get(id) ?? id}`, async () => {
+                await getUntask().tasks.undoLastUserAction();
+                await useTaskStore.getState().refreshTasks();
+              });
               setOpen(false);
             }}
             className={cn(
@@ -270,6 +318,10 @@ const StatusSegment = ({
             type="button"
             onClick={() => {
               void onUpdate({ id: task.id, status: id });
+              useToastStore.getState().showToast(`Moved to ${statusLabelMap.get(id) ?? id}`, async () => {
+                await getUntask().tasks.undoLastUserAction();
+                await useTaskStore.getState().refreshTasks();
+              });
               setOpen(false);
             }}
             className={cn(
@@ -310,6 +362,16 @@ const RecurrenceSegment = ({
   const customTouched = useRef(false);
   const presetApplied = useRef(false);
   const isEmpty = !task.recurrence;
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const flash = useFlashHighlight(triggerRef);
+  const prevRecurrence = useRef(task.recurrence);
+
+  useEffect(() => {
+    if (task.recurrence !== prevRecurrence.current) {
+      prevRecurrence.current = task.recurrence;
+      flash();
+    }
+  }, [task.recurrence, flash]);
 
   const handleOpenChange = (next: boolean) => {
     if (!next && customTouched.current && !presetApplied.current) {
@@ -326,12 +388,13 @@ const RecurrenceSegment = ({
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           tabIndex={0}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
-          aria-label="Recurrence"
+          aria-label={isEmpty ? 'Recurrence: none' : `Recurrence: ${task.recurrence}`}
         >
           {isEmpty ? '+ repeat' : task.recurrence}
         </button>
@@ -505,7 +568,7 @@ const AttachmentSegment = ({
       className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
       aria-label={isEmpty ? 'Attach file' : `${count} attachment${count !== 1 ? 's' : ''} — click to add more`}
     >
-      <Paperclip className="mr-0.5 size-3" />
+      <Paperclip aria-hidden="true" className="mr-0.5 size-3" />
       {isEmpty ? 'attach' : count}
     </button>
   );
@@ -586,6 +649,7 @@ export type TaskBodyProps = {
   task: Task;
   isExpanded: boolean;
   subtaskCount: number;
+  indentPx?: number;
   onRequestAddSubtask?: () => void;
   onBodyEditModeChange?: (editing: boolean) => void;
 };
@@ -594,6 +658,7 @@ export const TaskBody = ({
   task,
   isExpanded,
   subtaskCount,
+  indentPx = 0,
   onRequestAddSubtask,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
@@ -607,6 +672,25 @@ export const TaskBody = ({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBodyRef = useRef<string | null>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
+  const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
+  const openMetricKeyRef = useRef<string | null>(null);
+  const hasRecordedOpenLatencyRef = useRef(false);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      let disposed = false;
+      void import('../../lib/devLatencyMetrics').then(({ devLatencyMetrics }) => {
+        if (!disposed) {
+          devLatencyRef.current = devLatencyMetrics;
+        }
+      });
+      return () => {
+        disposed = true;
+        devLatencyRef.current = NOOP_DEV_LATENCY;
+      };
+    }
+    return undefined;
+  }, []);
 
   const attachmentCount = useMemo(() => countAttachments(task.body), [task.body]);
 
@@ -646,6 +730,11 @@ export const TaskBody = ({
 
   const handleBodyChange = useCallback(
     (json: string) => {
+      const metricKey = openMetricKeyRef.current;
+      if (!hasRecordedOpenLatencyRef.current && metricKey) {
+        hasRecordedOpenLatencyRef.current = true;
+        devLatencyRef.current.end('task-editor-open', metricKey);
+      }
       pendingBodyRef.current = json;
 
       if (saveTimerRef.current) {
@@ -674,6 +763,32 @@ export const TaskBody = ({
     };
   }, [flushSave]);
 
+  // Dev-only latency probe: expanded task editor -> first content change.
+  useEffect(() => {
+    if (!isExpanded) {
+      if (!hasRecordedOpenLatencyRef.current && openMetricKeyRef.current) {
+        devLatencyRef.current.cancel('task-editor-open', openMetricKeyRef.current);
+      }
+      openMetricKeyRef.current = null;
+      hasRecordedOpenLatencyRef.current = false;
+      return;
+    }
+
+    const key = String(task.id);
+    openMetricKeyRef.current = key;
+    hasRecordedOpenLatencyRef.current = false;
+    devLatencyRef.current.start('task-editor-open', key);
+
+    return () => {
+      if (!hasRecordedOpenLatencyRef.current) {
+        devLatencyRef.current.cancel('task-editor-open', key);
+      }
+      if (openMetricKeyRef.current === key) {
+        openMetricKeyRef.current = null;
+      }
+    };
+  }, [isExpanded, task.id]);
+
   const handleFocus = useCallback(() => {
     onBodyEditModeChange?.(true);
   }, [onBodyEditModeChange]);
@@ -687,7 +802,7 @@ export const TaskBody = ({
   return (
     <div className="overflow-hidden">
       {/* Part-of reference — subtask context */}
-      {parentTask && (
+      {parentTask && indentPx === 0 && (
         <div className="border-t border-border/30 px-3 pt-2">
           <button
             type="button"
@@ -712,15 +827,17 @@ export const TaskBody = ({
         'px-3 py-3',
         !parentTask && 'border-t border-border/30',
       )}>
-        <BlockEditor
-          content={task.body ?? ''}
-          onChange={handleBodyChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          className="untask-task-editor"
-          editorRef={editorRef}
-          getSlashMenuItems={getAttachmentSlashMenuItems}
-        />
+        <Suspense fallback={<div className="untask-task-editor min-h-[96px]" aria-hidden="true" />}>
+          <LazyBlockEditor
+            content={task.body ?? ''}
+            onChange={handleBodyChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            className="untask-task-editor"
+            editorRef={editorRef}
+            getSlashMenuItems={getAttachmentSlashMenuItems}
+          />
+        </Suspense>
       </div>
 
       {/* Zone 2 — Metadata Line */}

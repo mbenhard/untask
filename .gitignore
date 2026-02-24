@@ -114,3 +114,16 @@ Thumbs.db
 
 # Electron
 forge.env
+
+# Swift helper
+swift-helper/.build
+resources/bin/untask-helper
+
+
+# npm lockfile (project uses pnpm)
+package-lock.json
+
+# Private / not published to GitHub
+website/
+docs/plans/
+untask/

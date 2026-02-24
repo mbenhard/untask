@@ -59,6 +59,7 @@ const resetStores = (): void => {
       title: 'Note',
       content: '',
       status: 'active',
+      isPinned: false,
       createdAt: null,
       updatedAt: null,
     }],
@@ -68,7 +69,6 @@ const resetStores = (): void => {
     subView: 'list',
     layoutMode: 'list',
     activeNoteId: null,
-    activeNoteTitle: '',
     content: '',
     error: null,
     notice: null,
@@ -238,7 +238,7 @@ describe('useKeyboardShortcuts', () => {
     expect(processWithAI).toHaveBeenCalledTimes(1);
   });
 
-  it('runs Cmd/Ctrl+Shift+A to archive active note', () => {
+  it('runs Cmd/Ctrl+Backspace to archive active note', () => {
     const archiveNote = vi.fn(async () => undefined);
     useAppStore.setState({ activeView: 'notes' });
     useNotesStore.setState({
@@ -257,7 +257,7 @@ describe('useKeyboardShortcuts', () => {
     });
 
     flushSync(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', metaKey: true, shiftKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', metaKey: true }));
     });
 
     expect(archiveNote).toHaveBeenCalledWith('note-1');

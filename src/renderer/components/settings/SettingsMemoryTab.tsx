@@ -24,18 +24,20 @@ const MEMORY_FIELD_DESCRIPTIONS: Record<MemorySubTab, string> = {
 const MEMORY_SUB_TABS = ['identity', 'memory'] as const;
 type MemorySubTab = (typeof MEMORY_SUB_TABS)[number];
 
+type SettingsMemoryTabProps = {
+  setError: (error: string | null) => void;
+  setNotice: (notice: string | null) => void;
+  availableTabs?: readonly MemorySubTab[];
+};
+
 const EMPTY_MEMORY_STATE: SettingsMemoryStatePayload = {
   identity: '',
   memory: '',
 };
 
-type SettingsMemoryTabProps = {
-  setError: (error: string | null) => void;
-  setNotice: (notice: string | null) => void;
-};
-
-export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProps) => {
-  const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>('identity');
+export const SettingsMemoryTab = ({ setError, setNotice, availableTabs = MEMORY_SUB_TABS }: SettingsMemoryTabProps) => {
+  const defaultTab = availableTabs[0];
+  const [memorySubTab, setMemorySubTab] = useState<MemorySubTab>(defaultTab);
   const [draft, setDraft] = useState<SettingsMemoryStatePayload>(EMPTY_MEMORY_STATE);
   const [memoryHistory, setMemoryHistory] = useState<SettingsMemoryEventPayload[]>([]);
 
@@ -78,12 +80,20 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
   );
 
   useEffect(() => {
+    if (!availableTabs.includes(memorySubTab)) {
+      setMemorySubTab(availableTabs[0]);
+    }
+  }, [availableTabs, memorySubTab]);
+
+  useEffect(() => {
     void loadMemoryState();
   }, [loadMemoryState]);
 
   useEffect(() => {
     void loadMemoryHistory();
   }, [loadMemoryHistory]);
+
+  const showSubTabNav = availableTabs.length > 1;
 
   const saveField = useCallback(
     async (field: MemorySubTab) => {
@@ -139,23 +149,25 @@ export const SettingsMemoryTab = ({ setError, setNotice }: SettingsMemoryTabProp
 
   return (
     <div role="tabpanel" id="settings-panel-memory" className="space-y-3">
-      <nav className="flex items-center gap-0.5" aria-label="Memory layer tabs">
-        {MEMORY_SUB_TABS.map((sub) => (
-          <button
-            key={sub}
-            type="button"
-            onClick={() => setMemorySubTab(sub)}
-            className={cn(
-              'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
-              memorySubTab === sub
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground/80',
-            )}
-          >
-            {MEMORY_FIELD_LABELS[sub]}
-          </button>
-        ))}
-      </nav>
+      {showSubTabNav && (
+        <nav className="flex items-center gap-0.5" aria-label="Memory layer tabs">
+          {MEMORY_SUB_TABS.filter((sub) => availableTabs.includes(sub)).map((sub) => (
+            <button
+              key={sub}
+              type="button"
+              onClick={() => setMemorySubTab(sub)}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                memorySubTab === sub
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
+              )}
+            >
+              {MEMORY_FIELD_LABELS[sub]}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="space-y-2">
         <p className="text-[11px] text-muted-foreground">

@@ -21,6 +21,7 @@ export const InboxView = ({
   const activeView = useAppStore((state) => state.activeView);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
   const inboxTasks = useMemo(
     () =>
@@ -35,10 +36,6 @@ export const InboxView = ({
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading inbox...</p>
-        ) : null}
-
         {error ? (
           <p className="text-[11px] text-destructive">
             {error}
@@ -58,6 +55,7 @@ export const InboxView = ({
               placeholder: 'Type to capture...',
             }}
             triggerAdd={activeView === 'inbox' ? newTaskTrigger : undefined}
+            onRequestFocus={() => setFocusedIndex(0)}
           >
             <TaskList
               tasks={inboxTasks}
@@ -65,6 +63,9 @@ export const InboxView = ({
               emptyMessage="Inbox is empty."
               ariaLabel="Inbox tasks"
               scopeId="inbox"
+              isPrimaryList
+              focusedIndex={focusedIndex}
+              onFocusedIndexChange={setFocusedIndex}
             />
           </SectionGroup>
         ) : null}

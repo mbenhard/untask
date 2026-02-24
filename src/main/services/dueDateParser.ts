@@ -37,6 +37,21 @@ export const parseDueDate = (value: string | null | undefined): ParsedDueDate | 
 };
 
 /**
+ * Resolve the effective target time in ms for a due date.
+ * Date-only → 9 AM local. Date+time → exact time.
+ * Returns null if the value is empty or unparseable.
+ */
+export const resolveDueDateTargetMs = (
+  value: string | null | undefined,
+): number | null => {
+  const parsed = parseDueDate(value);
+  if (!parsed) return null;
+  return parsed.hasTime
+    ? parsed.ms
+    : new Date(parsed.dateStr + 'T09:00').getTime();
+};
+
+/**
  * Check if a dueDate is overdue relative to the given timestamp.
  * For date-only dueDates, overdue after 9 AM on the due date
  * (matching the notification trigger time).
@@ -49,16 +64,9 @@ export const isDueDateOverdue = (
   value: string | null | undefined,
   nowMs: number,
 ): boolean => {
-  const parsed = parseDueDate(value);
-  if (!parsed) return false;
-
-  if (parsed.hasTime) {
-    return parsed.ms < nowMs;
-  }
-
-  // Date-only: overdue after 9 AM on the due date
-  const nineAm = new Date(parsed.dateStr + 'T09:00');
-  return nineAm.getTime() <= nowMs;
+  const targetMs = resolveDueDateTargetMs(value);
+  if (targetMs === null) return false;
+  return targetMs <= nowMs;
 };
 
 /**

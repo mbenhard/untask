@@ -1,144 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+import { ApiKeyManager, type OllamaConnectionStatus } from './ApiKeyManager';
+import type { OllamaPullProgressPayload } from '../../../types/ipc';
+import { ModelCatalogView, getCuratedModelsForProvider, type OllamaModelOption } from './ModelCatalogView';
+import { ProviderSelector } from './ProviderSelector';
 import { SegmentedControl } from './SegmentedControl';
+import { SettingsMemoryTab } from './SettingsMemoryTab';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
-import { SettingsSelect } from './SettingsSelect';
 
 // ─── Provider types ──────────────────────────────────────────────────────────
 
 type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
-
-type CostTier = 'free' | 'cheap' | 'moderate' | 'premium';
-
-type CuratedModel = {
-  id: string;
-  name: string;
-  provider: ProviderType;
-  costTier: CostTier;
-  capabilities: ('tools' | 'vision' | 'reasoning')[];
-  isDefault?: boolean;
-  isRecommended?: boolean;
-};
-
-// ─── Static curated model list (mirrors main/ai/models.ts) ───────────────────
-
-const CURATED_MODELS: readonly CuratedModel[] = [
-  {
-    id: 'openai/gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    provider: 'openrouter',
-    costTier: 'cheap',
-    capabilities: ['tools', 'vision'],
-    isDefault: true,
-    isRecommended: true,
-  },
-  {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    provider: 'openai',
-    costTier: 'cheap',
-    capabilities: ['tools', 'vision'],
-    isDefault: true,
-    isRecommended: true,
-  },
-  {
-    id: 'openai/gpt-4o',
-    name: 'GPT-4o',
-    provider: 'openrouter',
-    costTier: 'moderate',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
-  {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
-    provider: 'openai',
-    costTier: 'moderate',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
-  {
-    id: 'anthropic/claude-sonnet-4-5',
-    name: 'Claude Sonnet 4.5',
-    provider: 'openrouter',
-    costTier: 'moderate',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
-  {
-    id: 'claude-sonnet-4-5-20250929',
-    name: 'Claude Sonnet 4.5',
-    provider: 'anthropic',
-    costTier: 'moderate',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isDefault: true,
-    isRecommended: true,
-  },
-  {
-    id: 'anthropic/claude-haiku-4-5',
-    name: 'Claude Haiku 4.5',
-    provider: 'openrouter',
-    costTier: 'cheap',
-    capabilities: ['tools'],
-    isRecommended: true,
-  },
-  {
-    id: 'claude-haiku-4-5-20251001',
-    name: 'Claude Haiku 4.5',
-    provider: 'anthropic',
-    costTier: 'cheap',
-    capabilities: ['tools'],
-    isRecommended: true,
-  },
-  {
-    id: 'google/gemini-2.5-flash-preview',
-    name: 'Gemini 2.5 Flash',
-    provider: 'openrouter',
-    costTier: 'free',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
-  {
-    id: 'google/gemini-3-flash-preview',
-    name: 'Gemini 3 Flash',
-    provider: 'openrouter',
-    costTier: 'cheap',
-    capabilities: ['tools', 'vision', 'reasoning'],
-    isRecommended: true,
-  },
-  {
-    id: 'z-ai/glm-4.7-flash',
-    name: 'GLM 4.7 Flash',
-    provider: 'openrouter',
-    costTier: 'free',
-    capabilities: ['tools', 'reasoning'],
-    isRecommended: true,
-  },
-  {
-    id: 'llama3.3:70b',
-    name: 'Llama 3.3 70B',
-    provider: 'ollama',
-    costTier: 'free',
-    capabilities: ['tools'],
-    isDefault: true,
-    isRecommended: true,
-  },
-  {
-    id: 'qwen3:8b',
-    name: 'Qwen 3 8B',
-    provider: 'ollama',
-    costTier: 'free',
-    capabilities: ['tools'],
-    isRecommended: true,
-  },
-];
-
-// ─── Provider metadata ────────────────────────────────────────────────────────
 
 const PROVIDER_LABELS: Record<ProviderType, string> = {
   openrouter: 'OpenRouter',
@@ -147,61 +23,24 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
   ollama: 'Ollama',
 };
 
-const PROVIDER_KEY_LINKS: Record<ProviderType, string | null> = {
-  openrouter: 'https://openrouter.ai/keys',
-  openai: 'https://platform.openai.com/api-keys',
-  anthropic: 'https://console.anthropic.com/settings/keys',
-  ollama: 'https://ollama.com/download',
-};
-
-const PROVIDER_KEY_PLACEHOLDER: Record<ProviderType, string> = {
-  openrouter: 'sk-or-...',
-  openai: 'sk-...',
-  anthropic: 'sk-ant-...',
-  ollama: '',
-};
-
-const COST_TIER_LABEL: Record<CostTier, string> = {
-  free: 'Free',
-  cheap: '$',
-  moderate: '$$',
-  premium: '$$$',
-};
-
 // ─── Setting key constants ────────────────────────────────────────────────────
 
 const SETTING_KEY_AI_PROVIDER = 'ai_provider';
 const SETTING_KEY_AI_OLLAMA_BASE_URL = 'ai_ollama_base_url';
 
-
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getCuratedModelsForProvider = (provider: ProviderType): CuratedModel[] =>
-  CURATED_MODELS.filter((m) => m.provider === provider);
-
-const buildModelLabel = (model: CuratedModel): string => {
-  const caps: string[] = [];
-  if (model.capabilities.includes('tools')) caps.push('tools');
-  if (model.capabilities.includes('vision')) caps.push('vision');
-  if (model.capabilities.includes('reasoning')) caps.push('reasoning');
-  const capStr = caps.length > 0 ? ` · ${caps.join(', ')}` : '';
-  const costStr = ` · ${COST_TIER_LABEL[model.costTier]}`;
-  return `${model.name}${capStr}${costStr}`;
-};
-
 const isValidProvider = (value: string): value is ProviderType =>
   ['openrouter', 'openai', 'anthropic', 'ollama'].includes(value);
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Hook: AI tab state ──────────────────────────────────────────────────────
 
-type SettingsAIProps = {
-  setError: (error: string | null) => void;
-  setNotice: (notice: string | null) => void;
-};
-
-export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
+const useAITabState = (
+  setError: (error: string | null) => void,
+  setNotice: (notice: string | null) => void,
+) => {
   const aiEnabled = useAppStore(selectAiEnabled);
   const setAiEnabledStore = useAppStore((state) => state.setAiEnabled);
 
@@ -226,10 +65,17 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   const [isLoadingOllamaUrl, setIsLoadingOllamaUrl] = useState(false);
   const [isSavingOllamaUrl, setIsSavingOllamaUrl] = useState(false);
 
+  // Ollama detection
+  const [ollamaStatus, setOllamaStatus] = useState<OllamaConnectionStatus>('loading');
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelOption[]>([]);
+  const [detectedBaseUrl, setDetectedBaseUrl] = useState<string>(DEFAULT_OLLAMA_BASE_URL);
+
+  // Ollama pull
+  const [pullProgress, setPullProgress] = useState<OllamaPullProgressPayload | null>(null);
+
   // Model
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
-
 
   // Behavior
   const [autonomyMode, setAutonomyMode] = useState<'auto' | 'confirm'>('auto');
@@ -237,7 +83,10 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
   const [retentionMode, setRetentionMode] = useState<'session' | '30d' | 'forever'>('session');
   const [isLoadingRetention, setIsLoadingRetention] = useState(false);
 
-  // ─── Loaders ────────────────────────────────────────────────────────────────
+  // Sub-tabs
+  const [activeSubTab, setActiveSubTab] = useState<'ai' | 'identity' | 'knowledge'>('ai');
+
+  // ─── Loaders ──────────────────────────────────────────────────────────────
 
   const loadAiEnabled = useCallback(async () => {
     try {
@@ -294,6 +143,27 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     }
   }, [setError]);
 
+  const loadOllamaStatus = useCallback(async () => {
+    try {
+      setOllamaStatus('loading');
+      const result = await getUntask().chat.getOllamaStatus();
+      setOllamaStatus(result.status);
+      setDetectedBaseUrl(result.baseUrl);
+      setOllamaBaseUrl(result.baseUrl);
+      setOllamaModels(
+        result.models.map((m) => ({
+          name: m.name,
+          parameterSize: m.parameterSize,
+          supportsTools: m.supportsTools,
+        })),
+      );
+      return result;
+    } catch {
+      setOllamaStatus('not_running');
+      return null;
+    }
+  }, []);
+
   const loadSelectedModel = useCallback(async () => {
     try {
       setIsLoadingModel(true);
@@ -305,8 +175,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
       setIsLoadingModel(false);
     }
   }, [setError]);
-
-
 
   const loadAutonomyMode = useCallback(async () => {
     try {
@@ -341,18 +209,38 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
       void loadSelectedModel();
       void loadAutonomyMode();
       void loadRetentionMode();
+
+      if (resolvedProvider === 'ollama') {
+        void loadOllamaStatus();
+      }
     })();
   }, [
     loadAiEnabled,
     loadProvider,
     loadApiKeyStatus,
     loadOllamaBaseUrl,
+    loadOllamaStatus,
     loadSelectedModel,
     loadAutonomyMode,
     loadRetentionMode,
   ]);
 
-  // ─── Handlers ────────────────────────────────────────────────────────────────
+  // ─── Ollama pull progress listener ────────────────────────────────────────
+
+  useEffect(() => {
+    const unsub = getUntask().chat.onOllamaPullProgress((progress) => {
+      setPullProgress(progress);
+      if (progress.status === 'success') {
+        void loadOllamaStatus();
+        setTimeout(() => setPullProgress(null), 2000);
+      } else if (progress.status === 'error') {
+        setTimeout(() => setPullProgress(null), 5000);
+      }
+    });
+    return unsub;
+  }, [loadOllamaStatus]);
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────
 
   const handleAiEnabledChange = useCallback(
     async (value: 'on' | 'off') => {
@@ -387,17 +275,24 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
       try {
         await getUntask().settings.set(SETTING_KEY_AI_PROVIDER, value);
 
-        // Load key status for new provider
-        if (value !== 'ollama') {
+        if (value === 'ollama') {
+          // Run detection and auto-select first model
+          const detection = await loadOllamaStatus();
+          if (detection?.defaultModelName) {
+            const result = await getUntask().chat.setSelectedModel({ modelId: detection.defaultModelName });
+            setSelectedModelId(result.modelId);
+          }
+        } else {
+          // Load key status for new provider
           await loadApiKeyStatus(value);
-        }
 
-        // Reset selected model to provider default
-        const providerModels = getCuratedModelsForProvider(value);
-        const defaultModel = providerModels.find((m) => m.isDefault) ?? providerModels[0];
-        if (defaultModel) {
-          const result = await getUntask().chat.setSelectedModel({ modelId: defaultModel.id });
-          setSelectedModelId(result.modelId);
+          // Reset selected model to provider default
+          const providerModels = getCuratedModelsForProvider(value);
+          const defaultModel = providerModels.find((m) => m.isDefault) ?? providerModels[0];
+          if (defaultModel) {
+            const result = await getUntask().chat.setSelectedModel({ modelId: defaultModel.id });
+            setSelectedModelId(result.modelId);
+          }
         }
 
         setNotice(`Provider changed to ${PROVIDER_LABELS[value]}.`);
@@ -406,7 +301,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
         setError(e instanceof Error ? e.message : 'Failed to update provider.');
       }
     },
-    [provider, setError, setNotice, loadApiKeyStatus],
+    [provider, setError, setNotice, loadApiKeyStatus, loadOllamaStatus],
   );
 
   const handleSaveApiKey = useCallback(async () => {
@@ -479,11 +374,11 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     }
   }, [provider, setError, setNotice]);
 
-  const handleSaveOllamaUrl = useCallback(async () => {
+  const handleSaveOllamaUrl = useCallback(async (): Promise<boolean> => {
     const normalized = ollamaBaseUrl.trim();
     if (normalized.length === 0) {
       setError('Enter a valid Ollama base URL.');
-      return;
+      return false;
     }
 
     try {
@@ -492,12 +387,16 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
       setNotice(null);
       await getUntask().settings.set(SETTING_KEY_AI_OLLAMA_BASE_URL, normalized);
       setNotice('Ollama base URL saved.');
+      // Re-run detection with new URL
+      void loadOllamaStatus();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save Ollama base URL.');
+      return false;
     } finally {
       setIsSavingOllamaUrl(false);
     }
-  }, [ollamaBaseUrl, setError, setNotice]);
+  }, [ollamaBaseUrl, setError, setNotice, loadOllamaStatus]);
 
   const handleModelChange = useCallback(
     async (modelId: string) => {
@@ -517,8 +416,6 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     },
     [selectedModelId, setError, setNotice],
   );
-
-
 
   const handleAutonomyChange = useCallback(
     async (mode: 'auto' | 'confirm') => {
@@ -558,230 +455,258 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
     [retentionMode, setError, setNotice],
   );
 
-  // ─── Derived values ──────────────────────────────────────────────────────────
+  const handleApiKeyInputChange = useCallback((value: string) => {
+    setApiKeyInput(value);
+    setApiKeyValid(null);
+    setApiKeyError(null);
+  }, []);
 
-  const providerModels = getCuratedModelsForProvider(provider);
-  const modelOptions = providerModels.map((m) => ({
-    value: m.id,
-    label: buildModelLabel(m),
-  }));
+  const handlePullModel = useCallback(
+    async (model: string) => {
+      setError(null);
+      setNotice(null);
+      try {
+        const result = await getUntask().chat.pullOllamaModel({ model });
+        if (result.ok) {
+          // Auto-select the newly pulled model after list refresh
+          const status = await getUntask().chat.getOllamaStatus();
+          const matchedModel = status.models.find(
+            (m) => m.name === model || m.name === `${model}:latest` || m.name.startsWith(`${model}:`),
+          );
+          if (matchedModel) {
+            const selectResult = await getUntask().chat.setSelectedModel({ modelId: matchedModel.name });
+            setSelectedModelId(selectResult.modelId);
+          }
+        } else if (result.error) {
+          setError(result.error);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to pull model.');
+      }
+    },
+    [setError, setNotice],
+  );
 
-  const isKeyedProvider = provider !== 'ollama';
-  const keyLink = PROVIDER_KEY_LINKS[provider];
+  const handleCancelPull = useCallback(() => {
+    void getUntask().chat.cancelOllamaPull();
+    setPullProgress(null);
+  }, []);
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  return {
+    // AI enabled
+    aiEnabled,
+    isLoadingAiEnabled,
+    handleAiEnabledChange,
+    // Provider
+    provider,
+    isLoadingProvider,
+    handleProviderChange,
+    // API key
+    apiKeyInput,
+    handleApiKeyInputChange,
+    hasApiKey,
+    isLoadingApiKey,
+    isSavingApiKey,
+    apiKeyValid,
+    apiKeyValidating,
+    apiKeyError,
+    handleValidateApiKey,
+    handleSaveApiKey,
+    handleClearApiKey,
+    // Ollama
+    ollamaBaseUrl,
+    setOllamaBaseUrl,
+    isLoadingOllamaUrl,
+    isSavingOllamaUrl,
+    handleSaveOllamaUrl,
+    ollamaStatus,
+    ollamaModels,
+    detectedBaseUrl,
+    pullProgress,
+    handlePullModel,
+    handleCancelPull,
+    // Model
+    selectedModelId,
+    isLoadingModel,
+    handleModelChange,
+    // Behavior
+    autonomyMode,
+    isLoadingAutonomy,
+    handleAutonomyChange,
+    retentionMode,
+    isLoadingRetention,
+    handleRetentionChange,
+    // Sub-tabs
+    activeSubTab,
+    setActiveSubTab,
+  };
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+type SettingsAIProps = {
+  setError: (error: string | null) => void;
+  setNotice: (notice: string | null) => void;
+};
+
+export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
+  const state = useAITabState(setError, setNotice);
+
+  const isKeyedProvider = state.provider !== 'ollama';
+
+  const renderSubTabContent = () => {
+    switch (state.activeSubTab) {
+      case 'identity':
+        return <SettingsMemoryTab setError={setError} setNotice={setNotice} availableTabs={['identity']} />;
+      case 'knowledge':
+        return <SettingsMemoryTab setError={setError} setNotice={setNotice} availableTabs={['memory']} />;
+      case 'ai':
+      default:
+        return (
+          <>
+            {/* ── Provider ──────────────────────────────────────────────────── */}
+            <SettingsSection title="Provider">
+              <ProviderSelector
+                provider={state.provider}
+                loading={state.isLoadingProvider}
+                onChange={(v) => void state.handleProviderChange(v)}
+              />
+            </SettingsSection>
+
+            {/* ── API Key / Connection ──────────────────────────────────────── */}
+            <SettingsSection title={isKeyedProvider ? 'API Key' : 'Connection'}>
+              <ApiKeyManager
+                provider={state.provider}
+                apiKeyInput={state.apiKeyInput}
+                onApiKeyInputChange={state.handleApiKeyInputChange}
+                hasApiKey={state.hasApiKey}
+                isLoadingApiKey={state.isLoadingApiKey}
+                isSavingApiKey={state.isSavingApiKey}
+                apiKeyValid={state.apiKeyValid}
+                apiKeyValidating={state.apiKeyValidating}
+                apiKeyError={state.apiKeyError}
+                onValidateApiKey={() => void state.handleValidateApiKey()}
+                onSaveApiKey={() => void state.handleSaveApiKey()}
+                onClearApiKey={() => void state.handleClearApiKey()}
+                ollamaBaseUrl={state.ollamaBaseUrl}
+                onOllamaBaseUrlChange={state.setOllamaBaseUrl}
+                isLoadingOllamaUrl={state.isLoadingOllamaUrl}
+                isSavingOllamaUrl={state.isSavingOllamaUrl}
+                defaultOllamaBaseUrl={DEFAULT_OLLAMA_BASE_URL}
+                onSaveOllamaUrl={() => state.handleSaveOllamaUrl()}
+                ollamaStatus={state.ollamaStatus}
+                detectedBaseUrl={state.detectedBaseUrl}
+              />
+            </SettingsSection>
+
+            {/* ── Model ─────────────────────────────────────────────────────── */}
+            <SettingsSection title="Model">
+              <ModelCatalogView
+                provider={state.provider}
+                selectedModelId={state.selectedModelId}
+                loading={state.isLoadingModel}
+                onChange={(v) => void state.handleModelChange(v)}
+                ollamaModels={state.ollamaModels}
+                ollamaStatus={state.ollamaStatus}
+                pullProgress={state.pullProgress}
+                onPullModel={(m) => void state.handlePullModel(m)}
+                onCancelPull={state.handleCancelPull}
+              />
+            </SettingsSection>
+
+            {/* ── Behavior ──────────────────────────────────────────────────── */}
+            <SettingsSection title="Behavior">
+              <SettingsRow label="Autonomy" loading={state.isLoadingAutonomy}>
+                <SegmentedControl
+                  options={[
+                    { value: 'auto' as const, label: 'Auto' },
+                    { value: 'confirm' as const, label: 'Confirm' },
+                  ]}
+                  value={state.autonomyMode}
+                  onChange={(v) => void state.handleAutonomyChange(v as 'auto' | 'confirm')}
+                />
+              </SettingsRow>
+              <SettingsRow label="Chat retention" loading={state.isLoadingRetention}>
+                <SegmentedControl
+                  options={[
+                    { value: 'session' as const, label: 'Session' },
+                    { value: '30d' as const, label: '30 days' },
+                    { value: 'forever' as const, label: 'Forever' },
+                  ]}
+                  value={state.retentionMode}
+                  onChange={(v) => void state.handleRetentionChange(v as 'session' | '30d' | 'forever')}
+                />
+              </SettingsRow>
+            </SettingsSection>
+
+          </>
+        );
+    }
+  };
 
   return (
     <div role="tabpanel" id="settings-panel-ai" className="space-y-3">
-
-      {/* ── Assistant toggle ─────────────────────────────────────────────── */}
       <SettingsSection title="Assistant">
         <SettingsRow
           label="Enable AI assistant"
           hint="When off, the app works as a pure task manager. Chat history and memory are preserved."
-          loading={isLoadingAiEnabled}
+          loading={state.isLoadingAiEnabled}
         >
           <SegmentedControl
             options={[
               { value: 'on' as const, label: 'On' },
               { value: 'off' as const, label: 'Off' },
             ]}
-            value={aiEnabled ? 'on' : 'off'}
-            onChange={(v) => void handleAiEnabledChange(v as 'on' | 'off')}
+            value={state.aiEnabled ? 'on' : 'off'}
+            onChange={(v) => void state.handleAiEnabledChange(v as 'on' | 'off')}
           />
         </SettingsRow>
       </SettingsSection>
 
-      {aiEnabled ? (
+      {state.aiEnabled && (
         <>
-          {/* ── Provider ──────────────────────────────────────────────────── */}
-          <SettingsSection title="Provider">
-            <SettingsRow label="AI provider" loading={isLoadingProvider}>
-              <SettingsSelect
-                options={[
-                  { value: 'openrouter', label: 'OpenRouter' },
-                  { value: 'openai', label: 'OpenAI' },
-                  { value: 'anthropic', label: 'Anthropic' },
-                  { value: 'ollama', label: 'Ollama (local)' },
-                ]}
-                value={provider}
-                onChange={(v) => void handleProviderChange(v)}
-                aria-label="AI provider"
-              />
-            </SettingsRow>
-          </SettingsSection>
-
-          {/* ── API Key / Connection ──────────────────────────────────────── */}
-          <SettingsSection title={isKeyedProvider ? 'API Key' : 'Connection'}>
-            <div className="px-2 py-2">
-              {isKeyedProvider ? (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="password"
-                      value={apiKeyInput}
-                      onChange={(event) => {
-                        setApiKeyInput(event.target.value);
-                        setApiKeyValid(null);
-                        setApiKeyError(null);
-                      }}
-                      placeholder={
-                        isLoadingApiKey
-                          ? 'Checking...'
-                          : hasApiKey
-                            ? 'Saved key (enter to replace)'
-                            : PROVIDER_KEY_PLACEHOLDER[provider]
-                      }
-                      disabled={isLoadingApiKey || isSavingApiKey}
-                      className="h-7 flex-1 text-[11px]"
-                      aria-label={`${PROVIDER_LABELS[provider]} API key`}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleValidateApiKey()}
-                      disabled={isLoadingApiKey || isSavingApiKey || apiKeyValidating || apiKeyInput.trim().length === 0}
-                      className="h-7 text-[11px]"
-                    >
-                      {apiKeyValidating ? 'Checking...' : 'Validate'}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => void handleSaveApiKey()}
-                      disabled={isLoadingApiKey || isSavingApiKey || apiKeyInput.trim().length === 0}
-                      className="h-7 text-[11px]"
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void handleClearApiKey()}
-                      disabled={isLoadingApiKey || isSavingApiKey || !hasApiKey}
-                      className="h-7 text-[11px]"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-
-                  {/* Status line */}
-                  <div className="flex items-center gap-1.5">
-                    {apiKeyValid === true ? (
-                      <span className="text-[11px] text-green-600 dark:text-green-400">Key is valid.</span>
-                    ) : apiKeyError ? (
-                      <span className="text-[11px] text-destructive">{apiKeyError}</span>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground">
-                        {isLoadingApiKey
-                          ? 'Checking key status...'
-                          : hasApiKey
-                            ? 'A key is currently saved.'
-                            : 'No key saved yet.'}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* "Where do I get a key?" link */}
-                  {keyLink ? (
-                    <p className="text-[11px] text-muted-foreground">
-                      <a
-                        href={keyLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-2 hover:text-foreground"
-                      >
-                        Where do I get a {PROVIDER_LABELS[provider]} key?
-                      </a>
-                    </p>
-                  ) : null}
-                </div>
-              ) : (
-                /* Ollama base URL */
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="text"
-                      value={ollamaBaseUrl}
-                      onChange={(event) => setOllamaBaseUrl(event.target.value)}
-                      placeholder={DEFAULT_OLLAMA_BASE_URL}
-                      disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-                      className="h-7 flex-1 text-[11px]"
-                      aria-label="Ollama base URL"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => void handleSaveOllamaUrl()}
-                      disabled={isLoadingOllamaUrl || isSavingOllamaUrl}
-                      className="h-7 text-[11px]"
-                    >
-                      Save
-                    </Button>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Ollama runs locally. No API key required.{' '}
-                    {keyLink ? (
-                      <a
-                        href={keyLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-2 hover:text-foreground"
-                      >
-                        Install Ollama
-                      </a>
-                    ) : null}
-                  </p>
-                </div>
+          <nav className="flex items-center gap-0.5" aria-label="Assistant sub-tabs">
+            <button
+              type="button"
+              onClick={() => state.setActiveSubTab('ai')}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                state.activeSubTab === 'ai'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
               )}
-            </div>
-          </SettingsSection>
+            >
+              AI
+            </button>
+            <button
+              type="button"
+              onClick={() => state.setActiveSubTab('identity')}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                state.activeSubTab === 'identity'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
+              )}
+            >
+              Identity
+            </button>
+            <button
+              type="button"
+              onClick={() => state.setActiveSubTab('knowledge')}
+              className={cn(
+                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                state.activeSubTab === 'knowledge'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80',
+              )}
+            >
+              Knowledge
+            </button>
+          </nav>
 
-          {/* ── Model ─────────────────────────────────────────────────────── */}
-          <SettingsSection title="Model">
-            <SettingsRow label="Active model" loading={isLoadingModel}>
-              <SettingsSelect
-                options={
-                  modelOptions.length > 0
-                    ? modelOptions
-                    : [{ value: selectedModelId ?? '', label: selectedModelId ?? '' }]
-                }
-                value={selectedModelId ?? ''}
-                onChange={(v) => void handleModelChange(v)}
-                aria-label="AI model"
-                className="max-w-[260px]"
-              />
-            </SettingsRow>
-          </SettingsSection>
-
-          {/* ── Behavior ──────────────────────────────────────────────────── */}
-          <SettingsSection title="Behavior">
-            <SettingsRow label="Autonomy" loading={isLoadingAutonomy}>
-              <SegmentedControl
-                options={[
-                  { value: 'auto' as const, label: 'Auto' },
-                  { value: 'confirm' as const, label: 'Confirm' },
-                ]}
-                value={autonomyMode}
-                onChange={(v) => void handleAutonomyChange(v as 'auto' | 'confirm')}
-              />
-            </SettingsRow>
-            <SettingsRow label="Chat retention" loading={isLoadingRetention}>
-              <SegmentedControl
-                options={[
-                  { value: 'session' as const, label: 'Session' },
-                  { value: '30d' as const, label: '30 days' },
-                  { value: 'forever' as const, label: 'Forever' },
-                ]}
-                value={retentionMode}
-                onChange={(v) => void handleRetentionChange(v as 'session' | '30d' | 'forever')}
-              />
-            </SettingsRow>
-          </SettingsSection>
+          {renderSubTabContent()}
         </>
-      ) : null}
+      )}
     </div>
   );
 };

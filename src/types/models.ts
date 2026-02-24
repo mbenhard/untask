@@ -31,7 +31,11 @@ export type TaskStatusConfig = {
 const statusMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s]));
 
 export function getStatusDef(id: PredefinedStatusId) {
-  return statusMap.get(id)!;
+  const statusDef = statusMap.get(id);
+  if (!statusDef) {
+    throw new Error(`Unknown task status id: ${id}`);
+  }
+  return statusDef;
 }
 
 export function getStatusLabel(id: PredefinedStatusId): string {
@@ -74,6 +78,7 @@ export type Task = {
   effort: 'unknown' | 'tiny' | 'small' | 'medium' | 'deep' | null;
   recurrence: string | null;
   recurrenceSourceId: string | null;
+  reminderOffset: string | null;
   order: number | null;
   createdAt: string | null;
   completedAt: string | null;
@@ -104,6 +109,7 @@ export type Note = {
   title: string;
   content: string;
   status: 'active' | 'archived';
+  isPinned: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 };

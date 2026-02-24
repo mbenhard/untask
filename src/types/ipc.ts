@@ -39,7 +39,6 @@ export const IPC_CHANNELS = {
   // ─── App/window lifecycle channels ──────────────────────
   APP_REQUEST_HIDE: 'app:request-hide',
   APP_ESCAPE_LAYER_EXIT: 'app:escape-layer-exit',
-  APP_QUICK_ADD_PAYLOAD: 'app:quick-add-payload',
   APP_BACKUP_RESTORED: 'app:backup-restored',
   APP_GET_LAUNCH_AT_LOGIN: 'app:get-launch-at-login',
   APP_SET_LAUNCH_AT_LOGIN: 'app:set-launch-at-login',
@@ -49,7 +48,9 @@ export const IPC_CHANNELS = {
   APP_MENU_NEW_NOTE: 'app:menu-new-note',
   APP_GET_DOCK_MODE: 'app:get-dock-mode',
   APP_SET_DOCK_MODE: 'app:set-dock-mode',
+  APP_GET_VERSION: 'app:get-version',
   SHORTCUT_UPDATE: 'shortcut:update',
+  SHORTCUT_GET_REGISTRATION_STATUS: 'shortcut:get-registration-status',
 
   SETTINGS_GET_BOOTSTRAP_STATE: 'settings:get-bootstrap-state',
   SETTINGS_GET_IDENTITY_CONTEXT_SNAPSHOT:
@@ -68,8 +69,11 @@ export const IPC_CHANNELS = {
   TASK_CANCEL: 'task:cancel',
   TASK_REOPEN: 'task:reopen',
   TASK_TOGGLE_TODAY: 'task:toggle-today',
+  TASK_NAVIGATE: 'task:navigate',
   TASK_GET_STATUSES: 'task:get-statuses',
   TASK_SET_STATUSES: 'task:set-statuses',
+  TASK_UNDO_LAST_USER_ACTION: 'task:undo-last-user-action',
+  TASK_DATA_CHANGED: 'task:data-changed',
   CHAT_SEND: 'chat:send',
   CHAT_STREAM_EVENT: 'chat:stream-event',
   CHAT_HISTORY: 'chat:history',
@@ -91,6 +95,11 @@ export const IPC_CHANNELS = {
   CHAT_CANCEL: 'chat:cancel',
   CHAT_LIST_PENDING_ACTIONS: 'chat:list-pending-actions',
   CHAT_FOCUS_MESSAGE: 'chat:focus-message',
+  OLLAMA_STATUS: 'ollama:status',
+  OLLAMA_PULL: 'ollama:pull',
+  OLLAMA_PULL_PROGRESS: 'ollama:pull-progress',
+  OLLAMA_PULL_CANCEL: 'ollama:pull-cancel',
+  OLLAMA_WARMUP: 'ollama:warmup',
   BACKUP_LIST: 'backup:list',
   BACKUP_CREATE: 'backup:create',
   BACKUP_EXPORT: 'backup:export',
@@ -103,7 +112,11 @@ export const IPC_CHANNELS = {
   NOTES_CREATE: 'notes:create',
   NOTES_SAVE: 'notes:save',
   NOTES_ARCHIVE: 'notes:archive',
+  NOTES_RESTORE: 'notes:restore',
   NOTES_DELETE: 'notes:delete',
+  NOTES_PIN: 'notes:pin',
+  NOTES_UNPIN: 'notes:unpin',
+  NOTES_DUPLICATE: 'notes:duplicate',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_GET_ALL: 'settings:get-all',
@@ -121,11 +134,31 @@ export const IPC_CHANNELS = {
   // ─── Update checker channels ──────────────────────────────
   APP_CHECK_FOR_UPDATES: 'app:check-for-updates',
   APP_GET_UPDATE_INFO: 'app:get-update-info',
+  APP_UPDATE_AVAILABLE: 'app:update-available',
   SETTINGS_GET_MEMORY_STATE: 'settings:get-memory-state',
   SETTINGS_UPDATE_MEMORY_STATE: 'settings:update-memory-state',
   SETTINGS_READ_JOURNAL: 'settings:read-journal',
   SETTINGS_GET_MEMORY_HISTORY: 'settings:get-memory-history',
   SETTINGS_UNDO_MEMORY_EVENT: 'settings:undo-memory-event',
+  // ─── Reminders sync channels ────────────────────────────
+  REMINDERS_GET_STATUS: 'reminders:get-status',
+  REMINDERS_TOGGLE: 'reminders:toggle',
+  REMINDERS_SET_FILTER: 'reminders:set-filter',
+  REMINDERS_SET_IMPORT: 'reminders:set-import',
+  REMINDERS_REQUEST_ACCESS: 'reminders:request-access',
+  REMINDERS_FORCE_SYNC: 'reminders:force-sync',
+  REMINDERS_PULL_ONLY: 'reminders:pull-only',
+  REMINDERS_SYNC_STATUS: 'reminders:sync-status',
+  // ─── Notification channels ──────────────────────────────
+  NOTIFICATIONS_FIRE_TEST: 'notifications:fire-test',
+  NOTIFICATIONS_PROBE_PERMISSION: 'notifications:probe-permission',
+  NOTIFICATIONS_OPEN_SETTINGS: 'notifications:open-settings',
+  // ─── Attachment channels ─────────────────────────────────
+  // ─── Quick add channels ──────────────────────────────────
+  QUICK_ADD_HIDE: 'quick-add:hide',
+  QUICK_ADD_RESIZE: 'quick-add:resize',
+  QUICK_ADD_PAYLOAD: 'quick-add:payload',
+  QUICK_ADD_NAVIGATE_TASK: 'quick-add:navigate-task',
   // ─── Attachment channels ─────────────────────────────────
   ATTACHMENT_SAVE: 'attachment:save',
   ATTACHMENT_OPEN: 'attachment:open',
@@ -133,6 +166,8 @@ export const IPC_CHANNELS = {
   ATTACHMENT_DELETE: 'attachment:delete',
   ATTACHMENT_READ: 'attachment:read',
   ATTACHMENT_PICK_AND_SAVE: 'attachment:pick-and-save',
+  // --- Shell channels ---
+  SHELL_OPEN_EXTERNAL: 'shell:open-external',
 } as const;
 
 export type SettingsBootstrapState = {
@@ -227,6 +262,10 @@ export type SettingsUndoMemoryEventResultPayload = {
   revertedEventIds: string[];
 };
 
+export type TaskNavigatePayload = {
+  taskId: string;
+};
+
 export type TaskDeleteRequestPayload = string | {
   id: string;
   cascade?: boolean;
@@ -237,11 +276,26 @@ export type TaskCompleteRequestPayload = string | {
   completeChildren?: boolean;
 };
 
+export type TaskUndoResultPayload = {
+  ok: boolean;
+  undone: boolean;
+  message?: string;
+  targetTaskId?: string;
+  originalEventId?: string;
+  originalAction?: 'create' | 'update' | 'move' | 'complete' | 'cancel' | 'delete';
+};
+
 // ─── App/window lifecycle payloads ────────────────────────
 
 export type QuickAddPayload = {
   text: string;
   source: 'clipboard-url' | 'clipboard-text' | 'empty';
+};
+
+export type QuickAddWindowPayload = {
+  text: string;
+  source: 'clipboard-url' | 'clipboard-text' | 'empty';
+  theme: 'dark' | 'light';
 };
 
 export type LaunchAtLoginPayload = {
@@ -264,6 +318,10 @@ export type DockMode = 'normal' | 'dock-only' | 'menu-bar-only';
 
 export type DockModeResult = {
   mode: DockMode;
+};
+
+export type ShortcutRegistrationStatusResult = {
+  status: Record<string, boolean>;
 };
 
 // ─── Backup payloads ──────────────────────────────────────
@@ -315,7 +373,8 @@ export type SearchQueryRequest = {
   limit?: number;
 };
 
-export type SearchResultItem = {
+export type TaskSearchResultItem = {
+  type: 'task';
   id: string;
   parentId: string | null;
   title: string;
@@ -328,9 +387,19 @@ export type SearchResultItem = {
   snippet: string;
 };
 
+export type NoteSearchResultItem = {
+  type: 'note';
+  id: string;
+  title: string;
+  snippet: string;
+};
+
+export type SearchResultItem = TaskSearchResultItem | NoteSearchResultItem;
+
 export type SearchQueryResponse = {
   results: SearchResultItem[];
   total: number;
+  types: ('task' | 'note')[];
 };
 
 export type SettingsGetAiEnabledResult = {
@@ -380,6 +449,7 @@ export type UpdateInfo = {
   latestVersion: string;
   releaseUrl: string;
   releaseNotes?: string;
+  installMethod: 'homebrew' | 'direct';
 };
 
 // ─── Attachment payloads ──────────────────────────────────
@@ -397,3 +467,58 @@ export type AttachmentPickAndSaveResult = {
   canceled: boolean;
   urls: string[];
 };
+
+// ─── Notification payloads ────────────────────────────────
+
+export type NotificationPermissionResult = {
+  status: 'granted' | 'denied';
+};
+
+// ─── Reminders sync payloads ─────────────────────────────
+
+export type RemindersSyncFilter = 'due_date_only' | 'today' | 'all';
+
+export type RemindersStatusResult = {
+  enabled: boolean;
+  authorized: boolean;
+  syncFilter: RemindersSyncFilter;
+  importEnabled: boolean;
+  lastSyncAt: string | null;
+  syncedCount: number;
+};
+
+export type RemindersSyncStatusPayload = {
+  status: 'syncing' | 'idle' | 'error';
+  message?: string;
+};
+
+// ─── Ollama detection payloads ────────────────────────────────
+
+export type OllamaStatusResult = {
+  status: 'not_installed' | 'not_running' | 'ready';
+  baseUrl: string;
+  models: Array<{
+    name: string;
+    size: number;
+    parameterSize: string;
+    family: string;
+    quantization: string;
+    supportsTools: boolean;
+  }>;
+  defaultModelName: string | null;
+};
+
+export type OllamaPullRequest = { model: string };
+export type OllamaPullResult = { ok: boolean; model: string; error?: string };
+export type OllamaPullProgressPayload = {
+  model: string;
+  status: string;
+  digest?: string;
+  total?: number;
+  completed?: number;
+  percent?: number;
+  error?: string;
+};
+
+export type OllamaWarmupRequest = { modelId: string; baseUrl?: string };
+export type OllamaWarmupResult = { ok: boolean; error?: string };

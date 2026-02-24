@@ -1,9 +1,20 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { Archive, ChevronRight, Plus, Sparkles, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronRight,
+  Clipboard,
+  Copy,
+  Pin,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 
 import type { Note } from '../../../types/models';
+import { useAutoFocusList } from '../../hooks/useAutoFocusList';
 import { useNotesListKeyboard } from '../../hooks/useNotesListKeyboard';
+import { deriveAutoTitle, getContentPreview, getDisplayTitle } from '../../lib/noteUtils';
 import { cn } from '../../lib/utils';
 import {
   selectActiveNotes,
@@ -13,6 +24,8 @@ import {
   useNotesStore,
 } from '../../stores/notesStore';
 import { Button } from '../ui/button';
+
+// ─── Helpers ─────────────────────────────────────────────────
 
 const formatRelativeTime = (iso: string | null): string => {
   if (!iso) return '';
@@ -27,103 +40,283 @@ const formatRelativeTime = (iso: string | null): string => {
   return `${days}d ago`;
 };
 
-const getPreview = (content: string): string => {
-  if (!content.trim()) return 'Empty note';
+// ─── Context Menu ────────────────────────────────────────────
 
-  try {
-    const blocks = JSON.parse(content) as Array<{
-      type?: string;
-      content?: Array<{ type?: string; text?: string }>;
-    }>;
-
-    if (!Array.isArray(blocks)) return 'Empty note';
-
-    for (const block of blocks) {
-      if (block.content && Array.isArray(block.content)) {
-        const text = block.content
-          .filter((c) => c.type === 'text' && c.text)
-          .map((c) => c.text)
-          .join('');
-        if (text.trim()) return text.trim();
-      }
-    }
-
-    return 'Empty note';
-  } catch {
-    // Legacy markdown — take first non-empty line.
-    const firstLine = content.split('\n').find((line) => line.trim());
-    return firstLine?.trim() || 'Empty note';
-  }
+type ContextMenuState = {
+  noteId: string;
+  x: number;
+  y: number;
+  isArchived: boolean;
+  isPinned: boolean;
 };
+
+type NoteContextMenuProps = ContextMenuState & {
+  onClose: () => void;
+  onPin: (id: string) => void;
+  onUnpin: (id: string) => void;
+  onArchive: (id: string) => void;
+  onRestore: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onCopyMarkdown: (id: string) => void;
+  onDelete: (id: string) => void;
+};
+
+const NoteContextMenu = ({
+  noteId,
+  x,
+  y,
+  isArchived,
+  isPinned,
+  onClose,
+  onPin,
+  onUnpin,
+  onArchive,
+  onRestore,
+  onDuplicate,
+  onCopyMarkdown,
+  onDelete,
+}: NoteContextMenuProps) => {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  useLayoutEffect(() => {
+    if (!menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    const el = menuRef.current;
+    if (rect.right > window.innerWidth) el.style.left = `${x - rect.width}px`;
+    if (rect.bottom > window.innerHeight) el.style.top = `${y - rect.height}px`;
+  }, [x, y]);
+
+  const itemClass = cn(
+    'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs',
+    'text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-100',
+  );
+
+  const action = (fn: (id: string) => void) => () => {
+    fn(noteId);
+    onClose();
+  };
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      className="fixed z-50 min-w-[180px] rounded-md border border-border/60 bg-popover p-1 shadow-md"
+      style={{ left: x, top: y }}
+    >
+      {isArchived ? (
+        <>
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onRestore)}>
+            <ArchiveRestore className="size-3.5" aria-hidden="true" />
+            <span>Restore</span>
+          </button>
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onCopyMarkdown)}>
+            <Clipboard className="size-3.5" aria-hidden="true" />
+            <span>Copy as Markdown</span>
+          </button>
+          <div className="my-1 h-px bg-border/60" />
+          <button
+            type="button"
+            role="menuitem"
+            className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
+            onClick={action(onDelete)}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            <span>Delete</span>
+          </button>
+        </>
+      ) : (
+        <>
+          <button type="button" role="menuitem" className={itemClass} onClick={action(isPinned ? onUnpin : onPin)}>
+            <Pin className="size-3.5" aria-hidden="true" />
+            <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+          </button>
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onArchive)}>
+            <Archive className="size-3.5" aria-hidden="true" />
+            <span>Archive</span>
+          </button>
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onDuplicate)}>
+            <Copy className="size-3.5" aria-hidden="true" />
+            <span>Duplicate</span>
+          </button>
+          <button type="button" role="menuitem" className={itemClass} onClick={action(onCopyMarkdown)}>
+            <Clipboard className="size-3.5" aria-hidden="true" />
+            <span>Copy as Markdown</span>
+          </button>
+          <div className="my-1 h-px bg-border/60" />
+          <button
+            type="button"
+            role="menuitem"
+            className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
+            onClick={action(onDelete)}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            <span>Delete</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ─── Note List Item ──────────────────────────────────────────
 
 type NoteListItemProps = {
   note: Note;
   selected: boolean;
   onClick: (id: string) => void;
   onHover: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, note: Note) => void;
+  // Archived-only hover actions
+  onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
+  // Active-only hover actions
+  onPin?: (id: string) => void;
+  onUnpin?: (id: string) => void;
+  onArchive?: (id: string) => void;
 };
 
-const NoteListItem = ({ note, selected, onClick, onHover, onDelete }: NoteListItemProps) => {
-  const preview = getPreview(note.content);
-  const isArchived = note.status === 'archived';
+const NoteListItem = ({
+  note,
+  selected,
+  onClick,
+  onHover,
+  onContextMenu,
+  onRestore,
+  onDelete,
+  onPin,
+  onUnpin,
+  onArchive,
+}: NoteListItemProps) => {
+  const title = getDisplayTitle(note.title, note.content);
+  const preview = getContentPreview(note.title, note.content);
+  const isEmptyTitle = !note.title && !deriveAutoTitle(note.content);
 
   return (
     <button
       type="button"
+      data-note-id={note.id}
       onClick={() => onClick(note.id)}
       onMouseEnter={() => onHover(note.id)}
       onFocus={() => onHover(note.id)}
+      onContextMenu={(e) => onContextMenu(e, note)}
       className={cn(
         'group flex w-full items-center gap-2 border-b border-border/40 px-2 py-2 text-left transition-colors duration-100 last:border-b-0',
-        selected
-          ? 'bg-accent/40'
-          : 'hover:bg-accent/10',
+        selected ? 'bg-accent/40' : 'hover:bg-accent/10',
       )}
       aria-selected={selected}
     >
+      {/* Pin indicator */}
+      {note.isPinned ? (
+        <Pin size={10} className="shrink-0 text-muted-foreground/60" aria-hidden="true" />
+      ) : null}
+
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-foreground">
-            {note.title}
+          <span
+            className={cn(
+              'truncate pl-0.5 text-[13px] font-medium',
+              isEmptyTitle ? 'text-muted-foreground' : 'text-foreground',
+            )}
+          >
+            {title}
           </span>
-          {isArchived ? (
-            <span className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
-              <Sparkles size={8} />
-              processed
-            </span>
-          ) : null}
         </div>
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-          {preview}
-        </p>
+        {preview ? (
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {preview}
+          </p>
+        ) : null}
       </div>
-      {onDelete ? (
-        <span
-          role="button"
-          tabIndex={0}
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(note.id);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.stopPropagation();
-              onDelete(note.id);
-            }
-          }}
-          aria-label="Delete note"
-        >
-          <Trash2 size={12} />
+
+      {/* Hover actions for active notes */}
+      {onPin || onUnpin || onArchive ? (
+        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          {note.isPinned && onUnpin ? (
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onUnpin(note.id); }}
+              aria-label="Unpin note"
+            >
+              <Pin size={12} aria-hidden="true" />
+            </button>
+          ) : onPin ? (
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onPin(note.id); }}
+              aria-label="Pin note"
+            >
+              <Pin size={12} aria-hidden="true" />
+            </button>
+          ) : null}
+          {onArchive ? (
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
+              aria-label="Archive note"
+            >
+              <Archive size={12} aria-hidden="true" />
+            </button>
+          ) : null}
         </span>
       ) : null}
-      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-        {formatRelativeTime(note.createdAt)}
+
+      {/* Hover actions for archived notes */}
+      {onRestore ? (
+        <button
+          type="button"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+          onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
+          aria-label="Restore note"
+        >
+          <ArchiveRestore size={12} aria-hidden="true" />
+        </button>
+      ) : null}
+      {onDelete && !onArchive ? (
+        <button
+          type="button"
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 group-focus-within:opacity-100"
+          onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+          aria-label="Delete note"
+        >
+          <Trash2 size={12} aria-hidden="true" />
+        </button>
+      ) : null}
+
+      {/* Timestamp — hidden on hover when actions are visible */}
+      <span className={cn(
+        'shrink-0 font-mono text-[10px] text-muted-foreground',
+        (onPin || onRestore) && 'group-hover:hidden',
+      )}>
+        {formatRelativeTime(note.updatedAt)}
       </span>
     </button>
   );
 };
+
+// ─── Notes List ──────────────────────────────────────────────
 
 type NotesListProps = {
   compact?: boolean;
@@ -137,10 +330,17 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
 
   const createNote = useNotesStore((s) => s.createNote);
   const openNote = useNotesStore((s) => s.openNote);
+  const restoreNote = useNotesStore((s) => s.restoreNote);
   const deleteNote = useNotesStore((s) => s.deleteNote);
+  const archiveNote = useNotesStore((s) => s.archiveNote);
+  const pinNote = useNotesStore((s) => s.pinNote);
+  const unpinNote = useNotesStore((s) => s.unpinNote);
+  const duplicateNote = useNotesStore((s) => s.duplicateNote);
+  const copyAsMarkdown = useNotesStore((s) => s.copyAsMarkdown);
   const setSelectedListNoteId = useNotesStore((s) => s.setSelectedListNoteId);
 
   const [archiveExpanded, setArchiveExpanded] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -169,6 +369,16 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     return activeNotes[0]?.id ?? null;
   }, [activeNotes, selectedListNoteId]);
 
+  const selectedIndex = activeNotes.findIndex((n) => n.id === effectiveSelectedId);
+
+  useAutoFocusList({
+    items: activeNotes,
+    selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
+    getItemId: (n) => n.id,
+    containerRef,
+    itemSelector: 'data-note-id',
+  });
+
   const handleCreate = useCallback(() => {
     void createNote();
   }, [createNote]);
@@ -188,12 +398,58 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     [setSelectedListNoteId],
   );
 
+  const handleRestore = useCallback(
+    (id: string) => { void restoreNote(id); },
+    [restoreNote],
+  );
+
   const handleDelete = useCallback(
-    (id: string) => {
-      void deleteNote(id);
-    },
+    (id: string) => { void deleteNote(id); },
     [deleteNote],
   );
+
+  const handleArchive = useCallback(
+    (id: string) => { void archiveNote(id); },
+    [archiveNote],
+  );
+
+  const handlePin = useCallback(
+    (id: string) => { void pinNote(id); },
+    [pinNote],
+  );
+
+  const handleUnpin = useCallback(
+    (id: string) => { void unpinNote(id); },
+    [unpinNote],
+  );
+
+  const handleDuplicate = useCallback(
+    (id: string) => { void duplicateNote(id); },
+    [duplicateNote],
+  );
+
+  const handleCopyMarkdown = useCallback(
+    (id: string) => { void copyAsMarkdown(id); },
+    [copyAsMarkdown],
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, note: Note) => {
+      e.preventDefault();
+      setContextMenu({
+        noteId: note.id,
+        x: e.clientX,
+        y: e.clientY,
+        isArchived: note.status === 'archived',
+        isPinned: note.isPinned,
+      });
+    },
+    [],
+  );
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   if (isLoading && activeNotes.length === 0) {
     return (
@@ -216,7 +472,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
           onClick={handleCreate}
         >
-          <Plus size={12} />
+          <Plus size={12} aria-hidden="true" />
           New
         </Button>
       </header>
@@ -227,12 +483,13 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
         onKeyDown={onKeyDown}
         className={cn('min-h-0 flex-1 overflow-y-auto px-1 outline-none', compact && 'pr-0')}
         role="listbox"
+        data-primary-focusable=""
       >
         {activeNotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 pt-16 text-center">
             <p className="text-sm text-muted-foreground">No active notes</p>
             <p className="mt-1 text-[11px] text-muted-foreground/70">
-              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Cmd+Shift+N</kbd> to create one
+              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Cmd+N</kbd> to create one
             </p>
           </div>
         ) : (
@@ -244,6 +501,10 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                 selected={effectiveSelectedId === note.id}
                 onClick={handleOpen}
                 onHover={handleHover}
+                onContextMenu={handleContextMenu}
+                onPin={handlePin}
+                onUnpin={handleUnpin}
+                onArchive={handleArchive}
               />
             ))}
           </div>
@@ -262,8 +523,9 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                   'transition-transform',
                   archiveExpanded && 'rotate-90',
                 )}
+                aria-hidden="true"
               />
-              <Archive size={12} />
+              <Archive size={12} aria-hidden="true" />
               <span>Archived</span>
               <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium">
                 {archivedNotes.length}
@@ -279,6 +541,8 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                     selected={false}
                     onClick={handleOpen}
                     onHover={handleHover}
+                    onContextMenu={handleContextMenu}
+                    onRestore={handleRestore}
                     onDelete={handleDelete}
                   />
                 ))}
@@ -287,6 +551,20 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           </div>
         ) : null}
       </div>
+
+      {contextMenu ? (
+        <NoteContextMenu
+          {...contextMenu}
+          onClose={handleCloseContextMenu}
+          onPin={handlePin}
+          onUnpin={handleUnpin}
+          onArchive={handleArchive}
+          onRestore={handleRestore}
+          onDuplicate={handleDuplicate}
+          onCopyMarkdown={handleCopyMarkdown}
+          onDelete={handleDelete}
+        />
+      ) : null}
     </div>
   );
 };

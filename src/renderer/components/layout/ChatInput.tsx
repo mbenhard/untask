@@ -18,7 +18,7 @@ import {
   selectPendingImages,
   selectPendingNoteContext,
   selectProcessingImageCount,
-} from '../../stores/chatStore';
+} from '../../stores/chat';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 
@@ -209,9 +209,9 @@ export const ChatInput = ({
         <div className="flex items-center px-3 pt-1.5 pb-0">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground">
             {isProcessingImages ? (
-              <Loader2 className="size-3 animate-spin" />
+              <Loader2 className="size-3 animate-spin" aria-hidden="true" />
             ) : (
-              <Paperclip className="size-3" />
+              <Paperclip className="size-3" aria-hidden="true" />
             )}
             <span>
               {isProcessingImages && pendingImages.length === 0
@@ -224,7 +224,7 @@ export const ChatInput = ({
               className="-mr-0.5 ml-0.5 rounded-full p-0.5 transition-colors hover:bg-muted hover:text-foreground"
               aria-label="Remove all images"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                 <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" />
               </svg>
             </button>
@@ -233,7 +233,7 @@ export const ChatInput = ({
       )}
 
       {errorMessage && (
-        <p className="px-3 pt-1 text-[11px] text-destructive">{errorMessage}</p>
+        <p role="alert" className="px-3 pt-1 text-[11px] text-destructive">{errorMessage}</p>
       )}
 
       <div className="flex min-h-11 items-end gap-2 px-3 py-1.5">
@@ -246,7 +246,7 @@ export const ChatInput = ({
           aria-label="Attach image"
           onClick={handleFilePickerClick}
         >
-          <Paperclip className="size-3.5" />
+          <Paperclip className="size-3.5" aria-hidden="true" />
         </Button>
 
         <input
@@ -292,9 +292,9 @@ export const ChatInput = ({
           }}
         >
           {isSending ? (
-            <Square className="size-3 fill-current" />
+            <Square className="size-3 fill-current" aria-hidden="true" />
           ) : (
-            <ArrowUp className="size-3.5" />
+            <ArrowUp className="size-3.5" aria-hidden="true" />
           )}
         </Button>
       </div>

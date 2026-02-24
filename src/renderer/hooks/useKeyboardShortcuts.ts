@@ -1,9 +1,12 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
+import { getUntask } from '../lib/untask';
 import { useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNotesStore } from '../stores/notesStore';
 import { useSearchStore } from '../stores/searchStore';
+import { useTaskStore } from '../stores/taskStore';
+import { useToastStore } from '../stores/toastStore';
 
 type UseKeyboardShortcutsOptions = {
   inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -97,7 +100,12 @@ export const useKeyboardShortcuts = ({
 
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
-        triggerNewTask();
+        if (activeViewRef.current === 'notes') {
+          setView('notes');
+          void useNotesStore.getState().createNote();
+        } else {
+          triggerNewTask();
+        }
         return;
       }
 
@@ -146,8 +154,7 @@ export const useKeyboardShortcuts = ({
         notesActive
         && notesState.activeNoteId
         && (event.metaKey || event.ctrlKey)
-        && event.shiftKey
-        && event.key.toLowerCase() === 'a'
+        && event.key === 'Backspace'
       ) {
         event.preventDefault();
         void notesState.archiveNote(notesState.activeNoteId);
@@ -167,11 +174,29 @@ export const useKeyboardShortcuts = ({
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
-        if (chatOverlayState === 'open' && !isTextInputElement(document.activeElement)) {
-          event.preventDefault();
+        if (isTextInputElement(document.activeElement)) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (chatOverlayState === 'open') {
           void undoAction();
           return;
         }
+
+        const toastStore = useToastStore.getState();
+        if (toastStore.toast && toastStore.toast.onUndo && !toastStore.isUndoing) {
+          toastStore.markUndoing();
+          void toastStore.toast.onUndo();
+        } else {
+          void (async () => {
+            await getUntask().tasks.undoLastUserAction();
+            await useTaskStore.getState().refreshTasks();
+            useToastStore.getState().showToast('Undone');
+          })();
+        }
+        return;
       }
 
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
@@ -194,7 +219,7 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        if (inputValueRef.current.length > 0) {
+        if (chatOverlayState === 'open' && inputValueRef.current.length > 0) {
           event.preventDefault();
           clearInput();
           return;
@@ -211,6 +236,10 @@ export const useKeyboardShortcuts = ({
           closeChatOverlayLayer();
           clearPendingNoteContext();
           inputRef.current?.blur();
+          requestAnimationFrame(() => {
+            const target = document.querySelector<HTMLElement>('[data-primary-focusable]');
+            target?.focus();
+          });
           return;
         }
       }

@@ -69,7 +69,11 @@ describe('useNotesListKeyboard', () => {
   };
 
   const dispatchKey = (key: string, opts: Partial<KeyboardEventInit> = {}) => {
-    const target = container.querySelector('[data-testid="container"]')!;
+    const target = container.querySelector('[data-testid="container"]');
+    expect(target).toBeTruthy();
+    if (!target) {
+      throw new Error('Expected keyboard container');
+    }
     flushSync(() => {
       target.dispatchEvent(
         new KeyboardEvent('keydown', { key, bubbles: true, ...opts }),

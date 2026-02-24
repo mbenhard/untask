@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+
+import { BirdMascot } from '../chat/BirdMascot';
 import { Button } from '../ui/button';
 
 type OnboardingWelcomeProps = {
@@ -5,12 +8,25 @@ type OnboardingWelcomeProps = {
 };
 
 export const OnboardingWelcome = ({ onNext }: OnboardingWelcomeProps) => {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onNext();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onNext]);
+
   return (
-    <div className="flex flex-col items-center gap-8 text-center">
+    <div className="onboarding-dot-grid relative flex flex-col items-center gap-8 text-center">
+      <BirdMascot size={36} animated variant="wobble" className="text-foreground/80" />
+
       <div className="flex flex-col gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Untask</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Your personal task manager and AI assistant.
+          A quiet place to get things done.
         </p>
       </div>
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeImage } from 'electron';
+import { app, BrowserWindow, nativeImage, shell } from 'electron';
 import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -7,20 +7,28 @@ import started from 'electron-squirrel-startup';
 import { buildSystemPrompt } from './ai/systemPrompt';
 import { startProactiveTurn } from './ai/chat';
 
-import { initProactiveLoop, stopProactiveLoop } from './assistant/proactiveLoop';
+import { fireAiReminder } from './assistant/proactiveLoop';
+import { initReminderScheduler, stopReminderScheduler } from './services/reminderScheduler';
+import { initRemindersSync, stopRemindersSync } from './services/remindersSync';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
+import { IPC_CHANNELS } from '../types/ipc';
 import {
   startDailyBackupScheduler,
   stopDailyBackupScheduler,
 } from './services/backupService';
-import { initChatSearchFts, initSearchFts } from './services/searchService';
+import { initChatSearchFts, initNotesSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
 import { getSetting, isAiEnabled } from './services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
 import { migrateApiKeysToSafeStorage } from './services/keyStorage';
-import { startUpdateChecker, stopUpdateChecker } from './services/updateChecker';
+import {
+  startUpdateChecker,
+  stopUpdateChecker,
+  setUpdateChannel,
+  checkForUpdates,
+} from './services/updateChecker';
 import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
@@ -30,7 +38,9 @@ import {
   summonWindow,
   hideWindow,
   restoreWindowBounds,
+  getMainWindow,
 } from './window/summonController';
+import { createQuickAddWindow, isActivationSuppressed, getQuickAddWindow } from './window/quickAddWindow';
 
 if (started) {
   app.quit();
@@ -67,10 +77,10 @@ const createMainWindow = (): BrowserWindow => {
   const window = new BrowserWindow({
     width: 680,
     height: 720,
-    minWidth: 680,
-    minHeight: 720,
-    maxWidth: 900,
-    maxHeight: 900,
+    minWidth: 620,
+    minHeight: 600,
+    maxWidth: 800,
+    maxHeight: 800,
     frame: false,
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 12, y: 12 },
@@ -88,11 +98,35 @@ const createMainWindow = (): BrowserWindow => {
 
   restoreWindowBounds(window);
 
+  // Open all external links in the default system browser
+  // instead of spawning new Electron windows.
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // Prevent the main window from navigating away to external URLs.
+  window.webContents.on('will-navigate', (event, url) => {
+    const appOrigins = [
+      MAIN_WINDOW_VITE_DEV_SERVER_URL,
+      'file://',
+    ].filter((origin): origin is string => Boolean(origin));
+    if (!appOrigins.some((origin) => url.startsWith(origin))) {
+      event.preventDefault();
+      void shell.openExternal(url);
+    }
+  });
+
   window.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
       hideWindow();
     }
+  });
+
+  window.once('ready-to-show', () => {
+    window.show();
+    window.focus();
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -119,10 +153,12 @@ const bootstrap = (): void => {
   migrateApiKeysToSafeStorage();
   initSearchFts();
   initChatSearchFts();
+  initNotesSearchFts();
   registerIpcHandlers();
 
   mainWindow = createMainWindow();
   initSummonController(mainWindow);
+  createQuickAddWindow();
   setupTray();
   applyDockMode();
   registerGlobalShortcuts(mainWindow);
@@ -201,42 +237,52 @@ app.whenReady().then(() => {
   bootstrap();
   applyLaunchAtLogin();
   startDailyBackupScheduler();
+  setUpdateChannel(IPC_CHANNELS.APP_UPDATE_AVAILABLE);
   startUpdateChecker();
-  summonWindow();
 
+  // Initialize reminder scheduler — always runs for native notifications.
+  // Wire AI callback only when AI is enabled.
+  initReminderScheduler(
+    isAiEnabled()
+      ? {
+        fireAiReminder: (taskContext) =>
+          fireAiReminder(taskContext, {
+            startProactiveTurn: (input) =>
+              startProactiveTurn({
+                triggerMessage: input.triggerMessage,
+                triggerType: input.triggerType,
+                emit: input.emit,
+              }),
+          }),
+      }
+      : {},
+  );
 
-  // Initialize the proactive loop with chat pipeline dependency.
-  // Only start when AI is enabled.
-  if (isAiEnabled()) {
-    initProactiveLoop({
-      startProactiveTurn: async (input) => {
-        await startProactiveTurn({
-          triggerMessage: input.triggerMessage,
-          triggerType: input.triggerType,
-          emit: input.emit,
-        });
-      },
-    });
-  }
+  // Initialize Reminders sync (if enabled in settings)
+  void initRemindersSync();
 
   const handleAppActivation = (): void => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (isActivationSuppressed()) return;
+
+    const qaWin = getQuickAddWindow();
+    if (qaWin && !qaWin.isDestroyed() && qaWin.isVisible()) return;
+
+    const existingMain = getMainWindow();
+    if (!existingMain || existingMain.isDestroyed()) {
       mainWindow = createMainWindow();
       initSummonController(mainWindow);
-      summonWindow();
     } else {
       summonWindow();
     }
+    void checkForUpdates(false);
   };
 
   app.on('activate', handleAppActivation);
-  if (process.platform === 'darwin') {
-    app.on('did-become-active', handleAppActivation);
-  }
 });
 
 app.on('will-quit', () => {
-  stopProactiveLoop();
+  stopRemindersSync();
+  stopReminderScheduler();
   stopDailyBackupScheduler();
   stopUpdateChecker();
   unregisterGlobalShortcuts();

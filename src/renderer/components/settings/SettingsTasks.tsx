@@ -30,11 +30,6 @@ import { useTaskStore } from '../../stores/taskStore';
 import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
 import { SettingsSection } from './SettingsSection';
 
-type SettingsTasksProps = {
-  setError: (error: string | null) => void;
-  setNotice: (notice: string | null) => void;
-};
-
 type StatusRowProps = {
   id: PredefinedStatusId;
   label: string;
@@ -108,7 +103,10 @@ const StatusRow = ({ id, label, enabled, locked, onToggle }: StatusRowProps) => 
   );
 };
 
-export const SettingsTasks = ({ setError: _setError, setNotice: _setNotice }: SettingsTasksProps) => {
+const getStatusDefinition = (id: PredefinedStatusId) =>
+  PREDEFINED_STATUSES.find((status) => status.id === id);
+
+export const SettingsTasks = () => {
   const config = useTaskStatusConfigStore((s) => s.config);
   const updateConfig = useTaskStatusConfigStore((s) => s.updateConfig);
   const tasks = useTaskStore((s) => s.tasks);
@@ -274,7 +272,8 @@ export const SettingsTasks = ({ setError: _setError, setNotice: _setNotice }: Se
               strategy={verticalListSortingStrategy}
             >
               {nonTerminalIds.map((id) => {
-                const def = PREDEFINED_STATUSES.find((s) => s.id === id)!;
+                const def = getStatusDefinition(id);
+                if (!def) return null;
                 return (
                   <StatusRow
                     key={id}
@@ -297,7 +296,8 @@ export const SettingsTasks = ({ setError: _setError, setNotice: _setNotice }: Se
               strategy={verticalListSortingStrategy}
             >
               {terminalIds.map((id) => {
-                const def = PREDEFINED_STATUSES.find((s) => s.id === id)!;
+                const def = getStatusDefinition(id);
+                if (!def) return null;
                 return (
                   <StatusRow
                     key={id}

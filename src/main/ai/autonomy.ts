@@ -102,11 +102,11 @@ export const evaluateGate = (
   if (hardOverride) {
     return { action: 'pending', reason: 'Confirm delete?' };
   }
-  if (mode === 'confirm') {
-    return { action: 'pending', reason: 'Approval needed.' };
+  if (mode === 'auto') {
+    return { action: 'execute' };
   }
-  // mode === 'auto'
-  return { action: 'execute' };
+  // mode === 'confirm'
+  return { action: 'pending', reason: 'Approval needed.' };
 };
 
 // ─── Pending action queue persistence ────────────────────────

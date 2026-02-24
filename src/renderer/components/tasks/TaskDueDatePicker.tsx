@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Calendar as CalendarIcon, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Bell } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
+import type { ReminderOffset } from '../../stores/taskStore';
 import { Button, Calendar, Popover, PopoverContent } from '../ui';
 import { formatDueDateDisplay, parseDueDate, parseDueTime, toISODateTime } from './dueDate';
 
@@ -11,6 +13,8 @@ export interface TaskDueDatePickerProps {
   onChange: (next: string | null) => void | Promise<void>;
   emptyLabel: string;
   variant: 'row' | 'meta' | 'segment';
+  reminderOffset?: ReminderOffset | null;
+  onReminderOffsetChange?: (offset: ReminderOffset) => void;
 }
 
 const ROW_TRIGGER_BASE =
@@ -23,38 +27,103 @@ const SEGMENT_TRIGGER_BASE =
 const clampHours = (v: number) => Math.max(0, Math.min(23, v));
 const clampMinutes = (v: number) => Math.max(0, Math.min(59, v));
 
-const TimeInput = ({
-  value,
+const REMINDER_OFFSET_LABELS: Record<ReminderOffset, string> = {
+  at_due: 'At due time',
+  '15m': '15 min before',
+  '1h': '1 hour before',
+  '1d': '1 day before',
+};
+
+export const TaskDueDatePicker = ({
+  dueDate,
   onChange,
-  onDone,
-  inputRef,
-  autoFocus = false,
-}: {
-  value: string | null;
-  onChange: (time: string | null) => void;
-  onDone?: () => void;
-  inputRef?: React.RefObject<HTMLInputElement | null>;
-  autoFocus?: boolean;
-}) => {
-  const [draft, setDraft] = useState(value ?? '');
-  const localInputRef = useRef<HTMLInputElement>(null);
-  const resolvedInputRef = inputRef ?? localInputRef;
+  emptyLabel,
+  variant,
+  reminderOffset,
+  onReminderOffsetChange,
+}: TaskDueDatePickerProps) => {
+  const [open, setOpen] = useState(false);
+  const [notifBlocked, setNotifBlocked] = useState(false);
+
+  // Probe notification permission once on mount
+  useEffect(() => {
+    if (!onReminderOffsetChange) return;
+    let cancelled = false;
+    getUntask().notifications.probePermission().then((result) => {
+      if (!cancelled) setNotifBlocked(result.status === 'denied');
+    }).catch(() => {
+      // ignore notification permission errors
+    });
+    return () => { cancelled = true; };
+  }, [onReminderOffsetChange]);
+
+  const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
+  const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
+  const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
+
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const triggerClassName = cn(
+    variant === 'row'
+      ? ROW_TRIGGER_BASE
+      : variant === 'meta'
+        ? META_TRIGGER_BASE
+        : SEGMENT_TRIGGER_BASE,
+    variant !== 'segment' &&
+    (dueDate
+      ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
+      : 'border-dashed border-border text-muted-foreground hover:text-foreground'),
+    variant === 'segment' && !dueDate && 'text-muted-foreground/50',
+    variant === 'meta' && dueDate && 'bg-transparent',
+  );
+
+  const handleDateSelect = useCallback(
+    (date: Date | undefined) => {
+      if (!date) return;
+      const nextValue = toISODateTime(date, currentTime);
+      void onChange(nextValue);
+    },
+    [currentTime, onChange],
+  );
+
+  const handleTimeChange = useCallback(
+    (time: string | null) => {
+      const baseDate = selected ?? today;
+      const nextValue = toISODateTime(baseDate, time);
+      void onChange(nextValue);
+    },
+    [onChange, selected, today],
+  );
+
+  const handleReminderOffsetChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onReminderOffsetChange?.(e.target.value as ReminderOffset);
+    },
+    [onReminderOffsetChange],
+  );
+
+  const [draft, setDraft] = useState(currentTime ?? '');
 
   useEffect(() => {
-    setDraft(value ?? '');
-  }, [value]);
+    setDraft(currentTime ?? '');
+  }, [currentTime]);
 
   const commit = useCallback(
     (raw: string) => {
       const trimmed = raw.trim();
       if (!trimmed) {
-        onChange(null);
+        handleTimeChange(null);
         return;
       }
 
       const match = /^(\d{1,2}):?(\d{2})$/.exec(trimmed);
       if (!match) {
-        setDraft(value ?? '');
+        setDraft(currentTime ?? '');
         return;
       }
 
@@ -62,9 +131,9 @@ const TimeInput = ({
       const m = clampMinutes(Number(match[2]));
       const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       setDraft(formatted);
-      onChange(formatted);
+      handleTimeChange(formatted);
     },
-    [onChange, value],
+    [handleTimeChange, currentTime],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -73,19 +142,19 @@ const TimeInput = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       commit(draft);
-      onDone?.();
+      setOpen(false);
       return;
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      setDraft(value ?? '');
-      onDone?.();
+      setDraft(currentTime ?? '');
+      setOpen(false);
       return;
     }
 
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      const input = resolvedInputRef.current;
+      const input = timeInputRef.current;
       if (!input) return;
 
       const cursor = input.selectionStart ?? 0;
@@ -103,7 +172,7 @@ const TimeInput = ({
 
       const next = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       setDraft(next);
-      onChange(next);
+      handleTimeChange(next);
 
       requestAnimationFrame(() => {
         if (cursor <= 2) {
@@ -117,100 +186,18 @@ const TimeInput = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value.replace(/[^\d:]/g, '');
+    raw = raw.replace(/:+/g, ':');
 
-    // Auto-insert colon: when typing "14" → "14:"
     if (raw.length === 2 && !raw.includes(':') && draft.length < raw.length) {
       raw = `${raw}:`;
     }
 
-    // Limit length
     if (raw.length > 5) {
       raw = raw.slice(0, 5);
     }
 
     setDraft(raw);
   };
-
-  return (
-    <div className="flex items-center justify-center gap-1.5">
-      <span className="font-mono text-[10px] text-muted-foreground">Time</span>
-      <input
-        ref={resolvedInputRef}
-        autoFocus={autoFocus}
-        type="text"
-        value={draft}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onBlur={() => commit(draft)}
-        onClick={(e) => e.stopPropagation()}
-        placeholder="HH:MM"
-        className="w-14 rounded border border-border/60 bg-transparent px-1.5 py-0.5 text-center font-mono text-[11px] text-foreground outline-none focus:border-ring"
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onChange(null);
-            setDraft('');
-          }}
-          className="inline-flex size-4 items-center justify-center text-muted-foreground hover:text-foreground"
-          aria-label="Clear time"
-        >
-          <X className="size-3" />
-        </button>
-      )}
-    </div>
-  );
-};
-
-export const TaskDueDatePicker = ({
-  dueDate,
-  onChange,
-  emptyLabel,
-  variant,
-}: TaskDueDatePickerProps) => {
-  const [open, setOpen] = useState(false);
-  const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
-  const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
-  const timeInputRef = useRef<HTMLInputElement>(null);
-  const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
-
-  const triggerClassName = cn(
-    variant === 'row'
-      ? ROW_TRIGGER_BASE
-      : variant === 'meta'
-        ? META_TRIGGER_BASE
-        : SEGMENT_TRIGGER_BASE,
-    variant !== 'segment' &&
-      (dueDate
-        ? 'border-border bg-muted text-muted-foreground hover:text-foreground'
-        : 'border-dashed border-border text-muted-foreground hover:text-foreground'),
-    variant === 'segment' && !dueDate && 'text-muted-foreground/50',
-    variant === 'meta' && dueDate && 'bg-transparent',
-  );
-
-  const handleDateSelect = useCallback(
-    (date: Date | undefined) => {
-      if (!date) return; // Prevent accidental clear on re-click
-      const nextValue = toISODateTime(date, currentTime);
-      void onChange(nextValue);
-    },
-    [currentTime, onChange],
-  );
-
-  const handleTimeChange = useCallback(
-    (time: string | null) => {
-      if (!selected) return;
-      const nextValue = toISODateTime(selected, time);
-      void onChange(nextValue);
-    },
-    [onChange, selected],
-  );
-
-  const handleTimeDone = useCallback(() => {
-    setOpen(false);
-  }, []);
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -222,52 +209,104 @@ export const TaskDueDatePicker = ({
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
-          {variant === 'meta' ? <CalendarIcon className="size-3" /> : null}
+          {variant === 'meta' ? <CalendarIcon className="size-3" aria-hidden="true" /> : null}
           {displayLabel}
         </button>
       </Popover.Trigger>
 
       <PopoverContent
-        className="w-auto p-0"
+        className="w-64 p-0"
         align="start"
         onKeyDown={(event) => event.stopPropagation()}
       >
+        {/* Calendar */}
         <Calendar
           mode="single"
           required={!!selected}
           selected={selected}
           defaultMonth={selected}
-          className="p-2 [--cell-size:1.5rem]"
+          disabled={{ before: today }}
+          className="w-full p-2"
           onSelect={handleDateSelect}
         />
 
-        {selected ? (
-          <div className="border-t border-border px-3 py-2">
-            <TimeInput
-              value={currentTime}
-              onChange={handleTimeChange}
-              onDone={handleTimeDone}
-              inputRef={timeInputRef}
-            />
+        {/* Time + Reminder — single compact row */}
+        <div className="border-t border-border px-2 py-2">
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-1">
+              <Clock className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <input
+                ref={timeInputRef}
+                type="text"
+                value={draft}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                onBlur={() => commit(draft)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="HH:MM"
+                disabled={false}
+                className="w-14 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-center font-mono text-xs text-foreground outline-none transition-colors focus:border-ring focus:bg-muted/60"
+              />
+            </div>
+            {onReminderOffsetChange && (
+              <>
+                <div className="h-3 w-px bg-border" />
+                <Bell className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <select
+                  value={reminderOffset ?? 'at_due'}
+                  onChange={handleReminderOffsetChange}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={!dueDate}
+                  className={cn(
+                    'rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-xs text-foreground outline-none transition-colors focus:border-ring',
+                    !dueDate && 'pointer-events-none opacity-50',
+                  )}
+                >
+                  {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
+                    <option key={key} value={key}>
+                      {REMINDER_OFFSET_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
-        ) : null}
+          {notifBlocked && dueDate ? (
+            <p className="mt-1.5 text-[10px] text-amber-500 leading-relaxed">
+              Reminders won&apos;t work — notifications are blocked.{' '}
+              <button
+                type="button"
+                className="underline hover:text-amber-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void getUntask().notifications.openSettings();
+                }}
+              >
+                Fix in Settings
+              </button>
+            </p>
+          ) : null}
+        </div>
 
-        {dueDate ? (
-          <div className="border-t border-border px-2 py-2">
-            <Button
-              variant="ghost"
-              size="xs"
-              className="w-full text-muted-foreground"
-              onClick={(event) => {
-                event.stopPropagation();
-                void onChange(null);
-                setOpen(false);
-              }}
-            >
-              Clear due date
-            </Button>
-          </div>
-        ) : null}
+        {/* Clear button — always visible, disabled when no date */}
+        <div className="border-t border-border px-3 py-2">
+          <Button
+            variant="ghost"
+            size="xs"
+            className={cn(
+              'w-full text-muted-foreground',
+              !dueDate && 'pointer-events-none opacity-50',
+            )}
+            disabled={!dueDate}
+            onClick={(event) => {
+              event.stopPropagation();
+              void onChange(null);
+              setOpen(false);
+            }}
+          >
+            Clear due date
+          </Button>
+        </div>
       </PopoverContent>
     </Popover.Root>
   );

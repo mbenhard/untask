@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 
-import type { BlockNoteEditor, PartialBlock } from '@blocknote/core';
+import type { BlockNoteEditor } from '@blocknote/core';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
-import { BlockNoteView } from '@blocknote/mantine';
-import '@blocknote/mantine/style.css';
 import {
+  BlockNoteViewRaw as BlockNoteView,
+  getDefaultReactSlashMenuItems,
   type DefaultReactSuggestionItem,
   FormattingToolbarController,
   SuggestionMenuController,
   useCreateBlockNote,
 } from '@blocknote/react';
+import '@blocknote/react/style.css';
 
 import { FileContextMenu } from './FileContextMenu';
 import { UntaskFormattingToolbar } from './UntaskFormattingToolbar';
 import { UntaskSlashMenu } from './UntaskSlashMenu';
 
 import { useTheme } from '../providers/ThemeProvider';
-import { isBlockNoteJson, parseStoredBlocks } from './editorUtils';
+import { resolveInitialEditorContent } from './editorUtils';
 
 export type BlockEditorProps = {
   /** JSON blocks string or legacy markdown */
@@ -29,9 +30,16 @@ export type BlockEditorProps = {
   className?: string;
   editable?: boolean;
   /** Custom slash-menu items. If omitted, BlockNote defaults are used. */
-  getSlashMenuItems?: (editor: BlockNoteEditor) => DefaultReactSuggestionItem[];
+  getSlashMenuItems?: (params: BlockEditorSlashMenuParams) => BlockEditorSlashMenuItem[];
   /** Ref to access the editor instance from parent components. */
   editorRef?: MutableRefObject<BlockNoteEditor | null>;
+};
+
+export type BlockEditorSlashMenuItem = DefaultReactSuggestionItem;
+
+export type BlockEditorSlashMenuParams = {
+  editor: BlockNoteEditor;
+  defaultItems: BlockEditorSlashMenuItem[];
 };
 
 const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -47,7 +55,10 @@ export const BlockEditor = ({
   editorRef,
 }: BlockEditorProps) => {
   const { resolvedTheme } = useTheme();
+  const initialContentResolutionRef = useRef(resolveInitialEditorContent(content));
+  const initialLegacyMarkdownRef = useRef(initialContentResolutionRef.current.legacyMarkdown);
   const editor = useCreateBlockNote({
+    initialContent: initialContentResolutionRef.current.initialBlocks,
     uploadFile: async (file: File) => {
       if (file.size > MAX_ATTACHMENT_SIZE) {
         throw new Error('File exceeds 50MB limit');
@@ -74,44 +85,30 @@ export const BlockEditor = ({
     };
   }, [editor, editorRef]);
 
-  const hasHydratedRef = useRef(false);
   const isHydratingRef = useRef(false);
-  const contentRef = useRef(content);
-  contentRef.current = content;
+  const hasConvertedLegacyRef = useRef(false);
 
-  // Hydrate editor on mount (once)
+  // Convert legacy markdown content on mount.
   useEffect(() => {
-    if (hasHydratedRef.current) {
+    if (hasConvertedLegacyRef.current) {
       return;
     }
 
-    hasHydratedRef.current = true;
+    hasConvertedLegacyRef.current = true;
 
-    const raw = contentRef.current;
-    if (!raw.trim()) {
+    const legacyMarkdown = initialLegacyMarkdownRef.current;
+    if (!legacyMarkdown) {
       return;
     }
 
-    const applyBlocks = (blocks: PartialBlock[]): void => {
-      isHydratingRef.current = true;
-      editor.replaceBlocks(editor.document, blocks);
-      queueMicrotask(() => {
-        isHydratingRef.current = false;
-      });
-    };
-
-    if (isBlockNoteJson(raw)) {
-      const blocks = parseStoredBlocks(raw);
-      if (blocks) {
-        applyBlocks(blocks);
-      }
-    } else {
-      // Legacy markdown — convert to blocks then persist as JSON
-      const blocks = editor.tryParseMarkdownToBlocks(raw);
-      applyBlocks(blocks);
-      const convertedJson = JSON.stringify(editor.document);
-      onChange(convertedJson);
-    }
+    // Legacy markdown — convert to blocks then persist as JSON.
+    isHydratingRef.current = true;
+    const blocks = editor.tryParseMarkdownToBlocks(legacyMarkdown);
+    editor.replaceBlocks(editor.document, blocks);
+    queueMicrotask(() => {
+      isHydratingRef.current = false;
+    });
+    onChange(JSON.stringify(editor.document));
   }, [editor, onChange]);
 
   const handleChange = useCallback(() => {
@@ -204,7 +201,22 @@ export const BlockEditor = ({
     [editor],
   );
 
-  const hasCustomSlashMenu = getSlashMenuItems !== undefined;
+  const customSlashMenuItems = useMemo(() => {
+    if (!getSlashMenuItems) {
+      return null;
+    }
+
+    const defaultItems = getDefaultReactSlashMenuItems(editor);
+    return getSlashMenuItems({ editor, defaultItems });
+  }, [editor, getSlashMenuItems]);
+
+  const getCustomSlashMenuItems = useCallback(async (query: string) => {
+    if (!customSlashMenuItems) {
+      return [];
+    }
+
+    return filterSuggestionItems(customSlashMenuItems, query);
+  }, [customSlashMenuItems]);
 
   return (
     <div
@@ -226,12 +238,7 @@ export const BlockEditor = ({
         <SuggestionMenuController
           triggerCharacter="/"
           suggestionMenuComponent={UntaskSlashMenu}
-          getItems={
-            hasCustomSlashMenu
-              ? async (query) =>
-                  filterSuggestionItems(getSlashMenuItems(editor), query)
-              : undefined
-          }
+          getItems={customSlashMenuItems ? getCustomSlashMenuItems : undefined}
         />
         <FormattingToolbarController
           formattingToolbar={UntaskFormattingToolbar}

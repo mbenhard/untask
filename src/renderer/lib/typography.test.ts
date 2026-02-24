@@ -47,13 +47,13 @@ describe('typography', () => {
       sansId: 'geist',
       monoId: 'geist-mono',
     });
-    expect(getTypographySelectionFromPreset('classic')).toEqual({
-      sansId: 'inter',
-      monoId: 'jetbrains-mono',
-    });
-    expect(getTypographySelectionFromPreset('plex')).toEqual({
-      sansId: 'ibm-plex-sans',
+    expect(getTypographySelectionFromPreset('warm')).toEqual({
+      sansId: 'dm-sans',
       monoId: 'ibm-plex-mono',
+    });
+    expect(getTypographySelectionFromPreset('focus')).toEqual({
+      sansId: 'manrope',
+      monoId: 'fira-code',
     });
   });
 });
