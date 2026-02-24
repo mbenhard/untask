@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 type UseAutoFocusListOptions<T> = {
   items: T[];
@@ -17,8 +17,13 @@ export function useAutoFocusList<T>({
   containerRef,
   itemSelector,
 }: UseAutoFocusListOptions<T>): void {
+  const hasMountFocusedRef = useRef(false);
+  const prevSelectedIndexRef = useRef(selectedIndex);
+
+  // Focus first item only on initial mount
   useEffect(() => {
-    if (!isPrimary || items.length === 0) return;
+    if (!isPrimary || items.length === 0 || hasMountFocusedRef.current) return;
+    hasMountFocusedRef.current = true;
     const container = containerRef.current;
     if (!container) return;
     const firstItemId = getItemId(items[0]);
@@ -26,7 +31,10 @@ export function useAutoFocusList<T>({
     el?.focus();
   }, [isPrimary, items, getItemId, containerRef, itemSelector]);
 
+  // Focus selected item only when selectedIndex actually changes (keyboard nav)
   useEffect(() => {
+    if (prevSelectedIndexRef.current === selectedIndex) return;
+    prevSelectedIndexRef.current = selectedIndex;
     if (selectedIndex < 0 || selectedIndex >= items.length) return;
     const itemId = getItemId(items[selectedIndex]);
     const container = containerRef.current;
