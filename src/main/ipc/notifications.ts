@@ -73,8 +73,8 @@ export const registerNotificationHandlers = (): void => {
 
         // Return cached status from the last real notification.
         // 'unknown' means no notification has been sent yet — treat as granted
-        // since the overdue catch-up notification fires on every cold start
-        // and will update the cache before the renderer needs it.
+        // so the renderer can assume notifications work until a scheduled
+        // reminder fires and updates the cache.
         return { status: cachedPermission === 'denied' ? 'denied' : 'granted' };
       },
     ),

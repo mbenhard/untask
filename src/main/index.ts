@@ -5,9 +5,6 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
 import { buildSystemPrompt } from './ai/systemPrompt';
-import { startProactiveTurn } from './ai/chat';
-
-import { fireAiReminder } from './assistant/proactiveLoop';
 import { initReminderScheduler, stopReminderScheduler } from './services/reminderScheduler';
 import { initRemindersSync, stopRemindersSync } from './services/remindersSync';
 import { initDatabase, closeDatabase } from './db';
@@ -20,7 +17,7 @@ import {
 } from './services/backupService';
 import { initChatSearchFts, initNotesSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
-import { getSetting, isAiEnabled } from './services/settingsService';
+import { getSetting } from './services/settingsService';
 import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from './defaultSettings';
 import { migrateApiKeysToSafeStorage } from './services/keyStorage';
 import {
@@ -240,23 +237,8 @@ app.whenReady().then(() => {
   setUpdateChannel(IPC_CHANNELS.APP_UPDATE_AVAILABLE);
   startUpdateChecker();
 
-  // Initialize reminder scheduler — always runs for native notifications.
-  // Wire AI callback only when AI is enabled.
-  initReminderScheduler(
-    isAiEnabled()
-      ? {
-        fireAiReminder: (taskContext) =>
-          fireAiReminder(taskContext, {
-            startProactiveTurn: (input) =>
-              startProactiveTurn({
-                triggerMessage: input.triggerMessage,
-                triggerType: input.triggerType,
-                emit: input.emit,
-              }),
-          }),
-      }
-      : {},
-  );
+  // Initialize reminder scheduler for native notifications.
+  initReminderScheduler();
 
   // Initialize Reminders sync (if enabled in settings)
   void initRemindersSync();

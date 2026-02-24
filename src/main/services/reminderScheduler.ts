@@ -85,20 +85,15 @@ const sendTaskNavigate = (taskId: string): void => {
 
 // ─── Types ──────────────────────────────────────────────────
 
-export type ReminderSchedulerDeps = {
-  fireAiReminder?: (taskContext: { id: string; title: string }) => Promise<void>;
-};
-
 export type InitReminderSchedulerOptions = {
   isColdStart?: boolean;
-} & ReminderSchedulerDeps;
+};
 
 // ─── Scheduler state ────────────────────────────────────────
 
 let scanInterval: NodeJS.Timeout | null = null;
 const taskTimers = new Map<string, NodeJS.Timeout>();
 let unsubscribeTaskChange: (() => void) | null = null;
-let deps: ReminderSchedulerDeps = {};
 
 // ─── Core logic ─────────────────────────────────────────────
 
@@ -190,7 +185,7 @@ const scanAndSchedule = (): void => {
 };
 
 /**
- * Fire a reminder for a single task: native notification + optional AI.
+ * Fire a reminder for a single task via native notification.
  */
 const fireReminder = (
   taskContext: { id: string; title: string },
@@ -201,47 +196,6 @@ const fireReminder = (
   showNativeNotification(title, taskContext.title, () => {
     sendTaskNavigate(taskContext.id);
   });
-
-  if (deps.fireAiReminder) {
-    deps.fireAiReminder(taskContext).catch((error) => {
-      // eslint-disable-next-line no-console
-      console.warn('[reminder-scheduler] AI reminder failed:', error);
-    });
-  }
-};
-
-/**
- * Catch-up: collect all overdue tasks and show summary/single notification.
- */
-const catchUpOverdue = (): void => {
-  const allTasks = listTasks();
-  const nowMs = Date.now();
-  const overdue: Array<{ id: string; title: string }> = [];
-
-  for (const task of allTasks) {
-    if (task.status === 'done' || task.status === 'cancelled') continue;
-
-    const targetMs = resolveDueDateTargetMs(task.dueDate);
-    if (targetMs === null) continue;
-
-    if (targetMs <= nowMs) {
-      overdue.push({ id: task.id, title: task.title });
-    }
-  }
-
-  if (overdue.length === 0) return;
-
-  if (overdue.length === 1) {
-    showNativeNotification('Task overdue', overdue[0].title, () => {
-      sendTaskNavigate(overdue[0].id);
-    });
-  } else {
-    const body = overdue
-      .slice(0, 3)
-      .map((t) => t.title)
-      .join(', ');
-    showNativeNotification(`${overdue.length} tasks overdue`, body);
-  }
 };
 
 /**
@@ -265,17 +219,11 @@ const onTaskChange = (event: TaskChangeEvent): void => {
 // ─── Public API ─────────────────────────────────────────────
 
 export const initReminderScheduler = (options: InitReminderSchedulerOptions = {}): void => {
-  const { isColdStart = true, ...depsOption } = options;
+  const { isColdStart = true } = options;
   stopReminderScheduler();
-  deps = depsOption;
 
   // Subscribe to task changes for immediate rescheduling
   unsubscribeTaskChange = subscribeTaskChanges(onTaskChange);
-
-  // Overdue catch-up only on cold start (app startup), not config changes
-  if (isColdStart) {
-    catchUpOverdue();
-  }
 
   // Immediate first scan — schedules all future tasks
   scanAndSchedule();
@@ -304,5 +252,4 @@ export const stopReminderScheduler = (): void => {
   }
 
   cooldownMap.clear();
-  deps = {};
 };

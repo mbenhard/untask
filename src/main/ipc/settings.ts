@@ -27,9 +27,7 @@ import { SETTING_KEY_AI_ENABLED } from '../defaultSettings';
 import { getIdentity, getMemory, setIdentity, setMemory } from '../ai/memory';
 import { readJournalEntries } from '../services/journalService';
 import { listMemoryEvents, undoMemoryEvents } from '../services/memoryService';
-import { fireAiReminder } from '../assistant/proactiveLoop';
 import { initReminderScheduler } from '../services/reminderScheduler';
-import { startProactiveTurn } from '../ai/chat';
 
 // ─── Sensitive key blocklist ─────────────────────────────────────────────────
 // Prevent the renderer from reading or writing API key slots directly.
@@ -85,26 +83,8 @@ export const registerSettingsHandlers = (): void => {
       'SETTINGS_SET_AI_ENABLED',
       (_event: Electron.IpcMainInvokeEvent, request: SettingsSetAiEnabledRequest): SettingsSetAiEnabledResult => {
         setSetting(SETTING_KEY_AI_ENABLED, String(request.enabled));
-        // Re-init scheduler with or without AI callback based on new setting
-        // Pass isColdStart: false to avoid triggering overdue catch-up notifications
-        initReminderScheduler(
-          {
-            isColdStart: false,
-            ...(request.enabled
-              ? {
-                  fireAiReminder: (taskContext) =>
-                    fireAiReminder(taskContext, {
-                      startProactiveTurn: (input) =>
-                        startProactiveTurn({
-                          triggerMessage: input.triggerMessage,
-                          triggerType: input.triggerType,
-                          emit: input.emit,
-                        }),
-                    }),
-                }
-              : {}),
-          },
-        );
+        // Re-init scheduler (warm reinit)
+        initReminderScheduler({ isColdStart: false });
         return { enabled: request.enabled };
       },
     ),

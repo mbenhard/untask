@@ -140,101 +140,6 @@ describe('reminderScheduler', () => {
     vi.useRealTimers();
   });
 
-  // ─── Overdue catch-up ────────────────────────────────────
-
-  describe('overdue catch-up on startup', () => {
-    it('shows single notification for one overdue task', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
-      mockTaskListRef.current = [
-        makeTask({
-          id: 'overdue-1',
-          title: 'Overdue Task',
-          dueDate: '2026-02-18T08:00',
-        }),
-      ];
-
-      initReminderScheduler();
-
-      expect(MockNotificationClass).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Task overdue',
-          body: 'Overdue Task',
-        }),
-      );
-    });
-
-    it('shows summary notification for multiple overdue tasks', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
-      mockTaskListRef.current = [
-        makeTask({ id: 't1', title: 'Task A', dueDate: '2026-02-17T08:00' }),
-        makeTask({ id: 't2', title: 'Task B', dueDate: '2026-02-17T09:00' }),
-        makeTask({ id: 't3', title: 'Task C', dueDate: '2026-02-18T08:00' }),
-      ];
-
-      initReminderScheduler();
-
-      expect(MockNotificationClass).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '3 tasks overdue',
-          body: 'Task A, Task B, Task C',
-        }),
-      );
-    });
-
-    it('truncates summary body to 3 tasks', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
-      mockTaskListRef.current = [
-        makeTask({ id: 't1', title: 'A', dueDate: '2026-02-17T08:00' }),
-        makeTask({ id: 't2', title: 'B', dueDate: '2026-02-17T08:00' }),
-        makeTask({ id: 't3', title: 'C', dueDate: '2026-02-17T08:00' }),
-        makeTask({ id: 't4', title: 'D', dueDate: '2026-02-17T08:00' }),
-      ];
-
-      initReminderScheduler();
-
-      expect(MockNotificationClass).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '4 tasks overdue',
-          body: 'A, B, C',
-        }),
-      );
-    });
-
-    it('skips done and cancelled tasks', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
-      mockTaskListRef.current = [
-        makeTask({ id: 't1', dueDate: '2026-02-17', status: 'done' }),
-        makeTask({ id: 't2', dueDate: '2026-02-17', status: 'cancelled' }),
-      ];
-
-      initReminderScheduler();
-
-      expect(MockNotificationClass).not.toHaveBeenCalled();
-    });
-
-    it('does not fire for tasks without due dates', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
-      mockTaskListRef.current = [makeTask({ dueDate: null })];
-
-      initReminderScheduler();
-
-      expect(MockNotificationClass).not.toHaveBeenCalled();
-    });
-
-    it('treats date-only due dates as 9 AM local for overdue check', () => {
-      // At 8:59 AM, a date-only task for today is NOT overdue (9AM threshold)
-      vi.setSystemTime(new Date('2026-02-18T08:59'));
-      mockTaskListRef.current = [
-        makeTask({ id: 't1', title: 'Today task', dueDate: '2026-02-18' }),
-      ];
-
-      initReminderScheduler();
-
-      const overdueNotification = mockNotifications.find((n) => n.title === 'Task overdue');
-      expect(overdueNotification).toBeUndefined();
-    });
-  });
-
   // ─── Scan and schedule ───────────────────────────────────
 
   describe('scan and schedule', () => {
@@ -404,88 +309,29 @@ describe('reminderScheduler', () => {
     });
   });
 
-  // ─── AI callback ─────────────────────────────────────────
-
-  describe('AI callback', () => {
-    it('fires AI reminder when callback is provided', () => {
-      vi.setSystemTime(new Date('2026-02-18T14:00'));
-      const mockAiReminder = vi.fn().mockResolvedValue(undefined);
-
-      mockTaskListRef.current = [
-        makeTask({
-          id: 'ai-task',
-          title: 'AI Task',
-          dueDate: '2026-02-18T14:30',
-          reminderOffset: 'at_due',
-        }),
-      ];
-
-      initReminderScheduler({ fireAiReminder: mockAiReminder });
-
-      vi.advanceTimersByTime(30 * 60 * 1000);
-
-      expect(mockAiReminder).toHaveBeenCalledWith({
-        id: 'ai-task',
-        title: 'AI Task',
-      });
-    });
-
-    it('does not call AI when no callback provided', () => {
-      vi.setSystemTime(new Date('2026-02-18T14:00'));
-      mockTaskListRef.current = [
-        makeTask({
-          id: 'no-ai',
-          title: 'No AI',
-          dueDate: '2026-02-18T14:30',
-          reminderOffset: 'at_due',
-        }),
-      ];
-
-      initReminderScheduler();
-
-      vi.advanceTimersByTime(30 * 60 * 1000);
-
-      const notification = mockNotifications.find((n) => n.body === 'No AI');
-      expect(notification).toBeDefined();
-    });
-
-    it('catches AI callback errors without crashing', () => {
-      vi.setSystemTime(new Date('2026-02-18T14:00'));
-      const mockAiReminder = vi.fn().mockRejectedValue(new Error('AI down'));
-
-      mockTaskListRef.current = [
-        makeTask({
-          id: 'err-task',
-          title: 'Error Task',
-          dueDate: '2026-02-18T14:30',
-          reminderOffset: 'at_due',
-        }),
-      ];
-
-      initReminderScheduler({ fireAiReminder: mockAiReminder });
-
-      expect(() => vi.advanceTimersByTime(30 * 60 * 1000)).not.toThrow();
-
-      const notification = mockNotifications.find((n) => n.body === 'Error Task');
-      expect(notification).toBeDefined();
-    });
-  });
-
   // ─── Notification click ──────────────────────────────────
 
   describe('notification click', () => {
-    it('sends TASK_NAVIGATE on single overdue notification click', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
+    it('sends TASK_NAVIGATE on future reminder notification click', () => {
+      vi.setSystemTime(new Date('2026-02-18T14:00'));
       mockTaskListRef.current = [
-        makeTask({ id: 'click-task', title: 'Click Me', dueDate: '2026-02-18T08:00' }),
+        makeTask({
+          id: 'click-task',
+          title: 'Click Me',
+          dueDate: '2026-02-18T14:30',
+          reminderOffset: 'at_due',
+        }),
       ];
 
       initReminderScheduler();
 
-      const notification = mockNotifications.find((n) => n.title === 'Task overdue');
+      // Advance to trigger the reminder
+      vi.advanceTimersByTime(30 * 60 * 1000);
+
+      const notification = mockNotifications.find((n) => n.title === 'Task due now');
       expect(notification).toBeDefined();
       if (!notification) {
-        throw new Error('Expected overdue notification');
+        throw new Error('Expected due now notification');
       }
 
       notification.handlers.click?.();
@@ -495,33 +341,6 @@ describe('reminderScheduler', () => {
       expect(mockWebContentsSend).toHaveBeenCalledWith('task:navigate', {
         taskId: 'click-task',
       });
-    });
-
-    it('focuses window on summary notification click without TASK_NAVIGATE', () => {
-      vi.setSystemTime(new Date('2026-02-18T10:00'));
-      mockTaskListRef.current = [
-        makeTask({ id: 't1', title: 'A', dueDate: '2026-02-18T08:00' }),
-        makeTask({ id: 't2', title: 'B', dueDate: '2026-02-18T08:00' }),
-      ];
-
-      initReminderScheduler();
-
-      const notification = mockNotifications.find((n) => n.title === '2 tasks overdue');
-      expect(notification).toBeDefined();
-      if (!notification) {
-        throw new Error('Expected summary notification');
-      }
-
-      notification.handlers.click?.();
-
-      // Window focused but no task:navigate (summary, no specific task)
-      expect(mockWindowShow).toHaveBeenCalled();
-      expect(mockWindowFocus).toHaveBeenCalled();
-      // No TASK_NAVIGATE should have been sent for summary
-      expect(mockWebContentsSend).not.toHaveBeenCalledWith(
-        'task:navigate',
-        expect.anything(),
-      );
     });
   });
 
