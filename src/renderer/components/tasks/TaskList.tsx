@@ -204,8 +204,6 @@ export const TaskList = ({
     if (!selectedTaskId) {
       return;
     }
-    let pulseFrameId: number | null = null;
-    let focusFrameId: number | null = null;
 
     const selectedIndex = tasks.findIndex((task) => task.id === selectedTaskId);
 
@@ -218,9 +216,9 @@ export const TaskList = ({
 
       // Trigger navigation pulse. Clear first to restart animation if same task.
       setNavigatedTaskId(null);
-      pulseFrameId = requestAnimationFrame(() => setNavigatedTaskId(selectedTaskId));
+      requestAnimationFrame(() => setNavigatedTaskId(selectedTaskId));
 
-      focusFrameId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
         const target = container.querySelector<HTMLElement>(
@@ -230,14 +228,7 @@ export const TaskList = ({
         target.scrollIntoView({ block: 'nearest' });
         target.focus();
       });
-      return () => {
-        if (pulseFrameId !== null) {
-          cancelAnimationFrame(pulseFrameId);
-        }
-        if (focusFrameId !== null) {
-          cancelAnimationFrame(focusFrameId);
-        }
-      };
+      return;
     }
 
     // Not a direct task — check if it's a subtask whose parent is in this list.
@@ -251,14 +242,6 @@ export const TaskList = ({
     setFocusedIndexRef.current(parentIndex);
     setExpandedTaskId(subtask.parentId);
     setIsAnyBodyEditing(false);
-    return () => {
-      if (pulseFrameId !== null) {
-        cancelAnimationFrame(pulseFrameId);
-      }
-      if (focusFrameId !== null) {
-        cancelAnimationFrame(focusFrameId);
-      }
-    };
   }, [allTasks, selectTask, selectedTaskId, tasks]);
 
   // Clear navigated highlight after animation completes
