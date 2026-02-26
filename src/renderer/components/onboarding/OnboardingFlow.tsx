@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
+import {
+  ONBOARDING_SCROLL_TRANSITION,
+} from '../../lib/animation';
 import { getUntask } from '../../lib/untask';
-import { Button } from '../ui/button';
 import { OnboardingBasics } from './OnboardingBasics';
 import { OnboardingIdentity } from './OnboardingIdentity';
 import { OnboardingNotifications } from './OnboardingNotifications';
@@ -24,6 +26,12 @@ type StepKey =
   | 'shortcuts'
   | 'preferences';
 
+export type OnboardingNavProps = {
+  onBack: () => void;
+  canGoBack: boolean;
+  stepLabel: string;
+};
+
 const STEP_TITLES: Record<StepKey, string> = {
   welcome: 'WELCOME',
   basics: 'BASICS',
@@ -37,8 +45,8 @@ const STEP_TITLES: Record<StepKey, string> = {
 const ALL_STEPS: StepKey[] = [
   'welcome',
   'basics',
-  'notifications',
   'provider',
+  'notifications',
   'identity',
   'shortcuts',
   'preferences',
@@ -66,6 +74,9 @@ const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string }[] = [
   { value: 'professional', label: 'Professional' },
 ];
 
+/** How many px of fade at each content edge in the thread mask. */
+const THREAD_FADE = 48;
+
 type OnboardingFlowProps = {
   onComplete: () => void;
   isTransitioningToApp?: boolean;
@@ -73,7 +84,6 @@ type OnboardingFlowProps = {
 
 export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: OnboardingFlowProps) => {
   const [currentStep, setCurrentStep] = useState<StepKey>('welcome');
-  const [direction, setDirection] = useState<1 | -1>(1);
   const [isFinishing, setIsFinishing] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -82,6 +92,21 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
   const [aiEnabled, setAiEnabled] = useState(false);
   const visibleSteps = useMemo(() => getVisibleSteps(aiEnabled), [aiEnabled]);
   const currentIndex = visibleSteps.indexOf(currentStep);
+  const safeIndex = Math.max(0, currentIndex);
+
+  // Track which steps have been visited for one-shot stagger animation
+  const [visitedSteps, setVisitedSteps] = useState<Set<StepKey>>(() => new Set(['welcome']));
+
+  // Refs for measuring section/content positions (thread mask + scroll offset)
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Map<StepKey, HTMLDivElement>>(new Map());
+  const contentRefs = useRef<Map<StepKey, HTMLDivElement>>(new Map());
+
+  // The computed translateY for the column (px value, negative to scroll down)
+  const [scrollY, setScrollY] = useState(0);
+  // The computed CSS mask for the thread line
+  const [threadMask, setThreadMask] = useState<string>('linear-gradient(to bottom, transparent, transparent)');
 
   // Guard against stale step IDs when the visible step list changes.
   useEffect(() => {
@@ -93,21 +118,13 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
     setCurrentStep(fallback);
   }, [currentIndex, visibleSteps]);
 
-  const resolveIndex = (step: StepKey): number => {
-    const idx = visibleSteps.indexOf(step);
-    if (idx !== -1) {
-      return idx;
-    }
-
-    const allIdx = ALL_STEPS.indexOf(step);
-    return allIdx === -1 ? 0 : allIdx;
-  };
-
   const goTo = (nextStep: StepKey) => {
-    const currentResolvedIndex = resolveIndex(currentStep);
-    const nextResolvedIndex = resolveIndex(nextStep);
-    setDirection(nextResolvedIndex > currentResolvedIndex ? 1 : -1);
     setCurrentStep(nextStep);
+    setVisitedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(nextStep);
+      return next;
+    });
   };
 
   const goNext = () => {
@@ -132,6 +149,7 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
     }
   };
 
+  // Keyboard navigation
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.defaultPrevented) {
@@ -160,6 +178,124 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [currentIndex, isTransitioningToApp, visibleSteps]);
+
+  // ── Compute scroll offset when the active step changes ──
+  // Each section is min-h-full, so the offset is stepIndex * viewportHeight.
+  // We measure the actual section positions for accuracy.
+  const computeScrollOffset = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const viewportHeight = viewport.offsetHeight;
+    // Each section is exactly viewportHeight tall (min-h-full on the section),
+    // so the offset is simply the index * viewportHeight.
+    const targetY = safeIndex * viewportHeight;
+    setScrollY(-targetY);
+  }, [safeIndex]);
+
+  // ── Compute thread mask — mirrors website's computeThreadMask ──
+  // The line is only visible in the gaps BETWEEN content blocks.
+  // It does not appear above the first or below the last.
+  const computeThreadMask = useCallback(() => {
+    const column = columnRef.current;
+    if (!column) return;
+
+    const contentEls = Array.from(contentRefs.current.values());
+    if (contentEls.length === 0) return;
+
+    const totalH = column.scrollHeight;
+    if (totalH <= 0) return;
+
+    // Collect content zones relative to the column
+    type Zone = { top: number; bottom: number };
+    const zones: Zone[] = [];
+    for (const el of contentEls) {
+      // Walk up the offset chain to accumulate the full offset from the column
+      // (offsetTop may be relative to an intermediate positioned parent).
+      let top = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== column) {
+        top += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+      const bottom = top + el.offsetHeight;
+      zones.push({ top, bottom });
+    }
+    zones.sort((a, b) => a.top - b.top);
+
+    // Merge overlapping/adjacent zones
+    const merged: Zone[] = [{ ...zones[0] }];
+    for (let i = 1; i < zones.length; i++) {
+      const prev = merged[merged.length - 1];
+      if (zones[i].top <= prev.bottom) {
+        prev.bottom = Math.max(prev.bottom, zones[i].bottom);
+      } else {
+        merged.push({ ...zones[i] });
+      }
+    }
+
+    // Build mask: transparent everywhere, black only in gaps between blocks
+    const stops: string[] = [];
+    stops.push('transparent 0px');
+
+    for (let i = 0; i < merged.length - 1; i++) {
+      const gapStart = merged[i].bottom;
+      const gapEnd = merged[i + 1].top;
+      const gapSize = gapEnd - gapStart;
+      const f = Math.min(THREAD_FADE, gapSize / 2);
+
+      // Fade in from transparent after content bottom
+      stops.push(`transparent ${gapStart}px`);
+      stops.push(`black ${gapStart + f}px`);
+      // Stay visible through the gap
+      stops.push(`black ${gapEnd - f}px`);
+      // Fade out to transparent before next content top
+      stops.push(`transparent ${gapEnd}px`);
+    }
+
+    stops.push(`transparent ${totalH}px`);
+
+    const mask = `linear-gradient(to bottom, ${stops.join(', ')})`;
+    setThreadMask(mask);
+  }, []);
+
+  // Recompute on step change and on mount
+  useLayoutEffect(() => {
+    computeScrollOffset();
+  }, [computeScrollOffset]);
+
+  useLayoutEffect(() => {
+    // Small delay to let DOM settle before measuring content positions
+    const timer = setTimeout(computeThreadMask, 50);
+    return () => clearTimeout(timer);
+  }, [computeThreadMask, visibleSteps]);
+
+  // Recompute on resize
+  useEffect(() => {
+    const handleResize = () => {
+      computeScrollOffset();
+      computeThreadMask();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [computeScrollOffset, computeThreadMask]);
+
+  // Also recompute when layout might have changed (after renders)
+  useEffect(() => {
+    // Use ResizeObserver on the column to catch content size changes
+    const column = columnRef.current;
+    if (!column) return;
+
+    const ro = new ResizeObserver(() => {
+      computeScrollOffset();
+      computeThreadMask();
+    });
+    ro.observe(column);
+    return () => ro.disconnect();
+  }, [computeScrollOffset, computeThreadMask]);
+
+  // ── Step handlers (unchanged from original) ──
 
   const handleWelcomeNext = () => {
     goNext();
@@ -266,20 +402,31 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
+  const displayStep = Math.max(1, safeIndex + 1);
+  const totalSteps = visibleSteps.length;
+  const stepLabel = `${String(displayStep).padStart(2, '0')} / ${String(totalSteps).padStart(2, '0')}`;
+  const canGoBack = currentIndex > 0 && !isFinishing;
+  const nav: OnboardingNavProps = { onBack: goBack, canGoBack, stepLabel };
+
+  // Determine which steps to render — all visible steps, always mounted
+  const stepsToRender = visibleSteps;
+
+  const renderStepContent = (step: StepKey, isActive: boolean) => {
+    switch (step) {
       case 'welcome':
-        return <OnboardingWelcome onNext={handleWelcomeNext} />;
+        return <OnboardingWelcome onNext={handleWelcomeNext} isActive={isActive} />;
       case 'basics':
         return (
           <OnboardingBasics
             onNext={(name, ai) => {
               void handleBasicsNext(name, ai);
             }}
+            nav={nav}
+            isActive={isActive}
           />
         );
       case 'notifications':
-        return <OnboardingNotifications onNext={handleNotificationsNext} />;
+        return <OnboardingNotifications onNext={handleNotificationsNext} nav={nav} isActive={isActive} />;
       case 'provider':
         return (
           <OnboardingProvider
@@ -287,6 +434,8 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
               void handleProviderNext(provider, keyOrUrl, modelId);
             }}
             onSkip={handleProviderSkip}
+            nav={nav}
+            isActive={isActive}
           />
         );
       case 'identity':
@@ -297,83 +446,110 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
               void handleIdentityNext(identityString, roleValue, styleValue, focusValue);
             }}
             onSkip={handleIdentitySkip}
+            nav={nav}
+            isActive={isActive}
           />
         );
       case 'shortcuts':
-        return <OnboardingShortcuts onNext={handleShortcutsNext} />;
+        return <OnboardingShortcuts onNext={handleShortcutsNext} nav={nav} isActive={isActive} />;
       case 'preferences':
-        return <OnboardingPreferences onNext={handlePreferencesNext} />;
+        return <OnboardingPreferences onNext={handlePreferencesNext} nav={nav} isActive={isActive} />;
     }
   };
 
-  const displayStep = Math.max(1, currentIndex + 1);
-  const totalSteps = visibleSteps.length;
-  const sectionLabel = `${String(displayStep).padStart(2, '0')} — ${STEP_TITLES[currentStep]}`;
+  const MotionDiv = prefersReducedMotion ? 'div' : motion.div;
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-background p-4">
-      <div className="relative flex h-full max-h-[680px] w-full max-w-[680px] overflow-hidden rounded-lg border border-border/70 bg-card/80">
-        <div
-          className={[
-            'pointer-events-none absolute bottom-8 left-8 top-8 border-l border-dashed border-border/60 transition-opacity duration-200',
-            isTransitioningToApp ? 'opacity-0' : 'opacity-100',
-          ].join(' ')}
-        />
-        <div className="pointer-events-none absolute left-[29px] top-[37px] size-2 rounded-full border border-border/80 bg-background/90" />
+    <div
+      className={[
+        'flex h-full w-full flex-col bg-background',
+        isTransitioningToApp ? 'pointer-events-none' : '',
+      ].join(' ')}
+    >
+      {/* Invisible drag region so the frameless window can be moved during onboarding.
+          Mirrors the 32px titlebar height from AppShell and reserves space for macOS traffic lights. */}
+      <div className="drag-region absolute inset-x-0 top-0 z-50 h-8" />
 
-        <div
-          className={[
-            'relative flex w-full flex-col px-8 pb-6 pt-7',
-            isTransitioningToApp ? 'pointer-events-none' : '',
-          ].join(' ')}
+      {/* Step viewport — overflow hidden, contains the tall scrollable column */}
+      <div
+        ref={viewportRef}
+        className={[
+          'relative flex-1 overflow-hidden transition-opacity duration-200',
+          isTransitioningToApp ? 'opacity-0' : 'opacity-100',
+        ].join(' ')}
+      >
+        {/* Tall scrollable column — all steps stacked vertically.
+            Translated via framer-motion to show the active step.
+            The dashed thread line runs through it via ::before. */}
+        <MotionDiv
+          ref={columnRef}
+          className="onboarding-column"
+          {...(prefersReducedMotion
+            ? { style: { transform: `translateY(${scrollY}px)`, '--thread-mask': threadMask } as React.CSSProperties }
+            : {
+                animate: { y: scrollY },
+                transition: ONBOARDING_SCROLL_TRANSITION,
+                style: { '--thread-mask': threadMask } as React.CSSProperties,
+              }
+          )}
         >
-          <header
-            className={[
-              'mb-4 pl-8 transition-opacity duration-200',
-              isTransitioningToApp ? 'opacity-0' : 'opacity-100',
-            ].join(' ')}
-          >
-            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-              {sectionLabel}
-            </p>
-          </header>
+          {stepsToRender.map((step) => {
+            const isActive = step === currentStep;
+            const hasBeenVisited = visitedSteps.has(step);
+            // Welcome is not counted — non-welcome steps are numbered from 01
+            const nonWelcomeSteps = stepsToRender.filter((s) => s !== 'welcome');
+            const nonWelcomeIndex = nonWelcomeSteps.indexOf(step as (typeof nonWelcomeSteps)[number]);
+            const stepNumber = nonWelcomeIndex >= 0 ? String(nonWelcomeIndex + 1).padStart(2, '0') : null;
 
-          <div className="relative min-h-0 flex-1 pl-8">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, y: prefersReducedMotion ? 0 : direction > 0 ? 16 : -16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: prefersReducedMotion ? 0 : direction > 0 ? -10 : 10 }}
-                transition={{ duration: prefersReducedMotion ? 0.06 : 0.24, ease: 'easeOut' }}
-                className="h-full"
+            return (
+              <div
+                key={step}
+                ref={(el) => {
+                  if (el) {
+                    sectionRefs.current.set(step, el);
+                  } else {
+                    sectionRefs.current.delete(step);
+                  }
+                }}
+                className="onboarding-section"
+                // Non-active sections are inert so they don't trap focus or
+                // expose interactive elements to assistive tech / DOM queries.
+                inert={!isActive || undefined}
+                aria-hidden={!isActive || undefined}
+                style={{
+                  // Each section is exactly viewport height
+                  height: viewportRef.current?.offsetHeight ?? '100%',
+                }}
               >
-                {renderStep()}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div
-            className={[
-              'mt-4 flex items-center justify-between border-t border-dashed border-border/60 pt-3 pl-8 transition-opacity duration-200',
-              isTransitioningToApp ? 'opacity-0' : 'opacity-100',
-            ].join(' ')}
-          >
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={goBack}
-              disabled={currentIndex <= 0 || isFinishing}
-              className="h-8 border-dashed border-border/60 bg-transparent text-[12px] hover:bg-accent/50"
-            >
-              Back
-            </Button>
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/80">
-              {String(displayStep).padStart(2, '0')} / {String(totalSteps).padStart(2, '0')}
-            </span>
-          </div>
-        </div>
+                {/* Content block — covers the thread line with bg-background */}
+                <div
+                  ref={(el) => {
+                    if (el) {
+                      contentRefs.current.set(step, el);
+                    } else {
+                      contentRefs.current.delete(step);
+                    }
+                  }}
+                  className="onboarding-content w-full max-w-sm shrink-0 px-4"
+                >
+                  {/* Section header — number + dashed line + title (skipped for welcome) */}
+                  {stepNumber !== null && (
+                    <header className="flex items-center justify-center gap-2.5 pb-6">
+                      <span className="font-mono text-[10px] tabular-nums text-muted-foreground/25">
+                        {stepNumber}
+                      </span>
+                      <span className="h-px w-4 border-t border-dashed border-border/60" />
+                      <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                        {STEP_TITLES[step]}
+                      </h2>
+                    </header>
+                  )}
+                  {renderStepContent(step, isActive && hasBeenVisited)}
+                </div>
+              </div>
+            );
+          })}
+        </MotionDiv>
       </div>
     </div>
   );
