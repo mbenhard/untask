@@ -887,13 +887,15 @@
 }
 
 /* ──────────────────────────────────────────────
-   Onboarding: dot-grid background + radial glow
+   Onboarding: card/grid background treatment
    ────────────────────────────────────────────── */
-.onboarding-dot-grid {
+.onboarding-mascot-stage {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
 }
 
-.onboarding-dot-grid::before {
+.onboarding-mascot-stage::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -901,10 +903,10 @@
   background-size: 24px 24px;
   opacity: 0.04;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
 
-.onboarding-dot-grid::after {
+.onboarding-mascot-stage::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -915,7 +917,12 @@
   background: radial-gradient(circle, var(--foreground) 0%, transparent 70%);
   opacity: 0.03;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
+}
+
+.onboarding-mascot-stage > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* ──────────────────────────────────────────────

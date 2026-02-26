@@ -20,17 +20,22 @@ export const OnboardingWelcome = ({ onNext }: OnboardingWelcomeProps) => {
   }, [onNext]);
 
   return (
-    <div className="onboarding-dot-grid relative flex flex-col items-center gap-8 text-center">
-      <BirdMascot size={36} animated variant="wobble" className="text-foreground/80" />
-
-      <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Untask</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          A quiet place to get things done.
-        </p>
+    <div className="flex h-full flex-col gap-5">
+      <div className="onboarding-mascot-stage flex min-h-[300px] items-center justify-center rounded-md border border-dashed border-border/60 bg-accent/20 p-6">
+        <BirdMascot size={88} animated variant="wobble" className="text-foreground/80" />
       </div>
 
-      <Button onClick={onNext} className="w-full">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Untask</h1>
+        <p className="text-[13px] text-muted-foreground leading-relaxed">
+          A quiet place to get things done.
+        </p>
+        <span className="rounded-full border border-border/40 px-3 py-1 font-mono text-[11px] text-muted-foreground">
+          v0.x.x
+        </span>
+      </div>
+
+      <Button onClick={onNext} size="sm" className="mt-auto h-8 w-full text-[12px]">
         Get Started
       </Button>
     </div>

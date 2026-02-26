@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getUntask } from '../../lib/untask';
 import { Button } from '../ui/button';
@@ -8,65 +8,124 @@ type OnboardingNotificationsProps = {
 };
 
 export const OnboardingNotifications = ({ onNext }: OnboardingNotificationsProps) => {
-  const handleEnable = useCallback(async () => {
-    try {
-      await getUntask().settings.set('notifications.enabled', 'true');
-      await getUntask().notifications.fireTest();
-    } catch {
-      // Non-fatal — proceed anyway
-    }
-    onNext();
-  }, [onNext]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [remindersSyncEnabled, setRemindersSyncEnabled] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [notificationHint, setNotificationHint] = useState<string | null>(null);
+  const [remindersHint, setRemindersHint] = useState<string | null>(null);
+  const firstActionRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleSkip = useCallback(async () => {
-    try {
-      await getUntask().settings.set('notifications.enabled', 'false');
-    } catch {
-      // Non-fatal
+  const handleContinue = useCallback(async () => {
+    if (isSaving) {
+      return;
     }
+
+    setIsSaving(true);
+    setNotificationHint(null);
+    setRemindersHint(null);
+
+    try {
+      try {
+        await getUntask().settings.set('notifications.enabled', String(notificationsEnabled));
+        if (notificationsEnabled) {
+          const permission = await getUntask().notifications.fireTest();
+          if (permission.status === 'denied') {
+            setNotificationHint('Notifications are blocked by macOS Focus/notification settings.');
+          }
+        }
+      } catch {
+        setNotificationHint('Could not save notification preference. You can update this in Settings.');
+      }
+
+      try {
+        if (remindersSyncEnabled) {
+          const accessResult = await getUntask().reminders.requestAccess();
+          if (accessResult.granted) {
+            await getUntask().reminders.toggle(true);
+          } else {
+            setRemindersHint('Reminders permission denied. Continue now and enable later in Settings.');
+          }
+        } else {
+          await getUntask().reminders.toggle(false);
+        }
+      } catch {
+        setRemindersHint('Could not configure Apple Reminders sync. You can update this in Settings.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+
     onNext();
-  }, [onNext]);
+  }, [isSaving, notificationsEnabled, remindersSyncEnabled, onNext]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        void handleEnable();
+    firstActionRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || isSaving) {
+        return;
       }
+
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-onboarding-enter-ignore="true"]')) {
+        return;
+      }
+
+      event.preventDefault();
+      void handleContinue();
     };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleEnable]);
+  }, [handleContinue, isSaving]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          Stay on top of tasks
-        </h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Get reminders when tasks are due so nothing slips.
+    <div className="flex h-full flex-col gap-2">
+      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
+        <div className="mb-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            REMINDERS
+          </span>
+        </div>
+        <p className="text-[12px] text-muted-foreground">
+          Get notified when tasks are due.
         </p>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Button onClick={() => void handleEnable()} className="w-full">
-          Enable reminders
-        </Button>
-        <button
-          type="button"
-          onClick={() => void handleSkip()}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Skip for now
-        </button>
-      </div>
-
-      <div className="mt-2 text-center">
-        <p className="text-[11px] text-muted-foreground/80">
-          Using macOS Focus modes?{' '}
+        <div className="mt-2 flex gap-2">
+          <button
+            ref={firstActionRef}
+            type="button"
+            aria-pressed={notificationsEnabled}
+            onClick={() => setNotificationsEnabled(true)}
+            className={[
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              notificationsEnabled
+                ? 'border-foreground/40 bg-accent text-foreground'
+                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            Enable
+          </button>
           <button
             type="button"
+            aria-pressed={!notificationsEnabled}
+            onClick={() => setNotificationsEnabled(false)}
+            className={[
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              !notificationsEnabled
+                ? 'border-foreground/40 bg-accent text-foreground'
+                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            Skip
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground/70">
+          Using Focus modes?{' '}
+          <button
+            type="button"
+            data-onboarding-enter-ignore="true"
             onClick={() =>
               void getUntask().shell.openExternal(
                 'x-apple.systempreferences:com.apple.Focus-Settings.extension',
@@ -74,9 +133,66 @@ export const OnboardingNotifications = ({ onNext }: OnboardingNotificationsProps
             }
             className="underline transition-colors hover:text-foreground"
           >
-            Allow Untask
+            Open macOS settings
           </button>
         </p>
+        {notificationHint ? (
+          <p className="mt-1 text-[11px] text-muted-foreground/80">{notificationHint}</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
+        <div className="mb-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            APPLE REMINDERS
+          </span>
+        </div>
+        <p className="text-[12px] text-muted-foreground">
+          Sync tasks with the macOS Reminders app.
+        </p>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            aria-pressed={remindersSyncEnabled}
+            onClick={() => setRemindersSyncEnabled(true)}
+            className={[
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              remindersSyncEnabled
+                ? 'border-foreground/40 bg-accent text-foreground'
+                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            Sync
+          </button>
+          <button
+            type="button"
+            aria-pressed={!remindersSyncEnabled}
+            onClick={() => setRemindersSyncEnabled(false)}
+            className={[
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              !remindersSyncEnabled
+                ? 'border-foreground/40 bg-accent text-foreground'
+                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            Skip
+          </button>
+        </div>
+        <p className="mt-2 text-[12px] text-muted-foreground">Two-way sync — changes reflect in both apps.</p>
+        {remindersHint ? (
+          <p className="mt-1 text-[11px] text-muted-foreground/80">{remindersHint}</p>
+        ) : null}
+      </div>
+
+      <div className="mt-auto">
+        <Button
+          onClick={() => void handleContinue()}
+          disabled={isSaving}
+          size="sm"
+          className="h-8 w-full text-[12px]"
+        >
+          {isSaving ? 'Saving...' : 'Continue'}
+        </Button>
       </div>
     </div>
   );

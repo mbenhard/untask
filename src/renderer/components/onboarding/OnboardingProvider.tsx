@@ -63,14 +63,11 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
       if (e.key === 'Enter' && canContinue) {
         e.preventDefault();
         onNext(provider, effectiveValue.trim(), selectedModelId);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        onSkip();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [canContinue, provider, effectiveValue, selectedModelId, onNext, onSkip]);
+  }, [canContinue, provider, effectiveValue, selectedModelId, onNext]);
 
   const handleProviderChange = (next: Provider) => {
     setProvider(next);
@@ -111,159 +108,146 @@ export const OnboardingProvider = ({ onNext, onSkip }: OnboardingProviderProps) 
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Connect AI provider</h2>
-        <p className="text-xs text-muted-foreground">
-          Choose where the AI assistant gets its intelligence. Key stored locally.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-foreground">Provider</span>
-          <div className="grid grid-cols-2 gap-1.5">
-            {PROVIDER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleProviderChange(opt.value)}
-                className={cn(
-                  'flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors text-left',
-                  provider === opt.value
-                    ? 'border-foreground/30 bg-accent text-foreground'
-                    : 'border-border bg-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <span className="font-mono text-[10px] opacity-40">{opt.monogram}</span>
-                <span>{opt.label}</span>
-                {opt.value === 'openrouter' && (
-                  <span className="ml-auto text-[10px] text-muted-foreground/60">Recommended</span>
-                )}
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[provider]}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {isOllama ? (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="onboarding-ollama-url" className="text-xs font-medium text-foreground">
-                Ollama URL
-              </label>
-              <Input
-                id="onboarding-ollama-url"
-                type="text"
-                value={ollamaUrl}
-                onChange={(e) => setOllamaUrl(e.target.value)}
-                placeholder="http://localhost:11434"
-                className="h-9 text-sm"
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="onboarding-api-key" className="text-xs font-medium text-foreground">
-                API key
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="onboarding-api-key"
-                  type="password"
-                  value={keyInput}
-                  onChange={(e) => {
-                    setKeyInput(e.target.value);
-                    setValidationState('idle');
-                    setValidationError('');
-                  }}
-                  placeholder={PROVIDER_PLACEHOLDERS[provider]}
-                  className={cn(
-                    'h-9 flex-1 text-sm',
-                    validationState === 'valid' && 'border-green-500/50 dark:border-green-400/50',
-                    validationState === 'error' && 'border-destructive/50',
-                  )}
-                  autoComplete="off"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleValidate()}
-                  disabled={!canValidate || isValidating}
-                  className="h-9 shrink-0 text-xs"
-                >
-                  {isValidating ? 'Checking...' : 'Validate'}
-                </Button>
-              </div>
-
-              {validationState === 'valid' ? (
-                <p className="flex items-center gap-1 text-[11px] text-green-500 dark:text-green-400">
-                  <Check className="size-3" />
-                  Key is valid
-                </p>
-              ) : validationState === 'error' ? (
-                <p className="text-[11px] text-destructive">
-                  {validationError}
-                </p>
+    <div className="flex h-full flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        {PROVIDER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => handleProviderChange(opt.value)}
+            className={cn(
+              'rounded-md border border-dashed border-border/60 px-3 py-2 text-left transition-colors',
+              provider === opt.value && 'border-solid border-foreground/40 bg-accent/30',
+            )}
+          >
+            <div className="mb-1 flex items-center gap-2">
+              <span className="rounded border border-border/70 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                {opt.monogram}
+              </span>
+              <span className="text-[13px] text-foreground">{opt.label}</span>
+              {opt.value === 'openrouter' ? (
+                <span className="ml-auto rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  Recommended
+                </span>
               ) : null}
             </div>
-          )}
+            <p className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[opt.value]}</p>
+          </button>
+        ))}
+      </div>
 
-          <div className="flex flex-col gap-2">
-            <label htmlFor="onboarding-model" className="text-xs font-medium text-foreground">
-              Model
-            </label>
-            {isOllama ? (
-              <select
-                id="onboarding-model"
-                value={selectedModelId}
-                onChange={(e) => setSelectedModelId(e.target.value)}
-                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-              >
-                <option value="" disabled>
-                  Select a model
-                </option>
-                <option value="llama3.1:8b">llama3.1:8b · 8B</option>
-                <option value="mistral:7b">mistral:7b · 7B</option>
-                <option value="qwen3:8b">qwen3:8b · 8B</option>
-                <option value="qwen3:14b">qwen3:14b · 14B</option>
-              </select>
-            ) : (
-              <select
-                id="onboarding-model"
-                value={selectedModelId}
-                onChange={(e) => setSelectedModelId(e.target.value)}
-                className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-              >
-                {buildModelOptions(provider, selectedModelId).map((group, idx) => (
-                  'options' in group ? (
-                    <optgroup key={idx} label={group.label}>
-                      {group.options.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : (
-                    <option key={group.value} value={group.value}>
-                      {group.label}
-                    </option>
-                  )
-                ))}
-              </select>
-            )}
+      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
+        <div className="mb-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            {isOllama ? 'SERVER URL' : 'API KEY'}
+          </span>
+        </div>
+        {isOllama ? (
+          <Input
+            id="onboarding-ollama-url"
+            type="text"
+            value={ollamaUrl}
+            onChange={(e) => setOllamaUrl(e.target.value)}
+            placeholder="http://localhost:11434"
+            className="h-8 text-[13px]"
+          />
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              id="onboarding-api-key"
+              type="password"
+              value={keyInput}
+              onChange={(e) => {
+                setKeyInput(e.target.value);
+                setValidationState('idle');
+                setValidationError('');
+              }}
+              placeholder={PROVIDER_PLACEHOLDERS[provider]}
+              className={cn(
+                'h-8 flex-1 text-[13px]',
+                validationState === 'valid' && 'border-green-500/50 dark:border-green-400/50',
+                validationState === 'error' && 'border-destructive/50',
+              )}
+              autoComplete="off"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleValidate()}
+              disabled={!canValidate || isValidating}
+              className="h-8 border-dashed border-border/60 px-3 text-[12px]"
+            >
+              {isValidating ? 'Checking...' : 'Validate'}
+            </Button>
           </div>
+        )}
+        {validationState === 'valid' ? (
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-green-500 dark:text-green-400">
+            <Check className="size-3" />
+            Key is valid
+          </p>
+        ) : null}
+        {validationState === 'error' ? (
+          <p className="mt-1 text-[11px] text-destructive">{validationError}</p>
+        ) : null}
+
+        <div className="mt-3">
+          <div className="mb-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+              MODEL
+            </span>
+          </div>
+          {isOllama ? (
+            <select
+              id="onboarding-model"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="h-8 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+            >
+              <option value="" disabled>
+                Select a model
+              </option>
+              <option value="llama3.1:8b">llama3.1:8b · 8B</option>
+              <option value="mistral:7b">mistral:7b · 7B</option>
+              <option value="qwen3:8b">qwen3:8b · 8B</option>
+              <option value="qwen3:14b">qwen3:14b · 14B</option>
+            </select>
+          ) : (
+            <select
+              id="onboarding-model"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="h-8 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+            >
+              {buildModelOptions(provider, selectedModelId).map((group, idx) => (
+                'options' in group ? (
+                  <optgroup key={idx} label={group.label}>
+                    {group.options.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={group.value} value={group.value}>
+                    {group.label}
+                  </option>
+                )
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Button onClick={handleContinue} disabled={!canContinue} className="w-full">
+      <div className="mt-auto flex flex-col gap-2">
+        <Button onClick={handleContinue} disabled={!canContinue} size="sm" className="h-8 w-full text-[12px]">
           Continue
         </Button>
         <button
           type="button"
           onClick={onSkip}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          className="py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
         >
           Skip for now
         </button>

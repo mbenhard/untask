@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { AppShell } from './components/layout/AppShell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
@@ -53,7 +55,30 @@ export const AppRoot = () => {
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>(() =>
     localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1' ? 'ready' : 'loading',
   );
+  const [isTransitioningToApp, setIsTransitioningToApp] = useState(false);
   const setAiEnabled = useAppStore((state) => state.setAiEnabled);
+  const prefersReducedMotion = useReducedMotion();
+  const transitionFallbackRef = useRef<number | null>(null);
+
+  const clearTransitionFallback = useCallback(() => {
+    if (transitionFallbackRef.current !== null) {
+      window.clearTimeout(transitionFallbackRef.current);
+      transitionFallbackRef.current = null;
+    }
+  }, []);
+
+  const finishBootstrapTransition = useCallback(() => {
+    clearTransitionFallback();
+    setIsTransitioningToApp(false);
+    setBootstrapStatus('ready');
+  }, [clearTransitionFallback]);
+
+  useEffect(
+    () => () => {
+      clearTransitionFallback();
+    },
+    [clearTransitionFallback],
+  );
 
   useEffect(() => {
     const untask = window.untask;
@@ -95,23 +120,69 @@ export const AppRoot = () => {
   }
 
   if (bootstrapStatus === 'onboarding') {
+    const transitionDurationMs = prefersReducedMotion ? 80 : 320;
+
+    const handleOnboardingComplete = async () => {
+      if (isTransitioningToApp) {
+        return;
+      }
+
+      try {
+        // Sync AI enabled setting from onboarding to store
+        const untask = window.untask;
+        if (untask) {
+          const aiEnabledResult = await untask.settings.getAiEnabled();
+          setAiEnabled(aiEnabledResult.enabled);
+        }
+      } catch {
+        // Use default if loading fails
+      }
+
+      localStorage.setItem(BOOTSTRAP_DONE_KEY, '1');
+      setIsTransitioningToApp(true);
+
+      clearTransitionFallback();
+      transitionFallbackRef.current = window.setTimeout(() => {
+        finishBootstrapTransition();
+      }, transitionDurationMs + 80);
+    };
+
     return (
-      <OnboardingFlow
-        onComplete={async () => {
-          // Sync AI enabled setting from onboarding to store
-          try {
-            const untask = window.untask;
-            if (untask) {
-              const aiEnabledResult = await untask.settings.getAiEnabled();
-              setAiEnabled(aiEnabledResult.enabled);
-            }
-          } catch {
-            // Use default if loading fails
+      <div className="relative h-full w-full overflow-hidden bg-background">
+        {isTransitioningToApp ? (
+          <motion.div
+            className="absolute inset-0"
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0.08 : 0.28, ease: 'easeOut' }}
+          >
+            <AppShell />
+          </motion.div>
+        ) : null}
+
+        <motion.div
+          className={isTransitioningToApp ? 'absolute inset-0 pointer-events-none' : 'h-full w-full'}
+          initial={false}
+          animate={
+            isTransitioningToApp
+              ? { opacity: 0, y: prefersReducedMotion ? 0 : -24 }
+              : { opacity: 1, y: 0 }
           }
-          localStorage.setItem(BOOTSTRAP_DONE_KEY, '1');
-          setBootstrapStatus('ready');
-        }}
-      />
+          transition={{ duration: prefersReducedMotion ? 0.08 : 0.28, ease: 'easeOut' }}
+          onAnimationComplete={() => {
+            if (isTransitioningToApp) {
+              finishBootstrapTransition();
+            }
+          }}
+        >
+          <OnboardingFlow
+            isTransitioningToApp={isTransitioningToApp}
+            onComplete={() => {
+              void handleOnboardingComplete();
+            }}
+          />
+        </motion.div>
+      </div>
     );
   }
 

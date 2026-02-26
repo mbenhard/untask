@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -15,73 +15,84 @@ export const OnboardingBasics = ({ onNext }: OnboardingBasicsProps) => {
     onNext(name.trim(), aiEnabled);
   };
 
-  const isNameValid = name.trim().length > 0;
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter') {
+        return;
+      }
+      event.preventDefault();
+      handleContinue();
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [name, aiEnabled]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Let's get set up</h2>
-        <p className="text-xs text-muted-foreground">A couple of quick questions.</p>
+    <div className="flex h-full flex-col gap-2">
+      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
+        <div className="mb-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            NAME
+          </span>
+        </div>
+        <label htmlFor="onboarding-name" className="sr-only">
+          What should I call you?
+        </label>
+        <Input
+          id="onboarding-name"
+          type="text"
+          placeholder="What should I call you?"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+          className="h-8 text-[13px]"
+        />
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <label htmlFor="onboarding-name" className="text-xs font-medium text-foreground">
-            What should I call you?
-          </label>
-          <Input
-            id="onboarding-name"
-            type="text"
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && isNameValid) {
-                handleContinue();
-              }
-            }}
-            autoFocus
-            className="h-9 text-sm"
-          />
+      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
+        <div className="mb-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            AI ASSISTANT
+          </span>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-foreground">Enable AI assistant?</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setAiEnabled(true)}
-              className={[
-                'flex-1 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
-                aiEnabled
-                  ? 'border-foreground/30 bg-accent text-foreground'
-                  : 'border-border bg-transparent text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              Yes
-            </button>
-            <button
-              type="button"
-              onClick={() => setAiEnabled(false)}
-              className={[
-                'flex-1 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
-                !aiEnabled
-                  ? 'border-foreground/30 bg-accent text-foreground'
-                  : 'border-border bg-transparent text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              No, task manager only
-            </button>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {aiEnabled
-              ? 'AI features will be enabled. You can turn this off later in settings.'
-              : 'App works as a pure task manager. You can enable AI later in settings.'}
-          </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={aiEnabled}
+            onClick={() => setAiEnabled(true)}
+            className={[
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              aiEnabled
+                ? 'border-foreground/40 bg-accent text-foreground'
+                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            Enable
+          </button>
+          <button
+            type="button"
+            aria-pressed={!aiEnabled}
+            onClick={() => setAiEnabled(false)}
+            className={[
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              !aiEnabled
+                ? 'border-foreground/40 bg-accent text-foreground'
+                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            Skip
+          </button>
         </div>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {aiEnabled
+            ? "I'll help you organize tasks and stay focused."
+            : 'You can always enable this later in Settings.'}
+        </p>
       </div>
 
-      <Button onClick={handleContinue} disabled={!isNameValid} className="w-full">
+      <Button onClick={handleContinue} size="sm" className="mt-auto h-8 w-full text-[12px]">
         Continue
       </Button>
     </div>
