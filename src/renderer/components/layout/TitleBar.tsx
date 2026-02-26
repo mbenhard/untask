@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 import { navigateToNotes } from '../../lib/notesNavigation';
-import { SNAPPY_SPRING } from '../../lib/animation';
+import { PILL_SLIDE } from '../../lib/animation';
 import {
   type AppView,
   selectActiveView,
@@ -61,7 +61,7 @@ export const TitleBar = () => {
                 <motion.span
                   layoutId="nav-pill"
                   className="absolute inset-0 rounded-lg bg-accent"
-                  transition={SNAPPY_SPRING}
+                  transition={PILL_SLIDE}
                   aria-hidden="true"
                 />
               )}

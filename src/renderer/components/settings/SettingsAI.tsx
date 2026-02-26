@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { SNAPPY_SPRING, fadeVariants, heightVariants } from '../../lib/animation';
+import { PILL_SLIDE, fadeVariants, heightVariants } from '../../lib/animation';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
@@ -689,7 +689,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                   )}
                 >
                   {state.activeSubTab === 'ai' && (
-                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={SNAPPY_SPRING} aria-hidden="true" />
+                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={PILL_SLIDE} aria-hidden="true" />
                   )}
                   <span className="relative">AI</span>
                 </button>
@@ -704,7 +704,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                   )}
                 >
                   {state.activeSubTab === 'identity' && (
-                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={SNAPPY_SPRING} aria-hidden="true" />
+                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={PILL_SLIDE} aria-hidden="true" />
                   )}
                   <span className="relative">Identity</span>
                 </button>
@@ -719,7 +719,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                   )}
                 >
                   {state.activeSubTab === 'knowledge' && (
-                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={SNAPPY_SPRING} aria-hidden="true" />
+                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={PILL_SLIDE} aria-hidden="true" />
                   )}
                   <span className="relative">Knowledge</span>
                 </button>

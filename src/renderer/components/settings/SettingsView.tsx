@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { cn } from '../../lib/utils';
-import { SNAPPY_SPRING, fadeVariants } from '../../lib/animation';
+import { PILL_SLIDE, fadeVariants } from '../../lib/animation';
 import { useToastStore } from '../../stores/toastStore';
 
 // Fetch version at module load so it's ready before first paint.
@@ -90,7 +90,7 @@ export const SettingsView = () => {
                   <motion.span
                     layoutId="settings-pill"
                     className="absolute inset-0 rounded-md bg-accent"
-                    transition={SNAPPY_SPRING}
+                    transition={PILL_SLIDE}
                     aria-hidden="true"
                   />
                 )}
