@@ -14,9 +14,14 @@ export function useMenuActions(): void {
       void navigateToNotes({ type: 'create' });
     });
 
+    const unsubSettings = window.untask?.app.onMenuSettings(() => {
+      useAppStore.getState().setView('settings');
+    });
+
     return () => {
       unsubTask?.();
       unsubNote?.();
+      unsubSettings?.();
     };
   }, []);
 }

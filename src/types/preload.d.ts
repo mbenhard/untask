@@ -105,6 +105,7 @@ export type UntaskApi = {
     getVersion: () => Promise<string>;
     onMenuNewTask: (listener: () => void) => () => void;
     onMenuNewNote: (listener: () => void) => () => void;
+    onMenuSettings: (listener: () => void) => () => void;
     checkForUpdates: () => Promise<UpdateInfo>;
     getUpdateInfo: () => Promise<UpdateInfo | null>;
     onUpdateAvailable: (listener: (info: UpdateInfo) => void) => () => void;

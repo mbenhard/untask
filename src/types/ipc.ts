@@ -46,6 +46,7 @@ export const IPC_CHANNELS = {
   APP_SET_WINDOW_DISMISS_MODE: 'app:set-window-dismiss-mode',
   APP_MENU_NEW_TASK: 'app:menu-new-task',
   APP_MENU_NEW_NOTE: 'app:menu-new-note',
+  APP_MENU_SETTINGS: 'app:menu-settings',
   APP_GET_DOCK_MODE: 'app:get-dock-mode',
   APP_SET_DOCK_MODE: 'app:set-dock-mode',
   APP_GET_VERSION: 'app:get-version',

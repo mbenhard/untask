@@ -137,6 +137,13 @@ const untaskApi: UntaskApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_NEW_NOTE, wrapped);
       };
     },
+    onMenuSettings: (listener: () => void): (() => void) => {
+      const wrapped = () => listener();
+      ipcRenderer.on(IPC_CHANNELS.APP_MENU_SETTINGS, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.APP_MENU_SETTINGS, wrapped);
+      };
+    },
     checkForUpdates: (): Promise<UpdateInfo> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_CHECK_FOR_UPDATES),
     getUpdateInfo: (): Promise<UpdateInfo | null> =>

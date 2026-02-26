@@ -44,7 +44,7 @@ function registerShortcut(
   return registered;
 }
 
-function sendMenuAction(channel: string): void {
+export function sendMenuAction(channel: string): void {
   summonWindow();
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
