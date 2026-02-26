@@ -5,19 +5,16 @@ import { TERMINAL_STATUSES } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { TaskViewSkeleton } from '../ui/loadingShells';
 import { SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 
 type TodayViewProps = {
   allTasks: Task[];
-  isLoading: boolean;
   error: string | null;
 };
 
 export const TodayView = ({
   allTasks,
-  isLoading,
   error,
 }: TodayViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
@@ -56,12 +53,8 @@ export const TodayView = ({
     }
   }, [allTasks, selectedTaskId]);
 
-  if (isLoading) {
-    return <TaskViewSkeleton />;
-  }
-
   return (
-    <div className="h-full overflow-y-auto p-3 pb-14" aria-busy={false}>
+    <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error ? (
           <p className="text-[11px] text-destructive">

@@ -20,7 +20,6 @@ import { isTerminalStatus, getStatusLabel } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { TaskViewSkeleton } from '../ui/loadingShells';
 import {
   useTaskStatusConfigStore,
   selectLaneOrder,
@@ -40,7 +39,6 @@ import {
 
 type TasksViewProps = {
   allTasks: Task[];
-  isLoading: boolean;
   error: string | null;
 };
 
@@ -128,7 +126,6 @@ const StatusGroupSection = ({
 
 export const TasksView = ({
   allTasks,
-  isLoading,
   error,
 }: TasksViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
@@ -363,12 +360,8 @@ export const TasksView = ({
     ],
   );
 
-  if (isLoading) {
-    return <TaskViewSkeleton />;
-  }
-
   return (
-    <div className="h-full overflow-y-auto p-3 pb-14" aria-busy={false}>
+    <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error ? (
           <p className="text-[11px] text-destructive">

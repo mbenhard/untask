@@ -261,7 +261,7 @@ const createOptimisticTempTaskId = (): string => {
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   selectedTaskId: null,
-  isLoading: true,
+  isLoading: false,
   error: null,
 
   // ── Fetch ───────────────────────────────────────────────
@@ -566,5 +566,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 // create new references (e.g. .filter(), .map()) will cause infinite re-renders
 // unless consumed via useShallow from 'zustand/react/shallow'.
 export const selectTasks = (s: TaskStore) => s.tasks;
-export const selectIsLoading = (s: TaskStore) => s.isLoading;
 export const selectError = (s: TaskStore) => s.error;
+
+// ─── Eager initial fetch ────────────────────────────────────
+// Fire at module load so data is ready before React's first paint.
+// Uses 'refresh' mode (no isLoading flash). Guard for test environments.
+if (typeof window !== 'undefined' && window.untask) {
+  void loadTasks(useTaskStore.setState, 'refresh');
+}

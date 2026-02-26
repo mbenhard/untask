@@ -5,13 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui';
-import {
-  ChatPanelSkeleton,
-  NotesViewSkeleton,
-  SearchModalSkeleton,
-  SettingsViewSkeleton,
-  TaskViewSkeleton,
-} from '../ui/loadingShells';
+import { ChatPanelSkeleton } from '../ui/loadingShells';
 import { useTheme } from '../providers/ThemeProvider';
 
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -19,10 +13,6 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
 import { isTaskRefreshSuppressed } from '../../lib/editorSaveGuard';
 import { createTaskRefreshCoalescer } from '../../lib/taskRefreshCoalescer';
-import {
-  cancelTargetedViewPrefetch,
-  scheduleTargetedViewPrefetch,
-} from '../../lib/viewPrefetch';
 import { cn } from '../../lib/utils';
 import {
   selectActiveView,
@@ -34,7 +24,6 @@ import {
 } from '../../stores/appStore';
 import {
   selectError,
-  selectIsLoading,
   selectTasks,
   useTaskStore,
 } from '../../stores/taskStore';
@@ -51,6 +40,13 @@ import { ToastContainer } from '../ui/Toast';
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
 
+import { NotesView } from '../notes/NotesView';
+import { SearchModal } from '../search/SearchModal';
+import { SettingsView } from '../settings/SettingsView';
+import { TodayView } from '../views/TodayView';
+import { TasksView } from '../views/TasksView';
+import { InboxView } from '../views/InboxView';
+
 const LazyChatView = lazy(async () => {
   const module = await import('../chat/ChatView');
   return { default: module.ChatView };
@@ -64,36 +60,6 @@ const LazyThreadListView = lazy(async () => {
 const LazyChatInput = lazy(async () => {
   const module = await import('./ChatInput');
   return { default: module.ChatInput };
-});
-
-const LazyNotesView = lazy(async () => {
-  const module = await import('../notes/NotesView');
-  return { default: module.NotesView };
-});
-
-const LazySearchModal = lazy(async () => {
-  const module = await import('../search/SearchModal');
-  return { default: module.SearchModal };
-});
-
-const LazySettingsView = lazy(async () => {
-  const module = await import('../settings/SettingsView');
-  return { default: module.SettingsView };
-});
-
-const LazyTodayView = lazy(async () => {
-  const module = await import('../views/TodayView');
-  return { default: module.TodayView };
-});
-
-const LazyTasksView = lazy(async () => {
-  const module = await import('../views/TasksView');
-  return { default: module.TasksView };
-});
-
-const LazyInboxView = lazy(async () => {
-  const module = await import('../views/InboxView');
-  return { default: module.InboxView };
 });
 
 export const AppShell = () => {
@@ -136,10 +102,8 @@ export const AppShell = () => {
   const setChatView = useAppStore((state) => state.setChatView);
   const isSearchOpen = useSearchStore(selectSearchIsOpen);
 
-  const fetchTasks = useTaskStore((state) => state.fetchTasks);
   const fetchStatusConfig = useTaskStatusConfigStore((s) => s.fetchConfig);
   const tasks = useTaskStore(selectTasks);
-  const isLoading = useTaskStore(selectIsLoading);
   const error = useTaskStore(selectError);
   const initializeChat = useChatStore((state) => state.initialize);
   const sendMessage = useChatStore((state) => state.sendMessage);
@@ -163,9 +127,8 @@ export const AppShell = () => {
   }, [chatOverlayState]);
 
   useEffect(() => {
-    void fetchTasks();
     void fetchStatusConfig();
-  }, [fetchTasks, fetchStatusConfig]);
+  }, [fetchStatusConfig]);
 
   useEffect(() => {
     void initializeChat();
@@ -267,13 +230,6 @@ export const AppShell = () => {
   useMenuActions();
 
   useEffect(() => {
-    scheduleTargetedViewPrefetch();
-    return () => {
-      cancelTargetedViewPrefetch();
-    };
-  }, []);
-
-  useEffect(() => {
     if (activeView !== 'notes') {
       clearPendingNoteContext();
     }
@@ -309,43 +265,23 @@ export const AppShell = () => {
 
   const activeViewComponent = useMemo(() => {
     if (activeView === 'today') {
-      return (
-        <Suspense fallback={<TaskViewSkeleton />}>
-          <LazyTodayView allTasks={tasks} isLoading={isLoading} error={error} />
-        </Suspense>
-      );
+      return <TodayView allTasks={tasks} error={error} />;
     }
 
     if (activeView === 'tasks') {
-      return (
-        <Suspense fallback={<TaskViewSkeleton />}>
-          <LazyTasksView allTasks={tasks} isLoading={isLoading} error={error} />
-        </Suspense>
-      );
+      return <TasksView allTasks={tasks} error={error} />;
     }
 
     if (activeView === 'notes') {
-      return (
-        <Suspense fallback={<NotesViewSkeleton />}>
-          <LazyNotesView />
-        </Suspense>
-      );
+      return <NotesView />;
     }
 
     if (activeView === 'settings') {
-      return (
-        <Suspense fallback={<SettingsViewSkeleton />}>
-          <LazySettingsView />
-        </Suspense>
-      );
+      return <SettingsView />;
     }
 
-    return (
-      <Suspense fallback={<TaskViewSkeleton />}>
-        <LazyInboxView allTasks={tasks} isLoading={isLoading} error={error} />
-      </Suspense>
-    );
-  }, [activeView, error, isLoading, tasks]);
+    return <InboxView allTasks={tasks} error={error} />;
+  }, [activeView, error, tasks]);
 
   const openChatFromOverlay = useCallback(() => {
     openChatOverlay();
@@ -651,9 +587,7 @@ export const AppShell = () => {
         </div>
       </div>
 
-      <Suspense fallback={isSearchOpen ? <SearchModalSkeleton /> : null}>
-        {isSearchOpen ? <LazySearchModal /> : null}
-      </Suspense>
+      {isSearchOpen ? <SearchModal /> : null}
       <ToastContainer />
     </div>
   );

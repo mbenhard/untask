@@ -3,19 +3,16 @@ import { useMemo, useState } from 'react';
 import type { Task } from '../../../types/models';
 
 import { useAppStore } from '../../stores/appStore';
-import { TaskViewSkeleton } from '../ui/loadingShells';
 import { SectionGroup } from '../tasks/SectionGroup';
 import { TaskList } from '../tasks/TaskList';
 
 type InboxViewProps = {
   allTasks: Task[];
-  isLoading: boolean;
   error: string | null;
 };
 
 export const InboxView = ({
   allTasks,
-  isLoading,
   error,
 }: InboxViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
@@ -34,12 +31,8 @@ export const InboxView = ({
     [allTasks],
   );
 
-  if (isLoading) {
-    return <TaskViewSkeleton />;
-  }
-
   return (
-    <div className="h-full overflow-y-auto p-3 pb-14" aria-busy={false}>
+    <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
         {error ? (
           <p className="text-[11px] text-destructive">

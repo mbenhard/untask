@@ -37,30 +37,6 @@ export const AppBootstrapSkeleton = () => (
   </main>
 );
 
-export const TaskViewSkeleton = () => (
-  <div
-    aria-busy="true"
-    data-testid="task-view-skeleton"
-    className="h-full overflow-y-auto p-3 pb-14"
-  >
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-      {[0, 1].map((section) => (
-        <div key={section} className="rounded-lg border border-border/30 px-3 py-3">
-          <div className="mb-3 flex items-center justify-between">
-            <Skeleton className="h-3 w-28" />
-            <Skeleton className="h-6 w-20" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-[94%]" />
-            <Skeleton className="h-9 w-[88%]" />
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
 type NotesListSkeletonProps = {
   testId?: string;
 };
@@ -107,8 +83,6 @@ export const NotesListSkeleton = ({
     </div>
   </div>
 );
-
-export const NotesViewSkeleton = () => <NotesListSkeleton testId="notes-view-skeleton" />;
 
 export const ChatPanelSkeleton = ({ variant, className }: ChatPanelSkeletonProps) => {
   if (variant === 'input') {
@@ -178,46 +152,6 @@ export const ChatPanelSkeleton = ({ variant, className }: ChatPanelSkeletonProps
     </div>
   );
 };
-
-export const SettingsViewSkeleton = () => (
-  <div
-    aria-busy="true"
-    data-testid="settings-view-skeleton"
-    className="h-full overflow-y-auto px-3 py-3"
-  >
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-      {[0, 1, 2].map((section) => (
-        <div key={section} className="rounded-lg border border-border/40 px-3 py-3">
-          <div className="mb-3">
-            <Skeleton className="h-3 w-32" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-[90%]" />
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-export const SearchModalSkeleton = () => (
-  <div
-    aria-busy="true"
-    data-testid="search-modal-skeleton"
-    className="no-drag fixed inset-0 z-50 flex items-start justify-center bg-background/40 pt-[18vh] backdrop-blur-[2px]"
-  >
-    <div className="h-fit w-full max-w-sm rounded-xl border border-border/70 bg-card px-3 py-2.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
-      <Skeleton className="h-8 w-full" />
-      <div className="mt-2 space-y-1.5 border-t border-border/30 py-2">
-        <Skeleton className="h-7 w-full" />
-        <Skeleton className="h-7 w-full" />
-        <Skeleton className="h-7 w-[94%]" />
-      </div>
-    </div>
-  </div>
-);
 
 type EditorBlockSkeletonProps = {
   className?: string;

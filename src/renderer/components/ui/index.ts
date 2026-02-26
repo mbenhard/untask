@@ -9,10 +9,6 @@ export {
   AppBootstrapSkeleton,
   ChatPanelSkeleton,
   EditorBlockSkeleton,
-  NotesViewSkeleton,
-  SearchModalSkeleton,
-  SettingsViewSkeleton,
-  TaskViewSkeleton,
 } from './loadingShells';
 export {
   Card,
