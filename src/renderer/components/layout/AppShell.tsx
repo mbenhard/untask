@@ -450,23 +450,37 @@ export const AppShell = () => {
                   >
                     {/* Header: adapts based on chatView */}
                     <header className="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
-                      {chatView === 'threads' ? (
-                        <span className="truncate px-1.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-                          Threads
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          aria-label="Back to threads"
-                          className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          onClick={() => setChatView('threads')}
-                        >
-                          <ArrowLeft className="size-3" aria-hidden="true" />
-                          <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
-                            {activeConversationTitle}
-                          </span>
-                        </button>
-                      )}
+                      <AnimatePresence mode="wait" initial={false}>
+                        {chatView === 'threads' ? (
+                          <motion.span
+                            key="threads-label"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.1 }}
+                            className="truncate px-1.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground"
+                          >
+                            Threads
+                          </motion.span>
+                        ) : (
+                          <motion.button
+                            key="back-button"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.1 }}
+                            type="button"
+                            aria-label="Back to threads"
+                            className="group flex max-w-[70%] items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            onClick={() => setChatView('threads')}
+                          >
+                            <ArrowLeft className="size-3" aria-hidden="true" />
+                            <span className="truncate font-mono font-medium uppercase tracking-[0.06em]">
+                              {activeConversationTitle}
+                            </span>
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
                       <button
                         type="button"
                         onClick={collapseChatOverlay}
@@ -587,7 +601,9 @@ export const AppShell = () => {
         </div>
       </div>
 
-      {isSearchOpen ? <SearchModal /> : null}
+      <AnimatePresence>
+        {isSearchOpen ? <SearchModal key="search-modal" /> : null}
+      </AnimatePresence>
       <ToastContainer />
     </div>
   );

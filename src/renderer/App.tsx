@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { MotionConfig, motion, useReducedMotion } from 'framer-motion';
 
 import { AppShell } from './components/layout/AppShell';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
@@ -191,9 +191,11 @@ export const AppRoot = () => {
 
 const App = () => (
   <AppErrorBoundary>
-    <TooltipProvider delayDuration={75}>
-      <AppRoot />
-    </TooltipProvider>
+    <MotionConfig reducedMotion="user">
+      <TooltipProvider delayDuration={75}>
+        <AppRoot />
+      </TooltipProvider>
+    </MotionConfig>
   </AppErrorBoundary>
 );
 

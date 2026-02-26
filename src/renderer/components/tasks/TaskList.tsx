@@ -20,8 +20,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
+import { AnimatePresence, motion } from 'framer-motion';
 import { isTerminalStatus, PREDEFINED_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
+import { fadeVariants } from '../../lib/animation';
 import { useTaskListKeyboard } from '../../hooks/useTaskListKeyboard';
 import { getUntask } from '../../lib/untask';
 import { useAppStore } from '../../stores/appStore';
@@ -515,18 +517,24 @@ export const TaskList = ({
     onNavigatePrevGroup,
   });
 
-  if (tasks.length === 0) {
-    return (
-      <div className="grid min-h-28 place-items-center rounded-lg border border-dashed border-border/40 px-1 text-center">
-        <div className="space-y-1">
-          <p className="text-[13px] text-muted-foreground">{emptyMessage}</p>
-          {emptyAction ? (
-            <p className="text-[11px] text-muted-foreground">{emptyAction}</p>
-          ) : null}
-        </div>
+  const emptyState = (
+    <motion.div
+      key="empty"
+      variants={fadeVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.1 }}
+      className="grid min-h-28 place-items-center rounded-lg border border-dashed border-border/40 px-1 text-center"
+    >
+      <div className="space-y-1">
+        <p className="text-[13px] text-muted-foreground">{emptyMessage}</p>
+        {emptyAction ? (
+          <p className="text-[11px] text-muted-foreground">{emptyAction}</p>
+        ) : null}
       </div>
-    );
-  }
+    </motion.div>
+  );
 
   const listContent = (
     <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
@@ -675,24 +683,40 @@ export const TaskList = ({
   );
 
   if (dndMode === 'shared') {
-    return <div style={indentPx > 0 ? { paddingLeft: indentPx } : undefined}>{listContent}</div>;
+    return (
+      <div style={indentPx > 0 ? { paddingLeft: indentPx } : undefined}>
+        <AnimatePresence mode="popLayout" initial={false}>
+          {tasks.length === 0 ? emptyState : (
+            <motion.div key="list" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }}>
+              {listContent}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
   }
 
   return (
     <div style={indentPx > 0 ? { paddingLeft: indentPx } : undefined}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => { setActiveDragId(null); document.body.classList.remove('cursor-grabbing'); }}
-      >
-        {listContent}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {tasks.length === 0 ? emptyState : (
+          <motion.div key="list" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={() => { setActiveDragId(null); document.body.classList.remove('cursor-grabbing'); }}
+            >
+              {listContent}
 
-        <DragOverlay dropAnimation={SHARED_DROP_ANIMATION}>
-          {activeDragTask ? <DragPreview task={activeDragTask} /> : null}
-        </DragOverlay>
-      </DndContext>
+              <DragOverlay dropAnimation={SHARED_DROP_ANIMATION}>
+                {activeDragTask ? <DragPreview task={activeDragTask} /> : null}
+              </DragOverlay>
+            </DndContext>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

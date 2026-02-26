@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { cn } from '../../lib/utils';
+import { fadeVariants } from '../../lib/animation';
 import { useToastStore } from '../../stores/toastStore';
 
 // Fetch version at module load so it's ready before first paint.
@@ -102,7 +104,18 @@ export const SettingsView = () => {
         )}
 
         <div role="tabpanel" className="flex-1">
-          {tabContent}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={activeTab}
+              variants={fadeVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.1 }}
+            >
+              {tabContent}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Footer / Credits */}

@@ -809,8 +809,6 @@ export const TaskBody = ({
     onBodyEditModeChange?.(false);
   }, [onBodyEditModeChange]);
 
-  if (!isExpanded) return null;
-
   return (
     <div className="overflow-hidden">
       {/* Part-of reference — subtask context */}

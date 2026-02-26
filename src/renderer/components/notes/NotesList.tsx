@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { AnimatePresence, motion } from 'framer-motion';
+
+import { SNAPPY, fadeVariants, heightVariants } from '../../lib/animation';
+
 import {
   Archive,
   ArchiveRestore,
@@ -506,46 +510,68 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           </div>
         )}
 
-        {archivedNotes.length > 0 ? (
-          <div className="mt-4 border-t border-border/50 pt-2">
-            <button
-              type="button"
-              onClick={() => setArchiveExpanded((value) => !value)}
-              className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+        <AnimatePresence>
+          {archivedNotes.length > 0 ? (
+            <motion.div
+              key="archive-section"
+              variants={fadeVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.1 }}
+              className="mt-4 border-t border-border/50 pt-2"
             >
-              <ChevronRight
-                size={12}
-                className={cn(
-                  'transition-transform',
-                  archiveExpanded && 'rotate-90',
-                )}
-                aria-hidden="true"
-              />
-              <Archive size={12} aria-hidden="true" />
-              <span>Archived</span>
-              <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium">
-                {archivedNotes.length}
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setArchiveExpanded((value) => !value)}
+                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ChevronRight
+                  size={12}
+                  className={cn(
+                    'transition-transform',
+                    archiveExpanded && 'rotate-90',
+                  )}
+                  aria-hidden="true"
+                />
+                <Archive size={12} aria-hidden="true" />
+                <span>Archived</span>
+                <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium">
+                  {archivedNotes.length}
+                </span>
+              </button>
 
-            {archiveExpanded ? (
-              <div className="mt-1 opacity-70">
-                {archivedNotes.map((note) => (
-                  <NoteListItem
-                    key={note.id}
-                    note={note}
-                    selected={false}
-                    onClick={handleOpen}
-                    onFocusSelect={handleFocusSelect}
-                    onContextMenu={handleContextMenu}
-                    onRestore={handleRestore}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+              <AnimatePresence initial={false}>
+                {archiveExpanded ? (
+                  <motion.div
+                    key="archive-list"
+                    variants={heightVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={SNAPPY}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="mt-1 opacity-70">
+                      {archivedNotes.map((note) => (
+                        <NoteListItem
+                          key={note.id}
+                          note={note}
+                          selected={false}
+                          onClick={handleOpen}
+                          onFocusSelect={handleFocusSelect}
+                          onContextMenu={handleContextMenu}
+                          onRestore={handleRestore}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       {contextMenu ? (

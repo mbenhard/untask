@@ -1,5 +1,7 @@
+import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 import { navigateToNotes } from '../../lib/notesNavigation';
+import { SNAPPY_SPRING } from '../../lib/animation';
 import {
   type AppView,
   selectActiveView,
@@ -48,13 +50,22 @@ export const TitleBar = () => {
               className={cn(
                 'no-drag relative rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] outline-none transition-colors',
                 isActive
-                  ? 'bg-accent text-foreground'
+                  ? 'text-foreground'
                   : 'text-muted-foreground hover:text-foreground/80',
               )}
               role="tab"
               aria-selected={isActive}
               aria-current={isActive ? 'page' : undefined}
             >
+              {isActive && (
+                <motion.span
+                  layoutId="nav-pill"
+                  className="absolute inset-0 rounded-lg bg-accent"
+                  style={{ zIndex: -1 }}
+                  transition={SNAPPY_SPRING}
+                  aria-hidden="true"
+                />
+              )}
               {TAB_LABELS[view]}
             </button>
           );

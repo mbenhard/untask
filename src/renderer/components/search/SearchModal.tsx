@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { SNAPPY, scaleVariants, heightVariants } from '../../lib/animation';
 
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 
@@ -106,22 +108,29 @@ export const SearchModal = () => {
     [close, getSelectedResult, navigateToResult, selectNext, selectPrevious],
   );
 
-  if (!isOpen) return null;
-
   const hasQuery = query.trim().length > 0;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.1 }}
       className="no-drag fixed inset-0 z-50 flex items-start justify-center bg-background/40 pt-[18vh] backdrop-blur-[2px]"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       onKeyDown={handleKeyDown}
     >
-      <div
+      <motion.div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Search tasks"
         className="h-fit w-full max-w-sm rounded-xl border border-border/70 bg-card shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
+        variants={scaleVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={SNAPPY}
       >
         {/* Input */}
         <div className="flex items-center gap-2 px-3 py-2.5">
@@ -147,7 +156,17 @@ export const SearchModal = () => {
         </div>
 
         {/* Results */}
-        {(hasQuery || error) && (
+        <AnimatePresence>
+          {(hasQuery || error) && (
+            <motion.div
+              key="search-results"
+              variants={heightVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ overflow: 'hidden' }}
+            >
           <div
             ref={listRef}
             id="search-results-listbox"
@@ -234,8 +253,10 @@ export const SearchModal = () => {
               </>
             )}
           </div>
-        )}
-      </div>
-    </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 };

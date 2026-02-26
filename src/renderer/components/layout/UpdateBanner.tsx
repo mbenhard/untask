@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 
 import { X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import type { UpdateInfo } from '../../../types/ipc';
 import { getUntask } from '../../lib/untask';
+import { heightVariants } from '../../lib/animation';
 
 const DISMISSED_KEY_PREFIX = 'untask-update-dismissed-v';
 
@@ -55,51 +57,61 @@ export const UpdateBanner = () => {
     setVisible(false);
   };
 
-  if (!visible || !updateInfo) {
-    return null;
-  }
-
   return (
-    <div className="relative flex items-center justify-between gap-2 border-b border-border/50 bg-muted/60 px-3 py-1.5 text-[11px] text-muted-foreground">
-      <span>
-        Untask{' '}
-        <span className="font-medium text-foreground">v{updateInfo.latestVersion}</span>{' '}
-        available.{' '}
-        {updateInfo.installMethod === 'homebrew' ? (
-          <>
-            Run{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
-              brew update && brew upgrade untask
-            </code>
-            {' · '}
-            <a
-              href={updateInfo.releaseUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-muted-foreground underline-offset-2 hover:underline"
+    <AnimatePresence>
+      {visible && updateInfo ? (
+        <motion.div
+          key="update-banner"
+          variants={heightVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+          style={{ overflow: 'hidden' }}
+        >
+          <div className="relative flex items-center justify-between gap-2 border-b border-border/50 bg-muted/60 px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span>
+              Untask{' '}
+              <span className="font-medium text-foreground">v{updateInfo.latestVersion}</span>{' '}
+              available.{' '}
+              {updateInfo.installMethod === 'homebrew' ? (
+                <>
+                  Run{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
+                    brew update && brew upgrade untask
+                  </code>
+                  {' · '}
+                  <a
+                    href={updateInfo.releaseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    View release
+                  </a>
+                </>
+              ) : (
+                <a
+                  href={updateInfo.releaseUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  View release
+                </a>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Dismiss update notification"
             >
-              View release
-            </a>
-          </>
-        ) : (
-          <a
-            href={updateInfo.releaseUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium text-foreground underline-offset-2 hover:underline"
-          >
-            View release
-          </a>
-        )}
-      </span>
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-        aria-label="Dismiss update notification"
-      >
-        <X className="size-3" aria-hidden="true" />
-      </button>
-    </div>
+              <X className="size-3" aria-hidden="true" />
+            </button>
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 };

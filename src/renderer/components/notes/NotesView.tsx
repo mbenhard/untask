@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
 
+import { AnimatePresence, motion } from 'framer-motion';
+
 import {
   selectActiveNoteId,
   selectIsViewReady,
   useNotesStore,
 } from '../../stores/notesStore';
 import { isExplicitNotesNavigationInFlight } from '../../lib/notesNavigation';
+import { fadeVariants } from '../../lib/animation';
 import { NoteEditor } from './NoteEditor';
 import { NotesList } from './NotesList';
 
@@ -27,9 +30,33 @@ export const NotesView = () => {
     return null;
   }
 
-  if (activeNoteId) {
-    return <NoteEditor />;
-  }
-
-  return <NotesList />;
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      {activeNoteId ? (
+        <motion.div
+          key={activeNoteId}
+          variants={fadeVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.08 }}
+          className="h-full"
+        >
+          <NoteEditor />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="notes-list"
+          variants={fadeVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.08 }}
+          className="h-full"
+        >
+          <NotesList />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 };

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { AnimatePresence, motion } from 'framer-motion';
+import { fadeVariants, heightVariants } from '../../lib/animation';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
@@ -663,50 +665,72 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
         </SettingsRow>
       </SettingsSection>
 
-      {state.aiEnabled && (
-        <>
-          <nav className="flex items-center gap-0.5" aria-label="Assistant sub-tabs">
-            <button
-              type="button"
-              onClick={() => state.setActiveSubTab('ai')}
-              className={cn(
-                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
-                state.activeSubTab === 'ai'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground/80',
-              )}
-            >
-              AI
-            </button>
-            <button
-              type="button"
-              onClick={() => state.setActiveSubTab('identity')}
-              className={cn(
-                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
-                state.activeSubTab === 'identity'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground/80',
-              )}
-            >
-              Identity
-            </button>
-            <button
-              type="button"
-              onClick={() => state.setActiveSubTab('knowledge')}
-              className={cn(
-                'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
-                state.activeSubTab === 'knowledge'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground/80',
-              )}
-            >
-              Knowledge
-            </button>
-          </nav>
-
-          {renderSubTabContent()}
-        </>
-      )}
+      <AnimatePresence initial={false}>
+        {state.aiEnabled && (
+          <motion.div
+            key="ai-config"
+            variants={heightVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.08, ease: [0.25, 0.1, 0.25, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="space-y-3">
+              <nav className="flex items-center gap-0.5" aria-label="Assistant sub-tabs">
+                <button
+                  type="button"
+                  onClick={() => state.setActiveSubTab('ai')}
+                  className={cn(
+                    'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    state.activeSubTab === 'ai'
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                >
+                  AI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => state.setActiveSubTab('identity')}
+                  className={cn(
+                    'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    state.activeSubTab === 'identity'
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                >
+                  Identity
+                </button>
+                <button
+                  type="button"
+                  onClick={() => state.setActiveSubTab('knowledge')}
+                  className={cn(
+                    'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    state.activeSubTab === 'knowledge'
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                >
+                  Knowledge
+                </button>
+              </nav>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={state.activeSubTab}
+                  variants={fadeVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.1 }}
+                >
+                  {renderSubTabContent()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

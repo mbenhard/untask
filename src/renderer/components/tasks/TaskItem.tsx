@@ -2,11 +2,12 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useStat
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AlignLeft, ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
 
 import { TERMINAL_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { SNAPPY, fadeVariants, heightVariants } from '../../lib/animation';
 import { getUntask } from '../../lib/untask';
 import { PRIORITY_DOT } from '../../lib/taskConstants';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
@@ -532,38 +533,48 @@ export const TaskItem = ({
         </div>
 
         <div className="ml-auto flex items-center gap-1">
-          {task.body && task.body.trim() !== '' && task.body !== '<p></p>' ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="inline-flex h-5 items-center justify-center rounded border border-border/70 bg-muted/40 px-1 text-muted-foreground"
-                >
-                  <AlignLeft aria-hidden="true" className="size-3" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Has notes</TooltipContent>
-            </Tooltip>
-          ) : null}
+          <AnimatePresence>
+            {task.body && task.body.trim() !== '' && task.body !== '<p></p>' ? (
+              <motion.div key="body-badge" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.08 }}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex h-5 items-center justify-center rounded border border-border/70 bg-muted/40 px-1 text-muted-foreground"
+                    >
+                      <AlignLeft aria-hidden="true" className="size-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Has notes</TooltipContent>
+                </Tooltip>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
-          {task.recurrence ? (
-            <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
-              {task.recurrence}
-            </span>
-          ) : null}
+          <AnimatePresence>
+            {task.recurrence ? (
+              <motion.span key="recurrence-badge" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.08 }} className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
+                {task.recurrence}
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
 
-          {dueDateLabel ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className={cn(
-                  'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
-                  isOverdue && 'text-destructive',
-                )}>
-                  {dueDateLabel}
-                </span>
-              </TooltipTrigger>
-              {dueDateTooltip && <TooltipContent>{dueDateTooltip}</TooltipContent>}
-            </Tooltip>
-          ) : null}
+          <AnimatePresence>
+            {dueDateLabel ? (
+              <motion.div key="duedate-badge" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.08 }}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={cn(
+                      'inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground',
+                      isOverdue && 'text-destructive',
+                    )}>
+                      {dueDateLabel}
+                    </span>
+                  </TooltipTrigger>
+                  {dueDateTooltip && <TooltipContent>{dueDateTooltip}</TooltipContent>}
+                </Tooltip>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
           {childrenCount > 0 && (
             <Tooltip>
@@ -578,11 +589,13 @@ export const TaskItem = ({
             </Tooltip>
           )}
 
-          {isCompleted && completedAtLabel ? (
-            <span className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">
-              {completedAtLabel}
-            </span>
-          ) : null}
+          <AnimatePresence>
+            {isCompleted && completedAtLabel ? (
+              <motion.span key="completedat-badge" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.08 }} className="inline-flex h-5 items-center rounded border border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground">
+                {completedAtLabel}
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -636,147 +649,149 @@ export const TaskItem = ({
               onClick={(event) => event.stopPropagation()}
               onKeyDown={(event) => event.stopPropagation()}
             >
-              {menuView === 'main' ? (
-                <div role="menu">
-                  {task.status === 'inbox' && (
+              <AnimatePresence mode="wait" initial={false}>
+                {menuView === 'main' ? (
+                  <motion.div key="menu-main" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }} role="menu">
+                    {task.status === 'inbox' && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          void updateTask({ id: task.id, status: 'active' });
+                          useToastStore.getState().showToast('Moved to Tasks', async () => {
+                            await getUntask().tasks.undoLastUserAction();
+                            await useTaskStore.getState().refreshTasks();
+                          });
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <ArrowRightLeft aria-hidden="true" className="size-3" />
+                        Move to Tasks
+                      </button>
+                    )}
+                    {task.status !== 'inbox' && !isTerminal && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          void updateTask({ id: task.id, status: 'inbox' });
+                          useToastStore.getState().showToast('Moved to Inbox', async () => {
+                            await getUntask().tasks.undoLastUserAction();
+                            await useTaskStore.getState().refreshTasks();
+                          });
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <ArrowRightLeft aria-hidden="true" className="size-3" />
+                        Move to Inbox
+                      </button>
+                    )}
+                    {cancelledEnabled && !isTerminal && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          void cancelTask(task.id);
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <Ban aria-hidden="true" className="size-3" />
+                        Cancel task
+                      </button>
+                    )}
+                    {showMoveToProject && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => setMenuView('projects')}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <FolderInput aria-hidden="true" className="size-3" />
+                        <span className="flex-1 text-left">Move to project</span>
+                        <span className="text-border">&rarr;</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => {
-                        void updateTask({ id: task.id, status: 'active' });
-                        useToastStore.getState().showToast('Moved to Tasks', async () => {
-                          await getUntask().tasks.undoLastUserAction();
-                          await useTaskStore.getState().refreshTasks();
-                        });
-                        setMenuOpen(false);
-                      }}
+                      onClick={handleDuplicate}
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <ArrowRightLeft aria-hidden="true" className="size-3" />
-                      Move to Tasks
+                      <Copy aria-hidden="true" className="size-3" />
+                      Duplicate
                     </button>
-                  )}
-                  {task.status !== 'inbox' && !isTerminal && (
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => {
-                        void updateTask({ id: task.id, status: 'inbox' });
-                        useToastStore.getState().showToast('Moved to Inbox', async () => {
-                          await getUntask().tasks.undoLastUserAction();
-                          await useTaskStore.getState().refreshTasks();
-                        });
-                        setMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={() => setMenuView('delete-confirm')}
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
-                      <ArrowRightLeft aria-hidden="true" className="size-3" />
-                      Move to Inbox
-                    </button>
-                  )}
-                  {cancelledEnabled && !isTerminal && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        void cancelTask(task.id);
-                        setMenuOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <Ban aria-hidden="true" className="size-3" />
-                      Cancel task
-                    </button>
-                  )}
-                  {showMoveToProject && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => setMenuView('projects')}
-                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <FolderInput aria-hidden="true" className="size-3" />
-                      <span className="flex-1 text-left">Move to project</span>
-                      <span className="text-border">&rarr;</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={handleDuplicate}
-                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  >
-                    <Copy aria-hidden="true" className="size-3" />
-                    Duplicate
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => setMenuView('delete-confirm')}
-                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 aria-hidden="true" className="size-3" />
-                    Delete
-                  </button>
-                </div>
-              ) : menuView === 'projects' ? (
-                <div role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => setMenuView('main')}
-                    className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <span>&larr;</span> Back
-                  </button>
-                  {projects.map((project) => (
-                    <button
-                      key={project.id}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        const updates: TaskUpdateInput = {
-                          id: task.id,
-                          parentId: project.id,
-                        };
-                        if (task.status === 'inbox')
-                          updates.status = 'active';
-                        void updateTask(updates);
-                        setMenuOpen(false);
-                        setMenuView('main');
-                      }}
-                      className="flex w-full items-center truncate rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      {project.title}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1.5 px-1 py-1.5">
-                  <p className="text-xs text-muted-foreground">
-                    {activeChildrenCount > 0
-                      ? `Delete this task and ${activeChildrenCount} active subtask${activeChildrenCount > 1 ? 's' : ''}?`
-                      : 'Delete this task?'}
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      ref={deleteConfirmButtonRef}
-                      type="button"
-                      onClick={() => handleDelete(activeChildrenCount > 0)}
-                      className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
-                    >
+                      <Trash2 aria-hidden="true" className="size-3" />
                       Delete
                     </button>
-                  </div>
-                </div>
-              )}
+                  </motion.div>
+                ) : menuView === 'projects' ? (
+                  <motion.div key="menu-projects" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }} role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => setMenuView('main')}
+                      className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <span>&larr;</span> Back
+                    </button>
+                    {projects.map((project) => (
+                      <button
+                        key={project.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          const updates: TaskUpdateInput = {
+                            id: task.id,
+                            parentId: project.id,
+                          };
+                          if (task.status === 'inbox')
+                            updates.status = 'active';
+                          void updateTask(updates);
+                          setMenuOpen(false);
+                          setMenuView('main');
+                        }}
+                        className="flex w-full items-center truncate rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        {project.title}
+                      </button>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <motion.div key="menu-delete" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }} className="flex flex-col gap-1.5 px-1 py-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      {activeChildrenCount > 0
+                        ? `Delete this task and ${activeChildrenCount} active subtask${activeChildrenCount > 1 ? 's' : ''}?`
+                        : 'Delete this task?'}
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        ref={deleteConfirmButtonRef}
+                        type="button"
+                        onClick={() => handleDelete(activeChildrenCount > 0)}
+                        className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </PopoverContent>
           </Popover.Root>
 
@@ -800,7 +815,21 @@ export const TaskItem = ({
         </div>
       </div>
 
-      {children}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            key="task-body"
+            variants={heightVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={SNAPPY}
+            style={{ overflow: 'hidden' }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

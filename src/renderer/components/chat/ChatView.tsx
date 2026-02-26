@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 
 import type { ChipAction, TurnStep } from '../../../types/chat';
+import { SNAPPY, heightVariants } from '../../lib/animation';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { BirdMascot } from './BirdMascot';
@@ -703,69 +704,93 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-3">
-      {error ? (
-        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <div className="min-w-0">
-            <p className="whitespace-pre-wrap break-words">{error}</p>
-            {lastStreamError ? (
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-destructive/80">
-                {lastStreamError.code.replaceAll('_', ' ')}
-              </p>
-            ) : null}
-          </div>
-          {lastStreamError?.retryable ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => {
-                void retryLastFailedMessage();
-              }}
-              className="shrink-0"
-            >
-              Retry last message
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {error ? (
+          <motion.div
+            key="chat-error"
+            variants={heightVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={SNAPPY}
+            style={{ overflow: 'hidden' }}
+          >
+            <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <div className="min-w-0">
+                <p className="whitespace-pre-wrap break-words">{error}</p>
+                {lastStreamError ? (
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.06em] text-destructive/80">
+                    {lastStreamError.code.replaceAll('_', ' ')}
+                  </p>
+                ) : null}
+              </div>
+              {lastStreamError?.retryable ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    void retryLastFailedMessage();
+                  }}
+                  className="shrink-0"
+                >
+                  Retry last message
+                </Button>
+              ) : null}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-      {pendingNoteContext ? (
-        <div className="rounded-lg border border-border/60 bg-card/60 px-3 py-2">
-          <p className="truncate text-[11px] text-muted-foreground">
-            Note attached: <span className="text-foreground">{pendingNoteContext.title}</span>
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-              onClick={() => triggerNotePrompt('Extract the action items from this note and add or update tasks as needed.')}
-            >
-              Extract tasks
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-              onClick={() => triggerNotePrompt('Summarize the key decisions from this note.')}
-            >
-              Summarize decisions
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-              onClick={() => triggerNotePrompt('Clean up this note for clarity and brevity without losing important details.')}
-            >
-              Clean up note
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-              onClick={detachPendingNoteContext}
-            >
-              Detach
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {pendingNoteContext ? (
+          <motion.div
+            key="note-context"
+            variants={heightVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={SNAPPY}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="rounded-lg border border-border/60 bg-card/60 px-3 py-2">
+              <p className="truncate text-[11px] text-muted-foreground">
+                Note attached: <span className="text-foreground">{pendingNoteContext.title}</span>
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                  onClick={() => triggerNotePrompt('Extract the action items from this note and add or update tasks as needed.')}
+                >
+                  Extract tasks
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                  onClick={() => triggerNotePrompt('Summarize the key decisions from this note.')}
+                >
+                  Summarize decisions
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                  onClick={() => triggerNotePrompt('Clean up this note for clarity and brevity without losing important details.')}
+                >
+                  Clean up note
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                  onClick={detachPendingNoteContext}
+                >
+                  Detach
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 pb-0">
         {renderedMessages.length > 0 ? (

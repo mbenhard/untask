@@ -1,9 +1,11 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChevronRight, Plus } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import type { TaskStatus } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { SNAPPY, heightVariants } from '../../lib/animation';
 import { InlineTaskInput } from './InlineTaskInput';
 
 export type AddTaskConfig = {
@@ -145,23 +147,47 @@ export const SectionGroup = ({
         ) : null}
       </div>
 
-      {!isCollapsed ? (
-        <div id={`section-${sectionId}`} className="border-t border-border/60 px-1 py-1">
-          {isAdding && addTaskConfig ? (
-            <InlineTaskInput
-              parentId={null}
-              defaultStatus={addTaskConfig.defaultStatus}
-              defaultToday={addTaskConfig.defaultToday}
-              showMetadata={addTaskConfig.showMetadata ?? false}
-              placeholder={addTaskConfig.placeholder}
-              alwaysOpen={true}
-              onDismiss={handleDismiss}
-              triggerOpen={triggerAdd}
-            />
-          ) : null}
-          {children}
-        </div>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {!isCollapsed ? (
+          <motion.div
+            key="section-content"
+            variants={heightVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={SNAPPY}
+            style={{ overflow: 'hidden' }}
+          >
+            <div id={`section-${sectionId}`} className="border-t border-border/60 px-1 py-1">
+              <AnimatePresence initial={false}>
+                {isAdding && addTaskConfig ? (
+                  <motion.div
+                    key="inline-input"
+                    variants={heightVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <InlineTaskInput
+                      parentId={null}
+                      defaultStatus={addTaskConfig.defaultStatus}
+                      defaultToday={addTaskConfig.defaultToday}
+                      showMetadata={addTaskConfig.showMetadata ?? false}
+                      placeholder={addTaskConfig.placeholder}
+                      alwaysOpen={true}
+                      onDismiss={handleDismiss}
+                      triggerOpen={triggerAdd}
+                    />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+              {children}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </section>
   );
 };
