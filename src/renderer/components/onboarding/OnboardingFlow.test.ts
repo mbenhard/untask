@@ -30,6 +30,7 @@ type UntaskMock = {
   reminders: {
     requestAccess: ReturnType<typeof vi.fn>;
     toggle: ReturnType<typeof vi.fn>;
+    setFilter: ReturnType<typeof vi.fn>;
   };
   apiKeys: {
     set: ReturnType<typeof vi.fn>;
@@ -63,6 +64,7 @@ const createUntaskMock = (): UntaskMock => ({
   reminders: {
     requestAccess: vi.fn().mockResolvedValue({ granted: true }),
     toggle: vi.fn().mockResolvedValue(undefined),
+    setFilter: vi.fn().mockResolvedValue(undefined),
   },
   apiKeys: {
     set: vi.fn().mockResolvedValue(undefined),
@@ -187,7 +189,6 @@ describe('OnboardingFlow', () => {
     await clickButton('Skip for now');
 
     expect(headerLabel()).toContain('03 — NOTIFICATIONS');
-    expect(container.textContent).toContain('03 / 06');
   });
 
   it('skips provider/identity and keeps contiguous numbering when AI is disabled', async () => {
@@ -200,7 +201,6 @@ describe('OnboardingFlow', () => {
     await clickButton('Continue');
 
     expect(headerLabel()).toContain('03 — SHORTCUTS');
-    expect(container.textContent).toContain('03 / 04');
   });
 
   it('supports enter and escape keyboard navigation deterministically', async () => {
@@ -230,7 +230,7 @@ describe('OnboardingFlow', () => {
 
     expect(headerLabel()).toContain('04 — PREFERENCES');
 
-    await clickButton('Continue');
+    await clickButton("Let's go");
 
     expect(untaskMock.settings.markBootstrapCompleted).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledTimes(1);

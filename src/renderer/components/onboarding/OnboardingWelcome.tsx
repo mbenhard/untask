@@ -34,8 +34,8 @@ export const OnboardingWelcome = ({ onNext, isActive }: OnboardingWelcomeProps) 
   const cardProps = prefersReducedMotion ? {} : { variants: onboardingCardVariants };
 
   return (
-    <Wrapper {...staggerProps} className="flex flex-col items-center gap-5">
-      <Card {...cardProps} className="bg-background px-6 py-4">
+    <Wrapper {...staggerProps} className="flex flex-col items-center gap-3">
+      <Card {...cardProps} className="bg-background px-6 py-2">
         <BirdMascot size={36} animated variant="wobble" className="text-muted-foreground" />
       </Card>
 

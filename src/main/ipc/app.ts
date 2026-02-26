@@ -296,7 +296,8 @@ export const registerAppHandlers = (): void => {
         } catch {
           throw new Error('Invalid URL.');
         }
-        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        const allowedProtocols = ['https:', 'http:', 'x-apple.systempreferences:'];
+        if (!allowedProtocols.includes(parsed.protocol)) {
           throw new Error(`Refusing to open URL with scheme: ${parsed.protocol}`);
         }
         await shell.openExternal(url);

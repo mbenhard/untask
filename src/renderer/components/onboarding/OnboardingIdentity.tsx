@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { motion, useReducedMotion } from 'framer-motion';
+
+import { onboardingCardVariants, onboardingStaggerContainer } from '../../lib/animation';
+import type { OnboardingNavProps } from './OnboardingFlow';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -58,12 +62,15 @@ type OnboardingIdentityProps = {
     focusValue: string,
   ) => void;
   onSkip: () => void;
+  nav: OnboardingNavProps;
+  isActive: boolean;
 };
 
-export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdentityProps) => {
+export const OnboardingIdentity = ({ userName, onNext, onSkip, nav, isActive }: OnboardingIdentityProps) => {
   const [role, setRole] = useState<Role | null>(null);
   const [style, setStyle] = useState<CommunicationStyle | null>(null);
   const [focus, setFocus] = useState('');
+  const prefersReducedMotion = useReducedMotion();
 
   const handleContinue = useCallback(() => {
     const identity = buildIdentityString(userName, role, style, focus);
@@ -72,6 +79,7 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!isActive) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         handleContinue();
@@ -79,16 +87,21 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleContinue]);
+  }, [handleContinue, isActive]);
+
+  const Wrapper = prefersReducedMotion ? 'div' : motion.div;
+  const Card = prefersReducedMotion ? 'div' : motion.div;
+  const staggerProps = prefersReducedMotion
+    ? {}
+    : { variants: onboardingStaggerContainer, initial: 'enter', animate: isActive ? 'center' : 'enter' };
+  const cardProps = prefersReducedMotion ? {} : { variants: onboardingCardVariants };
 
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
-        <div className="mb-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-            ROLE
-          </span>
-        </div>
+    <Wrapper {...staggerProps} className="flex flex-col gap-2">
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+          ROLE
+        </span>
         <div className="flex flex-wrap gap-1.5">
           {ROLE_OPTIONS.map((opt) => (
             <button
@@ -107,14 +120,12 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
-        <div className="mb-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-            COMMUNICATION
-          </span>
-        </div>
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+          COMMUNICATION
+        </span>
         <div className="flex flex-wrap gap-1.5">
           {COMMUNICATION_OPTIONS.map((opt) => (
             <button
@@ -136,28 +147,38 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
-        <div className="mb-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-            FOCUS
-          </span>
-        </div>
-        <Input
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+          FOCUS
+        </span>
+          <Input
           id="onboarding-focus"
           type="text"
-          placeholder="shipping my startup, finishing my thesis..."
+          placeholder="e.g. shipping a startup, finishing my thesis..."
           value={focus}
           onChange={(e) => setFocus(e.target.value)}
           className="h-8 text-[13px]"
         />
-      </div>
+      </Card>
 
-      <div className="mt-auto flex flex-col gap-2">
-        <Button onClick={handleContinue} size="sm" className="h-8 w-full text-[12px]">
-          Continue
-        </Button>
+      <Card {...cardProps} className="flex flex-col items-center gap-2 pt-3">
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={nav.onBack}
+            disabled={!nav.canGoBack}
+            className="h-8 border-dashed border-border/60 bg-transparent px-4 text-[12px] hover:bg-accent/50"
+          >
+            Back
+          </Button>
+          <Button onClick={handleContinue} size="sm" className="h-8 px-6 text-[12px]">
+            Continue
+          </Button>
+        </div>
         <button
           type="button"
           onClick={onSkip}
@@ -165,7 +186,7 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip }: OnboardingIdent
         >
           Skip
         </button>
-      </div>
-    </div>
+      </Card>
+    </Wrapper>
   );
 };

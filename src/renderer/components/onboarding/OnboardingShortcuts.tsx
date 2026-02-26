@@ -1,14 +1,23 @@
 import { useEffect } from 'react';
 
+import { motion, useReducedMotion } from 'framer-motion';
+
+import { onboardingCardVariants, onboardingStaggerContainer } from '../../lib/animation';
+import type { OnboardingNavProps } from './OnboardingFlow';
 import { Button } from '../ui/button';
 
 type OnboardingShortcutsProps = {
   onNext: () => void;
+  nav: OnboardingNavProps;
+  isActive: boolean;
 };
 
-export const OnboardingShortcuts = ({ onNext }: OnboardingShortcutsProps) => {
+export const OnboardingShortcuts = ({ onNext, nav, isActive }: OnboardingShortcutsProps) => {
+  const prefersReducedMotion = useReducedMotion();
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (!isActive) return;
       if (event.key !== 'Enter') {
         return;
       }
@@ -18,16 +27,21 @@ export const OnboardingShortcuts = ({ onNext }: OnboardingShortcutsProps) => {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onNext]);
+  }, [onNext, isActive]);
+
+  const Wrapper = prefersReducedMotion ? 'div' : motion.div;
+  const Card = prefersReducedMotion ? 'div' : motion.div;
+  const staggerProps = prefersReducedMotion
+    ? {}
+    : { variants: onboardingStaggerContainer, initial: 'enter', animate: isActive ? 'center' : 'enter' };
+  const cardProps = prefersReducedMotion ? {} : { variants: onboardingCardVariants };
 
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="rounded-md border border-dashed border-border/60 px-3 py-3">
-        <div className="mb-3">
-          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-            GLOBAL SHORTCUTS
-          </span>
-        </div>
+    <Wrapper {...staggerProps} className="flex flex-col gap-2">
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+          GLOBAL SHORTCUTS
+        </span>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-4">
@@ -60,13 +74,25 @@ export const OnboardingShortcuts = ({ onNext }: OnboardingShortcutsProps) => {
             <span className="text-[12px] text-muted-foreground">Quick add a task</span>
           </div>
         </div>
-      </div>
 
-      <p className="text-[11px] text-muted-foreground/70">Customizable in Settings -&gt; Shortcuts</p>
+        <p className="mt-3 text-[11px] text-muted-foreground/70">Customizable in Settings → Shortcuts</p>
+      </Card>
 
-      <Button onClick={onNext} size="sm" className="mt-auto h-8 w-full text-[12px]">
-        Continue
-      </Button>
-    </div>
+      <Card {...cardProps} className="flex items-center justify-center gap-3 pt-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={nav.onBack}
+          disabled={!nav.canGoBack}
+          className="h-8 border-dashed border-border/60 bg-transparent px-4 text-[12px] hover:bg-accent/50"
+        >
+          Back
+        </Button>
+        <Button onClick={onNext} size="sm" className="h-8 px-6 text-[12px]">
+          Continue
+        </Button>
+      </Card>
+    </Wrapper>
   );
 };
