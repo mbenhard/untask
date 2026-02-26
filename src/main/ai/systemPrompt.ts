@@ -1,5 +1,4 @@
-import type { Task } from '../db/schema';
-import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../types/models';
+import { TERMINAL_STATUSES, type PredefinedStatusId, type Task } from '../../types/models';
 import type {
   AssistantLiveContext,
   IdentityContextDebugSnapshot,

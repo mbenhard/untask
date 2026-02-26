@@ -1,4 +1,4 @@
-import { eq, asc, desc, isNull, and, inArray, sql, type SQL } from 'drizzle-orm';
+import { eq, asc, desc, isNull, isNotNull, and, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import {
@@ -10,7 +10,14 @@ import {
   getDefaultStatusConfig,
 } from '../../types/models';
 import { getDb } from '../db';
-import { tasks, taskEvents, type Task, type TaskEvent, type NewTask } from '../db/schema';
+import {
+  tasks,
+  taskEvents,
+  remindersMappings,
+  type Task,
+  type TaskEvent,
+  type NewTask,
+} from '../db/schema';
 import { calculateNextOccurrence } from './recurrenceEngine';
 import { getSetting, setSetting } from './settingsService';
 import { getMainWindow } from '../window/summonController';
@@ -74,10 +81,92 @@ const emitTaskChange = (event: TaskChangeEvent): void => {
 };
 
 const USER_UNDO_STACK_SIZE = 20;
+const TASK_UNDO_STATE_KEY = 'tasks.undo_state';
 const userUndoStack: string[] = [];
 
 // Maps a parent event ID -> child event IDs so recursive user actions can undo atomically.
 const cascadeUndoGroups = new Map<string, string[]>();
+let persistUndoStackTimer: NodeJS.Timeout | null = null;
+
+const persistUndoStackNow = (): void => {
+  try {
+    const payload = {
+      stack: userUndoStack,
+      cascadeGroups: Object.fromEntries(cascadeUndoGroups.entries()),
+    };
+    setSetting(TASK_UNDO_STATE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore persistence failures; undo should keep working in-memory.
+  }
+};
+
+const schedulePersistUndoStack = (): void => {
+  if (persistUndoStackTimer) {
+    clearTimeout(persistUndoStackTimer);
+  }
+  persistUndoStackTimer = setTimeout(() => {
+    persistUndoStackTimer = null;
+    persistUndoStackNow();
+  }, 500);
+};
+
+const restoreUndoStack = (): void => {
+  const raw = getSetting(TASK_UNDO_STATE_KEY);
+  userUndoStack.splice(0, userUndoStack.length);
+  cascadeUndoGroups.clear();
+
+  if (!raw) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      stack?: unknown;
+      cascadeGroups?: Record<string, unknown>;
+    };
+
+    if (Array.isArray(parsed.stack)) {
+      for (const eventId of parsed.stack) {
+        if (typeof eventId === 'string' && eventId.length > 0) {
+          userUndoStack.push(eventId);
+          if (userUndoStack.length >= USER_UNDO_STACK_SIZE) {
+            break;
+          }
+        }
+      }
+    }
+
+    const groups = parsed.cascadeGroups;
+    if (groups && typeof groups === 'object') {
+      for (const [parentEventId, childIds] of Object.entries(groups)) {
+        if (typeof parentEventId !== 'string' || !Array.isArray(childIds)) {
+          continue;
+        }
+
+        const normalizedChildren = childIds.filter(
+          (childId): childId is string => typeof childId === 'string' && childId.length > 0,
+        );
+        if (normalizedChildren.length > 0) {
+          cascadeUndoGroups.set(parentEventId, normalizedChildren);
+        }
+      }
+    }
+  } catch {
+    // Corrupt persisted state should not prevent app startup.
+  }
+};
+
+export const initUndoStack = (): void => {
+  restoreUndoStack();
+};
+
+export const flushUndoStackPersistence = (): void => {
+  if (persistUndoStackTimer) {
+    clearTimeout(persistUndoStackTimer);
+    persistUndoStackTimer = null;
+  }
+  persistUndoStackNow();
+};
 
 const pushUserUndoEvent = (eventId: string): void => {
   userUndoStack.unshift(eventId);
@@ -85,10 +174,13 @@ const pushUserUndoEvent = (eventId: string): void => {
     const evicted = userUndoStack.pop();
     if (evicted) cascadeUndoGroups.delete(evicted);
   }
+  schedulePersistUndoStack();
 };
 
 const popUserUndoEvent = (): string | null => {
-  return userUndoStack.shift() ?? null;
+  const popped = userUndoStack.shift() ?? null;
+  schedulePersistUndoStack();
+  return popped;
 };
 
 const groupNewUserUndoEvents = (stackLenBefore: number): void => {
@@ -103,6 +195,7 @@ const groupNewUserUndoEvents = (stackLenBefore: number): void => {
   }
   const childEventIds = userUndoStack.splice(1, newEventCount - 1);
   cascadeUndoGroups.set(parentEventId, childEventIds);
+  schedulePersistUndoStack();
 };
 
 const undoGroupedChildEvents = (eventId: string, source: TaskEventSource): void => {
@@ -119,6 +212,7 @@ const undoGroupedChildEvents = (eventId: string, source: TaskEventSource): void 
     }
   }
   cascadeUndoGroups.delete(eventId);
+  schedulePersistUndoStack();
 };
 
 export const subscribeTaskChanges = (
@@ -191,7 +285,7 @@ const assertTopLevelParentExists = (
   const [parent] = db
     .select()
     .from(tasks)
-    .where(eq(tasks.id, parentId))
+    .where(and(eq(tasks.id, parentId), isNull(tasks.deletedAt)))
     .all();
 
   if (!parent) {
@@ -211,7 +305,7 @@ const listChildTasks = (db: ReturnType<typeof getDb>, parentId: string): Task[] 
   db
     .select()
     .from(tasks)
-    .where(eq(tasks.parentId, parentId))
+    .where(and(eq(tasks.parentId, parentId), isNull(tasks.deletedAt)))
     .all();
 
 const listActiveChildTasks = (
@@ -232,7 +326,7 @@ export function listTasks(filter?: {
   limit?: number;
 }): Task[] {
   const db = getDb();
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [isNull(tasks.deletedAt)];
 
   if (filter?.status) {
     conditions.push(eq(tasks.status, filter.status));
@@ -291,6 +385,7 @@ export function clearStaleTodayFlags(): number {
     .set({ today: false })
     .where(
       and(
+        isNull(tasks.deletedAt),
         eq(tasks.today, true),
         inArray(tasks.status, [...TERMINAL_STATUSES]),
         sql`coalesce(${tasks.completedAt}, ${tasks.cancelledAt}, '1970-01-01') < ${todayIso}`,
@@ -306,11 +401,35 @@ export function clearStaleTodayFlags(): number {
   return result.length;
 }
 
+export function purgeOldSoftDeletedTasks(maxAgeDays = 30): number {
+  const db = getDb();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - maxAgeDays);
+
+  const purged = db
+    .delete(tasks)
+    .where(and(isNotNull(tasks.deletedAt), lt(tasks.deletedAt, cutoff.toISOString())))
+    .returning({ id: tasks.id })
+    .all();
+
+  return purged.length;
+}
+
 export function getTaskById(id: string): Task | null {
+  const db = getDb();
+  const [row] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
+  return row ?? null;
+}
+
+const getTaskByIdIncludeDeleted = (id: string): Task | null => {
   const db = getDb();
   const [row] = db.select().from(tasks).where(eq(tasks.id, id)).all();
   return row ?? null;
-}
+};
 
 export function getLastTaskEventForTask(taskId: string): TaskEvent | null {
   const db = getDb();
@@ -397,9 +516,16 @@ export function undoTaskEvent(
       throw new Error(`Cannot undo delete event ${eventId}: missing before snapshot.`);
     }
 
-    const existing = getTaskById(targetEvent.taskId);
+    const existing = getTaskByIdIncludeDeleted(targetEvent.taskId);
     const restored = existing
-      ? updateTaskFromSnapshot(targetEvent.taskId, before)
+      ? existing.deletedAt
+        ? db
+          .update(tasks)
+          .set({ deletedAt: null })
+          .where(eq(tasks.id, targetEvent.taskId))
+          .returning()
+          .all()[0]
+        : existing
       : db
         .insert(tasks)
         .values(before as NewTask)
@@ -499,12 +625,14 @@ export function createTask(
       const [row] = db
         .select({ maxOrder: sql<number>`MAX(${tasks.order})` })
         .from(tasks)
+        .where(isNull(tasks.deletedAt))
         .all();
       validated.order = row?.maxOrder != null ? row.maxOrder + 1 : 0;
     } else {
       const [row] = db
         .select({ minOrder: sql<number>`MIN(${tasks.order})` })
         .from(tasks)
+        .where(isNull(tasks.deletedAt))
         .all();
       validated.order = row?.minOrder != null ? row.minOrder - 1 : 0;
     }
@@ -530,7 +658,11 @@ export function updateTask(
   const { id, ...updates } = validated;
   const db = getDb();
 
-  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  const [before] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
   if (!before) throw new Error(`Task not found: ${id}`);
 
   if (validated.parentId !== undefined) {
@@ -547,7 +679,7 @@ export function updateTask(
     const hasChildren = db
       .select({ id: tasks.id })
       .from(tasks)
-      .where(eq(tasks.parentId, id))
+      .where(and(eq(tasks.parentId, id), isNull(tasks.deletedAt)))
       .all().length > 0;
 
     if (nextParentId && hasChildren) {
@@ -583,7 +715,11 @@ const deleteTaskRecursive = (
   visited.add(id);
   const db = getDb();
 
-  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  const [before] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
   if (!before) {
     visited.delete(id);
     throw new Error(`Task not found: ${id}`);
@@ -617,7 +753,12 @@ const deleteTaskRecursive = (
     }
   }
 
-  db.delete(tasks).where(eq(tasks.id, id)).run();
+  db
+    .update(tasks)
+    .set({ deletedAt: new Date().toISOString() })
+    .where(eq(tasks.id, id))
+    .run();
+  db.delete(remindersMappings).where(eq(remindersMappings.taskId, id)).run();
 
   logTaskEvent(id, 'delete', source, before, null);
   visited.delete(id);
@@ -653,7 +794,11 @@ const completeTaskRecursive = (
   visited.add(id);
   const db = getDb();
 
-  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  const [before] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
   if (!before) {
     visited.delete(id);
     throw new Error(`Task not found: ${id}`);
@@ -746,7 +891,11 @@ function spawnRecurringInstance(
 export function toggleToday(id: string, source: TaskEventSource = 'user'): Task {
   const db = getDb();
 
-  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  const [before] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
   if (!before) throw new Error(`Task not found: ${id}`);
 
   const [updated] = db
@@ -768,7 +917,11 @@ export function cancelTask(
   source: TaskEventSource = 'user',
 ): Task {
   const db = getDb();
-  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  const [before] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
   if (!before) throw new Error(`Task not found: ${id}`);
 
   const [updated] = db
@@ -788,7 +941,11 @@ export function reopenTask(
   source: TaskEventSource = 'user',
 ): Task {
   const db = getDb();
-  const [before] = db.select().from(tasks).where(eq(tasks.id, id)).all();
+  const [before] = db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .all();
   if (!before) throw new Error(`Task not found: ${id}`);
 
   const config = getTaskStatusConfig();
@@ -855,7 +1012,7 @@ export function reorderTasks(
     const beforeRows = tx
       .select()
       .from(tasks)
-      .where(inArray(tasks.id, validatedIds))
+      .where(and(inArray(tasks.id, validatedIds), isNull(tasks.deletedAt)))
       .all();
 
     if (beforeRows.length !== validatedIds.length) {

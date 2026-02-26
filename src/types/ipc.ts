@@ -106,6 +106,14 @@ export const IPC_CHANNELS = {
   BACKUP_IMPORT: 'backup:import',
   BACKUP_EXPORT_DIALOG: 'backup:export-dialog',
   BACKUP_IMPORT_DIALOG: 'backup:import-dialog',
+  BACKUP_OFFSITE_CREATE: 'backup:offsite-create',
+  BACKUP_OFFSITE_READ_MANIFEST: 'backup:offsite-read-manifest',
+  BACKUP_OFFSITE_RESTORE: 'backup:offsite-restore',
+  BACKUP_DETECT_CLOUD_FOLDERS: 'backup:detect-cloud-folders',
+  BACKUP_GET_SETTINGS: 'backup:get-settings',
+  BACKUP_SET_SETTINGS: 'backup:set-settings',
+  BACKUP_PICK_DESTINATION_FOLDER: 'backup:pick-destination-folder',
+  BACKUP_PICK_OFFSITE_FILE: 'backup:pick-offsite-file',
   SEARCH_QUERY: 'search:query',
   NOTES_LIST: 'notes:list',
   NOTES_GET: 'notes:get',
@@ -113,6 +121,7 @@ export const IPC_CHANNELS = {
   NOTES_SAVE: 'notes:save',
   NOTES_ARCHIVE: 'notes:archive',
   NOTES_RESTORE: 'notes:restore',
+  NOTES_RESTORE_FROM_TRASH: 'notes:restore-from-trash',
   NOTES_DELETE: 'notes:delete',
   NOTES_PIN: 'notes:pin',
   NOTES_UNPIN: 'notes:unpin',
@@ -364,6 +373,49 @@ export type BackupImportDialogResponse = {
   canceled: boolean;
   source?: string;
   restored: boolean;
+};
+
+export type BackupOffsiteManifestPayload = {
+  version: 1;
+  appVersion: string;
+  createdAt: string;
+  taskCount: number;
+  noteCount: number;
+  attachmentCount: number;
+  dbSizeBytes: number;
+};
+
+export type BackupOffsiteReadManifestRequest = {
+  source: string;
+};
+
+export type BackupOffsiteRestoreRequest = {
+  source: string;
+};
+
+export type BackupSettingsFrequency = 'hourly' | 'daily' | 'weekly';
+
+export type BackupSettingsPayload = {
+  destination: string;
+  frequency: BackupSettingsFrequency;
+  retention: number;
+  lastRunAt: string | null;
+};
+
+export type BackupSetSettingsRequest = {
+  destination: string;
+  frequency: BackupSettingsFrequency;
+  retention: number;
+};
+
+export type BackupPickDestinationFolderResponse = {
+  canceled: boolean;
+  destination?: string;
+};
+
+export type BackupPickOffsiteFileResponse = {
+  canceled: boolean;
+  source?: string;
 };
 
 // ─── Search payloads ──────────────────────────────────────

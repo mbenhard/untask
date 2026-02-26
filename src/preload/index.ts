@@ -49,6 +49,13 @@ import {
   type BackupImportDialogResponse,
   type BackupListResponse,
   type BackupMetadataPayload,
+  type BackupOffsiteManifestPayload,
+  type BackupOffsiteReadManifestRequest,
+  type BackupOffsiteRestoreRequest,
+  type BackupSettingsPayload,
+  type BackupSetSettingsRequest,
+  type BackupPickDestinationFolderResponse,
+  type BackupPickOffsiteFileResponse,
   type SearchQueryRequest,
   type SearchQueryResponse,
   type TaskDeleteRequestPayload,
@@ -331,6 +338,24 @@ const untaskApi: UntaskApi = {
       request?: BackupImportDialogRequest,
     ): Promise<BackupImportDialogResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_IMPORT_DIALOG, request),
+    offsiteCreate: (): Promise<BackupMetadataPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_OFFSITE_CREATE),
+    readOffsiteManifest: (
+      request: BackupOffsiteReadManifestRequest,
+    ): Promise<BackupOffsiteManifestPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_OFFSITE_READ_MANIFEST, request),
+    restoreOffsite: (request: BackupOffsiteRestoreRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_OFFSITE_RESTORE, request),
+    detectCloudFolders: (): Promise<string[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_DETECT_CLOUD_FOLDERS),
+    getSettings: (): Promise<BackupSettingsPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_GET_SETTINGS),
+    setSettings: (request: BackupSetSettingsRequest): Promise<BackupSettingsPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_SET_SETTINGS, request),
+    pickDestinationFolder: (): Promise<BackupPickDestinationFolderResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_PICK_DESTINATION_FOLDER),
+    pickOffsiteFile: (): Promise<BackupPickOffsiteFileResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_PICK_OFFSITE_FILE),
   },
   search: {
     query: (request: SearchQueryRequest): Promise<SearchQueryResponse> =>
@@ -344,6 +369,7 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.NOTES_SAVE, id, content),
     archive: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_ARCHIVE, id),
     restore: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RESTORE, id),
+    restoreFromTrash: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_RESTORE_FROM_TRASH, id),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_DELETE, id),
     pin: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_PIN, id),
     unpin: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.NOTES_UNPIN, id),

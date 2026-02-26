@@ -46,6 +46,13 @@ import type {
   BackupImportDialogResponse,
   BackupListResponse,
   BackupMetadataPayload,
+  BackupOffsiteManifestPayload,
+  BackupOffsiteReadManifestRequest,
+  BackupOffsiteRestoreRequest,
+  BackupSettingsPayload,
+  BackupSetSettingsRequest,
+  BackupPickDestinationFolderResponse,
+  BackupPickOffsiteFileResponse,
   SearchQueryRequest,
   SearchQueryResponse,
   SettingsMemoryStatePayload,
@@ -183,6 +190,14 @@ export type UntaskApi = {
     exportWithDialog: (request?: BackupExportDialogRequest) => Promise<BackupExportDialogResponse>;
     import: (request: BackupImportRequest) => Promise<void>;
     importWithDialog: (request?: BackupImportDialogRequest) => Promise<BackupImportDialogResponse>;
+    offsiteCreate: () => Promise<BackupMetadataPayload>;
+    readOffsiteManifest: (request: BackupOffsiteReadManifestRequest) => Promise<BackupOffsiteManifestPayload>;
+    restoreOffsite: (request: BackupOffsiteRestoreRequest) => Promise<void>;
+    detectCloudFolders: () => Promise<string[]>;
+    getSettings: () => Promise<BackupSettingsPayload>;
+    setSettings: (request: BackupSetSettingsRequest) => Promise<BackupSettingsPayload>;
+    pickDestinationFolder: () => Promise<BackupPickDestinationFolderResponse>;
+    pickOffsiteFile: () => Promise<BackupPickOffsiteFileResponse>;
   };
   search: {
     query: (request: SearchQueryRequest) => Promise<SearchQueryResponse>;
@@ -194,6 +209,7 @@ export type UntaskApi = {
     save: (id: string, content: string) => Promise<Note | undefined>;
     archive: (id: string) => Promise<Note | undefined>;
     restore: (id: string) => Promise<Note | undefined>;
+    restoreFromTrash: (id: string) => Promise<Note | undefined>;
     delete: (id: string) => Promise<void>;
     pin: (id: string) => Promise<Note | undefined>;
     unpin: (id: string) => Promise<Note | undefined>;

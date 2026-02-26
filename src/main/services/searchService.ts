@@ -88,7 +88,8 @@ export function initSearchFts(): void {
   db.exec(`
     CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN
       INSERT INTO tasks_fts(rowid, title, body, client)
-      VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, ''));
+      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, '')
+      WHERE NEW.deleted_at IS NULL;
     END;
   `);
 
@@ -98,7 +99,8 @@ export function initSearchFts(): void {
       INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client)
       VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''), COALESCE(OLD.client, ''));
       INSERT INTO tasks_fts(rowid, title, body, client)
-      VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, ''));
+      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, '')
+      WHERE NEW.deleted_at IS NULL;
     END;
   `);
 
@@ -177,7 +179,8 @@ export function initNotesSearchFts(): void {
   db.exec(`
     CREATE TRIGGER notes_fts_insert AFTER INSERT ON notes BEGIN
       INSERT INTO notes_fts(rowid, title, content)
-      VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.content, ''));
+      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.content, '')
+      WHERE NEW.deleted_at IS NULL;
     END;
   `);
 
@@ -187,7 +190,8 @@ export function initNotesSearchFts(): void {
       INSERT INTO notes_fts(notes_fts, rowid, title, content)
       VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.content, ''));
       INSERT INTO notes_fts(rowid, title, content)
-      VALUES (NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.content, ''));
+      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.content, '')
+      WHERE NEW.deleted_at IS NULL;
     END;
   `);
 
@@ -205,6 +209,22 @@ export function initNotesSearchFts(): void {
 export function rebuildSearchIndex(): void {
   const db = getRawDb();
   db.exec("INSERT INTO tasks_fts(tasks_fts) VALUES ('rebuild');");
+
+  const deletedRows = db
+    .prepare('SELECT rowid, title, body, client FROM tasks WHERE deleted_at IS NOT NULL')
+    .all() as Array<{
+    rowid: number;
+    title: string | null;
+    body: string | null;
+    client: string | null;
+  }>;
+
+  const deleteRow = db.prepare(
+    "INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client) VALUES ('delete', ?, ?, ?, ?)",
+  );
+  for (const row of deletedRows) {
+    deleteRow.run(row.rowid, row.title ?? '', row.body ?? '', row.client ?? '');
+  }
 }
 
 export function rebuildChatSearchIndex(): void {
@@ -215,6 +235,21 @@ export function rebuildChatSearchIndex(): void {
 export function rebuildNotesSearchIndex(): void {
   const db = getRawDb();
   db.exec("INSERT INTO notes_fts(notes_fts) VALUES ('rebuild');");
+
+  const deletedRows = db
+    .prepare('SELECT rowid, title, content FROM notes WHERE deleted_at IS NOT NULL')
+    .all() as Array<{
+    rowid: number;
+    title: string | null;
+    content: string | null;
+  }>;
+
+  const deleteRow = db.prepare(
+    "INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES ('delete', ?, ?, ?)",
+  );
+  for (const row of deletedRows) {
+    deleteRow.run(row.rowid, row.title ?? '', row.content ?? '');
+  }
 }
 
 /**
@@ -270,6 +305,7 @@ function executeNoteSearch(sanitized: string, limit: number): { results: NoteSea
       JOIN notes n ON n.rowid = notes_fts.rowid
       WHERE notes_fts MATCH ?
       AND n.status = 'active'
+      AND n.deleted_at IS NULL
       ORDER BY rank
       LIMIT ?
       `,
@@ -332,6 +368,7 @@ function executeTaskSearch(sanitized: string, limit: number): SearchQueryResult 
       FROM tasks_fts
       JOIN tasks t ON t.rowid = tasks_fts.rowid
       WHERE tasks_fts MATCH ?
+      AND t.deleted_at IS NULL
       ORDER BY rank
       LIMIT ?
       `,

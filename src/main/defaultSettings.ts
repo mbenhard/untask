@@ -36,6 +36,9 @@ export const SETTING_KEY_REMINDERS_IMPORT_ENABLED = 'reminders.import_enabled' a
 export const SETTING_KEY_NOTIFICATIONS_ENABLED = 'notifications.enabled' as const;
 export const SETTING_KEY_NOTIFICATIONS_DEFAULT_OFFSET = 'notifications.default_offset' as const;
 export const SETTING_KEY_NOTIFICATIONS_SOUND = 'notifications.sound' as const;
+export const SETTING_KEY_BACKUP_DESTINATION = 'backup.destination' as const;
+export const SETTING_KEY_BACKUP_FREQUENCY = 'backup.frequency' as const;
+export const SETTING_KEY_BACKUP_RETENTION = 'backup.retention' as const;
 
 // ─── Default values ───────────────────────────────────────────────────────────
 // Single source of truth for all persisted setting defaults.
@@ -76,4 +79,7 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_NOTIFICATIONS_ENABLED]: 'true',
   [SETTING_KEY_NOTIFICATIONS_DEFAULT_OFFSET]: 'at_due',
   [SETTING_KEY_NOTIFICATIONS_SOUND]: 'true',
+  [SETTING_KEY_BACKUP_DESTINATION]: '',
+  [SETTING_KEY_BACKUP_FREQUENCY]: 'daily',
+  [SETTING_KEY_BACKUP_RETENTION]: '10',
 };

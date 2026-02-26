@@ -12,8 +12,8 @@ import { runMigrations } from './db/migrate';
 import { registerIpcHandlers } from './ipc';
 import { IPC_CHANNELS } from '../types/ipc';
 import {
-  startDailyBackupScheduler,
-  stopDailyBackupScheduler,
+  startBackupScheduler,
+  stopBackupScheduler,
 } from './services/backupService';
 import { initChatSearchFts, initNotesSearchFts, initSearchFts } from './services/searchService';
 import { registerGlobalShortcuts, unregisterGlobalShortcuts } from './shortcuts';
@@ -26,7 +26,14 @@ import {
   setUpdateChannel,
   checkForUpdates,
 } from './services/updateChecker';
-import { ensureDefaultTaskStatusConfig, clearStaleTodayFlags } from './services/taskService';
+import {
+  ensureDefaultTaskStatusConfig,
+  clearStaleTodayFlags,
+  initUndoStack,
+  flushUndoStackPersistence,
+  purgeOldSoftDeletedTasks,
+} from './services/taskService';
+import { purgeOldSoftDeletedNotes } from './services/notesService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
 import { applyDockMode } from './window/dockMode';
@@ -46,6 +53,7 @@ if (started) {
 let isQuitting = false;
 app.on('before-quit', () => {
   isQuitting = true;
+  flushUndoStackPersistence();
 });
 
 // ─── Single-instance lock ─────────────────────────────────
@@ -141,8 +149,11 @@ const bootstrap = (): void => {
   registerAttachmentProtocol();
   initDatabase();
   runMigrations();
+  initUndoStack();
   ensureDefaultTaskStatusConfig();
   clearStaleTodayFlags();
+  purgeOldSoftDeletedTasks();
+  purgeOldSoftDeletedNotes();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
   // Migrate any plaintext API keys to encrypted safeStorage.
@@ -233,7 +244,7 @@ app.whenReady().then(() => {
   void emitIdentityContextDebugSnapshot();
   bootstrap();
   applyLaunchAtLogin();
-  startDailyBackupScheduler();
+  startBackupScheduler();
   setUpdateChannel(IPC_CHANNELS.APP_UPDATE_AVAILABLE);
   startUpdateChecker();
 
@@ -260,12 +271,16 @@ app.whenReady().then(() => {
   };
 
   app.on('activate', handleAppActivation);
+}).catch((error: unknown) => {
+  // eslint-disable-next-line no-console
+  console.error('[main] Failed during app startup', error);
+  app.quit();
 });
 
 app.on('will-quit', () => {
   stopRemindersSync();
   stopReminderScheduler();
-  stopDailyBackupScheduler();
+  stopBackupScheduler();
   stopUpdateChecker();
   unregisterGlobalShortcuts();
   destroyTray();

@@ -144,12 +144,6 @@ type StoredBlock = {
   children?: StoredBlock[];
 };
 
-type DeletedNoteSnapshot = {
-  content: string;
-  status: Note['status'];
-  isPinned: boolean;
-};
-
 const extractInlineText = (content?: StoredInlineContent[]): string => {
   if (!Array.isArray(content)) {
     return '';
@@ -630,11 +624,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   deleteNote: async (id) => {
     try {
-      const { activeNotes, archivedNotes } = get();
-      const source = [...activeNotes, ...archivedNotes].find((note) => note.id === id);
-      const snapshot: DeletedNoteSnapshot | null = source
-        ? { content: source.content, status: source.status, isPinned: source.isPinned }
-        : null;
+      const { activeNotes } = get();
       const nextSelectedId = getAdjacentActiveNoteId(activeNotes, id);
 
       await getUntask().notes.delete(id);
@@ -651,21 +641,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }
 
       get().setNotice({ kind: 'success', message: 'Note deleted.' });
-      if (snapshot) {
-        useToastStore.getState().showToast('Note deleted', async () => {
-          const restored = await getUntask().notes.create();
-          if (snapshot.content.length > 0) {
-            await getUntask().notes.save(restored.id, snapshot.content);
-          }
-          if (snapshot.isPinned) {
-            await getUntask().notes.pin(restored.id);
-          }
-          if (snapshot.status === 'archived') {
-            await getUntask().notes.archive(restored.id);
-          }
-          void get().loadList();
-        });
-      }
+      useToastStore.getState().showToast('Note deleted', async () => {
+        await getUntask().notes.restoreFromTrash(id);
+        void get().loadList(id);
+      });
       void get().loadList(nextSelectedId);
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });

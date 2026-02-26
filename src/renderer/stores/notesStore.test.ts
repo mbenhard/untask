@@ -24,6 +24,7 @@ type MockNotesApi = {
   save: ReturnType<typeof vi.fn<(id: string, content: string) => Promise<Note>>>;
   archive: ReturnType<typeof vi.fn<() => Promise<void>>>;
   restore: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  restoreFromTrash: ReturnType<typeof vi.fn<(id: string) => Promise<Note | undefined>>>;
   delete: ReturnType<typeof vi.fn<() => Promise<void>>>;
   pin: ReturnType<typeof vi.fn<() => Promise<void>>>;
   unpin: ReturnType<typeof vi.fn<() => Promise<void>>>;
@@ -48,6 +49,7 @@ const createMockNotesApi = (): MockNotesApi => ({
   }),
   archive: vi.fn(async () => undefined as void),
   restore: vi.fn(async () => undefined as void),
+  restoreFromTrash: vi.fn(async (id: string) => mockNote({ id })),
   delete: vi.fn(async () => undefined as void),
   pin: vi.fn(async () => undefined as void),
   unpin: vi.fn(async () => undefined as void),
@@ -524,7 +526,7 @@ describe('notesStore', () => {
     expect(useNotesStore.getState().selectedListNoteId).toBe('note-c');
   });
 
-  it('deleteNote undo recreates a deleted archived note snapshot', async () => {
+  it('deleteNote undo restores the same note from soft-delete trash', async () => {
     const api = getMockApi();
     useNotesStore.setState({
       activeNotes: [],
@@ -547,9 +549,8 @@ describe('notesStore', () => {
       await toast.onUndo();
     }
 
-    expect(api.create).toHaveBeenCalledTimes(1);
-    expect(api.save).toHaveBeenCalledWith('note-new', 'hello');
-    expect(api.pin).toHaveBeenCalledWith('note-new');
-    expect(api.archive).toHaveBeenCalledWith('note-new');
+    expect(api.restoreFromTrash).toHaveBeenCalledWith('note-archived');
+    expect(api.create).not.toHaveBeenCalled();
+    expect(api.save).not.toHaveBeenCalled();
   });
 });

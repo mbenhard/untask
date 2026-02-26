@@ -110,6 +110,20 @@ export const backupDialogRequestSchema = z.object({
   passphrase: z.string().optional(),
 });
 
+export const backupOffsiteReadManifestRequestSchema = z.object({
+  source: z.string().min(1),
+});
+
+export const backupOffsiteRestoreRequestSchema = z.object({
+  source: z.string().min(1),
+});
+
+export const backupSettingsSchema = z.object({
+  destination: z.string(),
+  frequency: z.enum(['hourly', 'daily', 'weekly']),
+  retention: z.number().int().min(1).max(50),
+});
+
 // ─── Task handler schemas ─────────────────────────────────────────────────────
 
 const taskStatusValues = [

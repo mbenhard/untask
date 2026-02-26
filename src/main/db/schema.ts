@@ -39,12 +39,14 @@ export const tasks = sqliteTable(
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     completedAt: text('completed_at'),
     cancelledAt: text('cancelled_at'),
+    deletedAt: text('deleted_at'),
   },
   (table) => [
     index('tasks_parent_id_idx').on(table.parentId),
     index('tasks_status_idx').on(table.status),
     index('tasks_today_idx').on(table.today),
     index('tasks_due_date_idx').on(table.dueDate),
+    index('tasks_deleted_at_idx').on(table.deletedAt),
   ],
 );
 
@@ -63,10 +65,12 @@ export const notes = sqliteTable(
     isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     updatedAt: text('updated_at'),
+    deletedAt: text('deleted_at'),
   },
   (table) => [
     index('notes_status_idx').on(table.status),
     index('notes_created_at_idx').on(table.createdAt),
+    index('notes_deleted_at_idx').on(table.deletedAt),
   ],
 );
 

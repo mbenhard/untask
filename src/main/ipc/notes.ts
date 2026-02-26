@@ -8,6 +8,7 @@ import {
   saveNote,
   archiveNote,
   restoreNote,
+  restoreFromTrash,
   deleteNote,
   listNotes,
   pinNote,
@@ -65,6 +66,14 @@ export const registerNotesHandlers = (): void => {
     withIpcLogging('NOTES_RESTORE', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
       const id = noteIdSchema.parse(idInput);
       return restoreNote(id);
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NOTES_RESTORE_FROM_TRASH,
+    withIpcLogging('NOTES_RESTORE_FROM_TRASH', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
+      const id = noteIdSchema.parse(idInput);
+      return restoreFromTrash(id);
     }),
   );
 

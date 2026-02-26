@@ -1,4 +1,4 @@
-import { eq, and, desc, lt } from 'drizzle-orm';
+import { eq, and, desc, lt, isNull, isNotNull } from 'drizzle-orm';
 
 import { getDb } from '../db';
 import { notes, type Note } from '../db/schema';
@@ -103,6 +103,7 @@ export function migrateNoteTitlesToContent(): void {
     .where(and(
       // SQLite: title != '' AND title IS NOT NULL
       // drizzle-orm doesn't have a neq('') helper, so we use a raw filter
+      isNull(notes.deletedAt),
     ))
     .all()
     .filter((n) => n.title.length > 0);
@@ -161,7 +162,7 @@ export function getNote(id: string): Note | undefined {
   const [note] = db
     .select()
     .from(notes)
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
     .all();
   return note;
 }
@@ -173,7 +174,7 @@ export function saveNote(id: string, content: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ content, updatedAt: now })
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
     .returning()
     .all();
   return updated;
@@ -184,7 +185,7 @@ export function archiveNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ status: 'archived', updatedAt: new Date().toISOString() })
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
     .returning()
     .all();
   return updated;
@@ -195,7 +196,7 @@ export function restoreNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ status: 'active', updatedAt: new Date().toISOString() })
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
     .returning()
     .all();
   return updated;
@@ -203,7 +204,22 @@ export function restoreNote(id: string): Note | undefined {
 
 export function deleteNote(id: string): void {
   const db = getDb();
-  db.delete(notes).where(eq(notes.id, id)).run();
+  db
+    .update(notes)
+    .set({ deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .run();
+}
+
+export function restoreFromTrash(id: string): Note | undefined {
+  const db = getDb();
+  const [updated] = db
+    .update(notes)
+    .set({ deletedAt: null, updatedAt: new Date().toISOString() })
+    .where(and(eq(notes.id, id), isNotNull(notes.deletedAt)))
+    .returning()
+    .all();
+  return updated;
 }
 
 export function pinNote(id: string): Note | undefined {
@@ -211,7 +227,7 @@ export function pinNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ isPinned: true })
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
     .returning()
     .all();
   return updated;
@@ -222,7 +238,7 @@ export function unpinNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ isPinned: false })
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
     .returning()
     .all();
   return updated;
@@ -292,6 +308,7 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   db.delete(notes)
     .where(
       and(
+        isNull(notes.deletedAt),
         eq(notes.status, 'active'),
         eq(notes.content, ''),
         lt(notes.createdAt, cutoff),
@@ -302,6 +319,7 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   const all = db
     .select()
     .from(notes)
+    .where(isNull(notes.deletedAt))
     .orderBy(desc(notes.isPinned), desc(notes.updatedAt))
     .all();
 
@@ -313,4 +331,18 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   }
 
   return { active, archived };
+}
+
+export function purgeOldSoftDeletedNotes(maxAgeDays = 30): number {
+  const db = getDb();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - maxAgeDays);
+
+  const purged = db
+    .delete(notes)
+    .where(and(isNotNull(notes.deletedAt), lt(notes.deletedAt, cutoff.toISOString())))
+    .returning({ id: notes.id })
+    .all();
+
+  return purged.length;
 }

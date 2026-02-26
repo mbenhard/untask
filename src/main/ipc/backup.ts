@@ -12,23 +12,45 @@ import {
   type BackupExportDialogResponse,
   type BackupImportDialogRequest,
   type BackupImportDialogResponse,
+  type BackupOffsiteReadManifestRequest,
+  type BackupOffsiteRestoreRequest,
+  type BackupOffsiteManifestPayload,
+  type BackupSettingsPayload,
+  type BackupSetSettingsRequest,
+  type BackupPickDestinationFolderResponse,
+  type BackupPickOffsiteFileResponse,
 } from '../../types/ipc';
 import { withIpcLogging } from './helpers';
 import {
   backupExportRequestSchema,
   backupImportRequestSchema,
   backupDialogRequestSchema,
+  backupOffsiteReadManifestRequestSchema,
+  backupOffsiteRestoreRequestSchema,
+  backupSettingsSchema,
 } from './schemas';
 import {
   createBackup,
+  createOffsiteBackup,
+  detectCloudFolders,
   exportBackup,
   importBackup,
   listBackups,
+  readBackupManifest,
+  restoreOffsiteBackup,
+  startBackupScheduler,
+  stopBackupScheduler,
 } from '../services/backupService';
 import { closeDatabase, initDatabase } from '../db';
 import { runMigrations } from '../db/migrate';
 import { initChatSearchFts, initNotesSearchFts, initSearchFts } from '../services/searchService';
 import { refreshTodayBadge } from '../tray';
+import {
+  SETTING_KEY_BACKUP_DESTINATION,
+  SETTING_KEY_BACKUP_FREQUENCY,
+  SETTING_KEY_BACKUP_RETENTION,
+} from '../defaultSettings';
+import { getSettingWithDefault, setSetting } from '../services/settingsService';
 
 const BACKUP_JOB_TIMEOUT_MS = 120_000;
 
@@ -113,6 +135,41 @@ const restoreBackupAndReloadRuntime = async (request: BackupImportRequest): Prom
   notifyBackupRestored();
 };
 
+const restoreOffsiteBackupAndReloadRuntime = async (request: BackupOffsiteRestoreRequest): Promise<void> => {
+  closeDatabase();
+
+  try {
+    await restoreOffsiteBackup(request.source);
+  } catch (error) {
+    reinitializeDatabase();
+    throw error;
+  }
+
+  reinitializeDatabase();
+  notifyBackupRestored();
+};
+
+const getBackupSettings = (): BackupSettingsPayload => {
+  const destination = (getSettingWithDefault(SETTING_KEY_BACKUP_DESTINATION) ?? '').trim();
+  const rawFrequency = getSettingWithDefault(SETTING_KEY_BACKUP_FREQUENCY) ?? 'daily';
+  const rawRetention = getSettingWithDefault(SETTING_KEY_BACKUP_RETENTION) ?? '10';
+  const retention = Number.parseInt(rawRetention, 10);
+
+  const settings = backupSettingsSchema.parse({
+    destination,
+    frequency: rawFrequency,
+    retention: Number.isNaN(retention) ? 10 : retention,
+  });
+
+  const lastRunAt = getSettingWithDefault('backup.last_run_at');
+  return {
+    destination: settings.destination,
+    frequency: settings.frequency,
+    retention: settings.retention,
+    lastRunAt: lastRunAt && lastRunAt.trim().length > 0 ? lastRunAt : null,
+  };
+};
+
 export const registerBackupHandlers = (): void => {
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_LIST,
@@ -172,6 +229,155 @@ export const registerBackupHandlers = (): void => {
           BACKUP_JOB_TIMEOUT_MS,
           'Backup import',
         );
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_OFFSITE_CREATE,
+    withIpcLogging(
+      'BACKUP_OFFSITE_CREATE',
+      async (): Promise<BackupMetadataPayload> => {
+        const settings = getBackupSettings();
+        if (!settings.destination) {
+          throw new Error('Set backup destination before running offsite backup.');
+        }
+        return await withTimeout(
+          createOffsiteBackup(settings.destination),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Offsite backup creation',
+        );
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_OFFSITE_READ_MANIFEST,
+    withIpcLogging(
+      'BACKUP_OFFSITE_READ_MANIFEST',
+      async (
+        _event: Electron.IpcMainInvokeEvent,
+        request: BackupOffsiteReadManifestRequest,
+      ): Promise<BackupOffsiteManifestPayload> => {
+        const validated = backupOffsiteReadManifestRequestSchema.parse(request ?? {});
+        return await withTimeout(
+          readBackupManifest(validated.source),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Offsite backup manifest read',
+        );
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_OFFSITE_RESTORE,
+    withIpcLogging(
+      'BACKUP_OFFSITE_RESTORE',
+      async (
+        _event: Electron.IpcMainInvokeEvent,
+        request: BackupOffsiteRestoreRequest,
+      ): Promise<void> => {
+        const validated = backupOffsiteRestoreRequestSchema.parse(request ?? {});
+        await withTimeout(
+          restoreOffsiteBackupAndReloadRuntime(validated),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Offsite backup restore',
+        );
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_DETECT_CLOUD_FOLDERS,
+    withIpcLogging(
+      'BACKUP_DETECT_CLOUD_FOLDERS',
+      async (): Promise<string[]> => {
+        return await withTimeout(
+          detectCloudFolders(),
+          BACKUP_JOB_TIMEOUT_MS,
+          'Cloud folder detection',
+        );
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_GET_SETTINGS,
+    withIpcLogging(
+      'BACKUP_GET_SETTINGS',
+      async (): Promise<BackupSettingsPayload> => {
+        return getBackupSettings();
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_SET_SETTINGS,
+    withIpcLogging(
+      'BACKUP_SET_SETTINGS',
+      async (
+        _event: Electron.IpcMainInvokeEvent,
+        request: BackupSetSettingsRequest,
+      ): Promise<BackupSettingsPayload> => {
+        const validated = backupSettingsSchema.parse(request ?? {});
+        setSetting(SETTING_KEY_BACKUP_DESTINATION, validated.destination.trim());
+        setSetting(SETTING_KEY_BACKUP_FREQUENCY, validated.frequency);
+        setSetting(SETTING_KEY_BACKUP_RETENTION, String(validated.retention));
+
+        stopBackupScheduler();
+        startBackupScheduler();
+
+        return getBackupSettings();
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_PICK_DESTINATION_FOLDER,
+    withIpcLogging(
+      'BACKUP_PICK_DESTINATION_FOLDER',
+      async (event: Electron.IpcMainInvokeEvent): Promise<BackupPickDestinationFolderResponse> => {
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Choose backup destination folder',
+          properties: ['openDirectory' as const, 'createDirectory' as const],
+        };
+        const result = owner
+          ? await dialog.showOpenDialog(owner, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
+
+        const destination = result.filePaths[0];
+        if (result.canceled || !destination) {
+          return { canceled: true };
+        }
+        return { canceled: false, destination };
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_PICK_OFFSITE_FILE,
+    withIpcLogging(
+      'BACKUP_PICK_OFFSITE_FILE',
+      async (event: Electron.IpcMainInvokeEvent): Promise<BackupPickOffsiteFileResponse> => {
+        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+        const dialogOptions = {
+          title: 'Select Untask backup',
+          properties: ['openFile' as const],
+          filters: [
+            { name: 'Untask Offsite Backup', extensions: ['untaskbackup'] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+        };
+        const result = owner
+          ? await dialog.showOpenDialog(owner, dialogOptions)
+          : await dialog.showOpenDialog(dialogOptions);
+
+        const source = result.filePaths[0];
+        if (result.canceled || !source) {
+          return { canceled: true };
+        }
+        return { canceled: false, source };
       },
     ),
   );

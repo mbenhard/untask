@@ -82,6 +82,28 @@ describeIfNativeSqlite('taskService hierarchy integrity', () => {
     expect(getTaskById(child.id)).toBeNull();
   });
 
+  it('soft-deletes rows and undo clears deleted_at on the same task id', () => {
+    const task = createTask({ title: 'Recoverable task', status: 'active' });
+
+    deleteTask(task.id);
+    expect(getTaskById(task.id)).toBeNull();
+
+    const deletedRow = sqlite
+      .prepare('SELECT id, deleted_at FROM tasks WHERE id = ?')
+      .get(task.id) as { id: string; deleted_at: string | null } | undefined;
+    expect(deletedRow?.id).toBe(task.id);
+    expect(deletedRow?.deleted_at).not.toBeNull();
+
+    const undoResult = undoLastUserTaskEvent();
+    expect(undoResult?.undone).toBe(true);
+    expect(getTaskById(task.id)).not.toBeNull();
+
+    const restoredRow = sqlite
+      .prepare('SELECT deleted_at FROM tasks WHERE id = ?')
+      .get(task.id) as { deleted_at: string | null } | undefined;
+    expect(restoredRow?.deleted_at).toBeNull();
+  });
+
   it('reparents completed subtasks when deleting parent without cascade', () => {
     const parent = createTask({ title: 'Parent task', status: 'active' });
     const child = createTask({ title: 'Child task', parentId: parent.id, status: 'done' });
