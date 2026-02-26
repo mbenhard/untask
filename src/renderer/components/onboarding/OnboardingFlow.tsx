@@ -11,7 +11,6 @@ import { OnboardingIdentity } from './OnboardingIdentity';
 import { OnboardingNotifications } from './OnboardingNotifications';
 import { OnboardingPreferences } from './OnboardingPreferences';
 import { OnboardingProvider } from './OnboardingProvider';
-import { OnboardingShortcuts } from './OnboardingShortcuts';
 import { OnboardingWelcome } from './OnboardingWelcome';
 
 type Role = 'freelancer' | 'developer' | 'student' | 'creative' | 'other';
@@ -23,7 +22,6 @@ type StepKey =
   | 'notifications'
   | 'provider'
   | 'identity'
-  | 'shortcuts'
   | 'preferences';
 
 export type OnboardingNavProps = {
@@ -38,7 +36,6 @@ const STEP_TITLES: Record<StepKey, string> = {
   notifications: 'NOTIFICATIONS',
   provider: 'PROVIDER',
   identity: 'IDENTITY',
-  shortcuts: 'SHORTCUTS',
   preferences: 'PREFERENCES',
 };
 
@@ -46,9 +43,8 @@ const ALL_STEPS: StepKey[] = [
   'welcome',
   'basics',
   'provider',
-  'notifications',
   'identity',
-  'shortcuts',
+  'notifications',
   'preferences',
 ];
 
@@ -57,7 +53,7 @@ const getVisibleSteps = (aiEnabled: boolean): StepKey[] => {
     return ALL_STEPS;
   }
 
-  return ['welcome', 'basics', 'notifications', 'shortcuts', 'preferences'];
+  return ['welcome', 'basics', 'notifications', 'preferences'];
 };
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
@@ -384,10 +380,6 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
     goNext();
   };
 
-  const handleShortcutsNext = () => {
-    goNext();
-  };
-
   const handlePreferencesNext = () => {
     void handleFinish();
   };
@@ -459,8 +451,6 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
             isActive={isActive}
           />
         );
-      case 'shortcuts':
-        return <OnboardingShortcuts onNext={handleShortcutsNext} nav={nav} isActive={isActive} />;
       case 'preferences':
         return <OnboardingPreferences onNext={handlePreferencesNext} nav={nav} isActive={isActive} />;
     }

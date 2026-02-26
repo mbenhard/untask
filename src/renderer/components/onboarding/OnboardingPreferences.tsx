@@ -3,7 +3,6 @@ import { flushSync } from 'react-dom';
 
 import { motion, useReducedMotion } from 'framer-motion';
 
-import type { DockMode } from '../../../types/ipc';
 import { onboardingCardVariants, onboardingStaggerContainer } from '../../lib/animation';
 import type { OnboardingNavProps } from './OnboardingFlow';
 import { getUntask } from '../../lib/untask';
@@ -21,7 +20,6 @@ type OnboardingPreferencesProps = {
 export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPreferencesProps) => {
   const { resolvedTheme, setTheme } = useTheme();
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(resolvedTheme);
-  const [dockMode, setDockMode] = useState<DockMode>('normal');
   const [launchAtLoginEnabled, setLaunchAtLoginEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -34,11 +32,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
   useEffect(() => {
     const load = async () => {
       try {
-        const [dockResult, launchResult] = await Promise.all([
-          getUntask().app.getDockMode(),
-          getUntask().app.getLaunchAtLogin(),
-        ]);
-        setDockMode(dockResult.mode);
+        const launchResult = await getUntask().app.getLaunchAtLogin();
         setLaunchAtLoginEnabled(launchResult.enabled);
       } catch {
         // Non-fatal.
@@ -75,18 +69,17 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
     setIsSaving(true);
     setHint(null);
 
+    // Silently apply dock mode default — not exposed in onboarding
     try {
-      await getUntask().app.setDockMode(dockMode);
+      await getUntask().app.setDockMode('normal');
     } catch {
-      setHint('Could not save dock preference. You can change this later in Settings.');
+      // Non-fatal.
     }
 
-      try {
+    try {
       const launchResult = await getUntask().app.setLaunchAtLogin(launchAtLoginEnabled);
       if (launchResult.error) {
-        // Dev builds can't register login items — suppress the hint silently.
         if (launchAtLoginEnabled && launchResult.applied === false) {
-          // Only show a hint in production if it genuinely failed.
           const isDevError = launchResult.error.includes('unavailable in this runtime');
           if (!isDevError) {
             setHint('Launch-at-login saved. It will take effect once Untask is installed.');
@@ -99,7 +92,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
 
     setIsSaving(false);
     onNext();
-  }, [dockMode, isSaving, launchAtLoginEnabled, onNext]);
+  }, [isSaving, launchAtLoginEnabled, onNext]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -124,9 +117,36 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
 
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
+      {/* SHORTCUTS */}
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+          Shortcuts
+        </span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⌘</span>
+              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⇧</span>
+              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">Space</span>
+            </div>
+            <span className="text-[12px] text-muted-foreground">Summon Untask from anywhere</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⌘</span>
+              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⇧</span>
+              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">Q</span>
+            </div>
+            <span className="text-[12px] text-muted-foreground">Quick-add a task</span>
+          </div>
+        </div>
+        <p className="mt-2.5 text-[11px] text-muted-foreground/60">Customizable in Settings → Shortcuts</p>
+      </Card>
+
+      {/* THEME */}
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
         <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          THEME
+          Theme
         </span>
         <div className="flex gap-2">
           <button
@@ -158,44 +178,10 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
         </div>
       </Card>
 
+      {/* LAUNCH AT LOGIN */}
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
         <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          DOCK
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {([
-            ['normal', 'Normal'],
-            ['dock-only', 'Dock only'],
-            ['menu-bar-only', 'Menu bar only'],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={dockMode === value}
-              onClick={() => setDockMode(value)}
-              className={[
-                'rounded-md border px-3 py-1.5 text-[12px] transition-colors',
-                dockMode === value
-                  ? 'border-foreground/40 bg-accent text-foreground'
-                  : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          {dockMode === 'normal'
-            ? 'Show in dock and menu bar.'
-            : dockMode === 'dock-only'
-              ? 'Show in dock. Hide menu bar icon.'
-              : 'Hide from dock. Show in menu bar only.'}
-        </p>
-      </Card>
-
-      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          LAUNCH AT LOGIN
+          Launch at login
         </span>
         <div className="flex gap-2">
           <button

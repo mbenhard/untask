@@ -19,9 +19,9 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
 ];
 
 const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string; hint: string }[] = [
-  { value: 'direct', label: 'Direct & concise', hint: 'Short, to the point.' },
-  { value: 'friendly', label: 'Friendly & casual', hint: 'Warm and conversational.' },
-  { value: 'professional', label: 'Professional', hint: 'Formal and thorough.' },
+  { value: 'direct', label: 'Direct', hint: 'Short.' },
+  { value: 'friendly', label: 'Friendly', hint: 'Warm.' },
+  { value: 'professional', label: 'Professional', hint: 'Thorough.' },
 ];
 
 const buildIdentityString = (
@@ -98,69 +98,72 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip, nav, isActive }: 
 
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
-      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          ROLE
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {ROLE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={role === opt.value}
-              onClick={() => setRole(role === opt.value ? null : opt.value)}
-              className={[
-                'rounded-md border px-3 py-1.5 text-[12px] transition-colors',
-                role === opt.value
-                  ? 'border-foreground/40 bg-accent text-foreground'
-                  : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              {opt.label}
-            </button>
-          ))}
+      <Card {...cardProps} className="flex flex-col gap-4 rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        {/* ROLE */}
+        <div>
+          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            Role
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {ROLE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={role === opt.value}
+                onClick={() => setRole(role === opt.value ? null : opt.value)}
+                className={[
+                  'rounded-md border px-3 py-1.5 text-[12px] transition-colors',
+                  role === opt.value
+                    ? 'border-foreground/40 bg-accent text-foreground'
+                    : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </Card>
 
-      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          COMMUNICATION
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {COMMUNICATION_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={style === opt.value}
-              onClick={() => setStyle(style === opt.value ? null : opt.value)}
-              className={[
-                'rounded-md border px-3 py-1.5 text-[12px] transition-colors',
-                style === opt.value
-                  ? 'border-foreground/40 bg-accent text-foreground'
-                  : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-              ].join(' ')}
-            >
-              <span>{opt.value === 'direct' ? 'Direct' : opt.value === 'friendly' ? 'Friendly' : 'Professional'}</span>
-              <span className="ml-2 text-[11px] text-muted-foreground/70">
-                {opt.value === 'direct' ? 'Short.' : opt.value === 'friendly' ? 'Warm.' : 'Thorough.'}
-              </span>
-            </button>
-          ))}
+        {/* COMMUNICATION */}
+        <div>
+          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            Tone
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {COMMUNICATION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={style === opt.value}
+                onClick={() => setStyle(style === opt.value ? null : opt.value)}
+                className={[
+                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] transition-colors',
+                  style === opt.value
+                    ? 'border-foreground/40 bg-accent text-foreground'
+                    : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                <span>{opt.label}</span>
+                <span className="text-[11px] opacity-50">{opt.hint}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </Card>
 
-      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          FOCUS
-        </span>
+        {/* FOCUS */}
+        <div>
+          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
+            Focus
+          </span>
           <Input
-          id="onboarding-focus"
-          type="text"
-          placeholder="e.g. shipping a startup, finishing my thesis..."
-          value={focus}
-          onChange={(e) => setFocus(e.target.value)}
-          className="h-8 text-[13px]"
-        />
+            id="onboarding-focus"
+            type="text"
+            placeholder="e.g. shipping a startup, finishing my thesis..."
+            value={focus}
+            onChange={(e) => setFocus(e.target.value)}
+            className="h-8 text-[13px]"
+          />
+        </div>
       </Card>
 
       <Card {...cardProps} className="flex flex-col items-center gap-2 pt-3">

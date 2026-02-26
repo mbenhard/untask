@@ -188,7 +188,7 @@ describe('OnboardingFlow', () => {
 
     await clickButton('Skip for now');
 
-    expect(headerLabel()).toContain('03 — NOTIFICATIONS');
+    expect(headerLabel()).toContain('03 — IDENTITY');
   });
 
   it('skips provider/identity and keeps contiguous numbering when AI is disabled', async () => {
@@ -200,7 +200,7 @@ describe('OnboardingFlow', () => {
 
     await clickButton('Continue');
 
-    expect(headerLabel()).toContain('03 — SHORTCUTS');
+    expect(headerLabel()).toContain('03 — PREFERENCES');
   });
 
   it('supports enter and escape keyboard navigation deterministically', async () => {
@@ -224,11 +224,7 @@ describe('OnboardingFlow', () => {
 
     await clickButton('Continue');
 
-    expect(headerLabel()).toContain('03 — SHORTCUTS');
-
-    await clickButton('Continue');
-
-    expect(headerLabel()).toContain('04 — PREFERENCES');
+    expect(headerLabel()).toContain('03 — PREFERENCES');
 
     await clickButton("Let's go");
 

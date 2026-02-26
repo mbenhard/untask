@@ -12,11 +12,11 @@ import { getCuratedModelsForProvider, buildModelOptions } from '../settings/Mode
 
 type Provider = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
 
-const PROVIDER_OPTIONS: { value: Provider; label: string; monogram: string }[] = [
-  { value: 'openrouter', label: 'OpenRouter', monogram: 'OR' },
-  { value: 'openai', label: 'OpenAI', monogram: 'OA' },
-  { value: 'anthropic', label: 'Anthropic', monogram: 'AN' },
-  { value: 'ollama', label: 'Ollama (local)', monogram: 'OL' },
+const PROVIDER_OPTIONS: { value: Provider; label: string }[] = [
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'ollama', label: 'Ollama (local)' },
 ];
 
 const PROVIDER_HINTS: Record<Provider, string> = {
@@ -124,7 +124,7 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
 
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
-      <Card {...cardProps} className="grid grid-cols-2 gap-2">
+      <Card {...cardProps} className="flex flex-col gap-1.5">
         {PROVIDER_OPTIONS.map((opt) => (
           <button
             key={opt.value}
@@ -135,18 +135,10 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
               provider === opt.value && 'border-solid border-foreground/40 bg-accent/30',
             )}
           >
-            <div className="mb-1 flex items-center gap-2">
-              <span className="rounded border border-border/70 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-                {opt.monogram}
-              </span>
+            <div className="flex items-center gap-2">
               <span className="text-[13px] text-foreground">{opt.label}</span>
-              {opt.value === 'openrouter' ? (
-                <span className="ml-auto rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  Recommended
-                </span>
-              ) : null}
+              <span className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[opt.value]}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">{PROVIDER_HINTS[opt.value]}</p>
           </button>
         ))}
       </Card>

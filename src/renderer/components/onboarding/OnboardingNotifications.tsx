@@ -199,7 +199,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
           </button>
         </div>
         {remindersSyncEnabled ? (
-          <div className="mt-2 flex gap-1.5">
+          <div className="mt-2 flex flex-col gap-1.5">
             {SYNC_FILTER_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -207,14 +207,14 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
                 aria-pressed={syncFilter === opt.value}
                 onClick={() => setSyncFilter(opt.value)}
                 className={[
-                  'flex-1 rounded-md border px-2 py-1.5 text-left transition-colors',
+                  'flex items-center justify-between rounded-md border px-3 py-2 text-left transition-colors',
                   syncFilter === opt.value
                     ? 'border-foreground/40 bg-accent text-foreground'
                     : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
                 ].join(' ')}
               >
-                <span className="block text-[11px]">{opt.label}</span>
-                <span className="block text-[10px] text-muted-foreground/70">{opt.hint}</span>
+                <span className="text-[12px]">{opt.label}</span>
+                <span className="text-[11px] text-muted-foreground/70">{opt.hint}</span>
               </button>
             ))}
           </div>
