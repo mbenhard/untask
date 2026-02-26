@@ -61,12 +61,11 @@ export const TitleBar = () => {
                 <motion.span
                   layoutId="nav-pill"
                   className="absolute inset-0 rounded-lg bg-accent"
-                  style={{ zIndex: -1 }}
                   transition={SNAPPY_SPRING}
                   aria-hidden="true"
                 />
               )}
-              {TAB_LABELS[view]}
+              <span className="relative">{TAB_LABELS[view]}</span>
             </button>
           );
         })}

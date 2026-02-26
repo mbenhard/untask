@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { cn } from '../../lib/utils';
-import { fadeVariants } from '../../lib/animation';
+import { SNAPPY_SPRING, fadeVariants } from '../../lib/animation';
 import { useToastStore } from '../../stores/toastStore';
 
 // Fetch version at module load so it's ready before first paint.
@@ -80,13 +80,21 @@ export const SettingsView = () => {
                   setError(null);
                 }}
                 className={cn(
-                  'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                  'relative rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
                   isActive
-                    ? 'bg-accent text-foreground'
+                    ? 'text-foreground'
                     : 'text-muted-foreground hover:text-foreground/80',
                 )}
               >
-                {tab.label}
+                {isActive && (
+                  <motion.span
+                    layoutId="settings-pill"
+                    className="absolute inset-0 rounded-md bg-accent"
+                    transition={SNAPPY_SPRING}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="relative">{tab.label}</span>
               </button>
             );
           })}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { fadeVariants, heightVariants } from '../../lib/animation';
+import { SNAPPY_SPRING, fadeVariants, heightVariants } from '../../lib/animation';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
@@ -682,37 +682,46 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                   type="button"
                   onClick={() => state.setActiveSubTab('ai')}
                   className={cn(
-                    'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    'relative rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
                     state.activeSubTab === 'ai'
-                      ? 'bg-accent text-foreground'
+                      ? 'text-foreground'
                       : 'text-muted-foreground hover:text-foreground/80',
                   )}
                 >
-                  AI
+                  {state.activeSubTab === 'ai' && (
+                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={SNAPPY_SPRING} aria-hidden="true" />
+                  )}
+                  <span className="relative">AI</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => state.setActiveSubTab('identity')}
                   className={cn(
-                    'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    'relative rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
                     state.activeSubTab === 'identity'
-                      ? 'bg-accent text-foreground'
+                      ? 'text-foreground'
                       : 'text-muted-foreground hover:text-foreground/80',
                   )}
                 >
-                  Identity
+                  {state.activeSubTab === 'identity' && (
+                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={SNAPPY_SPRING} aria-hidden="true" />
+                  )}
+                  <span className="relative">Identity</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => state.setActiveSubTab('knowledge')}
                   className={cn(
-                    'rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+                    'relative rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
                     state.activeSubTab === 'knowledge'
-                      ? 'bg-accent text-foreground'
+                      ? 'text-foreground'
                       : 'text-muted-foreground hover:text-foreground/80',
                   )}
                 >
-                  Knowledge
+                  {state.activeSubTab === 'knowledge' && (
+                    <motion.span layoutId="ai-sub-pill" className="absolute inset-0 rounded-md bg-accent" transition={SNAPPY_SPRING} aria-hidden="true" />
+                  )}
+                  <span className="relative">Knowledge</span>
                 </button>
               </nav>
               <AnimatePresence mode="wait" initial={false}>
