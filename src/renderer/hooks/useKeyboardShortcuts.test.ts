@@ -398,6 +398,38 @@ describe('useKeyboardShortcuts', () => {
     expect(deleteNote).toHaveBeenCalledWith('note-archived-1');
   });
 
+  it('runs toast undo callback on Cmd+Z even when a contentEditable element is focused', () => {
+    const onUndo = vi.fn(async () => undefined);
+    useAppStore.setState({ activeView: 'notes' });
+    useToastStore.setState({
+      toast: { id: 1, label: 'Note deleted', onUndo },
+      isUndoing: false,
+    });
+
+    // Simulate notes editor (contentEditable) being the active element
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    document.body.appendChild(editor);
+    editor.focus();
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+    });
+
+    document.body.removeChild(editor);
+
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(useToastStore.getState().isUndoing).toBe(true);
+  });
+
   it('does not run task undo fallback in notes view when no toast undo is available', () => {
     useAppStore.setState({ activeView: 'notes' });
     useNotesStore.setState({

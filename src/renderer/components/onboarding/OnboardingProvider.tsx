@@ -131,7 +131,7 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
             type="button"
             onClick={() => handleProviderChange(opt.value)}
             className={cn(
-              'rounded-md border border-dashed border-border/60 bg-background px-3 py-2 text-left transition-colors',
+              'rounded-md border border-dashed border-border/60 bg-background px-3 py-2 text-left transition-[background-color,color]',
               provider === opt.value && 'border-solid border-foreground/40 bg-accent/30',
             )}
           >

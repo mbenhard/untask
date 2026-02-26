@@ -887,42 +887,77 @@
 }
 
 /* ──────────────────────────────────────────────
-   Onboarding: card/grid background treatment
+   Onboarding: virtual-scroll architecture
+   A persistent dashed thread line runs the full
+   height of the scrollable column, visible only
+   in the gaps between step content blocks.
+   Mirrors the website's .sections-wrap pattern.
    ────────────────────────────────────────────── */
-.onboarding-mascot-stage {
+
+/* The tall column that holds all steps and gets translateY'd */
+.onboarding-column {
   position: relative;
-  isolation: isolate;
+  /* Mask computed by JS; hides line except in gaps between content blocks */
+  --thread-mask: linear-gradient(to bottom, transparent, transparent);
+}
+
+.onboarding-column::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 5px,
+    var(--border) 5px,
+    var(--border) 9px
+  );
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: var(--thread-mask);
+  mask-image: var(--thread-mask);
+}
+
+/* Each step section — full viewport height, flex-centered */
+.onboarding-section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
   overflow: hidden;
 }
 
-.onboarding-mascot-stage::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, var(--foreground) 0.5px, transparent 0.5px);
-  background-size: 24px 24px;
-  opacity: 0.04;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.onboarding-mascot-stage::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 300px;
-  height: 300px;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, var(--foreground) 0%, transparent 70%);
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.onboarding-mascot-stage > * {
+/* Content block covers the dashed line (same as website's [data-thread-content]) */
+.onboarding-content {
   position: relative;
   z-index: 1;
+  background: var(--background);
+}
+
+/* Checkpoint dot — completion indicator at the end of the thread */
+@keyframes onboarding-checkpoint-pulse {
+  0%   { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.onboarding-checkpoint-ring {
+  animation: onboarding-checkpoint-pulse 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes onboarding-done-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.onboarding-done-message {
+  opacity: 0;
+  animation: onboarding-done-fade-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.35s forwards;
 }
 
 /* ──────────────────────────────────────────────
@@ -971,7 +1006,10 @@ body.cursor-grabbing * {
   .bird-wobble-shadow,
   .bird-double-tap-shadow,
   .bird-snap-shadow,
-  .bird-smooth-bop-shadow {
+  .bird-smooth-bop-shadow,
+  .onboarding-checkpoint-ring,
+  .onboarding-done-message {
     animation: none !important;
+    opacity: 1;
   }
 }

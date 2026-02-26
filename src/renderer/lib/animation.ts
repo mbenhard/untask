@@ -45,6 +45,15 @@ export const ONBOARDING_SCROLL_TRANSITION: Transition = {
 };
 
 /**
+ * Transition for the onboarding → app slide-up.
+ * Same easing as the inter-step scroll but slightly shorter for snappiness.
+ */
+export const ONBOARDING_EXIT_TRANSITION: Transition = {
+  duration: 0.55,
+  ease: [0.45, 0, 0.15, 1],
+};
+
+/**
  * Stagger container — apply to a wrapper around cards.
  * Only triggers when isActive becomes true (controlled by animate prop).
  */

@@ -121,7 +121,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
             aria-pressed={notificationsEnabled}
             onClick={() => setNotificationsEnabled(true)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               notificationsEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -134,7 +134,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
             aria-pressed={!notificationsEnabled}
             onClick={() => setNotificationsEnabled(false)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               !notificationsEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -176,7 +176,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
             aria-pressed={remindersSyncEnabled}
             onClick={() => setRemindersSyncEnabled(true)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               remindersSyncEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -189,7 +189,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
             aria-pressed={!remindersSyncEnabled}
             onClick={() => setRemindersSyncEnabled(false)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               !remindersSyncEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -207,7 +207,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
                 aria-pressed={syncFilter === opt.value}
                 onClick={() => setSyncFilter(opt.value)}
                 className={[
-                  'flex items-center justify-between rounded-md border px-3 py-2 text-left transition-colors',
+                  'flex items-center justify-between rounded-md border px-3 py-2 text-left transition-[background-color,color]',
                   syncFilter === opt.value
                     ? 'border-foreground/40 bg-accent text-foreground'
                     : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',

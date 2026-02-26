@@ -255,13 +255,16 @@ const getAdjacentActiveNoteId = (activeNotes: Note[], removedId: string): string
   return fallback?.id ?? null;
 };
 
-/** Shared state fragment that resets the editor to list mode. */
+/** Shared state fragment that resets the editor to list mode.
+ *  `content` is intentionally NOT cleared here — AnimatePresence keeps
+ *  the NoteEditor mounted during its exit animation, and clearing it
+ *  would briefly flash an empty editor. `openNote` always overwrites
+ *  content when the next note is loaded. */
 const NOTES_LIST_RESET_STATE = {
   subView: 'list' as const,
   layoutMode: 'list' as const,
   activeNoteId: null,
   activeNoteUpdatedAt: null,
-  content: '',
   isDirty: false,
 } as const;
 

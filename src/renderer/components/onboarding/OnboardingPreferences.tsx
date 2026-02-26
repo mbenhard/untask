@@ -231,7 +231,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
           Back
         </Button>
         <Button onClick={() => void handleContinue()} disabled={isSaving} size="sm" className="h-8 px-6 text-[12px]">
-          {isSaving ? 'Saving...' : "Let's go"}
+          {isSaving ? 'Saving...' : 'Finish setup'}
         </Button>
       </Card>
     </Wrapper>

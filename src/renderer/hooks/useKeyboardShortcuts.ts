@@ -191,6 +191,16 @@ export const useKeyboardShortcuts = ({
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+        // Check toast undo first — it has priority over native text input undo.
+        // This ensures cmd+Z works after deleting a note even when the editor (contentEditable) is focused.
+        const toastStore = useToastStore.getState();
+        if (toastStore.toast && toastStore.toast.onUndo && !toastStore.isUndoing) {
+          event.preventDefault();
+          toastStore.markUndoing();
+          void toastStore.toast.onUndo();
+          return;
+        }
+
         if (isTextInputElement(document.activeElement)) {
           return;
         }
@@ -202,20 +212,16 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        const toastStore = useToastStore.getState();
-        if (toastStore.toast && toastStore.toast.onUndo && !toastStore.isUndoing) {
-          toastStore.markUndoing();
-          void toastStore.toast.onUndo();
-        } else if (notesActive) {
+        if (notesActive) {
           // Notes use local undo callbacks through toast actions only.
           return;
-        } else {
-          void (async () => {
-            await getUntask().tasks.undoLastUserAction();
-            await useTaskStore.getState().refreshTasks();
-            useToastStore.getState().showToast('Undone');
-          })();
         }
+
+        void (async () => {
+          await getUntask().tasks.undoLastUserAction();
+          await useTaskStore.getState().refreshTasks();
+          useToastStore.getState().showToast('Undone');
+        })();
         return;
       }
 

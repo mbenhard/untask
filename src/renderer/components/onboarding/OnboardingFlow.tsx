@@ -22,7 +22,8 @@ type StepKey =
   | 'notifications'
   | 'provider'
   | 'identity'
-  | 'preferences';
+  | 'preferences'
+  | 'done';
 
 export type OnboardingNavProps = {
   onBack: () => void;
@@ -37,6 +38,7 @@ const STEP_TITLES: Record<StepKey, string> = {
   provider: 'PROVIDER',
   identity: 'IDENTITY',
   preferences: 'PREFERENCES',
+  done: '',
 };
 
 const ALL_STEPS: StepKey[] = [
@@ -46,6 +48,7 @@ const ALL_STEPS: StepKey[] = [
   'identity',
   'notifications',
   'preferences',
+  'done',
 ];
 
 const getVisibleSteps = (aiEnabled: boolean): StepKey[] => {
@@ -53,7 +56,7 @@ const getVisibleSteps = (aiEnabled: boolean): StepKey[] => {
     return ALL_STEPS;
   }
 
-  return ['welcome', 'basics', 'notifications', 'preferences'];
+  return ['welcome', 'basics', 'notifications', 'preferences', 'done'];
 };
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
@@ -381,28 +384,48 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
   };
 
   const handlePreferencesNext = () => {
-    void handleFinish();
-  };
-
-  const handleFinish = async () => {
     if (isFinishing || isTransitioningToApp) {
       return;
     }
 
     setIsFinishing(true);
-    try {
-      await getUntask().settings.markBootstrapCompleted();
-    } catch {
-      // Even if this fails, complete onboarding in the UI
-    } finally {
+
+    // Mark bootstrap completed (fire-and-forget) then scroll to checkpoint
+    getUntask()
+      .settings.markBootstrapCompleted()
+      .catch(() => {
+        // Non-fatal — proceed anyway
+      });
+
+    if (prefersReducedMotion) {
+      // Skip checkpoint animation, go straight to app
       setIsFinishing(false);
       onComplete();
+      return;
     }
+
+    goTo('done');
   };
 
-  // Welcome doesn't count in the step label — only numbered sections do.
-  const numberedSteps = visibleSteps.filter((s): s is Exclude<StepKey, 'welcome'> => s !== 'welcome');
-  const numberedIndex = numberedSteps.indexOf(currentStep as Exclude<StepKey, 'welcome'>);
+  // When the 'done' checkpoint step becomes active, wait for the scroll +
+  // pulse to play, then fire the slide-up transition.
+  useEffect(() => {
+    if (currentStep !== 'done' || isTransitioningToApp) {
+      return;
+    }
+
+    // 0.7s scroll + 0.35s text delay + 0.4s text fade + 0.5s hold
+    const timer = window.setTimeout(() => {
+      setIsFinishing(false);
+      onComplete();
+    }, 1950);
+
+    return () => window.clearTimeout(timer);
+  }, [currentStep, isTransitioningToApp, onComplete]);
+
+  // Welcome and done don't count in the step label — only numbered sections do.
+  const numberedSteps = visibleSteps.filter((s): s is Exclude<StepKey, 'welcome' | 'done'> => s !== 'welcome' && s !== 'done');
+  const numberedIndex = numberedSteps.indexOf(currentStep as Exclude<StepKey, 'welcome' | 'done'>);
   const displayStep = Math.max(1, numberedIndex + 1);
   const totalSteps = numberedSteps.length;
   const stepLabel = `${String(displayStep).padStart(2, '0')} / ${String(totalSteps).padStart(2, '0')}`;
@@ -453,6 +476,20 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
         );
       case 'preferences':
         return <OnboardingPreferences onNext={handlePreferencesNext} nav={nav} isActive={isActive} />;
+      case 'done':
+        return (
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative flex items-center justify-center">
+              {/* Filled dot */}
+              <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+              {/* Pulse ring */}
+              <div className="onboarding-checkpoint-ring absolute h-1.5 w-1.5 rounded-full border border-muted-foreground" />
+            </div>
+            <p className="onboarding-done-message mt-4 font-mono text-[12px] tracking-wide text-muted-foreground">
+              All yours.
+            </p>
+          </div>
+        );
     }
   };
 
@@ -472,10 +509,7 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
       {/* Step viewport — overflow hidden, contains the tall scrollable column */}
       <div
         ref={viewportRef}
-        className={[
-          'relative flex-1 overflow-hidden transition-opacity duration-200',
-          isTransitioningToApp ? 'opacity-0' : 'opacity-100',
-        ].join(' ')}
+        className="relative flex-1 overflow-hidden"
       >
         {/* Tall scrollable column — all steps stacked vertically.
             Translated via framer-motion to show the active step.
@@ -496,7 +530,7 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
             const isActive = step === currentStep;
             const hasBeenVisited = visitedSteps.has(step);
             // Welcome is not counted — reuse numberedSteps computed above
-            const nonWelcomeIndex = numberedSteps.indexOf(step as Exclude<StepKey, 'welcome'>);
+            const nonWelcomeIndex = numberedSteps.indexOf(step as Exclude<StepKey, 'welcome' | 'done'>);
             const stepNumber = nonWelcomeIndex >= 0 ? String(nonWelcomeIndex + 1).padStart(2, '0') : null;
 
             return (

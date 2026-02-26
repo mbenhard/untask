@@ -226,7 +226,7 @@ describe('OnboardingFlow', () => {
 
     expect(headerLabel()).toContain('03 — PREFERENCES');
 
-    await clickButton("Let's go");
+    await clickButton('Finish setup');
 
     expect(untaskMock.settings.markBootstrapCompleted).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledTimes(1);

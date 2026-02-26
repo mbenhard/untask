@@ -74,7 +74,7 @@ export const OnboardingBasics = ({ onNext, nav, isActive }: OnboardingBasicsProp
             aria-pressed={aiEnabled}
             onClick={() => setAiEnabled(true)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               aiEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -87,7 +87,7 @@ export const OnboardingBasics = ({ onNext, nav, isActive }: OnboardingBasicsProp
             aria-pressed={!aiEnabled}
             onClick={() => setAiEnabled(false)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               !aiEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
