@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import { Archive, ArchiveRestore, ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
@@ -19,12 +19,7 @@ import {
 import { Button } from '../ui/button';
 import { EditorBlockSkeleton } from '../ui/loadingShells';
 import { Skeleton } from '../ui/skeleton';
-import type { BlockEditorSlashMenuItem, BlockEditorSlashMenuParams } from '../editor/BlockEditor';
-
-const LazyBlockEditor = lazy(async () => {
-  const module = await import('../editor/BlockEditor');
-  return { default: module.BlockEditor };
-});
+import { BlockEditor, type BlockEditorSlashMenuItem, type BlockEditorSlashMenuParams } from '../editor/BlockEditor';
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -416,21 +411,17 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
       </header>
 
       <div ref={editorHostRef} className="min-h-0 flex-1 overflow-y-auto">
-        <Suspense
-          fallback={<EditorBlockSkeleton className="h-full px-3 py-2" />}
-        >
-          <LazyBlockEditor
-            key={activeNoteId}
-            content={content}
-            onChange={handleChange}
-            className="untask-notes-editor"
-            preset="notes"
-            contextMenuMode="notes_contextual"
-            getSlashMenuItems={getSlashMenuItems}
-            editorRef={editorRef}
-            onEditorReady={handleEditorReady}
-          />
-        </Suspense>
+        <BlockEditor
+          key={activeNoteId}
+          content={content}
+          onChange={handleChange}
+          className="untask-notes-editor"
+          preset="notes"
+          contextMenuMode="notes_contextual"
+          getSlashMenuItems={getSlashMenuItems}
+          editorRef={editorRef}
+          onEditorReady={handleEditorReady}
+        />
       </div>
     </div>
   );

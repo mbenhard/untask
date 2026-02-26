@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import { Paperclip } from 'lucide-react';
@@ -20,16 +20,10 @@ import {
   selectEnabledTerminal,
 } from '../../stores/taskStatusConfigStore';
 import { isEmptyDocument } from '../editor/editorUtils';
-import { EditorBlockSkeleton } from '../ui/loadingShells';
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { getNextPriority } from './taskInteraction';
-import type { BlockEditorSlashMenuItem, BlockEditorSlashMenuParams } from '../editor/BlockEditor';
-
-const LazyBlockEditor = lazy(async () => {
-  const module = await import('../editor/BlockEditor');
-  return { default: module.BlockEditor };
-});
+import { BlockEditor, type BlockEditorSlashMenuItem, type BlockEditorSlashMenuParams } from '../editor/BlockEditor';
 
 // ─── Types & Constants ──────────────────────────────────────
 
@@ -845,19 +839,17 @@ export const TaskBody = ({
         'px-3 py-3',
         !parentTask && 'border-t border-border/30',
       )}>
-        <Suspense fallback={<EditorBlockSkeleton className="untask-task-editor min-h-[96px]" />}>
-          <LazyBlockEditor
-            content={task.body ?? ''}
-            onChange={handleBodyChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            className="untask-task-editor"
-            preset="task"
-            contextMenuMode="off"
-            editorRef={editorRef}
-            getSlashMenuItems={getAttachmentSlashMenuItems}
-          />
-        </Suspense>
+        <BlockEditor
+          content={task.body ?? ''}
+          onChange={handleBodyChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className="untask-task-editor"
+          preset="task"
+          contextMenuMode="off"
+          editorRef={editorRef}
+          getSlashMenuItems={getAttachmentSlashMenuItems}
+        />
       </div>
 
       {/* Zone 2 — Metadata Line */}
