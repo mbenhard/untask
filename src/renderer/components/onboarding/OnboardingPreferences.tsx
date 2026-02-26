@@ -8,6 +8,7 @@ import type { OnboardingNavProps } from './OnboardingFlow';
 import { getUntask } from '../../lib/untask';
 import { useTheme } from '../providers/ThemeProvider';
 import { Button } from '../ui/button';
+import { Key } from '../ui/Key';
 
 type ThemeChoice = 'dark' | 'light';
 
@@ -122,24 +123,24 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
         <span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
           Shortcuts
         </span>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⌘</span>
-              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⇧</span>
-              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">Space</span>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-1">
+                <Key k="cmd" />
+                <Key k="shift" />
+                <Key>Space</Key>
+              </div>
+              <span className="text-[12px] text-muted-foreground">Summon Untask from anywhere</span>
             </div>
-            <span className="text-[12px] text-muted-foreground">Summon Untask from anywhere</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⌘</span>
-              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">⇧</span>
-              <span className="rounded border border-border/60 bg-accent px-1.5 py-0.5 font-mono text-[11px]">Q</span>
+            <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-1">
+                <Key k="cmd" />
+                <Key k="shift" />
+                <Key>Q</Key>
+              </div>
+              <span className="text-[12px] text-muted-foreground">Quick-add a task</span>
             </div>
-            <span className="text-[12px] text-muted-foreground">Quick-add a task</span>
           </div>
-        </div>
         <p className="mt-2.5 text-[11px] text-muted-foreground/60">Customizable in Settings → Shortcuts</p>
       </Card>
 
@@ -154,7 +155,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
             aria-pressed={themeChoice === 'dark'}
             onClick={() => applyTheme('dark')}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               themeChoice === 'dark'
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -167,7 +168,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
             aria-pressed={themeChoice === 'light'}
             onClick={() => applyTheme('light')}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               themeChoice === 'light'
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -189,7 +190,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
             aria-pressed={launchAtLoginEnabled}
             onClick={() => setLaunchAtLoginEnabled(true)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               launchAtLoginEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -202,7 +203,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
             aria-pressed={!launchAtLoginEnabled}
             onClick={() => setLaunchAtLoginEnabled(false)}
             className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-colors',
+              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
               !launchAtLoginEnabled
                 ? 'border-foreground/40 bg-accent text-foreground'
                 : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',

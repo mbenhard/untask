@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { BirdMascot } from '../chat/BirdMascot';
 import { Button } from '../ui/button';
+import { Key } from '../ui/Key';
 
 type OnboardingSummary = {
   userName: string;
@@ -81,9 +82,12 @@ export const OnboardingReady = ({ onFinish, isFinishing, summary }: OnboardingRe
         </div>
       ) : null}
 
-      <Button onClick={onFinish} disabled={isFinishing} className="w-full">
-        {isFinishing ? 'Opening...' : 'Open App'}
-      </Button>
+      <div className="flex w-full items-center gap-3">
+        <Button onClick={onFinish} disabled={isFinishing} className="flex-1">
+          {isFinishing ? 'Opening...' : 'Open App'}
+        </Button>
+        <Key k="enter" size="sm" className="opacity-40" />
+      </div>
     </div>
   );
 };

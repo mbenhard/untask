@@ -20,6 +20,7 @@ import { useAutoFocusList } from '../../hooks/useAutoFocusList';
 import { useNotesListKeyboard } from '../../hooks/useNotesListKeyboard';
 import { deriveAutoTitle, getContentPreview, getDisplayTitle } from '../../lib/noteUtils';
 import { cn } from '../../lib/utils';
+import { Key } from '../ui/Key';
 import {
   selectActiveNotes,
   selectArchivedNotes,
@@ -489,7 +490,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           <div className="flex flex-col items-center justify-center px-4 pt-16 text-center">
             <p className="text-sm text-muted-foreground">No active notes</p>
             <p className="mt-1 text-[11px] text-muted-foreground/70">
-              Press <kbd className="rounded border border-border px-1 py-0.5 text-[10px]">Cmd+N</kbd> to create one
+              Press <span className="inline-flex items-center gap-0.5"><Key k="cmd" size="sm" /><Key size="sm">N</Key></span> to create one
             </p>
           </div>
         ) : (

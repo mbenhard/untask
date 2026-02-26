@@ -8,6 +8,7 @@ import { SlashPopover } from './SlashPopover';
 import { formatDueDateDisplay } from '../tasks/dueDate';
 import { PRIORITY_DOT, PRIORITY_LABEL, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { QuickAddDueDatePicker } from './QuickAddDueDatePicker';
+import { Key } from '../ui/Key';
 
 const COLLAPSED_HEIGHT = 60;
 const EXPANDED_HEIGHT = 102;
@@ -333,13 +334,9 @@ export function QuickAddApp() {
             tabIndex={-1}
           >
             {!expanded && (
-              <kbd className="inline-flex h-4 items-center rounded border border-border/40 bg-muted/30 px-1 font-mono text-[9px] text-muted-foreground/60">
-                tab
-              </kbd>
+              <Key k="tab" size="xs" />
             )}
-            <kbd className="inline-flex h-4 items-center rounded border border-border/40 bg-muted/30 px-1 font-mono text-[9px] text-muted-foreground/60">
-              ↵
-            </kbd>
+            <Key k="enter" size="xs" />
           </button>
         </div>
 

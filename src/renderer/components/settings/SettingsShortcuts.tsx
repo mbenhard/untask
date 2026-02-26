@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getUntask } from '../../lib/untask';
 import { cn } from '../../lib/utils';
+import { Keys } from '../ui/Key';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
 
@@ -78,12 +79,6 @@ const SHORTCUT_HINT_SECTIONS: ShortcutHintSection[] = [
   },
 ];
 
-const formatAccelerator = (value: string): string =>
-  value
-    .replace(/CommandOrControl/g, '⌘')
-    .replace(/Command/g, '⌘')
-    .replace(/Control/g, '⌘')
-    .replace(/\+/g, ' ');
 
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift']);
 
@@ -237,13 +232,17 @@ const ShortcutRecorder = ({
           ref={recorderRef}
           tabIndex={0}
           className={cn(
-            'rounded-sm border px-2 py-0.5 font-mono text-[10px] outline-none transition-colors',
+            'flex items-center gap-1 rounded-sm border px-2 py-0.5 outline-none transition-colors',
             pending
-              ? 'border-foreground/30 bg-muted/40 text-foreground'
-              : 'animate-pulse border-foreground/20 bg-muted/20 text-muted-foreground',
+              ? 'border-foreground/30 bg-muted/40'
+              : 'animate-pulse border-foreground/20 bg-muted/20',
           )}
         >
-          {pending ? formatAccelerator(pending) : 'Press a shortcut\u2026'}
+          {pending ? (
+            <Keys combo={pending} size="sm" />
+          ) : (
+            <span className="font-mono text-[10px] text-muted-foreground">Press a shortcut…</span>
+          )}
         </div>
         {error ? (
           <span role="alert" className="text-[10px] text-destructive">{error}</span>
@@ -270,9 +269,7 @@ const ShortcutRecorder = ({
 
   return (
     <div className="flex items-center gap-1.5">
-      <code className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-        {formatAccelerator(currentAccelerator)}
-      </code>
+      <Keys combo={currentAccelerator} size="sm" />
       <button
         type="button"
         onClick={startRecording}
@@ -391,9 +388,7 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
               label={entry.action}
               hint={entry.context}
             >
-              <code className="rounded-sm bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                {entry.keys}
-              </code>
+              <Keys combo={entry.keys} size="sm" />
             </SettingsRow>
           ))}
         </SettingsSection>
