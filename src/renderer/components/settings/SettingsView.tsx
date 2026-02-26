@@ -2,6 +2,12 @@ import { useState, useCallback, useEffect } from 'react';
 
 import { cn } from '../../lib/utils';
 import { useToastStore } from '../../stores/toastStore';
+
+// Fetch version at module load so it's ready before first paint.
+let _cachedVersion = '';
+if (typeof window !== 'undefined' && window.untask) {
+  void window.untask.app.getVersion().then((v) => { _cachedVersion = v; });
+}
 import { SettingsGeneral } from './SettingsGeneral';
 import { SettingsTasks } from './SettingsTasks';
 import { SettingsAI } from './SettingsAI';
@@ -28,11 +34,14 @@ export const SettingsView = () => {
     (notice: string | null) => { if (notice) showToast(notice); },
     [showToast],
   );
-  const [version, setVersion] = useState<string>('');
+  const [version, setVersion] = useState(_cachedVersion);
 
   useEffect(() => {
-    window.untask?.app.getVersion().then(setVersion);
-  }, []);
+    // If module-level fetch hasn't resolved yet, pick it up here.
+    if (!version) {
+      window.untask?.app.getVersion().then(setVersion);
+    }
+  }, [version]);
 
   const tabContent = (() => {
     switch (activeTab) {

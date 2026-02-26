@@ -31,6 +31,7 @@ type NotesStore = {
   selectedListNoteId: string | null;
 
   // View state
+  isViewReady: boolean;
   subView: NotesSubView;
   layoutMode: NotesLayoutMode;
 
@@ -276,6 +277,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   isListLoading: false,
   selectedListNoteId: null,
 
+  isViewReady: false,
   subView: 'list',
   layoutMode: 'list',
 
@@ -389,6 +391,9 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       await enterNotesViewPromise;
     } finally {
       enterNotesViewPromise = null;
+      if (!get().isViewReady) {
+        set({ isViewReady: true });
+      }
     }
   },
 
@@ -865,6 +870,7 @@ useNotesStore.subscribe((state, previousState) => {
 });
 
 // Selectors
+export const selectIsViewReady = (state: NotesStore) => state.isViewReady;
 export const selectNotesSubView = (state: NotesStore) => state.subView;
 export const selectNotesLayoutMode = (state: NotesStore) => state.layoutMode;
 export const selectActiveNotes = (state: NotesStore) => state.activeNotes;
