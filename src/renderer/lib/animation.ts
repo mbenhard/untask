@@ -33,56 +33,37 @@ export const scaleVariants: Variants = {
   exit: { opacity: 0, scale: 0.96 },
 };
 
-// --- Onboarding ---
+// --- Onboarding (virtual-scroll architecture) ---
 
-export const ONBOARDING_TRANSITION: Transition = {
-  duration: 0.25,
-  ease: [0.25, 0.1, 0.25, 1],
+/**
+ * Main scroll transition — applied to the tall column container.
+ * Smooth ease-in-out for a polished, scroll-like feel.
+ */
+export const ONBOARDING_SCROLL_TRANSITION: Transition = {
+  duration: 0.7,
+  ease: [0.45, 0, 0.15, 1],
 };
 
-export const ONBOARDING_HEADER_TRANSITION: Transition = {
-  duration: 0.15,
-  ease: [0.25, 0.1, 0.25, 1],
-};
-
-/** Direction-aware step variants. `custom` = 1 (forward) or -1 (backward). */
-export const onboardingStepVariants: Variants = {
-  enter: (direction: number) => ({
-    opacity: 0,
-    y: direction > 0 ? 20 : -20,
-  }),
-  center: {
-    opacity: 1,
-    y: 0,
-  },
-  exit: (direction: number) => ({
-    opacity: 0,
-    y: direction > 0 ? -20 : 20,
-  }),
-};
-
-export const onboardingHeaderVariants: Variants = {
-  enter: { opacity: 0 },
-  center: { opacity: 1 },
-  exit: { opacity: 0 },
-};
-
-/** Stagger container — apply to a wrapper around cards. */
+/**
+ * Stagger container — apply to a wrapper around cards.
+ * Only triggers when isActive becomes true (controlled by animate prop).
+ */
 export const onboardingStaggerContainer: Variants = {
   enter: {},
   center: {
     transition: {
-      staggerChildren: 0.06,
+      staggerChildren: 0,
+      delayChildren: 0,
     },
   },
 };
 
 /** Individual card entrance — children of the stagger container. */
 export const onboardingCardVariants: Variants = {
-  enter: { opacity: 0, y: 12 },
+  enter: { opacity: 1, y: 0 },
   center: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+    transition: { duration: 0, ease: 'linear' },
   },
 };

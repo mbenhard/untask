@@ -101,6 +101,13 @@ describe('OnboardingFlow', () => {
     untaskMock = createUntaskMock();
     (window as unknown as { untask?: unknown }).untask = untaskMock;
 
+    // jsdom does not provide ResizeObserver — stub it out.
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
@@ -135,10 +142,13 @@ describe('OnboardingFlow', () => {
   };
 
   const clickButton = async (label: string) => {
-    const button = Array.from(container.querySelectorAll('button')).find((el) =>
-      el.textContent?.replace(/\s+/g, ' ').trim().includes(label),
-    );
+    // Only consider buttons that are NOT inside an aria-hidden (inactive) section.
+    // All steps are rendered simultaneously, so we must ignore non-active ones.
+    const button = Array.from(container.querySelectorAll('button'))
+      .filter((el) => !el.closest('[aria-hidden="true"]'))
+      .find((el) => el.textContent?.replace(/\s+/g, ' ').trim().includes(label));
     const available = Array.from(container.querySelectorAll('button'))
+      .filter((el) => !el.closest('[aria-hidden="true"]'))
       .map((el) => el.textContent?.replace(/\s+/g, ' ').trim() ?? '')
       .join(' | ');
     expect(button, `available buttons: ${available}`).toBeTruthy();
@@ -155,7 +165,16 @@ describe('OnboardingFlow', () => {
     await tick();
   };
 
-  const headerLabel = () => container.querySelector('header p')?.textContent ?? '';
+  const headerLabel = () => {
+    // Find the header inside the active (non-hidden) section
+    const activeSection = Array.from(container.querySelectorAll('.onboarding-section'))
+      .find((el) => el.getAttribute('aria-hidden') !== 'true');
+    const header = activeSection?.querySelector('header');
+    if (!header) return '';
+    const num = header.querySelector('span')?.textContent ?? '';
+    const title = header.querySelector('h2')?.textContent ?? '';
+    return `${num} — ${title}`;
+  };
 
   it('routes AI-enabled flow through provider with dynamic numbering', async () => {
     renderFlow();
@@ -163,12 +182,12 @@ describe('OnboardingFlow', () => {
     await clickButton('Get Started');
     await clickButton('Continue');
 
+    expect(headerLabel()).toContain('02 — PROVIDER');
+
+    await clickButton('Skip for now');
+
     expect(headerLabel()).toContain('03 — NOTIFICATIONS');
-
-    await clickButton('Continue');
-
-    expect(headerLabel()).toContain('04 — PROVIDER');
-    expect(container.textContent).toContain('04 / 07');
+    expect(container.textContent).toContain('03 / 06');
   });
 
   it('skips provider/identity and keeps contiguous numbering when AI is disabled', async () => {
@@ -180,18 +199,19 @@ describe('OnboardingFlow', () => {
 
     await clickButton('Continue');
 
-    expect(headerLabel()).toContain('04 — SHORTCUTS');
-    expect(container.textContent).toContain('04 / 05');
+    expect(headerLabel()).toContain('03 — SHORTCUTS');
+    expect(container.textContent).toContain('03 / 04');
   });
 
   it('supports enter and escape keyboard navigation deterministically', async () => {
     renderFlow();
 
     await pressKey('Enter');
-    expect(headerLabel()).toContain('02 — BASICS');
+    expect(headerLabel()).toContain('01 — BASICS');
 
     await pressKey('Escape');
-    expect(headerLabel()).toContain('01 — WELCOME');
+    // Welcome has no section header — headerLabel returns empty string
+    expect(headerLabel()).toBe('');
   });
 
   it('marks bootstrap complete and calls onComplete at preferences finish', async () => {
@@ -204,11 +224,11 @@ describe('OnboardingFlow', () => {
 
     await clickButton('Continue');
 
-    expect(headerLabel()).toContain('04 — SHORTCUTS');
+    expect(headerLabel()).toContain('03 — SHORTCUTS');
 
     await clickButton('Continue');
 
-    expect(headerLabel()).toContain('05 — PREFERENCES');
+    expect(headerLabel()).toContain('04 — PREFERENCES');
 
     await clickButton('Continue');
 

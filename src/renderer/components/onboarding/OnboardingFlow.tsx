@@ -314,7 +314,13 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
       // Non-fatal — proceed anyway
     }
 
-    goTo('notifications');
+    // Use the updated visibleSteps based on the new ai value, not the stale closure.
+    const nextSteps = getVisibleSteps(ai);
+    const nextIndex = nextSteps.indexOf('basics') + 1;
+    const next = nextSteps[nextIndex];
+    if (next) {
+      goTo(next);
+    }
   };
 
   const handleNotificationsNext = () => {
@@ -402,8 +408,11 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
     }
   };
 
-  const displayStep = Math.max(1, safeIndex + 1);
-  const totalSteps = visibleSteps.length;
+  // Welcome doesn't count in the step label — only numbered sections do.
+  const numberedSteps = visibleSteps.filter((s): s is Exclude<StepKey, 'welcome'> => s !== 'welcome');
+  const numberedIndex = numberedSteps.indexOf(currentStep as Exclude<StepKey, 'welcome'>);
+  const displayStep = Math.max(1, numberedIndex + 1);
+  const totalSteps = numberedSteps.length;
   const stepLabel = `${String(displayStep).padStart(2, '0')} / ${String(totalSteps).padStart(2, '0')}`;
   const canGoBack = currentIndex > 0 && !isFinishing;
   const nav: OnboardingNavProps = { onBack: goBack, canGoBack, stepLabel };
@@ -496,9 +505,8 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
           {stepsToRender.map((step) => {
             const isActive = step === currentStep;
             const hasBeenVisited = visitedSteps.has(step);
-            // Welcome is not counted — non-welcome steps are numbered from 01
-            const nonWelcomeSteps = stepsToRender.filter((s) => s !== 'welcome');
-            const nonWelcomeIndex = nonWelcomeSteps.indexOf(step as (typeof nonWelcomeSteps)[number]);
+            // Welcome is not counted — reuse numberedSteps computed above
+            const nonWelcomeIndex = numberedSteps.indexOf(step as Exclude<StepKey, 'welcome'>);
             const stepNumber = nonWelcomeIndex >= 0 ? String(nonWelcomeIndex + 1).padStart(2, '0') : null;
 
             return (
