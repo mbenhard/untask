@@ -169,8 +169,8 @@ export const SettingsMemoryTab = ({ setError, setNotice, availableTabs = MEMORY_
         </nav>
       )}
 
-      <div className="space-y-2">
-        <p className="text-[11px] text-muted-foreground">
+      <div className="space-y-1.5">
+        <p className="px-0.5 text-[11px] text-muted-foreground">
           {MEMORY_FIELD_DESCRIPTIONS[memorySubTab]}
         </p>
 

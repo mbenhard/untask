@@ -727,6 +727,7 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={state.activeSubTab}
+                  className="space-y-3"
                   variants={fadeVariants}
                   initial="initial"
                   animate="animate"

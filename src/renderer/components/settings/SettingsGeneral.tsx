@@ -141,8 +141,8 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
         setWindowDismissModeState(result.mode);
         setNotice(
           result.mode === 'persistent'
-            ? 'Window dismiss mode set to Persistent.'
-            : 'Window dismiss mode set to Quick-hide.',
+            ? 'Window will stay open when clicking away.'
+            : 'Window will auto-hide when clicking away.',
         );
       } catch (saveError) {
         setWindowDismissModeState(previousMode);
@@ -304,18 +304,18 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
 
       <SettingsSection title="Window">
         <SettingsRow
-          label="Dismiss mode"
+          label="When clicking away"
           hint={
             windowDismissMode === 'persistent'
-              ? 'Stay visible when focus changes.'
-              : 'Hide when window loses focus.'
+              ? 'Window stays on screen when you switch apps.'
+              : 'Window hides when you switch apps.'
           }
           loading={isLoadingWindowDismissMode}
         >
           <SegmentedControl
             options={[
-              { value: 'persistent' as const, label: 'Persistent' },
-              { value: 'quick-hide' as const, label: 'Quick-hide' },
+              { value: 'persistent' as const, label: 'Keep open' },
+              { value: 'quick-hide' as const, label: 'Auto-hide' },
             ]}
             value={windowDismissMode}
             onChange={(v) => void handleWindowDismissModeChange(v as WindowDismissMode)}
@@ -378,10 +378,7 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
             type="button"
             className="rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
             onClick={() => {
-              localStorage.removeItem('untask-bootstrap-done');
-              void getUntask()
-                .settings.set('app.bootstrap_completed', 'false')
-                .then(() => window.location.reload());
+              window.dispatchEvent(new CustomEvent('untask:restart-onboarding'));
             }}
           >
             Reset

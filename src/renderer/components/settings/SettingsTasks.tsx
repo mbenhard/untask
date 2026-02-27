@@ -256,10 +256,7 @@ export const SettingsTasks = () => {
 
   return (
     <div className="space-y-3">
-      <SettingsSection title="Status Lanes">
-        <p className="px-2 pb-1 text-[11px] text-muted-foreground">
-          Toggle statuses on/off and drag to reorder. Inbox is always separate.
-        </p>
+      <SettingsSection title="Status Lanes" description="Toggle statuses on/off and drag to reorder. Inbox is always separate.">
 
         <DndContext
           sensors={sensors}
