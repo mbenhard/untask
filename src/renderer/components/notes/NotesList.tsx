@@ -313,7 +313,7 @@ const NoteListItem = ({
       {/* Timestamp — hidden on hover when actions are visible */}
       <span className={cn(
         'shrink-0 font-mono text-[10px] text-muted-foreground',
-        (onPin || onRestore) && 'group-hover:hidden',
+        (onPin || onRestore) && 'opacity-100 transition-opacity group-hover:opacity-0',
       )}>
         {formatRelativeTime(note.updatedAt)}
       </span>

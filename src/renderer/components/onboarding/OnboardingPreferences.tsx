@@ -128,9 +128,6 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
             </button>
           ))}
         </div>
-        {themeChoice === 'system' ? (
-          <p className="mt-2 text-[12px] text-muted-foreground">Follows your macOS appearance.</p>
-        ) : null}
       </Card>
 
       {/* LAUNCH AT LOGIN */}
@@ -178,7 +175,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
           nav={nav}
           onContinue={() => void handleContinue()}
           continueDisabled={isSaving}
-          continueLabel={isSaving ? 'Saving...' : 'Finish setup'}
+          continueLabel="Finish setup"
         />
       </Card>
     </Wrapper>

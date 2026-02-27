@@ -332,7 +332,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
                 key={backup.path}
                 className="border-t border-border/40 px-2 py-2 first:border-t-0"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <p className="text-[12px] font-medium text-foreground">
                       {formatDate(backup.createdAt)}
@@ -377,7 +377,7 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
           })
         )}
 
-        <div className="flex justify-end border-t border-border/40 px-2 pt-2">
+        <div className="flex items-center justify-end border-t border-border/40 px-2 pt-2">
           <Button
             type="button"
             size="sm"
