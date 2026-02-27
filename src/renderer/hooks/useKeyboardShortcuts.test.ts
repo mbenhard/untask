@@ -44,6 +44,7 @@ const resetStores = (): void => {
     chatOverlayState: 'peek',
     unreadProactive: false,
     newTaskTrigger: 0,
+    aiEnabled: true,
   });
 
   useSearchStore.setState({
@@ -247,6 +248,33 @@ describe('useKeyboardShortcuts', () => {
     expect(blur).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores Cmd/Ctrl+K when AI is disabled', () => {
+    useAppStore.setState({ aiEnabled: false });
+    const focus = vi.fn();
+    const blur = vi.fn();
+    const inputRef = {
+      current: { focus, blur } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(
+        createElement(HookHarness, {
+          inputRef,
+          inputValue: '',
+          clearInput: vi.fn(),
+        }),
+      );
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
+    });
+
+    expect(useAppStore.getState().chatOverlayState).toBe('peek');
+    expect(focus).not.toHaveBeenCalled();
+    expect(blur).not.toHaveBeenCalled();
+  });
+
   it('collapses open overlay on Escape and stops at peek', () => {
     useAppStore.setState({ chatOverlayState: 'open' });
 
@@ -299,6 +327,31 @@ describe('useKeyboardShortcuts', () => {
     });
 
     expect(processWithAI).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Cmd/Ctrl+Enter when AI is disabled', () => {
+    const processWithAI = vi.fn(async () => ({ ok: true, reason: 'staged' as const }));
+    useAppStore.setState({ activeView: 'notes', aiEnabled: false });
+    useNotesStore.setState({
+      subView: 'editor',
+      layoutMode: 'focus',
+      activeNoteId: 'note-1',
+      processWithAI: processWithAI as never,
+    });
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', metaKey: true }));
+    });
+
+    expect(processWithAI).not.toHaveBeenCalled();
   });
 
   it('runs Cmd/Ctrl+Backspace to archive active note', () => {

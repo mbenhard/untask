@@ -704,6 +704,11 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       isProcessing,
       activeNoteId,
     } = get();
+    const aiEnabled = useAppStore.getState().aiEnabled;
+
+    if (!aiEnabled) {
+      return { ok: false, reason: 'save_failed' };
+    }
 
     if (isProcessing || !activeNoteId) {
       return { ok: false, reason: 'save_failed' };

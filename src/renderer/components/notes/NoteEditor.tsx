@@ -16,6 +16,7 @@ import {
   selectNotesNotice,
   useNotesStore,
 } from '../../stores/notesStore';
+import { selectAiEnabled, useAppStore } from '../../stores/appStore';
 import { Button } from '../ui/button';
 import { EditorBlockSkeleton } from '../ui/loadingShells';
 import { Skeleton } from '../ui/skeleton';
@@ -53,10 +54,13 @@ const createProcessItem = (editor: BlockNoteEditor): BlockEditorSlashMenuItem =>
   subtext: 'Start a new AI chat with this note attached',
 });
 
-const getSlashMenuItems = ({
-  editor,
-  defaultItems,
-}: BlockEditorSlashMenuParams): BlockEditorSlashMenuItem[] => [
+const getSlashMenuItems = (
+  {
+    editor,
+    defaultItems,
+  }: BlockEditorSlashMenuParams,
+  aiEnabled: boolean,
+): BlockEditorSlashMenuItem[] => [
   ...defaultItems
     .filter((item) => {
       const titleIsEmoji = item.title.trim().toLowerCase() === 'emoji';
@@ -68,7 +72,7 @@ const getSlashMenuItems = ({
         ? { ...item, aliases: [...(item.aliases ?? []), 'todo'] }
         : item,
     ),
-  createProcessItem(editor),
+  ...(aiEnabled ? [createProcessItem(editor)] : []),
 ];
 
 type NoteEditorProps = {
@@ -90,6 +94,7 @@ const NOOP_DEV_LATENCY: DevLatencyApi = {
 // ─── Component ─────────────────────────────────────────────
 
 export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
+  const aiEnabled = useAppStore(selectAiEnabled);
   const activeNoteId = useNotesStore(selectActiveNoteId);
   const updatedAt = useNotesStore(selectActiveNoteUpdatedAt);
   const content = useNotesStore(selectNotesContent);
@@ -358,18 +363,20 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-            onClick={handleProcess}
-            disabled={isProcessing}
-            title="Send note to AI (⌘↵)"
-          >
-            <Sparkles size={12} />
-            {isProcessing ? 'sending' : 'send to ai'}
-          </Button>
+          {aiEnabled ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={handleProcess}
+              disabled={isProcessing}
+              title="Send note to AI (⌘↵)"
+            >
+              <Sparkles size={12} />
+              {isProcessing ? 'sending' : 'send to ai'}
+            </Button>
+          ) : null}
 
           {isArchived ? (
             <>
@@ -418,7 +425,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
           className="untask-notes-editor"
           preset="notes"
           contextMenuMode="notes_contextual"
-          getSlashMenuItems={getSlashMenuItems}
+          getSlashMenuItems={(params) => getSlashMenuItems(params, aiEnabled)}
           editorRef={editorRef}
           onEditorReady={handleEditorReady}
         />

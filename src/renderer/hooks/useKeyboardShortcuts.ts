@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 
 import { getUntask } from '../lib/untask';
 import { navigateToNotes } from '../lib/notesNavigation';
-import { useAppStore } from '../stores/appStore';
+import { selectAiEnabled, useAppStore } from '../stores/appStore';
 import { useChatStore } from '../stores/chatStore';
 import { useNotesStore } from '../stores/notesStore';
 import { useSearchStore } from '../stores/searchStore';
@@ -39,6 +39,7 @@ export const useKeyboardShortcuts = ({
   const triggerNewTask = useAppStore((state) => state.triggerNewTask);
   const toggleChatOverlay = useAppStore((state) => state.toggleChatOverlay);
   const closeChatOverlayLayer = useAppStore((state) => state.closeChatOverlayLayer);
+  const aiEnabled = useAppStore(selectAiEnabled);
 
   const undoAction = useChatStore((state) => state.undoAction);
   const clearPendingNoteContext = useChatStore((state) => state.clearPendingNoteContext);
@@ -70,6 +71,9 @@ export const useKeyboardShortcuts = ({
       const notesActive = activeViewRef.current === 'notes';
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        if (!aiEnabled) {
+          return;
+        }
         event.preventDefault();
         const isOpen = chatOverlayState === 'open';
         toggleChatOverlay();
@@ -144,6 +148,9 @@ export const useKeyboardShortcuts = ({
         && !event.shiftKey
         && event.key === 'Enter'
       ) {
+        if (!aiEnabled) {
+          return;
+        }
         event.preventDefault();
         void notesState.processWithAI();
         return;
@@ -276,6 +283,7 @@ export const useKeyboardShortcuts = ({
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [
+    aiEnabled,
     clearInput,
     closeSearch,
     closeChatOverlayLayer,

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getUntask } from '../../lib/untask';
 import { cn } from '../../lib/utils';
+import { selectAiEnabled, useAppStore } from '../../stores/appStore';
 import { Keys } from '../ui/Key';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
@@ -297,9 +298,34 @@ type SettingsShortcutsProps = {
 };
 
 export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
+  const aiEnabled = useAppStore(selectAiEnabled);
   const [resolvedShortcuts, setResolvedShortcuts] = useState<Record<string, string>>({});
   const [registrationStatus, setRegistrationStatus] = useState<Record<string, boolean>>({});
   const [isLoadingShortcuts, setIsLoadingShortcuts] = useState(false);
+
+  const shortcutHintSections = useMemo(() => {
+    if (aiEnabled) {
+      return SHORTCUT_HINT_SECTIONS;
+    }
+
+    return SHORTCUT_HINT_SECTIONS.map((section) => {
+      if (section.title === 'App-wide') {
+        return {
+          ...section,
+          entries: section.entries.filter((entry) => entry.action !== 'Toggle chat overlay'),
+        };
+      }
+
+      if (section.title === 'Notes editor') {
+        return {
+          ...section,
+          entries: section.entries.filter((entry) => entry.action !== 'Process with AI'),
+        };
+      }
+
+      return section;
+    }).filter((section) => section.entries.length > 0);
+  }, [aiEnabled]);
 
   const loadShortcuts = useCallback(async () => {
     try {
@@ -380,7 +406,7 @@ export const SettingsShortcuts = ({ setError }: SettingsShortcutsProps) => {
         })}
       </SettingsSection>
 
-      {SHORTCUT_HINT_SECTIONS.map((section) => (
+      {shortcutHintSections.map((section) => (
         <SettingsSection key={section.title} title={section.title}>
           {section.entries.map((entry, index) => (
             <SettingsRow
