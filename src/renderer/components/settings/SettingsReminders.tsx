@@ -169,6 +169,9 @@ export const SettingsReminders = ({ setError, setNotice }: SettingsRemindersProp
       const nextEnabled = value === 'on';
       const previousEnabled = enabled;
       setEnabled(nextEnabled);
+      if (nextEnabled) {
+        setSyncStatus({ status: 'syncing' });
+      }
       setNotice(null);
       setError(null);
 
