@@ -13,10 +13,11 @@ import { SettingsView } from './SettingsView';
 
 vi.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: { children: ReactNode }) => createElement('div', null, children),
-  motion: {
-    div: (props: HTMLAttributes<HTMLDivElement> & { children?: ReactNode }) =>
-      createElement('div', props, props.children),
-  },
+  motion: new Proxy({}, {
+    get: (_: object, tag: string | symbol) =>
+      (props: HTMLAttributes<HTMLElement> & { children?: ReactNode }) =>
+        createElement(tag as string, props, props.children),
+  }),
   useReducedMotion: () => true,
 }));
 
