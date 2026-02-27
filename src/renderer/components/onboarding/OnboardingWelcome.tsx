@@ -1,10 +1,6 @@
-import { useEffect } from 'react';
-
-import { motion, useReducedMotion } from 'framer-motion';
-
-import { onboardingCardVariants, onboardingStaggerContainer } from '../../lib/animation';
 import { BirdMascot } from '../chat/BirdMascot';
 import { Button } from '../ui/button';
+import { useOnboardingAnimation, useOnboardingEnterKey } from './onboarding-shared';
 
 type OnboardingWelcomeProps = {
   onNext: () => void;
@@ -12,26 +8,9 @@ type OnboardingWelcomeProps = {
 };
 
 export const OnboardingWelcome = ({ onNext, isActive }: OnboardingWelcomeProps) => {
-  const prefersReducedMotion = useReducedMotion();
+  const { Wrapper, Card, staggerProps, cardProps } = useOnboardingAnimation(isActive);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!isActive) return;
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        onNext();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onNext, isActive]);
-
-  const Wrapper = prefersReducedMotion ? 'div' : motion.div;
-  const Card = prefersReducedMotion ? 'div' : motion.div;
-  const staggerProps = prefersReducedMotion
-    ? {}
-    : { variants: onboardingStaggerContainer, initial: 'enter', animate: isActive ? 'center' : 'enter' };
-  const cardProps = prefersReducedMotion ? {} : { variants: onboardingCardVariants };
+  useOnboardingEnterKey(onNext, isActive);
 
   return (
     <Wrapper {...staggerProps} className="flex flex-col items-center gap-3">

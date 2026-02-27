@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
 
-import { motion, useReducedMotion } from 'framer-motion';
 import { Check } from 'lucide-react';
 
-import { onboardingCardVariants, onboardingStaggerContainer } from '../../lib/animation';
-import { getUntask } from '../../lib/untask';
+import type { OnboardingNavProps } from './OnboardingFlow';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { getCuratedModelsForProvider, buildModelOptions } from '../settings/ModelCatalogView';
+import {
+  SectionLabel,
+  StepNav,
+  useOnboardingAnimation,
+  useOnboardingEnterKey,
+} from './onboarding-shared';
 
 type Provider = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
 
@@ -33,8 +38,6 @@ const PROVIDER_PLACEHOLDERS: Record<Provider, string> = {
   ollama: '',
 };
 
-import type { OnboardingNavProps } from './OnboardingFlow';
-
 type OnboardingProviderProps = {
   onNext: (provider: Provider, keyOrUrl: string, modelId: string) => void;
   onSkip: () => void;
@@ -50,7 +53,7 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
   const [isValidating, setIsValidating] = useState(false);
   const [validationState, setValidationState] = useState<'idle' | 'valid' | 'error'>('idle');
   const [validationError, setValidationError] = useState('');
-  const prefersReducedMotion = useReducedMotion();
+  const { Wrapper, Card, staggerProps, cardProps } = useOnboardingAnimation(isActive);
 
   const isOllama = provider === 'ollama';
   const effectiveValue = isOllama ? ollamaUrl : keyInput;
@@ -65,17 +68,14 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
     setSelectedModelId(defaultModel?.id ?? '');
   }, [provider]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!isActive) return;
-      if (e.key === 'Enter' && canContinue) {
-        e.preventDefault();
+  useOnboardingEnterKey(
+    () => {
+      if (canContinue) {
         onNext(provider, effectiveValue.trim(), selectedModelId);
       }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [canContinue, provider, effectiveValue, selectedModelId, onNext, isActive]);
+    },
+    isActive,
+  );
 
   const handleProviderChange = (next: Provider) => {
     setProvider(next);
@@ -115,13 +115,6 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
     onNext(provider, effectiveValue.trim(), selectedModelId);
   };
 
-  const Wrapper = prefersReducedMotion ? 'div' : motion.div;
-  const Card = prefersReducedMotion ? 'div' : motion.div;
-  const staggerProps = prefersReducedMotion
-    ? {}
-    : { variants: onboardingStaggerContainer, initial: 'enter', animate: isActive ? 'center' : 'enter' };
-  const cardProps = prefersReducedMotion ? {} : { variants: onboardingCardVariants };
-
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
       <Card {...cardProps} className="flex flex-col gap-1.5">
@@ -144,9 +137,7 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
       </Card>
 
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-            {isOllama ? 'SERVER URL' : 'API KEY'}
-          </span>
+        <SectionLabel>{isOllama ? 'SERVER URL' : 'API KEY'}</SectionLabel>
         {isOllama ? (
           <Input
             id="onboarding-ollama-url"
@@ -198,9 +189,7 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
         ) : null}
 
         <div className="mt-3">
-          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-            MODEL
-          </span>
+          <SectionLabel>MODEL</SectionLabel>
           {isOllama ? (
             <select
               id="onboarding-model"
@@ -244,28 +233,13 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
       </Card>
 
       <Card {...cardProps} className="flex flex-col items-center gap-2 pt-3">
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={nav.onBack}
-            disabled={!nav.canGoBack}
-            className="h-8 border-dashed border-border/60 bg-transparent px-4 text-[12px] hover:bg-accent/50"
-          >
-            Back
-          </Button>
-          <Button onClick={handleContinue} disabled={!canContinue} size="sm" className="h-8 px-6 text-[12px]">
-            Continue
-          </Button>
-        </div>
-        <button
-          type="button"
-          onClick={onSkip}
-          className="py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Skip for now
-        </button>
+        <StepNav
+          nav={nav}
+          onContinue={handleContinue}
+          continueDisabled={!canContinue}
+          onSkip={onSkip}
+          skipLabel="Skip for now"
+        />
       </Card>
     </Wrapper>
   );

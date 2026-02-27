@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   ONBOARDING_SCROLL_TRANSITION,
 } from '../../lib/animation';
+import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { OnboardingBasics } from './OnboardingBasics';
 import { OnboardingIdentity } from './OnboardingIdentity';
@@ -12,9 +13,12 @@ import { OnboardingNotifications } from './OnboardingNotifications';
 import { OnboardingPreferences } from './OnboardingPreferences';
 import { OnboardingProvider } from './OnboardingProvider';
 import { OnboardingWelcome } from './OnboardingWelcome';
-
-type Role = 'freelancer' | 'developer' | 'student' | 'creative' | 'other';
-type CommunicationStyle = 'direct' | 'friendly' | 'professional';
+import {
+  COMMUNICATION_OPTIONS,
+  ROLE_OPTIONS,
+  type CommunicationStyle,
+  type Role,
+} from './onboarding-shared';
 
 type StepKey =
   | 'welcome'
@@ -58,20 +62,6 @@ const getVisibleSteps = (aiEnabled: boolean): StepKey[] => {
 
   return ['welcome', 'basics', 'notifications', 'preferences', 'done'];
 };
-
-const ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: 'freelancer', label: 'Freelancer' },
-  { value: 'developer', label: 'Developer' },
-  { value: 'student', label: 'Student' },
-  { value: 'creative', label: 'Creative' },
-  { value: 'other', label: 'Other' },
-];
-
-const COMMUNICATION_OPTIONS: { value: CommunicationStyle; label: string }[] = [
-  { value: 'direct', label: 'Direct & concise' },
-  { value: 'friendly', label: 'Friendly & casual' },
-  { value: 'professional', label: 'Professional' },
-];
 
 /** How many px of fade at each content edge in the thread mask. */
 const THREAD_FADE = 48;
@@ -497,10 +487,10 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
 
   return (
     <div
-      className={[
+      className={cn(
         'flex h-full w-full flex-col bg-background',
-        isTransitioningToApp ? 'pointer-events-none' : '',
-      ].join(' ')}
+        isTransitioningToApp && 'pointer-events-none',
+      )}
     >
       {/* Invisible drag region so the frameless window can be moved during onboarding.
           Mirrors the 32px titlebar height from AppShell and reserves space for macOS traffic lights. */}

@@ -56,6 +56,7 @@ export const AppRoot = () => {
     localStorage.getItem(BOOTSTRAP_DONE_KEY) === '1' ? 'ready' : 'loading',
   );
   const [isTransitioningToApp, setIsTransitioningToApp] = useState(false);
+  const [isResettingToOnboarding, setIsResettingToOnboarding] = useState(false);
   const setAiEnabled = useAppStore((state) => state.setAiEnabled);
   const prefersReducedMotion = useReducedMotion();
   const transitionFallbackRef = useRef<number | null>(null);
@@ -73,12 +74,42 @@ export const AppRoot = () => {
     setBootstrapStatus('ready');
   }, [clearTransitionFallback]);
 
+  const finishResetTransition = useCallback(() => {
+    clearTransitionFallback();
+    setIsResettingToOnboarding(false);
+  }, [clearTransitionFallback]);
+
   useEffect(
     () => () => {
       clearTransitionFallback();
     },
     [clearTransitionFallback],
   );
+
+  // Listen for "restart onboarding" from Settings → play reverse transition
+  useEffect(() => {
+    const handler = () => {
+      if (bootstrapStatus !== 'ready' || isResettingToOnboarding) return;
+
+      localStorage.removeItem(BOOTSTRAP_DONE_KEY);
+      const untask = window.untask;
+      if (untask) {
+        void untask.settings.set('app.bootstrap_completed', 'false');
+      }
+
+      setIsResettingToOnboarding(true);
+      setBootstrapStatus('onboarding');
+
+      const durationMs = prefersReducedMotion ? 80 : 320;
+      clearTransitionFallback();
+      transitionFallbackRef.current = window.setTimeout(() => {
+        finishResetTransition();
+      }, durationMs + 80);
+    };
+
+    window.addEventListener('untask:restart-onboarding', handler);
+    return () => window.removeEventListener('untask:restart-onboarding', handler);
+  }, [bootstrapStatus, isResettingToOnboarding, prefersReducedMotion, clearTransitionFallback, finishResetTransition]);
 
   useEffect(() => {
     const untask = window.untask;
@@ -149,12 +180,26 @@ export const AppRoot = () => {
 
     return (
       <div className="relative h-full w-full overflow-hidden bg-background">
+        {/* App fading in (onboarding → app) */}
         {isTransitioningToApp ? (
           <motion.div
             className="absolute inset-0"
             initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: prefersReducedMotion ? 0.08 : 0.28, ease: 'easeOut' }}
+          >
+            <AppShell />
+          </motion.div>
+        ) : null}
+
+        {/* App fading out (app → onboarding reset) */}
+        {isResettingToOnboarding ? (
+          <motion.div
+            className="absolute inset-0 z-10 pointer-events-none"
+            initial={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 0, y: prefersReducedMotion ? 0 : -24 }}
+            transition={{ duration: prefersReducedMotion ? 0.08 : 0.28, ease: 'easeOut' }}
+            onAnimationComplete={() => finishResetTransition()}
           >
             <AppShell />
           </motion.div>

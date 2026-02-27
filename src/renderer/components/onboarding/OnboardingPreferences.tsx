@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { motion, useReducedMotion } from 'framer-motion';
-
-import { onboardingCardVariants, onboardingStaggerContainer } from '../../lib/animation';
 import type { OnboardingNavProps } from './OnboardingFlow';
 import { getUntask } from '../../lib/untask';
 import { useTheme } from '../providers/ThemeProvider';
-import { Button } from '../ui/button';
 import { Key } from '../ui/Key';
+import {
+  SectionLabel,
+  StepNav,
+  TogglePair,
+  useOnboardingAnimation,
+  useOnboardingEnterKey,
+} from './onboarding-shared';
 
 type ThemeChoice = 'dark' | 'light';
 
@@ -24,7 +27,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
   const [launchAtLoginEnabled, setLaunchAtLoginEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
-  const prefersReducedMotion = useReducedMotion();
+  const { Wrapper, Card, staggerProps, cardProps } = useOnboardingAnimation(isActive);
 
   useEffect(() => {
     setThemeChoice(resolvedTheme);
@@ -95,34 +98,17 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
     onNext();
   }, [isSaving, launchAtLoginEnabled, onNext]);
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (!isActive) return;
-      if (event.key !== 'Enter' || isSaving) {
-        return;
-      }
-      event.preventDefault();
-      void handleContinue();
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleContinue, isSaving, isActive]);
-
-  const Wrapper = prefersReducedMotion ? 'div' : motion.div;
-  const Card = prefersReducedMotion ? 'div' : motion.div;
-  const staggerProps = prefersReducedMotion
-    ? {}
-    : { variants: onboardingStaggerContainer, initial: 'enter', animate: isActive ? 'center' : 'enter' };
-  const cardProps = prefersReducedMotion ? {} : { variants: onboardingCardVariants };
+  useOnboardingEnterKey(
+    () => void handleContinue(),
+    isActive,
+    { disabled: isSaving },
+  );
 
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
       {/* SHORTCUTS */}
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-2 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          Shortcuts
-        </span>
+        <SectionLabel className="mb-2">Shortcuts</SectionLabel>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <div className="flex shrink-0 items-center gap-1">
@@ -146,72 +132,24 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
 
       {/* THEME */}
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          Theme
-        </span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            aria-pressed={themeChoice === 'dark'}
-            onClick={() => applyTheme('dark')}
-            className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
-              themeChoice === 'dark'
-                ? 'border-foreground/40 bg-accent text-foreground'
-                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            Dark
-          </button>
-          <button
-            type="button"
-            aria-pressed={themeChoice === 'light'}
-            onClick={() => applyTheme('light')}
-            className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
-              themeChoice === 'light'
-                ? 'border-foreground/40 bg-accent text-foreground'
-                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            Light
-          </button>
-        </div>
+        <SectionLabel>Theme</SectionLabel>
+        <TogglePair
+          value={themeChoice === 'dark'}
+          onChange={(isDark) => applyTheme(isDark ? 'dark' : 'light')}
+          enableLabel="Dark"
+          disableLabel="Light"
+        />
       </Card>
 
       {/* LAUNCH AT LOGIN */}
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">
-          Launch at login
-        </span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            aria-pressed={launchAtLoginEnabled}
-            onClick={() => setLaunchAtLoginEnabled(true)}
-            className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
-              launchAtLoginEnabled
-                ? 'border-foreground/40 bg-accent text-foreground'
-                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            Enable
-          </button>
-          <button
-            type="button"
-            aria-pressed={!launchAtLoginEnabled}
-            onClick={() => setLaunchAtLoginEnabled(false)}
-            className={[
-              'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
-              !launchAtLoginEnabled
-                ? 'border-foreground/40 bg-accent text-foreground'
-                : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            Skip
-          </button>
-        </div>
+        <SectionLabel>Launch at login</SectionLabel>
+        <TogglePair
+          value={launchAtLoginEnabled}
+          onChange={setLaunchAtLoginEnabled}
+          enableLabel="Enable"
+          disableLabel="Skip"
+        />
         <p className="mt-2 text-[12px] text-muted-foreground">
           Start Untask automatically when you log in.
         </p>
@@ -219,20 +157,13 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
 
       {hint ? <p className="text-[11px] text-muted-foreground/80">{hint}</p> : null}
 
-      <Card {...cardProps} className="flex items-center justify-center gap-3 pt-3">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={nav.onBack}
-          disabled={!nav.canGoBack}
-          className="h-8 border-dashed border-border/60 bg-transparent px-4 text-[12px] hover:bg-accent/50"
-        >
-          Back
-        </Button>
-        <Button onClick={() => void handleContinue()} disabled={isSaving} size="sm" className="h-8 px-6 text-[12px]">
-          {isSaving ? 'Saving...' : 'Finish setup'}
-        </Button>
+      <Card {...cardProps} className="flex items-center justify-center pt-3">
+        <StepNav
+          nav={nav}
+          onContinue={() => void handleContinue()}
+          continueDisabled={isSaving}
+          continueLabel={isSaving ? 'Saving...' : 'Finish setup'}
+        />
       </Card>
     </Wrapper>
   );
