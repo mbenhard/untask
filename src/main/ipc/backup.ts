@@ -50,19 +50,40 @@ import { getSettingWithDefault, setSetting } from '../services/settingsService';
 const BACKUP_JOB_TIMEOUT_MS = 120_000;
 
 // ─── Path safety ─────────────────────────────────────────────────────────────
-// The non-dialog BACKUP_IMPORT handler is used by the settings UI to restore
-// from the app's own backup list. Restrict it to the backup directory.
-// The non-dialog BACKUP_EXPORT handler restricts to common user directories.
+// assertImportPathSafe: restricts BACKUP_IMPORT to the internal backups dir
+// (the only source the settings list UI can pass).
+//
+// assertBackupFileSafe: used by BACKUP_DELETE, BACKUP_REVEAL, and
+// BACKUP_OFFSITE_RESTORE — accepts files from either the internal backups dir
+// OR the user-configured destination folder (which may be any path).
 
 const getBackupDirPath = (): string =>
   path.join(app.getPath('userData'), 'backups');
 
+const isWithinDir = (resolvedFile: string, dir: string): boolean => {
+  const resolvedDir = path.resolve(dir);
+  return (
+    resolvedFile.startsWith(resolvedDir + path.sep) ||
+    resolvedFile === resolvedDir
+  );
+};
+
 const assertImportPathSafe = async (source: string): Promise<void> => {
   const resolved = await realpath(source);
-  const backupDir = path.resolve(getBackupDirPath());
-  if (!resolved.startsWith(backupDir + path.sep) && resolved !== backupDir) {
+  if (!isWithinDir(resolved, getBackupDirPath())) {
     throw new Error('Import source must be within the app backup directory.');
   }
+};
+
+const assertBackupFileSafe = async (filePath: string): Promise<void> => {
+  const resolved = await realpath(filePath);
+  const internalDir = getBackupDirPath();
+  const configuredDestination = getBackupSettings().destination.trim();
+
+  if (isWithinDir(resolved, internalDir)) return;
+  if (configuredDestination && isWithinDir(resolved, configuredDestination)) return;
+
+  throw new Error('Backup file must be within the configured backup folder.');
 };
 
 const withTimeout = async <T>(
@@ -229,6 +250,7 @@ export const registerBackupHandlers = (): void => {
         request: BackupOffsiteRestoreRequest,
       ): Promise<void> => {
         const validated = backupOffsiteRestoreRequestSchema.parse(request ?? {});
+        await assertBackupFileSafe(validated.source);
         await withTimeout(
           restoreOffsiteBackupAndReloadRuntime(validated),
           BACKUP_JOB_TIMEOUT_MS,
@@ -373,7 +395,7 @@ export const registerBackupHandlers = (): void => {
         request: BackupDeleteRequest,
       ): Promise<void> => {
         const validated = backupDeleteRequestSchema.parse(request ?? {});
-        await assertImportPathSafe(validated.path);
+        await assertBackupFileSafe(validated.path);
         await unlink(validated.path);
       },
     ),
@@ -388,7 +410,7 @@ export const registerBackupHandlers = (): void => {
         request: BackupRevealRequest,
       ): Promise<void> => {
         const validated = backupRevealRequestSchema.parse(request ?? {});
-        await assertImportPathSafe(validated.path);
+        await assertBackupFileSafe(validated.path);
         shell.showItemInFolder(validated.path);
       },
     ),

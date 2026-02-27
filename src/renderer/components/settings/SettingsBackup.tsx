@@ -226,12 +226,15 @@ export const SettingsBackup = ({ setError, setNotice }: SettingsBackupProps) => 
 
       await getUntask().backup.restoreOffsite({ source: picked.source });
       setNotice('Backup restored. Reloading app state…');
+      // Refresh in case APP_BACKUP_RESTORED doesn't trigger a full reload
+      // (e.g. main window unavailable at the time of restore).
+      await loadBackups();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import backup.');
     } finally {
       setIsImporting(false);
     }
-  }, [setError, setNotice]);
+  }, [loadBackups, setError, setNotice]);
 
   const isBusy = isLoadingSettings || isBackingUpNow;
 
