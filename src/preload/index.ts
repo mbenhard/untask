@@ -41,14 +41,7 @@ import {
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
   type MemoryPromotionEvaluationResultPayload,
-  type BackupExportRequest,
-  type BackupExportDialogRequest,
-  type BackupExportDialogResponse,
   type BackupImportRequest,
-  type BackupImportDialogRequest,
-  type BackupImportDialogResponse,
-  type BackupListResponse,
-  type BackupMetadataPayload,
   type BackupOffsiteManifestPayload,
   type BackupOffsiteReadManifestRequest,
   type BackupOffsiteRestoreRequest,
@@ -56,6 +49,9 @@ import {
   type BackupSetSettingsRequest,
   type BackupPickDestinationFolderResponse,
   type BackupPickOffsiteFileResponse,
+  type BackupListWithManifestsResponse,
+  type BackupDeleteRequest,
+  type BackupRevealRequest,
   type SearchQueryRequest,
   type SearchQueryResponse,
   type TaskDeleteRequestPayload,
@@ -329,23 +325,11 @@ const untaskApi: UntaskApi = {
     },
   },
   backup: {
-    list: (): Promise<BackupListResponse> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_LIST),
-    create: (): Promise<BackupMetadataPayload> =>
+    create: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_CREATE),
-    export: (request: BackupExportRequest): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_EXPORT, request),
-    exportWithDialog: (
-      request?: BackupExportDialogRequest,
-    ): Promise<BackupExportDialogResponse> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_EXPORT_DIALOG, request),
     import: (request: BackupImportRequest): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_IMPORT, request),
-    importWithDialog: (
-      request?: BackupImportDialogRequest,
-    ): Promise<BackupImportDialogResponse> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_IMPORT_DIALOG, request),
-    offsiteCreate: (): Promise<BackupMetadataPayload> =>
+    offsiteCreate: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_OFFSITE_CREATE),
     readOffsiteManifest: (
       request: BackupOffsiteReadManifestRequest,
@@ -353,8 +337,6 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_OFFSITE_READ_MANIFEST, request),
     restoreOffsite: (request: BackupOffsiteRestoreRequest): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_OFFSITE_RESTORE, request),
-    detectCloudFolders: (): Promise<string[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_DETECT_CLOUD_FOLDERS),
     getSettings: (): Promise<BackupSettingsPayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_GET_SETTINGS),
     setSettings: (request: BackupSetSettingsRequest): Promise<BackupSettingsPayload> =>
@@ -363,6 +345,12 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_PICK_DESTINATION_FOLDER),
     pickOffsiteFile: (): Promise<BackupPickOffsiteFileResponse> =>
       ipcRenderer.invoke(IPC_CHANNELS.BACKUP_PICK_OFFSITE_FILE),
+    listWithManifests: (): Promise<BackupListWithManifestsResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_LIST_WITH_MANIFESTS),
+    delete: (request: BackupDeleteRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_DELETE, request),
+    reveal: (request: BackupRevealRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BACKUP_REVEAL, request),
   },
   search: {
     query: (request: SearchQueryRequest): Promise<SearchQueryResponse> =>

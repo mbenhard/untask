@@ -38,14 +38,7 @@ import type {
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
   MemoryPromotionEvaluationResultPayload,
-  BackupExportRequest,
-  BackupExportDialogRequest,
-  BackupExportDialogResponse,
   BackupImportRequest,
-  BackupImportDialogRequest,
-  BackupImportDialogResponse,
-  BackupListResponse,
-  BackupMetadataPayload,
   BackupOffsiteManifestPayload,
   BackupOffsiteReadManifestRequest,
   BackupOffsiteRestoreRequest,
@@ -53,6 +46,9 @@ import type {
   BackupSetSettingsRequest,
   BackupPickDestinationFolderResponse,
   BackupPickOffsiteFileResponse,
+  BackupListWithManifestsResponse,
+  BackupDeleteRequest,
+  BackupRevealRequest,
   SearchQueryRequest,
   SearchQueryResponse,
   SettingsMemoryStatePayload,
@@ -185,20 +181,18 @@ export type UntaskApi = {
     onOllamaPullProgress: (listener: (event: OllamaPullProgressPayload) => void) => () => void;
   };
   backup: {
-    list: () => Promise<BackupListResponse>;
-    create: () => Promise<BackupMetadataPayload>;
-    export: (request: BackupExportRequest) => Promise<void>;
-    exportWithDialog: (request?: BackupExportDialogRequest) => Promise<BackupExportDialogResponse>;
+    create: () => Promise<void>;
     import: (request: BackupImportRequest) => Promise<void>;
-    importWithDialog: (request?: BackupImportDialogRequest) => Promise<BackupImportDialogResponse>;
-    offsiteCreate: () => Promise<BackupMetadataPayload>;
+    offsiteCreate: () => Promise<void>;
     readOffsiteManifest: (request: BackupOffsiteReadManifestRequest) => Promise<BackupOffsiteManifestPayload>;
     restoreOffsite: (request: BackupOffsiteRestoreRequest) => Promise<void>;
-    detectCloudFolders: () => Promise<string[]>;
     getSettings: () => Promise<BackupSettingsPayload>;
     setSettings: (request: BackupSetSettingsRequest) => Promise<BackupSettingsPayload>;
     pickDestinationFolder: () => Promise<BackupPickDestinationFolderResponse>;
     pickOffsiteFile: () => Promise<BackupPickOffsiteFileResponse>;
+    listWithManifests: () => Promise<BackupListWithManifestsResponse>;
+    delete: (request: BackupDeleteRequest) => Promise<void>;
+    reveal: (request: BackupRevealRequest) => Promise<void>;
   };
   search: {
     query: (request: SearchQueryRequest) => Promise<SearchQueryResponse>;

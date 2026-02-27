@@ -101,20 +101,18 @@ export const IPC_CHANNELS = {
   OLLAMA_PULL_PROGRESS: 'ollama:pull-progress',
   OLLAMA_PULL_CANCEL: 'ollama:pull-cancel',
   OLLAMA_WARMUP: 'ollama:warmup',
-  BACKUP_LIST: 'backup:list',
   BACKUP_CREATE: 'backup:create',
-  BACKUP_EXPORT: 'backup:export',
   BACKUP_IMPORT: 'backup:import',
-  BACKUP_EXPORT_DIALOG: 'backup:export-dialog',
-  BACKUP_IMPORT_DIALOG: 'backup:import-dialog',
   BACKUP_OFFSITE_CREATE: 'backup:offsite-create',
   BACKUP_OFFSITE_READ_MANIFEST: 'backup:offsite-read-manifest',
   BACKUP_OFFSITE_RESTORE: 'backup:offsite-restore',
-  BACKUP_DETECT_CLOUD_FOLDERS: 'backup:detect-cloud-folders',
   BACKUP_GET_SETTINGS: 'backup:get-settings',
   BACKUP_SET_SETTINGS: 'backup:set-settings',
   BACKUP_PICK_DESTINATION_FOLDER: 'backup:pick-destination-folder',
   BACKUP_PICK_OFFSITE_FILE: 'backup:pick-offsite-file',
+  BACKUP_LIST_WITH_MANIFESTS: 'backup:list-with-manifests',
+  BACKUP_DELETE: 'backup:delete',
+  BACKUP_REVEAL: 'backup:reveal',
   SEARCH_QUERY: 'search:query',
   NOTES_LIST: 'notes:list',
   NOTES_GET: 'notes:get',
@@ -336,44 +334,9 @@ export type ShortcutRegistrationStatusResult = {
 
 // ─── Backup payloads ──────────────────────────────────────
 
-export type BackupMetadataPayload = {
-  filename: string;
-  path: string;
-  createdAt: string;
-  sizeBytes: number;
-};
-
-export type BackupListResponse = {
-  backups: BackupMetadataPayload[];
-};
-
-export type BackupExportRequest = {
-  destination: string;
-  passphrase?: string;
-};
-
 export type BackupImportRequest = {
   source: string;
   passphrase?: string;
-};
-
-export type BackupExportDialogRequest = {
-  passphrase?: string;
-};
-
-export type BackupExportDialogResponse = {
-  canceled: boolean;
-  destination?: string;
-};
-
-export type BackupImportDialogRequest = {
-  passphrase?: string;
-};
-
-export type BackupImportDialogResponse = {
-  canceled: boolean;
-  source?: string;
-  restored: boolean;
 };
 
 export type BackupOffsiteManifestPayload = {
@@ -417,6 +380,28 @@ export type BackupPickDestinationFolderResponse = {
 export type BackupPickOffsiteFileResponse = {
   canceled: boolean;
   source?: string;
+};
+
+export type BackupListWithManifestsEntry = {
+  path: string;
+  filename: string;
+  createdAt: string;
+  sizeBytes: number;
+  taskCount: number;
+  noteCount: number;
+  attachmentCount: number;
+};
+
+export type BackupListWithManifestsResponse = {
+  backups: BackupListWithManifestsEntry[];
+};
+
+export type BackupDeleteRequest = {
+  path: string;
+};
+
+export type BackupRevealRequest = {
+  path: string;
 };
 
 // ─── Search payloads ──────────────────────────────────────

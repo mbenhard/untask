@@ -108,7 +108,7 @@ const KeyedApiKeyManager = ({
         </Button>
       </div>
 
-      {/* Status line */}
+      {/* Status line + "Where do I get a key?" link */}
       <div className="flex items-center gap-1.5">
         {apiKeyValid === true ? (
           <span className="text-[11px] text-green-600 dark:text-green-400">Key is valid.</span>
@@ -123,21 +123,17 @@ const KeyedApiKeyManager = ({
                 : 'No key saved yet.'}
           </p>
         )}
-      </div>
-
-      {/* "Where do I get a key?" link */}
-      {keyLink ? (
-        <p className="text-[11px] text-muted-foreground">
+        {keyLink ? (
           <a
             href={keyLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
             Where do I get a {PROVIDER_LABELS[provider]} key?
           </a>
-        </p>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 };

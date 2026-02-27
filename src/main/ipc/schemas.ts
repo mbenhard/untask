@@ -96,17 +96,8 @@ export const undoMemoryEventRequestSchema = z.object({
 
 export const launchAtLoginSchema = z.boolean();
 
-export const backupExportRequestSchema = z.object({
-  destination: z.string().min(1),
-  passphrase: z.string().optional(),
-});
-
 export const backupImportRequestSchema = z.object({
   source: z.string().min(1),
-  passphrase: z.string().optional(),
-});
-
-export const backupDialogRequestSchema = z.object({
   passphrase: z.string().optional(),
 });
 
@@ -116,6 +107,14 @@ export const backupOffsiteReadManifestRequestSchema = z.object({
 
 export const backupOffsiteRestoreRequestSchema = z.object({
   source: z.string().min(1),
+});
+
+export const backupDeleteRequestSchema = z.object({
+  path: z.string().min(1),
+});
+
+export const backupRevealRequestSchema = z.object({
+  path: z.string().min(1),
 });
 
 export const backupSettingsSchema = z.object({

@@ -1,17 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { getMainWindow } from '../window/summonController';
 import path from 'node:path';
-import { realpath } from 'node:fs/promises';
+import { readdir, realpath, stat, unlink } from 'node:fs/promises';
 import {
   IPC_CHANNELS,
-  type BackupListResponse,
-  type BackupMetadataPayload,
-  type BackupExportRequest,
   type BackupImportRequest,
-  type BackupExportDialogRequest,
-  type BackupExportDialogResponse,
-  type BackupImportDialogRequest,
-  type BackupImportDialogResponse,
   type BackupOffsiteReadManifestRequest,
   type BackupOffsiteRestoreRequest,
   type BackupOffsiteManifestPayload,
@@ -19,27 +12,29 @@ import {
   type BackupSetSettingsRequest,
   type BackupPickDestinationFolderResponse,
   type BackupPickOffsiteFileResponse,
+  type BackupListWithManifestsResponse,
+  type BackupListWithManifestsEntry,
+  type BackupDeleteRequest,
+  type BackupRevealRequest,
 } from '../../types/ipc';
 import { withIpcLogging } from './helpers';
 import {
-  backupExportRequestSchema,
   backupImportRequestSchema,
-  backupDialogRequestSchema,
   backupOffsiteReadManifestRequestSchema,
   backupOffsiteRestoreRequestSchema,
   backupSettingsSchema,
+  backupDeleteRequestSchema,
+  backupRevealRequestSchema,
 } from './schemas';
 import {
   createBackup,
   createOffsiteBackup,
-  detectCloudFolders,
-  exportBackup,
   importBackup,
-  listBackups,
   readBackupManifest,
   restoreOffsiteBackup,
   startBackupScheduler,
   stopBackupScheduler,
+  type BackupMetadata,
 } from '../services/backupService';
 import { closeDatabase, initDatabase } from '../db';
 import { runMigrations } from '../db/migrate';
@@ -59,8 +54,6 @@ const BACKUP_JOB_TIMEOUT_MS = 120_000;
 // from the app's own backup list. Restrict it to the backup directory.
 // The non-dialog BACKUP_EXPORT handler restricts to common user directories.
 
-const SAFE_EXPORT_DIRS = ['documents', 'downloads', 'desktop'] as const;
-
 const getBackupDirPath = (): string =>
   path.join(app.getPath('userData'), 'backups');
 
@@ -71,16 +64,6 @@ const assertImportPathSafe = async (source: string): Promise<void> => {
     throw new Error('Import source must be within the app backup directory.');
   }
 };
-
-const assertExportPathSafe = (destination: string): void => {
-  const resolved = path.resolve(destination);
-  const allowed = SAFE_EXPORT_DIRS.map((dir) => path.resolve(app.getPath(dir)));
-  if (!allowed.some((dir) => resolved.startsWith(dir + path.sep))) {
-    throw new Error('Export destination must be within Documents, Downloads, or Desktop.');
-  }
-};
-
-const backupTimestamp = (): string => new Date().toISOString().replace(/[:.]/g, '-');
 
 const withTimeout = async <T>(
   task: Promise<T>,
@@ -172,46 +155,14 @@ const getBackupSettings = (): BackupSettingsPayload => {
 
 export const registerBackupHandlers = (): void => {
   ipcMain.handle(
-    IPC_CHANNELS.BACKUP_LIST,
-    withIpcLogging(
-      'BACKUP_LIST',
-      async (): Promise<BackupListResponse> => {
-        return {
-          backups: await withTimeout(
-            listBackups(),
-            BACKUP_JOB_TIMEOUT_MS,
-            'Backup listing',
-          ),
-        };
-      },
-    ),
-  );
-
-  ipcMain.handle(
     IPC_CHANNELS.BACKUP_CREATE,
     withIpcLogging(
       'BACKUP_CREATE',
-      async (): Promise<BackupMetadataPayload> => {
+      async (): Promise<BackupMetadata> => {
         return await withTimeout(
           createBackup(),
           BACKUP_JOB_TIMEOUT_MS,
           'Backup creation',
-        );
-      },
-    ),
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.BACKUP_EXPORT,
-    withIpcLogging(
-      'BACKUP_EXPORT',
-      async (_event: Electron.IpcMainInvokeEvent, request: BackupExportRequest): Promise<void> => {
-        const validated = backupExportRequestSchema.parse(request ?? {});
-        assertExportPathSafe(validated.destination);
-        await withTimeout(
-          exportBackup(validated.destination, validated.passphrase),
-          BACKUP_JOB_TIMEOUT_MS,
-          'Backup export',
         );
       },
     ),
@@ -237,7 +188,7 @@ export const registerBackupHandlers = (): void => {
     IPC_CHANNELS.BACKUP_OFFSITE_CREATE,
     withIpcLogging(
       'BACKUP_OFFSITE_CREATE',
-      async (): Promise<BackupMetadataPayload> => {
+      async (): Promise<BackupMetadata> => {
         const settings = getBackupSettings();
         if (!settings.destination) {
           throw new Error('Set backup destination before running offsite backup.');
@@ -282,20 +233,6 @@ export const registerBackupHandlers = (): void => {
           restoreOffsiteBackupAndReloadRuntime(validated),
           BACKUP_JOB_TIMEOUT_MS,
           'Offsite backup restore',
-        );
-      },
-    ),
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.BACKUP_DETECT_CLOUD_FOLDERS,
-    withIpcLogging(
-      'BACKUP_DETECT_CLOUD_FOLDERS',
-      async (): Promise<string[]> => {
-        return await withTimeout(
-          detectCloudFolders(),
-          BACKUP_JOB_TIMEOUT_MS,
-          'Cloud folder detection',
         );
       },
     ),
@@ -383,82 +320,76 @@ export const registerBackupHandlers = (): void => {
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.BACKUP_EXPORT_DIALOG,
+    IPC_CHANNELS.BACKUP_LIST_WITH_MANIFESTS,
     withIpcLogging(
-      'BACKUP_EXPORT_DIALOG',
-      async (
-        event: Electron.IpcMainInvokeEvent,
-        request?: BackupExportDialogRequest,
-      ): Promise<BackupExportDialogResponse> => {
-        const validated = backupDialogRequestSchema.parse(request ?? {});
-        const extension = validated.passphrase?.trim() ? 'taskdb.enc' : 'taskdb';
-        const defaultPath = path.join(
-          app.getPath('documents'),
-          `untask-backup-${backupTimestamp()}.${extension}`,
-        );
-        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-        const dialogOptions = {
-          title: 'Export Untask backup',
-          defaultPath,
-          filters: [
-            { name: 'Untask Backup', extensions: ['taskdb', 'enc', 'db'] },
-            { name: 'All Files', extensions: ['*'] },
-          ],
-        };
-        const result = owner
-          ? await dialog.showSaveDialog(owner, dialogOptions)
-          : await dialog.showSaveDialog(dialogOptions);
-
-        if (result.canceled || !result.filePath) {
-          return { canceled: true };
+      'BACKUP_LIST_WITH_MANIFESTS',
+      async (): Promise<BackupListWithManifestsResponse> => {
+        const settings = getBackupSettings();
+        const dir = settings.destination || getBackupDirPath();
+        let entries: string[];
+        try {
+          entries = (await readdir(dir)).filter((name) =>
+            name.endsWith('.untaskbackup'),
+          );
+        } catch {
+          return { backups: [] };
         }
 
-        await withTimeout(
-          exportBackup(result.filePath, validated.passphrase?.trim() || undefined),
-          BACKUP_JOB_TIMEOUT_MS,
-          'Backup export',
+        const backups: BackupListWithManifestsEntry[] = [];
+        for (const name of entries) {
+          const fullPath = path.join(dir, name);
+          try {
+            const fileStat = await stat(fullPath);
+            const manifest = await readBackupManifest(fullPath);
+            backups.push({
+              path: fullPath,
+              filename: name,
+              createdAt: manifest.createdAt,
+              sizeBytes: fileStat.size,
+              taskCount: manifest.taskCount,
+              noteCount: manifest.noteCount,
+              attachmentCount: manifest.attachmentCount,
+            });
+          } catch {
+            // Skip files with unreadable manifests.
+          }
+        }
+
+        backups.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
-        return { canceled: false, destination: result.filePath };
+        return { backups };
       },
     ),
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.BACKUP_IMPORT_DIALOG,
+    IPC_CHANNELS.BACKUP_DELETE,
     withIpcLogging(
-      'BACKUP_IMPORT_DIALOG',
+      'BACKUP_DELETE',
       async (
-        event: Electron.IpcMainInvokeEvent,
-        request?: BackupImportDialogRequest,
-      ): Promise<BackupImportDialogResponse> => {
-        const validated = backupDialogRequestSchema.parse(request ?? {});
-        const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-        const dialogOptions = {
-          title: 'Import Untask backup',
-          properties: ['openFile' as const],
-          filters: [
-            { name: 'Untask Backup', extensions: ['taskdb', 'enc', 'db'] },
-            { name: 'All Files', extensions: ['*'] },
-          ],
-        };
-        const result = owner
-          ? await dialog.showOpenDialog(owner, dialogOptions)
-          : await dialog.showOpenDialog(dialogOptions);
+        _event: Electron.IpcMainInvokeEvent,
+        request: BackupDeleteRequest,
+      ): Promise<void> => {
+        const validated = backupDeleteRequestSchema.parse(request ?? {});
+        await assertImportPathSafe(validated.path);
+        await unlink(validated.path);
+      },
+    ),
+  );
 
-        const source = result.filePaths[0];
-        if (result.canceled || !source) {
-          return { canceled: true, restored: false };
-        }
-
-        await withTimeout(
-          restoreBackupAndReloadRuntime({
-            source,
-            passphrase: validated.passphrase?.trim() || undefined,
-          }),
-          BACKUP_JOB_TIMEOUT_MS,
-          'Backup import',
-        );
-        return { canceled: false, source, restored: true };
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REVEAL,
+    withIpcLogging(
+      'BACKUP_REVEAL',
+      async (
+        _event: Electron.IpcMainInvokeEvent,
+        request: BackupRevealRequest,
+      ): Promise<void> => {
+        const validated = backupRevealRequestSchema.parse(request ?? {});
+        await assertImportPathSafe(validated.path);
+        shell.showItemInFolder(validated.path);
       },
     ),
   );
