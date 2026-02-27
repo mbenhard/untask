@@ -242,12 +242,10 @@
   min-height: 100%;
   cursor: text;
   --untask-notes-inline-gutter: clamp(20px, 3vw, 32px);
-  --untask-notes-left-rail-space: 4px;
+  --untask-notes-left-rail-space: 27px;
   --untask-notes-handle-size: 18px;
-  --untask-editor-chrome-bg: color-mix(in srgb, var(--accent) 42%, transparent);
-  --untask-editor-chrome-hover-bg: color-mix(in srgb, var(--accent) 68%, transparent);
-  --untask-editor-chrome-border: color-mix(in srgb, var(--border) 74%, transparent);
-  --untask-editor-chrome-icon: color-mix(in srgb, var(--muted-foreground) 88%, transparent);
+  --untask-editor-chrome-hover-bg: color-mix(in srgb, var(--accent) 55%, transparent);
+  --untask-editor-chrome-icon: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
 }
 
 .untask-notes-editor .bn-container {
@@ -268,7 +266,7 @@
   cursor: text;
   font-size: 14px;
   line-height: 1.45;
-  padding: 0 4px 0 var(--untask-notes-left-rail-space);
+  padding: 0 var(--untask-notes-left-rail-space) 0 var(--untask-notes-left-rail-space);
 }
 
 .untask-notes-editor .bn-block-outer {
@@ -301,38 +299,44 @@
   font-size: 0.875rem !important;
 }
 
-/* Compact side menu icons (+ / drag handle) */
+/* Compact side menu icons (drag handle) */
 .untask-notes-editor .bn-side-menu {
+  align-items: center;
+  display: flex;
   gap: 0;
+  justify-content: center;
   min-width: 0;
-  padding-left: 0;
-  transform: translateY(1px);
+  padding: 0;
+  width: var(--untask-notes-handle-size);
 }
 
 .untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root:not(.mantine-Menu-item), .bn-button) svg {
   height: 13px !important;
   width: 13px !important;
   color: var(--untask-editor-chrome-icon) !important;
-  opacity: 0.95;
+  transition: color 150ms ease;
 }
 
 .untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button) {
   align-items: center;
-  background-color: var(--untask-editor-chrome-bg);
-  border: 1px solid var(--untask-editor-chrome-border);
-  border-radius: 5px;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
   display: inline-flex;
   height: var(--untask-notes-handle-size);
   justify-content: center;
   min-width: var(--untask-notes-handle-size);
   padding: 0 !important;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 150ms ease;
   width: var(--untask-notes-handle-size);
 }
 
 .untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover {
   background-color: var(--untask-editor-chrome-hover-bg);
-  border-color: color-mix(in srgb, var(--ring) 30%, var(--untask-editor-chrome-border));
+}
+
+.untask-notes-editor .bn-side-menu :is(.mantine-UnstyledButton-root, .bn-button):hover svg {
+  color: color-mix(in srgb, var(--muted-foreground) 80%, transparent) !important;
 }
 
 /* Notes: hide the side-menu add button (+), keep only drag handle control */

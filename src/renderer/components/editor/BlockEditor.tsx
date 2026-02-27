@@ -326,7 +326,7 @@ export const BlockEditor = ({
 
     return {
       useFloatingOptions: {
-        middleware: [offset({ mainAxis: -12 })],
+        middleware: [offset({ mainAxis: 4, crossAxis: -2 })],
       },
     };
   }, [preset, uiConfig.sideMenu]);
