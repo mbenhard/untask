@@ -1,4 +1,4 @@
-import { Fragment, type RefObject, createElement, useCallback, useEffect } from 'react';
+import { Fragment, type RefObject, createElement, useEffect } from 'react';
 
 import { motion, useReducedMotion } from 'framer-motion';
 
@@ -28,8 +28,6 @@ export function useOnboardingEnterKey(
   isActive: boolean,
   options?: { disabled?: boolean; ignoreSelector?: string },
 ) {
-  const stableHandler = useCallback(handler, [handler]);
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isActive) return;
@@ -42,12 +40,12 @@ export function useOnboardingEnterKey(
       }
 
       event.preventDefault();
-      stableHandler();
+      handler();
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [stableHandler, isActive, options?.disabled, options?.ignoreSelector]);
+  }, [handler, isActive, options?.disabled, options?.ignoreSelector]);
 }
 
 // ── Components ──

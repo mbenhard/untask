@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cn } from '../../lib/utils';
 import type { OnboardingNavProps } from './OnboardingFlow';
@@ -77,6 +77,10 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
 
     onNext();
   }, [isSaving, notificationsEnabled, remindersSyncEnabled, syncFilter, onNext]);
+
+  useEffect(() => {
+    firstActionRef.current?.focus();
+  }, []);
 
   useOnboardingEnterKey(
     () => void handleContinue(),
