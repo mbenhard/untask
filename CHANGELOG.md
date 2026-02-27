@@ -2,6 +2,32 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.15] - 2026-02-27
+
+Onboarding redesign, animated interactions, backup overhaul, and tray menu redesign.
+
+### Changes
+
+**Added**
+- **Soft-delete undo** — Deleting a note now lets you undo it instantly via a toast notification
+- **Animated interactions** — Subtle animations across tab navigation, task expand/collapse, search, notes, settings, and chat — respects Reduce Motion
+- **Tray menu redesign** — Menu bar now shows today's task progress, Quick Add, Settings, and update status
+- **Identity in settings** — AI identity (role, style, focus) is now configurable directly from Settings → AI, not just onboarding
+- **Keyboard shortcut styling** — Shortcuts now render consistently across the app
+
+**Improved**
+- **Onboarding redesign** — Cleaner flow with a theme picker, merged shortcuts step, better labels, and improved accessibility
+- **Backup settings** — Auto-saving controls, frequency and retention settings, per-backup Restore/Delete/Reveal actions, and Import from File
+- **Instant startup** — No more skeleton loading flashes when switching views or opening notes/tasks for the first time
+- **Dock mode** — Window hide behavior is now automatic based on dock mode; the separate "When clicking away" setting has been removed
+- **Editor drag handle** — Moved to the left gutter for a cleaner editing experience
+
+**Fixed**
+- AI buttons, slash commands, and shortcuts are hidden when AI is disabled
+- Backup delete, reveal, and offsite restore work correctly with custom backup destinations
+- Reminders toggle no longer flashes a stale count when turned on
+- Onboarding: fixed a bug where skipping the AI provider step could land on the wrong next step
+
 ## [0.1.14] - 2026-02-24
 
 Editor stability, notification cleanup, and drag-reorder fixes.
@@ -334,6 +360,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.15]: https://github.com/mbenhard/untask/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/mbenhard/untask/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/mbenhard/untask/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/mbenhard/untask/compare/v0.1.11...v0.1.12
