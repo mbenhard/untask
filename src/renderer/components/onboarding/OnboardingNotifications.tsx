@@ -91,7 +91,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <SectionLabel>REMINDERS</SectionLabel>
+        <SectionLabel>NOTIFICATIONS</SectionLabel>
         <p className="text-[12px] text-muted-foreground">
           Get notified when tasks are due.
         </p>
@@ -100,7 +100,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
             value={notificationsEnabled}
             onChange={setNotificationsEnabled}
             enableLabel="Enable"
-            disableLabel="Skip"
+            disableLabel="Off"
             enableRef={firstActionRef}
           />
         </div>
@@ -114,7 +114,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
                 'x-apple.systempreferences:com.apple.Focus-Settings.extension',
               )
             }
-            className="underline transition-colors hover:text-foreground"
+            className="rounded-sm underline transition-colors hover:text-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
           >
             Open macOS settings
           </button>
@@ -134,11 +134,12 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
             value={remindersSyncEnabled}
             onChange={setRemindersSyncEnabled}
             enableLabel="Sync"
-            disableLabel="Skip"
+            disableLabel="Off"
           />
         </div>
         {remindersSyncEnabled ? (
           <div className="mt-2 flex flex-col gap-1.5">
+            <p className="text-[12px] text-muted-foreground">Two-way sync — changes reflect in both apps.</p>
             {SYNC_FILTER_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -146,7 +147,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
                 aria-pressed={syncFilter === opt.value}
                 onClick={() => setSyncFilter(opt.value)}
                 className={cn(
-                  'flex items-center justify-between rounded-md border px-3 py-2 text-left transition-[background-color,color]',
+                  'flex items-center justify-between rounded-md border px-3 py-2 text-left transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
                   syncFilter === opt.value
                     ? 'border-foreground/40 bg-accent text-foreground'
                     : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -157,9 +158,7 @@ export const OnboardingNotifications = ({ onNext, nav, isActive }: OnboardingNot
               </button>
             ))}
           </div>
-        ) : (
-          <p className="mt-2 text-[12px] text-muted-foreground">Two-way sync — changes reflect in both apps.</p>
-        )}
+        ) : null}
         {remindersHint ? (
           <p className="mt-1 text-[11px] text-muted-foreground/80">{remindersHint}</p>
         ) : null}

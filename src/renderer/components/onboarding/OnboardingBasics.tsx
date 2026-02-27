@@ -51,7 +51,7 @@ export const OnboardingBasics = ({ onNext, nav, isActive }: OnboardingBasicsProp
           value={aiEnabled}
           onChange={setAiEnabled}
           enableLabel="Enable"
-          disableLabel="Skip"
+          disableLabel="Off"
         />
         <p className="mt-2 text-[12px] text-muted-foreground">
           {aiEnabled

@@ -124,7 +124,7 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
             type="button"
             onClick={() => handleProviderChange(opt.value)}
             className={cn(
-              'rounded-md border border-dashed border-border/60 bg-background px-3 py-2 text-left transition-[background-color,color]',
+              'rounded-md border border-dashed border-border/60 bg-background px-3 py-2 text-left transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
               provider === opt.value && 'border-solid border-foreground/40 bg-accent/30',
             )}
           >
@@ -139,6 +139,10 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
         <SectionLabel>{isOllama ? 'SERVER URL' : 'API KEY'}</SectionLabel>
         {isOllama ? (
+          <>
+          <label htmlFor="onboarding-ollama-url" className="sr-only">
+            Ollama server URL
+          </label>
           <Input
             id="onboarding-ollama-url"
             type="text"
@@ -147,8 +151,12 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
             placeholder="http://localhost:11434"
             className="h-8 text-[13px]"
           />
+          </>
         ) : (
           <div className="flex gap-2">
+            <label htmlFor="onboarding-api-key" className="sr-only">
+              API key
+            </label>
             <Input
               id="onboarding-api-key"
               type="password"
@@ -190,6 +198,9 @@ export const OnboardingProvider = ({ onNext, onSkip, nav, isActive }: Onboarding
 
         <div className="mt-3">
           <SectionLabel>MODEL</SectionLabel>
+          <label htmlFor="onboarding-model" className="sr-only">
+            AI model
+          </label>
           {isOllama ? (
             <select
               id="onboarding-model"

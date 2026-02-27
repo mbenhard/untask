@@ -476,7 +476,7 @@ export const OnboardingFlow = ({ onComplete, isTransitioningToApp = false }: Onb
               <div className="onboarding-checkpoint-ring absolute h-1.5 w-1.5 rounded-full border border-muted-foreground" />
             </div>
             <p className="onboarding-done-message mt-4 font-mono text-[12px] tracking-wide text-muted-foreground">
-              All yours.
+              You're all set.
             </p>
           </div>
         );

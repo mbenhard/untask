@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import type { OnboardingNavProps } from './OnboardingFlow';
+import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { useTheme } from '../providers/ThemeProvider';
 import { Key } from '../ui/Key';
@@ -13,7 +14,7 @@ import {
   useOnboardingEnterKey,
 } from './onboarding-shared';
 
-type ThemeChoice = 'dark' | 'light';
+type ThemeChoice = 'dark' | 'light' | 'system';
 
 type OnboardingPreferencesProps = {
   onNext: () => void;
@@ -22,16 +23,16 @@ type OnboardingPreferencesProps = {
 };
 
 export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPreferencesProps) => {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [themeChoice, setThemeChoice] = useState<ThemeChoice>(resolvedTheme);
+  const { theme, setTheme } = useTheme();
+  const [themeChoice, setThemeChoice] = useState<ThemeChoice>(theme);
   const [launchAtLoginEnabled, setLaunchAtLoginEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const { Wrapper, Card, staggerProps, cardProps } = useOnboardingAnimation(isActive);
 
   useEffect(() => {
-    setThemeChoice(resolvedTheme);
-  }, [resolvedTheme]);
+    setThemeChoice(theme);
+  }, [theme]);
 
   useEffect(() => {
     const load = async () => {
@@ -106,6 +107,46 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
 
   return (
     <Wrapper {...staggerProps} className="flex flex-col gap-2">
+      {/* THEME */}
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <SectionLabel>Theme</SectionLabel>
+        <div className="flex gap-2">
+          {(['dark', 'light', 'system'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={themeChoice === t}
+              onClick={() => applyTheme(t)}
+              className={cn(
+                'h-8 flex-1 rounded-md border px-3 text-[12px] capitalize transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+                themeChoice === t
+                  ? 'border-foreground/40 bg-accent text-foreground'
+                  : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t === 'system' ? 'System' : t === 'dark' ? 'Dark' : 'Light'}
+            </button>
+          ))}
+        </div>
+        {themeChoice === 'system' ? (
+          <p className="mt-2 text-[12px] text-muted-foreground">Follows your macOS appearance.</p>
+        ) : null}
+      </Card>
+
+      {/* LAUNCH AT LOGIN */}
+      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
+        <SectionLabel>Launch at login</SectionLabel>
+        <TogglePair
+          value={launchAtLoginEnabled}
+          onChange={setLaunchAtLoginEnabled}
+          enableLabel="Enable"
+          disableLabel="Off"
+        />
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          Start Untask automatically when you log in.
+        </p>
+      </Card>
+
       {/* SHORTCUTS */}
       <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
         <SectionLabel className="mb-2">Shortcuts</SectionLabel>
@@ -128,31 +169,6 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
             </div>
           </div>
         <p className="mt-2.5 text-[11px] text-muted-foreground/60">Customizable in Settings → Shortcuts</p>
-      </Card>
-
-      {/* THEME */}
-      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <SectionLabel>Theme</SectionLabel>
-        <TogglePair
-          value={themeChoice === 'dark'}
-          onChange={(isDark) => applyTheme(isDark ? 'dark' : 'light')}
-          enableLabel="Dark"
-          disableLabel="Light"
-        />
-      </Card>
-
-      {/* LAUNCH AT LOGIN */}
-      <Card {...cardProps} className="rounded-md border border-dashed border-border/60 bg-background px-3 py-3">
-        <SectionLabel>Launch at login</SectionLabel>
-        <TogglePair
-          value={launchAtLoginEnabled}
-          onChange={setLaunchAtLoginEnabled}
-          enableLabel="Enable"
-          disableLabel="Skip"
-        />
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          Start Untask automatically when you log in.
-        </p>
       </Card>
 
       {hint ? <p className="text-[11px] text-muted-foreground/80">{hint}</p> : null}

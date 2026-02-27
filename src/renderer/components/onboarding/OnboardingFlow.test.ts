@@ -195,7 +195,7 @@ describe('OnboardingFlow', () => {
     renderFlow();
 
     await clickButton('Get Started');
-    await clickButton('Skip');
+    await clickButton('Off');
     await clickButton('Continue');
 
     await clickButton('Continue');
@@ -219,7 +219,7 @@ describe('OnboardingFlow', () => {
     renderFlow(onComplete);
 
     await clickButton('Get Started');
-    await clickButton('Skip');
+    await clickButton('Off');
     await clickButton('Continue');
 
     await clickButton('Continue');

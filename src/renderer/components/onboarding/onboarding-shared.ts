@@ -88,7 +88,7 @@ export function TogglePair({ value, onChange, enableLabel, disableLabel, enableR
         'aria-pressed': value,
         onClick: () => onChange(true),
         className: cn(
-          'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
+          'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
           value
             ? 'border-foreground/40 bg-accent text-foreground'
             : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -103,7 +103,7 @@ export function TogglePair({ value, onChange, enableLabel, disableLabel, enableR
         'aria-pressed': !value,
         onClick: () => onChange(false),
         className: cn(
-          'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color]',
+          'h-8 flex-1 rounded-md border px-3 text-[12px] transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
           !value
             ? 'border-foreground/40 bg-accent text-foreground'
             : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -168,7 +168,7 @@ export function StepNav({
         {
           type: 'button',
           onClick: onSkip,
-          className: 'py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground',
+          className: 'rounded-sm py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
         },
         skipLabel,
       ),

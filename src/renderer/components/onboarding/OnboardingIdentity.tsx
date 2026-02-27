@@ -55,7 +55,7 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip, nav, isActive }: 
                 aria-pressed={role === opt.value}
                 onClick={() => setRole(role === opt.value ? null : opt.value)}
                 className={cn(
-                  'rounded-md border px-3 py-1.5 text-[12px] transition-[background-color,color]',
+                  'rounded-md border px-3 py-1.5 text-[12px] transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
                   role === opt.value
                     ? 'border-foreground/40 bg-accent text-foreground'
                     : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -78,7 +78,7 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip, nav, isActive }: 
                 aria-pressed={style === opt.value}
                 onClick={() => setStyle(style === opt.value ? null : opt.value)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] transition-[background-color,color]',
+                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] transition-[background-color,color] outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
                   style === opt.value
                     ? 'border-foreground/40 bg-accent text-foreground'
                     : 'border-dashed border-border/60 text-muted-foreground hover:text-foreground',
@@ -94,6 +94,9 @@ export const OnboardingIdentity = ({ userName, onNext, onSkip, nav, isActive }: 
         {/* FOCUS */}
         <div>
           <SectionLabel>Focus</SectionLabel>
+          <label htmlFor="onboarding-focus" className="sr-only">
+            What are you focused on?
+          </label>
           <Input
             id="onboarding-focus"
             type="text"
