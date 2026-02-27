@@ -30,8 +30,6 @@ import type {
   IdentityContextSnapshotRequest,
   IdentityContextSnapshotResult,
   LaunchAtLoginResult,
-  WindowDismissMode,
-  WindowDismissModeResult,
   DockMode,
   DockModeResult,
   MemoryPromotionConfirmRequestPayload,
@@ -94,8 +92,6 @@ export type UntaskApi = {
     onBackupRestored: (listener: () => void) => () => void;
     getLaunchAtLogin: () => Promise<LaunchAtLoginResult>;
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
-    getWindowDismissMode: () => Promise<WindowDismissModeResult>;
-    setWindowDismissMode: (mode: WindowDismissMode) => Promise<WindowDismissModeResult>;
     getDockMode: () => Promise<DockModeResult>;
     setDockMode: (mode: DockMode) => Promise<DockModeResult>;
     getVersion: () => Promise<string>;

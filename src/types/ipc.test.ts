@@ -8,8 +8,6 @@ describe('IPC_CHANNELS', () => {
     expect(IPC_CHANNELS.APP_ESCAPE_LAYER_EXIT).toBe('app:escape-layer-exit');
     expect(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN).toBe('app:get-launch-at-login');
     expect(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN).toBe('app:set-launch-at-login');
-    expect(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE).toBe('app:get-window-dismiss-mode');
-    expect(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE).toBe('app:set-window-dismiss-mode');
   });
 
   it('contains chat thread channels', () => {

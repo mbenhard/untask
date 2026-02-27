@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { DockMode, WindowDismissMode } from '../../../types/ipc';
+import type { DockMode } from '../../../types/ipc';
 import { getUntask } from '../../lib/untask';
 import {
   MONO_FONT_OPTIONS,
@@ -32,9 +32,6 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
   const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
   const [isLoadingLaunchAtLogin, setIsLoadingLaunchAtLogin] = useState(false);
   const [isSavingLaunchAtLogin, setIsSavingLaunchAtLogin] = useState(false);
-  const [windowDismissMode, setWindowDismissModeState] = useState<WindowDismissMode>('persistent');
-  const [isLoadingWindowDismissMode, setIsLoadingWindowDismissMode] = useState(false);
-  const [isSavingWindowDismissMode, setIsSavingWindowDismissMode] = useState(false);
   const [dockMode, setDockModeState] = useState<DockMode>('normal');
   const [isLoadingDockMode, setIsLoadingDockMode] = useState(false);
   const [isSavingDockMode, setIsSavingDockMode] = useState(false);
@@ -59,21 +56,6 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
     }
   }, []);
 
-  const loadWindowDismissMode = useCallback(async () => {
-    try {
-      setIsLoadingWindowDismissMode(true);
-      setError(null);
-      const result = await getUntask().app.getWindowDismissMode();
-      setWindowDismissModeState(result.mode);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error ? loadError.message : 'Failed to load window behavior setting.',
-      );
-    } finally {
-      setIsLoadingWindowDismissMode(false);
-    }
-  }, [setError]);
-
   const loadDockMode = useCallback(async () => {
     try {
       setIsLoadingDockMode(true);
@@ -91,9 +73,8 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
 
   useEffect(() => {
     void loadLaunchAtLogin();
-    void loadWindowDismissMode();
     void loadDockMode();
-  }, [loadLaunchAtLogin, loadWindowDismissMode, loadDockMode]);
+  }, [loadLaunchAtLogin, loadDockMode]);
 
   const handleLaunchAtLoginChange = useCallback(
     async (value: 'on' | 'off') => {
@@ -126,34 +107,6 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
       }
     },
     [launchAtLoginEnabled, setNotice],
-  );
-
-  const handleWindowDismissModeChange = useCallback(
-    async (mode: WindowDismissMode) => {
-      const previousMode = windowDismissMode;
-      setWindowDismissModeState(mode);
-      setNotice(null);
-      setError(null);
-
-      try {
-        setIsSavingWindowDismissMode(true);
-        const result = await getUntask().app.setWindowDismissMode(mode);
-        setWindowDismissModeState(result.mode);
-        setNotice(
-          result.mode === 'persistent'
-            ? 'Window will stay open when clicking away.'
-            : 'Window will auto-hide when clicking away.',
-        );
-      } catch (saveError) {
-        setWindowDismissModeState(previousMode);
-        setError(
-          saveError instanceof Error ? saveError.message : 'Failed to update window behavior setting.',
-        );
-      } finally {
-        setIsSavingWindowDismissMode(false);
-      }
-    },
-    [windowDismissMode, setError, setNotice],
   );
 
   const handleDockModeChange = useCallback(
@@ -282,10 +235,10 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
           label="Dock & menu bar"
           hint={
             dockMode === 'normal'
-              ? 'Show in dock and menu bar.'
+              ? 'Show in dock and menu bar. Window stays open when switching apps.'
               : dockMode === 'dock-only'
-                ? 'Show in dock. Hide menu bar icon.'
-                : 'Hide from dock. Show in menu bar only.'
+                ? 'Show in dock only. Window stays open when switching apps.'
+                : 'Show in menu bar only. Window hides when switching apps.'
           }
           loading={isLoadingDockMode}
         >
@@ -298,28 +251,6 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
             value={dockMode}
             onChange={(v) => void handleDockModeChange(v as DockMode)}
             disabled={isSavingDockMode}
-          />
-        </SettingsRow>
-      </SettingsSection>
-
-      <SettingsSection title="Window">
-        <SettingsRow
-          label="When clicking away"
-          hint={
-            windowDismissMode === 'persistent'
-              ? 'Window stays on screen when you switch apps.'
-              : 'Window hides when you switch apps.'
-          }
-          loading={isLoadingWindowDismissMode}
-        >
-          <SegmentedControl
-            options={[
-              { value: 'persistent' as const, label: 'Keep open' },
-              { value: 'quick-hide' as const, label: 'Auto-hide' },
-            ]}
-            value={windowDismissMode}
-            onChange={(v) => void handleWindowDismissModeChange(v as WindowDismissMode)}
-            disabled={isSavingWindowDismissMode}
           />
         </SettingsRow>
       </SettingsSection>

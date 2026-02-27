@@ -33,8 +33,6 @@ import {
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
   type LaunchAtLoginResult,
-  type WindowDismissMode,
-  type WindowDismissModeResult,
   type DockMode,
   type DockModeResult,
   type MemoryPromotionConfirmRequestPayload,
@@ -109,10 +107,6 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_LAUNCH_AT_LOGIN),
     setLaunchAtLogin: (enabled: boolean): Promise<LaunchAtLoginResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_LAUNCH_AT_LOGIN, enabled),
-    getWindowDismissMode: (): Promise<WindowDismissModeResult> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE),
-    setWindowDismissMode: (mode: WindowDismissMode): Promise<WindowDismissModeResult> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE, mode),
     getDockMode: (): Promise<DockModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_DOCK_MODE),
     setDockMode: (mode: DockMode): Promise<DockModeResult> =>

@@ -2,7 +2,6 @@ import { app, ipcMain, shell } from 'electron';
 import {
   IPC_CHANNELS,
   type SettingsBootstrapState,
-  type WindowDismissModeResult,
   type DockModeResult,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
@@ -22,10 +21,7 @@ import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from '../defaultSettings';
 import {
   requestHideFromRenderer,
   onEscapeLayerExit,
-  getWindowDismissMode,
-  setWindowDismissMode,
 } from '../window/summonController';
-import { windowDismissModeSchema } from '../window/dismissMode';
 import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from '../window/dockMode';
 import { reRegisterShortcuts, getShortcutRegistrationStatus } from '../shortcuts';
 import {
@@ -96,27 +92,6 @@ export const registerAppHandlers = (): void => {
         };
       }
     }),
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.APP_GET_WINDOW_DISMISS_MODE,
-    withIpcLogging(
-      'APP_GET_WINDOW_DISMISS_MODE',
-      (): WindowDismissModeResult => {
-        return { mode: getWindowDismissMode() };
-      },
-    ),
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.APP_SET_WINDOW_DISMISS_MODE,
-    withIpcLogging(
-      'APP_SET_WINDOW_DISMISS_MODE',
-      (_event: Electron.IpcMainInvokeEvent, modeInput: unknown): WindowDismissModeResult => {
-        const mode = windowDismissModeSchema.parse(modeInput);
-        return { mode: setWindowDismissMode(mode) };
-      },
-    ),
   );
 
   ipcMain.handle(

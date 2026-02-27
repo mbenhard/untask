@@ -10,10 +10,9 @@ import {
   rectangleToBounds,
 } from './bounds';
 import {
-  WINDOW_DISMISS_MODE_KEY,
-  type WindowDismissMode,
-  sanitizeWindowDismissMode,
-} from './dismissMode';
+  DOCK_MODE_KEY,
+  sanitizeDockMode,
+} from './dockMode';
 
 const BOUNDS_KEY = 'window.bounds';
 const DEFAULT_WIDTH = 680;
@@ -25,8 +24,12 @@ const PULL_ON_FOCUS_MIN_INTERVAL_MS = 30_000; // Don't pull more than once every
 let win: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let boundsSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let windowDismissMode: WindowDismissMode = sanitizeWindowDismissMode(null);
 let lastPullOnFocusAt = 0;
+
+function shouldQuickHide(): boolean {
+  const dockMode = sanitizeDockMode(getSetting(DOCK_MODE_KEY));
+  return dockMode === 'menu-bar-only';
+}
 
 export function restoreWindowBounds(window: BrowserWindow): void {
   const stored = parseBoundsJson(getSetting(BOUNDS_KEY));
@@ -40,7 +43,6 @@ export function initSummonController(mainWindow: BrowserWindow): void {
     boundsSaveTimer = null;
   }
   win = mainWindow;
-  windowDismissMode = getWindowDismissMode();
 
   mainWindow.on('move', scheduleBoundsSave);
   mainWindow.on('resize', scheduleBoundsSave);
@@ -49,7 +51,7 @@ export function initSummonController(mainWindow: BrowserWindow): void {
     if (Date.now() < blurSuppressedUntil) {
       return;
     }
-    if (getWindowDismissMode() !== 'quick-hide') {
+    if (!shouldQuickHide()) {
       return;
     }
     if (mainWindow.isVisible() && !mainWindow.isDestroyed()) {
@@ -107,19 +109,6 @@ export function onEscapeLayerExit(): void {
 
 export function getMainWindow(): BrowserWindow | null {
   return win;
-}
-
-export function getWindowDismissMode(): WindowDismissMode {
-  windowDismissMode = sanitizeWindowDismissMode(
-    getSetting(WINDOW_DISMISS_MODE_KEY),
-  );
-  return windowDismissMode;
-}
-
-export function setWindowDismissMode(mode: WindowDismissMode): WindowDismissMode {
-  windowDismissMode = mode;
-  setSetting(WINDOW_DISMISS_MODE_KEY, mode);
-  return windowDismissMode;
 }
 
 function suppressBlur(): void {

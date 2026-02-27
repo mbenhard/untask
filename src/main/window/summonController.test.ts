@@ -22,11 +22,9 @@ vi.mock('./bounds', () => ({
 
 import { getSetting, setSetting } from '../services/settingsService';
 import {
-  getWindowDismissMode,
   initSummonController,
   onEscapeLayerExit,
   requestHideFromRenderer,
-  setWindowDismissMode,
   summonWindow,
 } from './summonController';
 
@@ -81,19 +79,15 @@ describe('summonController dismiss mode behavior', () => {
     vi.setSystemTime(new Date('2026-02-16T12:00:00.000Z'));
     mockGetSetting.mockReset();
     mockSetSetting.mockReset();
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'app.windowDismissMode') {
-        return null;
-      }
-      return null;
-    });
+    // Default: normal dock mode → persistent (keep open)
+    mockGetSetting.mockImplementation((_key: string) => null);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('keeps window visible on blur in persistent mode', () => {
+  it('keeps window visible on blur in normal dock mode', () => {
     const { window, listeners } = createMockWindow();
     initSummonController(window as never);
 
@@ -102,10 +96,26 @@ describe('summonController dismiss mode behavior', () => {
     expect(window.hide).not.toHaveBeenCalled();
   });
 
-  it('hides window on blur in quick-hide mode', () => {
+  it('keeps window visible on blur in dock-only mode', () => {
     mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'app.windowDismissMode') {
-        return 'quick-hide';
+      if (key === 'app.dockMode') {
+        return 'dock-only';
+      }
+      return null;
+    });
+
+    const { window, listeners } = createMockWindow();
+    initSummonController(window as never);
+
+    listeners.blur?.();
+
+    expect(window.hide).not.toHaveBeenCalled();
+  });
+
+  it('hides window on blur in menu-bar-only mode', () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'app.dockMode') {
+        return 'menu-bar-only';
       }
       return null;
     });
@@ -118,10 +128,10 @@ describe('summonController dismiss mode behavior', () => {
     expect(window.hide).toHaveBeenCalledTimes(1);
   });
 
-  it('suppresses immediate blur hide right after summon in quick-hide mode', () => {
+  it('suppresses immediate blur hide right after summon in menu-bar-only mode', () => {
     mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'app.windowDismissMode') {
-        return 'quick-hide';
+      if (key === 'app.dockMode') {
+        return 'menu-bar-only';
       }
       if (key === 'window.bounds') {
         return null;
@@ -145,7 +155,7 @@ describe('summonController dismiss mode behavior', () => {
     expect(window.hide).toHaveBeenCalledTimes(1);
   });
 
-  it('explicit hide paths still hide in persistent mode', () => {
+  it('explicit hide paths still hide in normal dock mode', () => {
     const { window } = createMockWindow();
     initSummonController(window as never);
 
@@ -153,26 +163,5 @@ describe('summonController dismiss mode behavior', () => {
     onEscapeLayerExit();
 
     expect(window.hide).toHaveBeenCalledTimes(2);
-  });
-
-  it('round-trips dismiss mode through setting helpers', () => {
-    let storedMode: string | null = null;
-
-    mockGetSetting.mockImplementation((key: string) => {
-      if (key === 'app.windowDismissMode') {
-        return storedMode;
-      }
-      return null;
-    });
-    mockSetSetting.mockImplementation((key: string, value: string) => {
-      if (key === 'app.windowDismissMode') {
-        storedMode = value;
-      }
-      return { key, value } as never;
-    });
-
-    expect(getWindowDismissMode()).toBe('persistent');
-    expect(setWindowDismissMode('quick-hide')).toBe('quick-hide');
-    expect(getWindowDismissMode()).toBe('quick-hide');
   });
 });
