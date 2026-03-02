@@ -65,12 +65,12 @@ export const notes = sqliteTable(
     isPinned: integer('is_pinned', { mode: 'boolean' }).notNull().default(false),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     updatedAt: text('updated_at'),
-    deletedAt: text('deleted_at'),
+    deletedAt: text('deleted_at'), // Legacy: no longer written to. Kept for schema compatibility.
   },
   (table) => [
     index('notes_status_idx').on(table.status),
     index('notes_created_at_idx').on(table.createdAt),
-    index('notes_deleted_at_idx').on(table.deletedAt),
+    index('notes_deleted_at_idx').on(table.deletedAt), // Legacy index, kept for schema compatibility.
   ],
 );
 

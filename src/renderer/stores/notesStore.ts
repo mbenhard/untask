@@ -635,6 +635,8 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         set(NOTES_LIST_RESET_STATE);
         await persistLastOpenedNoteId(null);
         await persistSubView('list');
+      } else if (get().selectedListNoteId === id) {
+        set({ selectedListNoteId: null });
       }
 
       get().setNotice({ kind: 'success', message: 'Note permanently deleted.' });

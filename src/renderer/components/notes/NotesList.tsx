@@ -86,6 +86,10 @@ const NoteContextMenu = ({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
+    setConfirmingDelete(false);
+  }, [noteId]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
