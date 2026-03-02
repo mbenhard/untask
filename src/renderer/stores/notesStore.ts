@@ -62,7 +62,7 @@ type NotesStore = {
 
   archiveNote: (id: string) => Promise<void>;
   restoreNote: (id: string) => Promise<void>;
-  deleteNote: (id: string) => Promise<void>;
+  permanentlyDeleteNote: (id: string) => Promise<void>;
   pinNote: (id: string) => Promise<void>;
   unpinNote: (id: string) => Promise<void>;
   duplicateNote: (id: string) => Promise<void>;
@@ -626,30 +626,19 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
   },
 
-  deleteNote: async (id) => {
+  permanentlyDeleteNote: async (id) => {
     try {
-      const { activeNotes } = get();
-      const nextSelectedId = getAdjacentActiveNoteId(activeNotes, id);
+      const wasActive = get().activeNoteId === id;
+      await getUntask().notes.permanentDelete(id);
 
-      await getUntask().notes.delete(id);
-
-      if (get().activeNoteId === id) {
-        set({
-          ...NOTES_LIST_RESET_STATE,
-          selectedListNoteId: nextSelectedId,
-        });
+      if (wasActive) {
+        set(NOTES_LIST_RESET_STATE);
         await persistLastOpenedNoteId(null);
         await persistSubView('list');
-      } else if (get().selectedListNoteId === id) {
-        set({ selectedListNoteId: nextSelectedId });
       }
 
-      get().setNotice({ kind: 'success', message: 'Note deleted.' });
-      useToastStore.getState().showToast('Note deleted', async () => {
-        await getUntask().notes.restoreFromTrash(id);
-        void get().loadList(id);
-      });
-      void get().loadList(nextSelectedId);
+      get().setNotice({ kind: 'success', message: 'Note permanently deleted.' });
+      void get().loadList();
     } catch (error) {
       set({ error: toErrorMessage(error, 'Notes operation failed.') });
     }
