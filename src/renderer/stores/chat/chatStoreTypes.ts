@@ -106,7 +106,7 @@ export type ChatStore = {
 
   // Note context
   pendingNoteContext: ChatNoteContext | null;
-  noteHintDismissedForConversationId: string | null;
+  noteHintDismissed: { conversationId: string; noteId: string } | null;
 
   // ─── Actions ────────────────────────────────────────────────
 
@@ -134,7 +134,7 @@ export type ChatStore = {
   consumePendingNoteContext: () => ChatNoteContext | null;
   detachPendingNoteContext: () => void;
   clearPendingNoteContext: () => void;
-  dismissNoteHint: () => void;
+  dismissNoteHint: (noteId: string) => void;
 
   // Stream event processing
   applyStreamEvent: (event: import('../../../types/chat').ChatStreamEvent) => void;

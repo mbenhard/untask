@@ -243,10 +243,10 @@ export const createMessageActions = (
     set({ pendingNoteContext: null });
   },
 
-  dismissNoteHint: () => {
+  dismissNoteHint: (noteId: string) => {
     const conversationId = get().activeConversationId;
     if (conversationId) {
-      set({ noteHintDismissedForConversationId: conversationId });
+      set({ noteHintDismissed: { conversationId, noteId } });
     }
   },
 

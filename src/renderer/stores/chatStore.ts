@@ -22,7 +22,7 @@ export {
   selectProcessingImageCount,
   selectFocusMessageId,
   selectPendingNoteContext,
-  selectNoteHintDismissedForConversationId,
+  selectNoteHintDismissed,
 } from './chat';
 
 export type { ChatStore } from './chat';

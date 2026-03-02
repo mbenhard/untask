@@ -29,21 +29,16 @@ const AvatarIcon = ({ size, className }: { size: number; className?: string }) =
   </svg>
 );
 import {
-  selectChatActiveConversationId,
   selectChatError,
   selectChatIsSending,
   selectChatLastStreamError,
   selectChatMessages,
   selectChatSelectedModelId,
   selectFocusMessageId,
-  selectNoteHintDismissedForConversationId,
-  selectPendingNoteContext,
   useChatStore,
 } from '../../stores/chat';
-import { selectActiveView, useAppStore } from '../../stores/appStore';
-import { useNotesStore } from '../../stores/notesStore';
-import { getDisplayTitle as getNoteDisplayTitle } from '../../lib/noteUtils';
 import { Button } from '../ui/button';
+import { NoteContextBar } from './NoteContextBar';
 
 const formatTimestamp = (createdAt: string | null): string => {
   if (!createdAt) {
@@ -378,38 +373,13 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const error = useChatStore(selectChatError);
   const lastStreamError = useChatStore(selectChatLastStreamError);
   const focusMessageId = useChatStore(selectFocusMessageId);
-  const pendingNoteContext = useChatStore(selectPendingNoteContext);
   const selectedModelId = useChatStore(selectChatSelectedModelId);
-
-  const activeConversationId = useChatStore(selectChatActiveConversationId);
-  const noteHintDismissedForConversationId = useChatStore(selectNoteHintDismissedForConversationId);
-  const dismissNoteHint = useChatStore((state) => state.dismissNoteHint);
-
-  const activeView = useAppStore(selectActiveView);
-  const activeNoteId = useNotesStore((state) => state.activeNoteId);
-  const activeNotes = useNotesStore((state) => state.activeNotes);
-  const stageCurrentNoteForChat = useNotesStore((state) => state.stageCurrentNoteForChat);
-
-  const activeNoteTitle = useMemo(() => {
-    if (!activeNoteId) return null;
-    const note = activeNotes.find((n) => n.id === activeNoteId);
-    if (!note) return null;
-    const title = getNoteDisplayTitle(note.title, note.content);
-    return title === 'Empty note' ? null : title;
-  }, [activeNoteId, activeNotes]);
-
-  const showNoteHint =
-    activeView === 'notes' &&
-    Boolean(activeNoteId) &&
-    !pendingNoteContext &&
-    noteHintDismissedForConversationId !== activeConversationId;
 
   const undoAction = useChatStore((state) => state.undoAction);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
   const rejectPendingAction = useChatStore((state) => state.rejectPendingAction);
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
   const clearFocusMessageId = useChatStore((state) => state.clearFocusMessageId);
-  const detachPendingNoteContext = useChatStore((state) => state.detachPendingNoteContext);
 
   const prefersReducedMotion = useReducedMotion();
   const lastAnimatedIdRef = useRef<string | null>(null);
@@ -545,17 +515,6 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   );
 
   const sendMessage = useChatStore((state) => state.sendMessage);
-  const triggerNotePrompt = useCallback(
-    (prompt: string) => {
-      if (onSuggestionClick) {
-        onSuggestionClick(prompt);
-        return;
-      }
-
-      void sendMessage(prompt);
-    },
-    [onSuggestionClick, sendMessage],
-  );
 
   const handleChipClick = useCallback(
     (_messageId: string, chip: ChipAction) => {
@@ -770,91 +729,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         ) : null}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {pendingNoteContext ? (
-          <motion.div
-            key="note-context"
-            variants={heightVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={SNAPPY}
-            style={{ overflow: 'hidden' }}
-          >
-            <div className="rounded-lg border border-border/60 bg-card/60 px-3 py-2">
-              <p className="truncate text-[11px] text-muted-foreground">
-                Note attached: <span className="text-foreground">{pendingNoteContext.title}</span>
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-                  onClick={() => triggerNotePrompt('Extract the action items from this note and add or update tasks as needed.')}
-                >
-                  Extract tasks
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-                  onClick={() => triggerNotePrompt('Summarize the key decisions from this note.')}
-                >
-                  Summarize decisions
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-                  onClick={() => triggerNotePrompt('Clean up this note for clarity and brevity without losing important details.')}
-                >
-                  Clean up note
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-                  onClick={detachPendingNoteContext}
-                >
-                  Detach
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showNoteHint ? (
-          <motion.div
-            key="note-hint"
-            variants={heightVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={SNAPPY}
-            style={{ overflow: 'hidden' }}
-          >
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2">
-              <p className="min-w-0 truncate text-[11px] text-muted-foreground">
-                Attach {activeNoteTitle ? <span className="text-foreground">&ldquo;{activeNoteTitle}&rdquo;</span> : 'this note'}?
-              </p>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-                  onClick={() => stageCurrentNoteForChat()}
-                >
-                  Attach
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-transparent px-2 py-1 text-[11px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
-                  onClick={dismissNoteHint}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      <NoteContextBar onSuggestionClick={onSuggestionClick} />
 
       <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 py-3">
         {renderedMessages.length > 0 ? (
