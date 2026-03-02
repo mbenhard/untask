@@ -55,7 +55,7 @@ const getAttachedNoteSnapshot = (
 
 export const listNotesTool = {
   name: 'list_notes',
-  description: 'List all notes. Returns active notes and archived notes. Use when the user asks to see their notes or when you need to find a specific note.',
+  description: 'List all notes with titles and dates. Use when you need to find a note by topic, or when the user asks about something that might be in their notes.',
   schema: listNotesToolInputSchema,
   execute: async (): Promise<ToolExecutionEnvelope> => {
     const { active, archived } = listNotes();
@@ -79,7 +79,7 @@ export const listNotesTool = {
 
 export const readNoteTool = {
   name: 'read_note',
-  description: 'Read a specific note by ID. If noteId is omitted, reads the most recent active note. Use before editing to understand current context. If note content is attached in the system prompt, use it directly — do not call read_note.',
+  description: 'Read a specific note by ID. If noteId is omitted, reads the most recent active note. Check the Notes section in context first to pick the right note. If note content is already attached in the system prompt, use it directly instead of calling this tool.',
   schema: readNoteToolInputSchema,
   execute: async (input: { noteId?: string }, context: ToolExecutionContext): Promise<ToolExecutionEnvelope> => {
     const id = resolveNoteId(input.noteId, context.activeNoteId);

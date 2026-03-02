@@ -243,6 +243,13 @@ export const createMessageActions = (
     set({ pendingNoteContext: null });
   },
 
+  dismissNoteHint: () => {
+    const conversationId = get().activeConversationId;
+    if (conversationId) {
+      set({ noteHintDismissedForConversationId: conversationId });
+    }
+  },
+
   clearHistory: async () => {
     try {
       await getUntask().chat.clear();

@@ -68,6 +68,7 @@ type NotesStore = {
   duplicateNote: (id: string) => Promise<void>;
   copyAsMarkdown: (id: string) => Promise<void>;
   processWithAI: (markdownOverride?: string) => Promise<ProcessWithAIResult>;
+  stageCurrentNoteForChat: () => boolean;
 
   setLayoutMode: (mode: NotesLayoutMode) => void;
   setSelectedListNoteId: (id: string | null) => void;
@@ -771,6 +772,22 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       get().setNotice({ kind: 'error', message });
       return { ok: false, reason: 'save_failed' };
     }
+  },
+
+  stageCurrentNoteForChat: () => {
+    const { content, activeNoteId } = get();
+    if (!activeNoteId) return false;
+
+    const markdown = serializeNoteForProcessing(content).trim();
+    if (!markdown) return false;
+
+    const title = deriveAutoTitle(content) || 'Untitled note';
+    useChatStore.getState().stageNoteContext({
+      noteId: activeNoteId,
+      title,
+      markdown,
+    });
+    return true;
   },
 
   setLayoutMode: (mode) => {

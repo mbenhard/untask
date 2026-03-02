@@ -29,15 +29,19 @@ const AvatarIcon = ({ size, className }: { size: number; className?: string }) =
   </svg>
 );
 import {
+  selectChatActiveConversationId,
   selectChatError,
   selectChatIsSending,
   selectChatLastStreamError,
   selectChatMessages,
   selectChatSelectedModelId,
   selectFocusMessageId,
+  selectNoteHintDismissedForConversationId,
   selectPendingNoteContext,
   useChatStore,
 } from '../../stores/chat';
+import { selectActiveView, useAppStore } from '../../stores/appStore';
+import { useNotesStore } from '../../stores/notesStore';
 import { Button } from '../ui/button';
 
 const formatTimestamp = (createdAt: string | null): string => {
@@ -375,6 +379,28 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const focusMessageId = useChatStore(selectFocusMessageId);
   const pendingNoteContext = useChatStore(selectPendingNoteContext);
   const selectedModelId = useChatStore(selectChatSelectedModelId);
+
+  const activeConversationId = useChatStore(selectChatActiveConversationId);
+  const noteHintDismissedForConversationId = useChatStore(selectNoteHintDismissedForConversationId);
+  const dismissNoteHint = useChatStore((state) => state.dismissNoteHint);
+
+  const activeView = useAppStore(selectActiveView);
+  const activeNoteId = useNotesStore((state) => state.activeNoteId);
+  const activeNotes = useNotesStore((state) => state.activeNotes);
+  const stageCurrentNoteForChat = useNotesStore((state) => state.stageCurrentNoteForChat);
+
+  const activeNoteTitle = useMemo(() => {
+    if (!activeNoteId) return null;
+    const note = activeNotes.find((n) => n.id === activeNoteId);
+    if (!note) return null;
+    return note.title || null;
+  }, [activeNoteId, activeNotes]);
+
+  const showNoteHint =
+    activeView === 'notes' &&
+    Boolean(activeNoteId) &&
+    !pendingNoteContext &&
+    noteHintDismissedForConversationId !== activeConversationId;
 
   const undoAction = useChatStore((state) => state.undoAction);
   const approvePendingAction = useChatStore((state) => state.approvePendingAction);
@@ -785,6 +811,42 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                   onClick={detachPendingNoteContext}
                 >
                   Detach
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showNoteHint ? (
+          <motion.div
+            key="note-hint"
+            variants={heightVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={SNAPPY}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2">
+              <p className="min-w-0 truncate text-[11px] text-muted-foreground">
+                Attach {activeNoteTitle ? <span className="text-foreground">&ldquo;{activeNoteTitle}&rdquo;</span> : 'this note'}?
+              </p>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  className="rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                  onClick={() => stageCurrentNoteForChat()}
+                >
+                  Attach
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-transparent px-2 py-1 text-[11px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+                  onClick={dismissNoteHint}
+                >
+                  Dismiss
                 </button>
               </div>
             </div>

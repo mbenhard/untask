@@ -52,6 +52,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
     processingImageCount: 0,
     focusMessageId: null,
     pendingNoteContext: null,
+    noteHintDismissedForConversationId: null,
 
     // ─── Initialize ───────────────────────────────────────────
     initialize: async () => {
@@ -177,6 +178,7 @@ export const selectPendingImages = (state: ChatStore) => state.pendingImages;
 export const selectProcessingImageCount = (state: ChatStore) => state.processingImageCount;
 export const selectFocusMessageId = (state: ChatStore) => state.focusMessageId;
 export const selectPendingNoteContext = (state: ChatStore) => state.pendingNoteContext;
+export const selectNoteHintDismissedForConversationId = (state: ChatStore) => state.noteHintDismissedForConversationId;
 
 // Re-export the ChatStore type for external consumers
 export type { ChatStore } from './chatStoreTypes';

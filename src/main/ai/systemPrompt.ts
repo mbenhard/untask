@@ -73,6 +73,31 @@ const formatLocalTimestamp = (now: Date, timezone: string): string => {
   }
 };
 
+// ─── Relative time helper ────────────────────────────────────
+
+export const formatRelativeTime = (dateStr: string | null, now: Date): string => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffWeeks === 1) return 'last week';
+  if (diffWeeks < 4) return `${diffWeeks} weeks ago`;
+  if (diffMonths === 1) return 'last month';
+  return `${diffMonths} months ago`;
+};
+
 // ─── Section builders ───────────────────────────────────────
 
 const buildMetaSection = (now: Date, timezone: string): string =>
@@ -120,6 +145,30 @@ const buildTodaySection = (
   ].join('\n');
 };
 
+const buildNotesSection = (
+  liveContext: AssistantLiveContext,
+  now: Date,
+  noteLimit = 10,
+): string => {
+  const notes = liveContext.notes ?? [];
+  if (notes.length === 0) return '';
+
+  const limited = notes.slice(0, noteLimit);
+
+  const lines = limited.map((note) => {
+    const title = note.title || '(Untitled note)';
+    const relative = formatRelativeTime(note.updatedAt, now);
+    const timeTag = relative ? ` (updated ${relative})` : '';
+    return `- [${note.id}] ${title}${timeTag}`;
+  });
+
+  return [
+    '## Notes',
+    `${limited.length} active note${limited.length === 1 ? '' : 's'}:`,
+    ...lines,
+  ].join('\n');
+};
+
 // ─── Slim identity for local models ─────────────────────────
 
 const buildSlimIdentity = (): string => {
@@ -158,11 +207,31 @@ export const buildSystemPrompt = (
     : '';
 
   const todaySection = buildTodaySection(input.liveContext, now, slim ? 5 : 10);
+  const notesSection = buildNotesSection(input.liveContext, now, slim ? 5 : 10);
 
   const toolingRules = [
-    '## Tooling Rules',
-    'If the user asks to read or change tasks or notes, call the relevant tool first instead of guessing.',
-    'Never claim an action was completed unless the corresponding tool returned success.',
+    '## Tool use',
+    '',
+    'Act, don\'t narrate. When intent is clear, call the tool immediately.',
+    '',
+    '### Reading before acting',
+    '- read_note before edit_note',
+    '- list_tasks / list_notes when you need to find something by topic',
+    '- Check the Notes and Today sections in context first — they may already have what you need',
+    '',
+    '### Be proactive',
+    '- If the user\'s question likely relates to their notes or tasks, look them up — don\'t wait to be asked explicitly',
+    '- If context sections look stale or incomplete, re-fetch with the relevant list tool',
+    '',
+    '### Accuracy',
+    '- Never claim an action was completed unless the tool returned success',
+    '- Never fabricate note content, task details, or IDs',
+    '- If a tool errors, tell the user what happened — don\'t silently retry or guess',
+    '',
+    '### Efficiency',
+    '- Batch related reads into one turn when possible',
+    '- Don\'t call list_notes/list_tasks if the answer is already visible in your context sections',
+    '- Prefer the attached note snapshot over calling read_note for the same note',
   ].join('\n');
 
   const formatRules = '## Formatting Rules\nNever mention internal IDs (like task, event, or subtask IDs) in chat responses. Humans do not understand them. Use human-readable names and titles instead.';
@@ -180,6 +249,9 @@ export const buildSystemPrompt = (
     '<user_tasks>',
     todaySection,
     '</user_tasks>',
+    ...(notesSection
+      ? ['---', '<user_notes>', notesSection, '</user_notes>']
+      : []),
     '---',
     toolingRules,
     '---',
@@ -193,7 +265,7 @@ export const buildSystemPrompt = (
     timezone,
     tokenBudget: estimatedTotalTokens,
     estimatedTotalTokens,
-    sectionOrder: ['now', 'identity', 'knowledge', 'today', 'tooling', 'formatting'],
+    sectionOrder: ['now', 'identity', 'knowledge', 'today', 'notes', 'tooling', 'formatting'],
     sections: [
       {
         id: 'now',
@@ -228,8 +300,16 @@ export const buildSystemPrompt = (
         snippetIds: [],
       },
       {
+        id: 'notes',
+        title: 'Notes',
+        estimatedTokens: estimateTokens(notesSection),
+        included: Boolean(notesSection),
+        truncated: false,
+        snippetIds: [],
+      },
+      {
         id: 'tooling',
-        title: 'Tooling Rules',
+        title: 'Tool Use',
         estimatedTokens: estimateTokens(toolingRules),
         included: true,
         truncated: false,

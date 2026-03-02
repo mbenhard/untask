@@ -1,9 +1,17 @@
 export type { Task, AiJournal } from './models';
 import type { Task } from './models';
 
+export type NoteMetadata = {
+  id: string;
+  title: string;
+  isPinned: boolean;
+  updatedAt: string | null;
+};
+
 export type AssistantLiveContext = {
   tasks: Task[];
   inboxCount: number;
+  notes?: NoteMetadata[];
   now?: string;
   timezone?: string;
 };
