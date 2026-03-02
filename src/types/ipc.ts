@@ -49,6 +49,8 @@ export const IPC_CHANNELS = {
   APP_MENU_SETTINGS: 'app:menu-settings',
   APP_GET_DOCK_MODE: 'app:get-dock-mode',
   APP_SET_DOCK_MODE: 'app:set-dock-mode',
+  APP_GET_UI_SCALE: 'app:get-ui-scale',
+  APP_SET_UI_SCALE: 'app:set-ui-scale',
   APP_GET_VERSION: 'app:get-version',
   SHORTCUT_UPDATE: 'shortcut:update',
   SHORTCUT_GET_REGISTRATION_STATUS: 'shortcut:get-registration-status',
@@ -326,6 +328,12 @@ export type DockMode = 'normal' | 'dock-only' | 'menu-bar-only';
 
 export type DockModeResult = {
   mode: DockMode;
+};
+
+export type UiScale = 'compact' | 'default' | 'comfortable' | 'large';
+
+export type UiScaleResult = {
+  scale: UiScale;
 };
 
 export type ShortcutRegistrationStatusResult = {

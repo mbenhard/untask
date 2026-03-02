@@ -45,6 +45,7 @@ import {
   restoreWindowBounds,
   getMainWindow,
 } from './window/summonController';
+import { applyUiScale, applyUiScaleToWindow } from './window/uiScale';
 import { createQuickAddWindow, isActivationSuppressed, getQuickAddWindow } from './window/quickAddWindow';
 
 if (started) {
@@ -172,6 +173,7 @@ const bootstrap = (): void => {
   mainWindow = createMainWindow();
   initSummonController(mainWindow);
   createQuickAddWindow();
+  applyUiScale();
   setupTray();
   applyDockMode();
   registerGlobalShortcuts(mainWindow);
@@ -271,6 +273,7 @@ app.whenReady().then(() => {
       mainWindow = createMainWindow();
       initSummonController(mainWindow);
       applyDockMode();
+      applyUiScaleToWindow(mainWindow);
     } else {
       applyDockMode();
       summonWindow();

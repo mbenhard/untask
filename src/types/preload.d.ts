@@ -32,6 +32,8 @@ import type {
   LaunchAtLoginResult,
   DockMode,
   DockModeResult,
+  UiScale,
+  UiScaleResult,
   MemoryPromotionConfirmRequestPayload,
   MemoryPromotionConfirmResultPayload,
   MemoryPromotionEvaluationRequestPayload,
@@ -94,6 +96,8 @@ export type UntaskApi = {
     setLaunchAtLogin: (enabled: boolean) => Promise<LaunchAtLoginResult>;
     getDockMode: () => Promise<DockModeResult>;
     setDockMode: (mode: DockMode) => Promise<DockModeResult>;
+    getUiScale: () => Promise<UiScaleResult>;
+    setUiScale: (scale: UiScale) => Promise<UiScaleResult>;
     getVersion: () => Promise<string>;
     onMenuNewTask: (listener: () => void) => () => void;
     onMenuNewNote: (listener: () => void) => () => void;

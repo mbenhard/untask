@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { DockMode } from '../../../types/ipc';
+import type { DockMode, UiScale } from '../../../types/ipc';
 import { getUntask } from '../../lib/untask';
 import {
   MONO_FONT_OPTIONS,
@@ -36,6 +36,9 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
   const [isLoadingDockMode, setIsLoadingDockMode] = useState(false);
   const [isSavingDockMode, setIsSavingDockMode] = useState(false);
   const [isSavingTypography, setIsSavingTypography] = useState(false);
+  const [uiScale, setUiScaleState] = useState<UiScale>('default');
+  const [isLoadingUiScale, setIsLoadingUiScale] = useState(false);
+  const [isSavingUiScale, setIsSavingUiScale] = useState(false);
 
   const loadLaunchAtLogin = useCallback(async () => {
     try {
@@ -71,10 +74,26 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
     }
   }, [setError]);
 
+  const loadUiScale = useCallback(async () => {
+    try {
+      setIsLoadingUiScale(true);
+      setError(null);
+      const result = await getUntask().app.getUiScale();
+      setUiScaleState(result.scale);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error ? loadError.message : 'Failed to load UI scale setting.',
+      );
+    } finally {
+      setIsLoadingUiScale(false);
+    }
+  }, [setError]);
+
   useEffect(() => {
     void loadLaunchAtLogin();
     void loadDockMode();
-  }, [loadLaunchAtLogin, loadDockMode]);
+    void loadUiScale();
+  }, [loadLaunchAtLogin, loadDockMode, loadUiScale]);
 
   const handleLaunchAtLoginChange = useCallback(
     async (value: 'on' | 'off') => {
@@ -136,6 +155,36 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
       }
     },
     [dockMode, setError, setNotice],
+  );
+
+  const handleUiScaleChange = useCallback(
+    async (scale: UiScale) => {
+      const previousScale = uiScale;
+      setUiScaleState(scale);
+      setNotice(null);
+      setError(null);
+
+      try {
+        setIsSavingUiScale(true);
+        const result = await getUntask().app.setUiScale(scale);
+        setUiScaleState(result.scale);
+        const labels: Record<UiScale, string> = {
+          compact: 'Compact (90%)',
+          default: 'Default (100%)',
+          comfortable: 'Comfortable (110%)',
+          large: 'Large (120%)',
+        };
+        setNotice(`UI scale set to ${labels[result.scale]}.`);
+      } catch (saveError) {
+        setUiScaleState(previousScale);
+        setError(
+          saveError instanceof Error ? saveError.message : 'Failed to update UI scale setting.',
+        );
+      } finally {
+        setIsSavingUiScale(false);
+      }
+    },
+    [uiScale, setError, setNotice],
   );
 
   const handleSansFontChange = useCallback(
@@ -251,6 +300,31 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
             value={dockMode}
             onChange={(v) => void handleDockModeChange(v as DockMode)}
             disabled={isSavingDockMode}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="UI scale"
+          hint={
+            uiScale === 'compact'
+              ? 'Smaller interface elements (90%).'
+              : uiScale === 'default'
+                ? 'Standard interface size (100%).'
+                : uiScale === 'comfortable'
+                  ? 'Slightly larger interface (110%).'
+                  : 'Larger interface elements (120%).'
+          }
+          loading={isLoadingUiScale}
+        >
+          <SegmentedControl
+            options={[
+              { value: 'compact' as const, label: 'Compact' },
+              { value: 'default' as const, label: 'Default' },
+              { value: 'comfortable' as const, label: 'Comfortable' },
+              { value: 'large' as const, label: 'Large' },
+            ]}
+            value={uiScale}
+            onChange={(v) => void handleUiScaleChange(v as UiScale)}
+            disabled={isSavingUiScale}
           />
         </SettingsRow>
       </SettingsSection>

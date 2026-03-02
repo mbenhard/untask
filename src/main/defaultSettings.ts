@@ -41,6 +41,7 @@ export const SETTING_KEY_BACKUP_DESTINATION = 'backup.destination' as const;
 export const SETTING_KEY_BACKUP_FREQUENCY = 'backup.frequency' as const;
 export const SETTING_KEY_BACKUP_RETENTION = 'backup.retention' as const;
 export const SETTING_KEY_TASKS_AUTO_CLEAN_DAYS = 'tasks.auto_clean_days' as const;
+export const SETTING_KEY_UI_SCALE = 'ui.scale' as const;
 
 // ─── Default values ───────────────────────────────────────────────────────────
 // Single source of truth for all persisted setting defaults.
@@ -86,4 +87,5 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_BACKUP_FREQUENCY]: 'daily',
   [SETTING_KEY_BACKUP_RETENTION]: '10',
   [SETTING_KEY_TASKS_AUTO_CLEAN_DAYS]: 'never',
+  [SETTING_KEY_UI_SCALE]: 'default',
 };

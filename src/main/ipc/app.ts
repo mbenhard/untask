@@ -3,6 +3,7 @@ import {
   IPC_CHANNELS,
   type SettingsBootstrapState,
   type DockModeResult,
+  type UiScaleResult,
   type IdentityContextSnapshotRequest,
   type IdentityContextSnapshotResult,
   type MemoryPromotionEvaluationResultPayload,
@@ -25,6 +26,7 @@ import {
   endDockModeTransition,
 } from '../window/summonController';
 import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from '../window/dockMode';
+import { uiScaleSchema, readUiScale, applyUiScale, UI_SCALE_KEY } from '../window/uiScale';
 import { reRegisterShortcuts, getShortcutRegistrationStatus } from '../shortcuts';
 import {
   checkForUpdates as runUpdateCheck,
@@ -116,6 +118,29 @@ export const registerAppHandlers = (): void => {
         beginDockModeTransition();
         applyDockMode(mode, endDockModeTransition);
         return { mode };
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_UI_SCALE,
+    withIpcLogging(
+      'APP_GET_UI_SCALE',
+      (): UiScaleResult => {
+        return { scale: readUiScale() };
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_SET_UI_SCALE,
+    withIpcLogging(
+      'APP_SET_UI_SCALE',
+      (_event: Electron.IpcMainInvokeEvent, scaleInput: unknown): UiScaleResult => {
+        const scale = uiScaleSchema.parse(scaleInput);
+        setSetting(UI_SCALE_KEY, scale);
+        applyUiScale(scale);
+        return { scale };
       },
     ),
   );

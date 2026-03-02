@@ -35,6 +35,8 @@ import {
   type LaunchAtLoginResult,
   type DockMode,
   type DockModeResult,
+  type UiScale,
+  type UiScaleResult,
   type MemoryPromotionConfirmRequestPayload,
   type MemoryPromotionConfirmResultPayload,
   type MemoryPromotionEvaluationRequestPayload,
@@ -111,6 +113,10 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_DOCK_MODE),
     setDockMode: (mode: DockMode): Promise<DockModeResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_SET_DOCK_MODE, mode),
+    getUiScale: (): Promise<UiScaleResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_GET_UI_SCALE),
+    setUiScale: (scale: UiScale): Promise<UiScaleResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_UI_SCALE, scale),
     getVersion: (): Promise<string> =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     onMenuNewTask: (listener: () => void): (() => void) => {
