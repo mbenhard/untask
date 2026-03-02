@@ -50,7 +50,7 @@ export const UntaskSlashMenu = ({
   return (
     <div
       ref={containerRef}
-      className="untask-editor-slash-menu min-w-[220px] max-h-[300px] overflow-y-auto rounded-md border border-border/60 bg-popover/95 p-1 backdrop-blur-sm"
+      className="untask-editor-slash-menu min-w-[220px] overflow-y-auto rounded-md border border-border/60 bg-popover/95 p-1 backdrop-blur-sm"
     >
       {loadingState === 'loading-initial' && (
         <div className="px-2 py-3 text-center text-xs text-muted-foreground/50">

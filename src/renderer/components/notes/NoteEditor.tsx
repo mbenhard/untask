@@ -431,7 +431,7 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
         </div>
       </header>
 
-      <div ref={editorHostRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={editorHostRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <BlockEditor
           key={activeNoteId}
           content={content}
