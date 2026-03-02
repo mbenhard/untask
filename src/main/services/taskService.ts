@@ -883,6 +883,7 @@ function spawnRecurringInstance(
       dueDate: next.nextDate,
       recurrence: completedTask.recurrence,
       recurrenceSourceId: sourceId,
+      reminderOffset: (completedTask.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined,
     },
     source,
   );

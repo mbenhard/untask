@@ -170,5 +170,5 @@ describeIfNativeSqlite('drizzle migration 0011_add_soft_delete_columns', () => {
     expect(noteRow?.deleted_at ?? null).toBeNull();
 
     sqlite.close();
-  });
+   });
 });

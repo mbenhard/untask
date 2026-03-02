@@ -85,6 +85,6 @@
       "when": 1772115662465,
       "tag": "0011_add_soft_delete_columns",
       "breakpoints": true
-    }
+    },
   ]
 }

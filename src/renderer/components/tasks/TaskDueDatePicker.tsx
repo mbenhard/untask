@@ -102,7 +102,8 @@ export const TaskDueDatePicker = ({
 
   const handleReminderOffsetChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      onReminderOffsetChange?.(e.target.value as ReminderOffset);
+      const next = e.target.value as ReminderOffset;
+      onReminderOffsetChange?.(next);
     },
     [onReminderOffsetChange],
   );
@@ -142,13 +143,11 @@ export const TaskDueDatePicker = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       commit(draft);
-      setOpen(false);
       return;
     }
     if (e.key === 'Escape') {
       e.preventDefault();
       setDraft(currentTime ?? '');
-      setOpen(false);
       return;
     }
 
@@ -230,63 +229,62 @@ export const TaskDueDatePicker = ({
           onSelect={handleDateSelect}
         />
 
-        {/* Time + Reminder — single compact row */}
-        <div className="border-t border-border px-2 py-2">
-          <div className="flex items-center justify-center gap-2">
-            <div className="flex items-center gap-1">
-              <Clock className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <input
-                ref={timeInputRef}
-                type="text"
-                value={draft}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                onBlur={() => commit(draft)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="HH:MM"
-                disabled={false}
-                className="w-14 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-center font-mono text-xs text-foreground outline-none transition-colors focus:border-ring focus:bg-muted/60"
-              />
-            </div>
-            {onReminderOffsetChange && (
-              <>
-                <div className="h-3 w-px bg-border" />
-                <Bell className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <select
-                  value={reminderOffset ?? 'at_due'}
-                  onChange={handleReminderOffsetChange}
+        {/* Time — only once a date is picked */}
+        {dueDate && (
+          <div className="border-t border-border px-2 py-2">
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center gap-1">
+                <Clock className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <input
+                  ref={timeInputRef}
+                  type="text"
+                  value={draft}
+                  onChange={handleChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={() => commit(draft)}
                   onClick={(e) => e.stopPropagation()}
-                  disabled={!dueDate}
-                  className={cn(
-                    'rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-xs text-foreground outline-none transition-colors focus:border-ring',
-                    !dueDate && 'pointer-events-none opacity-50',
-                  )}
+                  placeholder="HH:MM"
+                  className="w-14 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-center font-mono text-xs text-foreground outline-none transition-colors focus:border-ring focus:bg-muted/60"
+                />
+              </div>
+
+              {/* Reminder — only once a time is set */}
+              {onReminderOffsetChange && currentTime && (
+                <>
+                  <div className="h-3 w-px bg-border" />
+                  <Bell className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <select
+                    value={reminderOffset ?? 'at_due'}
+                    onChange={handleReminderOffsetChange}
+                    onClick={(e) => e.stopPropagation()}
+                    className="rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-xs text-foreground outline-none transition-colors focus:border-ring"
+                  >
+                    {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
+                      <option key={key} value={key}>
+                        {REMINDER_OFFSET_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+            {notifBlocked && currentTime ? (
+              <p className="mt-1.5 text-[10px] text-amber-500 leading-relaxed">
+                Reminders won&apos;t work — notifications are blocked.{' '}
+                <button
+                  type="button"
+                  className="underline hover:text-amber-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void getUntask().notifications.openSettings();
+                  }}
                 >
-                  {(Object.keys(REMINDER_OFFSET_LABELS) as ReminderOffset[]).map((key) => (
-                    <option key={key} value={key}>
-                      {REMINDER_OFFSET_LABELS[key]}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
+                  Fix in Settings
+                </button>
+              </p>
+            ) : null}
           </div>
-          {notifBlocked && dueDate ? (
-            <p className="mt-1.5 text-[10px] text-amber-500 leading-relaxed">
-              Reminders won&apos;t work — notifications are blocked.{' '}
-              <button
-                type="button"
-                className="underline hover:text-amber-400"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void getUntask().notifications.openSettings();
-                }}
-              >
-                Fix in Settings
-              </button>
-            </p>
-          ) : null}
-        </div>
+        )}
 
         {/* Clear button — always visible, disabled when no date */}
         <div className="border-t border-border px-3 py-2">

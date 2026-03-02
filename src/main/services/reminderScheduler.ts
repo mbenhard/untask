@@ -106,6 +106,18 @@ const parseOffsetMs = (offset: string | null | undefined): number => {
 };
 
 /**
+ * Compute the reminder fire time in ms for a task.
+ * Fires at dueTime - offsetMs.
+ */
+const computeReminderMs = (
+  task: { dueDate: string | null; reminderOffset: string | null },
+): number | null => {
+  const targetMs = resolveDueDateTargetMs(task.dueDate);
+  if (targetMs === null) return null;
+  return targetMs - parseOffsetMs(task.reminderOffset);
+};
+
+/**
  * Schedule (or reschedule) a timer for a single task.
  * Clears any existing timer for the task first.
  */
@@ -121,11 +133,9 @@ const scheduleTaskTimer = (taskId: string): void => {
   if (!task) return;
   if (task.status === 'done' || task.status === 'cancelled') return;
 
-  const targetMs = resolveDueDateTargetMs(task.dueDate);
-  if (targetMs === null) return;
+  const reminderMs = computeReminderMs(task);
+  if (reminderMs === null) return;
 
-  const offsetMs = parseOffsetMs(task.reminderOffset);
-  const reminderMs = targetMs - offsetMs;
   const nowMs = Date.now();
 
   if (reminderMs <= nowMs) return; // Already past
