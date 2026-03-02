@@ -133,7 +133,7 @@ export const editNoteTool = {
     if (!current) {
       const attachedSnapshot = getAttachedNoteSnapshot(context, id);
       if (attachedSnapshot) {
-        throw new Error('The attached note was deleted after it was shared. I can still analyze the attached snapshot, but I cannot apply edits until the note is restored or recreated.');
+        throw new Error('The attached note was archived or permanently deleted after it was shared. I can still analyze the attached snapshot, but I cannot apply edits to the original note.');
       }
       throw new Error(`Note ${id} not found.`);
     }
