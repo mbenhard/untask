@@ -28,7 +28,7 @@ import {
   selectSelectedListNoteId,
   useNotesStore,
 } from '../../stores/notesStore';
-import { NotesListSkeleton } from '../ui/loadingShells';
+
 import { Button } from '../ui/button';
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -360,6 +360,9 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const archiveSectionRef = useRef<HTMLDivElement>(null);
+
+
 
   const handleSelectRelative = useCallback(
     (delta: -1 | 1) => {
@@ -469,7 +472,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
   }, []);
 
   if (isLoading && activeNotes.length === 0) {
-    return <NotesListSkeleton />;
+    return null;
   }
 
   return (
@@ -494,7 +497,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
         ref={containerRef}
         tabIndex={0}
         onKeyDown={onKeyDown}
-        className={cn('min-h-0 flex-1 overflow-y-auto px-1 outline-none', compact && 'pr-0')}
+        className={cn('min-h-0 flex-1 overflow-y-auto px-1 pb-20 outline-none', compact && 'pr-0')}
         role="listbox"
         data-primary-focusable=""
       >
@@ -527,6 +530,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           {archivedNotes.length > 0 ? (
             <motion.div
               key="archive-section"
+              ref={archiveSectionRef}
               variants={fadeVariants}
               initial="initial"
               animate="animate"
@@ -564,6 +568,11 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                     exit="exit"
                     transition={SNAPPY}
                     style={{ overflow: 'hidden' }}
+                    onAnimationComplete={(definition) => {
+                      if (definition === 'animate' && archiveSectionRef.current) {
+                        archiveSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }
+                    }}
                   >
                     <div className="mt-1 opacity-70">
                       {archivedNotes.map((note) => (

@@ -30,9 +30,6 @@
   --editor-link: #0b65d9;
   --editor-link-hover: #084ea8;
   --foreground-muted: rgba(23, 23, 23, 0.25);
-  --skeleton-base: rgba(23, 23, 23, 0.04);
-  --skeleton-highlight: rgba(23, 23, 23, 0.07);
-  --skeleton-border: rgba(23, 23, 23, 0.06);
 }
 
 /* ──────────────────────────────────────────────
@@ -61,9 +58,6 @@
   --editor-link: #7db4ff;
   --editor-link-hover: #9bc7ff;
   --foreground-muted: rgba(245, 245, 245, 0.35);
-  --skeleton-base: rgba(245, 245, 245, 0.035);
-  --skeleton-highlight: rgba(245, 245, 245, 0.065);
-  --skeleton-border: rgba(245, 245, 245, 0.05);
 }
 
 /* ──────────────────────────────────────────────
@@ -139,42 +133,6 @@
 /* Chat input placeholder in Geist Mono for terminal-prompt feel */
 [aria-label="Chat input"]::placeholder {
   font-family: var(--font-mono);
-}
-
-/* Shared skeleton treatment for loading shells */
-@keyframes untask-skeleton-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-
-.untask-skeleton {
-  background-color: var(--skeleton-base);
-  background-image: linear-gradient(
-    100deg,
-    transparent 18%,
-    var(--skeleton-highlight) 48%,
-    transparent 82%
-  );
-  background-size: 240% 100%;
-  box-shadow: inset 0 0 0 1px var(--skeleton-border);
-  will-change: background-position;
-  animation: untask-skeleton-shimmer 1.55s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.untask-skeleton-static {
-  animation: none;
-  background-image: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .untask-skeleton {
-    animation: none;
-    background-image: none;
-  }
 }
 
 /* Ensure BlockNote surfaces follow the app sans stack */

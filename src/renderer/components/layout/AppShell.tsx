@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, LampDesk, Settings, X } from 'lucide-react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui';
-import { ChatPanelSkeleton } from '../ui/loadingShells';
+
 import { useTheme } from '../providers/ThemeProvider';
 
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -537,7 +537,7 @@ export const AppShell = () => {
                           transition={{ duration: 0 }}
                           className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
-                          <Suspense fallback={<ChatPanelSkeleton variant="threads" className="min-h-0 flex-1" />}>
+                          <Suspense fallback={null}>
                             <LazyThreadListView
                               conversations={conversations}
                               activeConversationId={activeConversationId}
@@ -566,12 +566,12 @@ export const AppShell = () => {
                           className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
                           <div className="min-h-0 flex-1 overflow-hidden px-4 py-0">
-                            <Suspense fallback={<ChatPanelSkeleton variant="conversation" className="h-full w-full" />}>
+                            <Suspense fallback={null}>
                               <LazyChatView onSuggestionClick={handleSuggestionClick} />
                             </Suspense>
                           </div>
                           <div className="border-t border-dashed border-border/50">
-                            <Suspense fallback={<ChatPanelSkeleton variant="input" className="h-[84px]" />}>
+                            <Suspense fallback={null}>
                               <LazyChatInput
                                 inputRef={inputRef}
                                 value={chatInputValue}

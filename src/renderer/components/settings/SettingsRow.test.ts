@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SettingsRow } from './SettingsRow';
 
-describe('SettingsRow loading state', () => {
+describe('SettingsRow', () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -21,7 +21,7 @@ describe('SettingsRow loading state', () => {
     document.body.removeChild(container);
   });
 
-  it('renders skeleton instead of loading text when loading=true', () => {
+  it('renders children even when loading=true (skeleton removed)', () => {
     flushSync(() => {
       root.render(
         createElement(
@@ -32,8 +32,8 @@ describe('SettingsRow loading state', () => {
       );
     });
 
-    expect(container.querySelector('[data-testid="settings-row-loading-skeleton"]')).not.toBeNull();
-    expect(container.textContent?.includes('Loading...')).toBe(false);
+    expect(container.querySelector('[data-testid="settings-row-loading-skeleton"]')).toBeNull();
+    expect(container.textContent?.includes('OpenAI')).toBe(true);
   });
 
   it('renders children when loading=false', () => {
@@ -47,7 +47,6 @@ describe('SettingsRow loading state', () => {
       );
     });
 
-    expect(container.querySelector('[data-testid="settings-row-loading-skeleton"]')).toBeNull();
     expect(container.textContent?.includes('OpenAI')).toBe(true);
   });
 });
