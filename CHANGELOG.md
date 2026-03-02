@@ -2,6 +2,29 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.17] - 2026-03-02
+
+Redo, UI scale, auto-cleanup, and chat rendering improvements.
+
+### Changes
+
+**Added**
+- **Redo** — Undo any undo with Cmd+Shift+Z; works for all task actions including delete, status change, and reorder
+- **UI scale** — Adjustable zoom in Settings → General with four presets: Compact (90%), Default (100%), Comfortable (110%), Large (120%)
+- **Auto-cleanup** — Opt-in setting to automatically remove done and cancelled tasks after 7, 14, 30, or 90 days (Settings → Tasks → Cleanup)
+- **Chat markdown renderer** — New ChatMarkdown component with task cards for cleaner, more readable AI output
+
+**Improved**
+- S shortcut on a subtask now resolves to the parent task and navigates to its destination view
+- Tasks added in Today view now default to "In Progress" status
+- Destructive actions (Clear due date, Remove repeat) now use red styling for clarity
+
+**Fixed**
+- Quick Add no longer resurfaces the main window on dismiss or after delayed macOS activation events
+- Slash menu in notes no longer shifts the page when opened near the viewport edge
+- Redo correctly soft-deletes tasks and handles cascade group transfer timing
+- Quick Add shortcut description now matches the actual shortcut (Cmd+Shift+A)
+
 ## [0.1.16] - 2026-03-02
 
 Inception Labs AI provider, notes awareness, archive-only model, and chat panel resize.
@@ -383,6 +406,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.17]: https://github.com/mbenhard/untask/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/mbenhard/untask/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/mbenhard/untask/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/mbenhard/untask/compare/v0.1.13...v0.1.14
