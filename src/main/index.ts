@@ -33,7 +33,7 @@ import {
   flushUndoStackPersistence,
   purgeOldSoftDeletedTasks,
 } from './services/taskService';
-import { purgeOldSoftDeletedNotes } from './services/notesService';
+import { purgeOldArchivedNotes } from './services/notesService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
 import { setupTray, destroyTray } from './tray';
 import { applyDockMode } from './window/dockMode';
@@ -153,7 +153,7 @@ const bootstrap = (): void => {
   ensureDefaultTaskStatusConfig();
   clearStaleTodayFlags();
   purgeOldSoftDeletedTasks();
-  purgeOldSoftDeletedNotes();
+  purgeOldArchivedNotes();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
   // Migrate any plaintext API keys to encrypted safeStorage.

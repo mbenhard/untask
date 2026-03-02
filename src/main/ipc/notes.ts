@@ -8,18 +8,19 @@ import {
   saveNote,
   archiveNote,
   restoreNote,
-  restoreFromTrash,
-  deleteNote,
+  permanentlyDeleteNote,
   listNotes,
   pinNote,
   unpinNote,
   duplicateNote,
   migrateNoteTitlesToContent,
+  migrateDeletedNotesToPermanentDelete,
 } from '../services/notesService';
 
 export const registerNotesHandlers = (): void => {
-  // One-time migration: move stored titles into note content
+  // One-time migrations
   migrateNoteTitlesToContent();
+  migrateDeletedNotesToPermanentDelete();
   ipcMain.handle(
     IPC_CHANNELS.NOTES_LIST,
     withIpcLogging('NOTES_LIST', () => {
@@ -70,18 +71,10 @@ export const registerNotesHandlers = (): void => {
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.NOTES_RESTORE_FROM_TRASH,
-    withIpcLogging('NOTES_RESTORE_FROM_TRASH', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
+    IPC_CHANNELS.NOTES_PERMANENT_DELETE,
+    withIpcLogging('NOTES_PERMANENT_DELETE', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
       const id = noteIdSchema.parse(idInput);
-      return restoreFromTrash(id);
-    }),
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.NOTES_DELETE,
-    withIpcLogging('NOTES_DELETE', (_event: Electron.IpcMainInvokeEvent, idInput: string) => {
-      const id = noteIdSchema.parse(idInput);
-      return deleteNote(id);
+      return permanentlyDeleteNote(id);
     }),
   );
 
