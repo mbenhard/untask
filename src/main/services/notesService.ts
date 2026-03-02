@@ -1,4 +1,4 @@
-import { eq, and, desc, lt, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, lt, isNotNull } from 'drizzle-orm';
 
 import { getDb } from '../db';
 import { notes, type Note } from '../db/schema';
@@ -91,6 +91,20 @@ export const blockNoteToMarkdown = (raw: string): string => {
 const EMPTY_NOTE_TTL_MS = 60_000; // 1 minute
 
 /**
+ * One-time migration: permanently delete any notes that have `deletedAt` set.
+ * Without this, those notes would resurface after the deletedAt filter is removed.
+ */
+export function migrateDeletedNotesToPermanentDelete(): number {
+  const db = getDb();
+  const purged = db
+    .delete(notes)
+    .where(isNotNull(notes.deletedAt))
+    .returning({ id: notes.id })
+    .all();
+  return purged.length;
+}
+
+/**
  * One-time migration: prepend stored titles into note content as a heading block,
  * then clear the title field. This allows titles to be derived purely from content.
  * Safe to call multiple times — only affects notes with non-empty titles.
@@ -100,11 +114,6 @@ export function migrateNoteTitlesToContent(): void {
   const withTitles = db
     .select()
     .from(notes)
-    .where(and(
-      // SQLite: title != '' AND title IS NOT NULL
-      // drizzle-orm doesn't have a neq('') helper, so we use a raw filter
-      isNull(notes.deletedAt),
-    ))
     .all()
     .filter((n) => n.title.length > 0);
 
@@ -162,7 +171,7 @@ export function getNote(id: string): Note | undefined {
   const [note] = db
     .select()
     .from(notes)
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .where(eq(notes.id, id))
     .all();
   return note;
 }
@@ -174,7 +183,7 @@ export function saveNote(id: string, content: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ content, updatedAt: now })
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .where(eq(notes.id, id))
     .returning()
     .all();
   return updated;
@@ -185,7 +194,7 @@ export function archiveNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ status: 'archived', updatedAt: new Date().toISOString() })
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .where(eq(notes.id, id))
     .returning()
     .all();
   return updated;
@@ -196,30 +205,20 @@ export function restoreNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ status: 'active', updatedAt: new Date().toISOString() })
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .where(eq(notes.id, id))
     .returning()
     .all();
   return updated;
 }
 
-export function deleteNote(id: string): void {
+export function permanentlyDeleteNote(id: string): boolean {
   const db = getDb();
-  db
-    .update(notes)
-    .set({ deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
-    .run();
-}
-
-export function restoreFromTrash(id: string): Note | undefined {
-  const db = getDb();
-  const [updated] = db
-    .update(notes)
-    .set({ deletedAt: null, updatedAt: new Date().toISOString() })
-    .where(and(eq(notes.id, id), isNotNull(notes.deletedAt)))
-    .returning()
+  const deleted = db
+    .delete(notes)
+    .where(eq(notes.id, id))
+    .returning({ id: notes.id })
     .all();
-  return updated;
+  return deleted.length > 0;
 }
 
 export function pinNote(id: string): Note | undefined {
@@ -227,7 +226,7 @@ export function pinNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ isPinned: true })
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .where(eq(notes.id, id))
     .returning()
     .all();
   return updated;
@@ -238,7 +237,7 @@ export function unpinNote(id: string): Note | undefined {
   const [updated] = db
     .update(notes)
     .set({ isPinned: false })
-    .where(and(eq(notes.id, id), isNull(notes.deletedAt)))
+    .where(eq(notes.id, id))
     .returning()
     .all();
   return updated;
@@ -308,7 +307,6 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   db.delete(notes)
     .where(
       and(
-        isNull(notes.deletedAt),
         eq(notes.status, 'active'),
         eq(notes.content, ''),
         lt(notes.createdAt, cutoff),
@@ -319,7 +317,6 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   const all = db
     .select()
     .from(notes)
-    .where(isNull(notes.deletedAt))
     .orderBy(desc(notes.isPinned), desc(notes.updatedAt))
     .all();
 
@@ -333,14 +330,14 @@ export function listNotes(): { active: Note[]; archived: Note[] } {
   return { active, archived };
 }
 
-export function purgeOldSoftDeletedNotes(maxAgeDays = 30): number {
+export function purgeOldArchivedNotes(maxAgeDays = 30): number {
   const db = getDb();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - maxAgeDays);
 
   const purged = db
     .delete(notes)
-    .where(and(isNotNull(notes.deletedAt), lt(notes.deletedAt, cutoff.toISOString())))
+    .where(and(eq(notes.status, 'archived'), lt(notes.updatedAt, cutoff.toISOString())))
     .returning({ id: notes.id })
     .all();
 
