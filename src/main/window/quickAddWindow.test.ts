@@ -14,6 +14,8 @@ const windowListeners = new Map<string, Listener>();
 
 const mockMainWindow = {
   isDestroyed: vi.fn(() => false),
+  isVisible: vi.fn(() => false),
+  hide: vi.fn(),
   webContents: {
     send: vi.fn(),
   },
@@ -46,6 +48,7 @@ const mockBrowserWindow = {
 const BrowserWindowCtor = vi.fn(function BrowserWindowCtor() {
   return mockBrowserWindow;
 });
+const mockAppHide = vi.fn();
 const ipcMainOn = vi.fn((channel: string, handler: Listener) => {
   ipcHandlers.set(channel, handler);
 });
@@ -75,6 +78,7 @@ vi.mock('electron', () => ({
       return electronState.isPackaged;
     },
     getAppPath: vi.fn(() => '/mock/app'),
+    hide: () => mockAppHide(),
   },
 }));
 
@@ -101,7 +105,10 @@ describe('quickAddWindow', () => {
     mockGetSetting.mockReset();
     mockSummonWindow.mockReset();
     mockMainWindow.isDestroyed.mockReturnValue(false);
+    mockMainWindow.isVisible.mockReturnValue(false);
+    mockMainWindow.hide.mockReset();
     mockMainWindow.webContents.send.mockReset();
+    mockAppHide.mockReset();
 
     BrowserWindowCtor.mockClear();
     ipcMainOn.mockClear();
@@ -164,6 +171,40 @@ describe('quickAddWindow', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('re-hides main window when quick add dismisses from hidden-main state', async () => {
+    vi.useFakeTimers();
+    try {
+      mockMainWindow.isVisible.mockReturnValue(false);
+      const quickAdd = await loadModule();
+      quickAdd.createQuickAddWindow();
+
+      quickAdd.showQuickAdd();
+
+      // Simulate unexpected main-window restoration during quick-add dismissal.
+      mockMainWindow.isVisible.mockReturnValue(true);
+      quickAdd.hideQuickAdd();
+
+      expect(mockAppHide).toHaveBeenCalledTimes(1);
+      expect(mockMainWindow.hide).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(350);
+      expect(mockMainWindow.hide).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not hide app when main window was already visible before quick add', async () => {
+    mockMainWindow.isVisible.mockReturnValue(true);
+    const quickAdd = await loadModule();
+    quickAdd.createQuickAddWindow();
+
+    quickAdd.showQuickAdd();
+    quickAdd.hideQuickAdd();
+
+    expect(mockAppHide).not.toHaveBeenCalled();
   });
 
   it('routes quick-add navigate IPC to summon + task navigation', async () => {

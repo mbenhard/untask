@@ -9,10 +9,39 @@ const WINDOW_WIDTH = 600;
 const COLLAPSED_HEIGHT = 60;
 const BLUR_SUPPRESSION_MS = 150;
 const ACTIVATION_SUPPRESSION_MS = 1500;
+const MAIN_REHIDE_DELAY_MS = 300;
 
 let quickAddWin: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let activationSuppressedUntil = 0;
+let mainWasVisibleBeforeQuickAdd = false;
+let mainRehideTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearMainRehideTimer(): void {
+  if (!mainRehideTimer) return;
+  clearTimeout(mainRehideTimer);
+  mainRehideTimer = null;
+}
+
+function hideMainIfVisible(): void {
+  const main = getMainWindow();
+  if (main && !main.isDestroyed() && main.isVisible()) {
+    main.hide();
+  }
+}
+
+function maybePreventMainResurfaceAfterDismiss(): void {
+  if (process.platform !== 'darwin' || mainWasVisibleBeforeQuickAdd) {
+    return;
+  }
+
+  app.hide();
+  hideMainIfVisible();
+  mainRehideTimer = setTimeout(() => {
+    mainRehideTimer = null;
+    hideMainIfVisible();
+  }, MAIN_REHIDE_DELAY_MS);
+}
 
 function resolveTheme(): 'dark' | 'light' {
   // Theme is stored in localStorage as 'untask-theme' in the renderer,
@@ -108,6 +137,8 @@ export function createQuickAddWindow(): void {
     ipcMain.removeListener(IPC_CHANNELS.QUICK_ADD_HIDE, onHide);
     ipcMain.removeListener(IPC_CHANNELS.QUICK_ADD_RESIZE, onResize);
     ipcMain.removeListener(IPC_CHANNELS.QUICK_ADD_NAVIGATE_TASK, onNavigateTask);
+    clearMainRehideTimer();
+    mainWasVisibleBeforeQuickAdd = false;
     quickAddWin = null;
   });
 }
@@ -140,6 +171,7 @@ export function showQuickAdd(): void {
 
   // Safety net: suppress app activation handler in case macOS fires it.
   activationSuppressedUntil = Date.now() + ACTIVATION_SUPPRESSION_MS;
+  clearMainRehideTimer();
 
   suppressBlur();
   positionOnActiveDisplay();
@@ -153,6 +185,11 @@ export function showQuickAdd(): void {
     source: 'empty',
     theme,
   };
+
+  // Keep track of prior visibility so dismissal can avoid resurrecting
+  // a previously hidden main window.
+  const main = getMainWindow();
+  mainWasVisibleBeforeQuickAdd = !!(main && !main.isDestroyed() && main.isVisible());
 
   // Send payload before showing so the renderer can apply the theme
   // before the first visible frame, preventing a light-mode flash.
@@ -169,15 +206,14 @@ export function hideQuickAdd(): void {
 
   // Safety net: suppress app activation handler.
   activationSuppressedUntil = Date.now() + ACTIVATION_SUPPRESSION_MS;
+  clearMainRehideTimer();
 
   // Suppress blur to prevent re-entry from the blur event
   // that fires when the focused window is hidden.
   suppressBlur();
 
   quickAddWin.hide();
-
-  // With type: 'panel', no app.hide() is needed — the panel never
-  // activated the app, so focus returns to the previous app naturally.
+  maybePreventMainResurfaceAfterDismiss();
 }
 
 export function isActivationSuppressed(): boolean {
