@@ -236,7 +236,16 @@ export const buildSystemPrompt = (
     '- Prefer the attached note snapshot over calling read_note for the same note',
   ].join('\n');
 
-  const formatRules = '## Formatting Rules\nNever mention internal IDs (like task, event, or subtask IDs) in chat responses. Humans do not understand them. Use human-readable names and titles instead.';
+  const formatRules = [
+    '## Response format',
+    'Never mention internal IDs (task, event, or subtask IDs) in chat. Use human-readable names and titles instead.',
+    '',
+    '### Formatting',
+    '- Short paragraphs and bullet lists. Keep responses to 2-3 sentences when a short answer suffices.',
+    '- No markdown tables — task data appears as cards automatically after tool calls.',
+    '- No headings (#, ##, etc.) — keep text flat and conversational.',
+    '- Use **bold** for emphasis, `inline code` for technical terms.',
+  ].join('\n');
 
   const compiledSections = [
     metaSection,

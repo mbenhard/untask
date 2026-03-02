@@ -2,13 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, Check, ChevronRight, Image as ImageIcon, Loader2, Undo2, X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkBreaks from 'remark-breaks';
-
 import type { ChipAction, TurnStep } from '../../../types/chat';
+import { ChatMarkdown } from './ChatMarkdown';
+import { ChatTaskResults } from './ChatTaskCard';
 import { SNAPPY, heightVariants } from '../../lib/animation';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
+import { useAppStore } from '../../stores/appStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { BirdMascot } from './BirdMascot';
 
 const AvatarIcon = ({ size, className }: { size: number; className?: string }) => (
@@ -381,6 +382,24 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
   const retryLastFailedMessage = useChatStore((state) => state.retryLastFailedMessage);
   const clearFocusMessageId = useChatStore((state) => state.clearFocusMessageId);
 
+  const setView = useAppStore((state) => state.setView);
+  const selectTask = useTaskStore((state) => state.selectTask);
+  const allTasks = useTaskStore((state) => state.tasks);
+
+  const handleTaskCardClick = useCallback((taskId: string) => {
+    const task = allTasks.find((t) => t.id === taskId);
+    if (task) {
+      if (task.status === 'inbox') {
+        setView('inbox');
+      } else if (task.today) {
+        setView('today');
+      } else {
+        setView('tasks');
+      }
+      selectTask(taskId);
+    }
+  }, [allTasks, setView, selectTask]);
+
   const prefersReducedMotion = useReducedMotion();
   const lastAnimatedIdRef = useRef<string | null>(null);
 
@@ -585,9 +604,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                           key={`text-${index}`}
                           className="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm"
                         >
-                          <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                            <ReactMarkdown remarkPlugins={[remarkBreaks]}>{step.content}</ReactMarkdown>
-                          </div>
+                          <ChatMarkdown content={step.content} />
                         </div>
                       );
                     }
@@ -608,6 +625,16 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                           onReject={(actionId) => {
                             void rejectPendingAction(actionId);
                           }}
+                        />
+                      );
+                    }
+
+                    if (step.kind === 'task_results') {
+                      return (
+                        <ChatTaskResults
+                          key={`tasks-${index}`}
+                          tasks={step.tasks}
+                          onTaskClick={handleTaskCardClick}
                         />
                       );
                     }
@@ -647,9 +674,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                       'border-border bg-card/80 text-foreground',
                     )}
                   >
-                    <div className="prose prose-invert max-w-none text-sm text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 [&_p]:whitespace-pre-wrap">
-                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{message.content}</ReactMarkdown>
-                    </div>
+                    <ChatMarkdown content={message.content} />
                   </div>
                   {message.chips && message.chips.length > 0 ? (
                     <ChipBar

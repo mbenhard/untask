@@ -412,6 +412,14 @@ const handleToolCallCompleted: StreamEventHandler = ({ set, event, inFlight }) =
     return step;
   });
 
+  // If tool result includes task data, add a task_results step after the tool step
+  if (event.taskResults && event.taskResults.length > 0) {
+    nextSteps.push({
+      kind: 'task_results',
+      tasks: event.taskResults,
+    });
+  }
+
   set((state) => ({
     inFlightByRequestId: {
       ...state.inFlightByRequestId,
@@ -721,7 +729,7 @@ export const createStreamActions = (
         if (msg.isStreaming) {
           const hasContent = msg.content.trim().length > 0;
           const hasVisibleSteps = msg.steps.some(
-            (step) => step.kind === 'text' || step.kind === 'tool',
+            (step) => step.kind === 'text' || step.kind === 'tool' || step.kind === 'task_results',
           );
 
           if (!hasContent && !hasVisibleSteps) {

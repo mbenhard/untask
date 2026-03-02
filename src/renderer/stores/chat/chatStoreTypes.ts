@@ -295,6 +295,14 @@ export const reconstructStepsFromMetadata = (
       summary: exec.message,
       actionCard: card,
     });
+
+    // If this tool execution carried task results, add a task_results step
+    if (exec.taskResults && exec.taskResults.length > 0) {
+      steps.push({
+        kind: 'task_results',
+        tasks: exec.taskResults,
+      });
+    }
   }
 
   return steps;

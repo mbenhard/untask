@@ -5,6 +5,7 @@ import { generateText, stepCountIs, streamText, type ModelMessage } from 'ai';
 
 import type {
   ChatActionCard,
+  ChatTaskSummary,
   ChipAction,
   ChatNoteContext,
   ChatRequestOrigin,
@@ -1504,15 +1505,6 @@ export const runAssistantStream = async (
                 }
               }
 
-              const execution: ChatToolExecutionSummary = {
-                toolName: part.toolName,
-                toolCallId: part.toolCallId,
-                status,
-                message,
-                actionCardId: actionCard?.id,
-              };
-              toolExecutions.push(execution);
-
               // Capture chips from emit_chips tool results
               let toolChips: ChipAction[] | undefined;
               if (
@@ -1527,6 +1519,37 @@ export const runAssistantStream = async (
                 emittedChips = toolChips;
               }
 
+              // Extract task results from list_tasks tool
+              let taskResults: ChatTaskSummary[] | undefined;
+              if (
+                part.toolName === 'list_tasks' &&
+                status === 'success' &&
+                envelope?.data &&
+                typeof envelope.data === 'object' &&
+                'tasks' in envelope.data &&
+                Array.isArray((envelope.data as Record<string, unknown>).tasks)
+              ) {
+                const rawTasks = (envelope.data as Record<string, unknown>).tasks as Array<Record<string, unknown>>;
+                taskResults = rawTasks.map((t) => ({
+                  id: String(t.id ?? ''),
+                  title: String(t.title ?? ''),
+                  status: String(t.status ?? ''),
+                  priority: t.priority != null ? String(t.priority) : null,
+                  dueDate: t.dueDate != null ? String(t.dueDate) : null,
+                  today: Boolean(t.today),
+                }));
+              }
+
+              const execution: ChatToolExecutionSummary = {
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                status,
+                message,
+                actionCardId: actionCard?.id,
+                ...(taskResults ? { taskResults } : {}),
+              };
+              toolExecutions.push(execution);
+
               emit({
                 type: 'tool_call_completed',
                 requestId: input.requestId,
@@ -1537,6 +1560,7 @@ export const runAssistantStream = async (
                 summary,
                 actionCard,
                 ...(toolChips ? { chips: toolChips } : {}),
+                ...(taskResults ? { taskResults } : {}),
               });
               if (isDev) {
                 console.log(`[chat-stream] tool ${part.toolName} completed (${status}): ${(performance.now() - t0).toFixed(0)}ms`);
@@ -1635,12 +1659,35 @@ export const runAssistantStream = async (
             if (fallbackResult.ok) {
               const actionCard = fallbackResult.output.actionCard;
               const fallbackSummary = generateToolCallSummary(fallbackResult.toolName, fallbackResult.output);
+
+              // Extract task results from fallback list_tasks execution
+              let fallbackTaskResults: ChatTaskSummary[] | undefined;
+              if (
+                fallbackResult.toolName === 'list_tasks' &&
+                fallbackResult.output.status === 'success' &&
+                fallbackResult.output.data &&
+                typeof fallbackResult.output.data === 'object' &&
+                'tasks' in fallbackResult.output.data &&
+                Array.isArray((fallbackResult.output.data as Record<string, unknown>).tasks)
+              ) {
+                const rawTasks = (fallbackResult.output.data as Record<string, unknown>).tasks as Array<Record<string, unknown>>;
+                fallbackTaskResults = rawTasks.map((t) => ({
+                  id: String(t.id ?? ''),
+                  title: String(t.title ?? ''),
+                  status: String(t.status ?? ''),
+                  priority: t.priority != null ? String(t.priority) : null,
+                  dueDate: t.dueDate != null ? String(t.dueDate) : null,
+                  today: Boolean(t.today),
+                }));
+              }
+
               const execution: ChatToolExecutionSummary = {
                 toolName: fallbackResult.toolName,
                 toolCallId: fallbackToolCallId,
                 status: fallbackResult.output.status,
                 message: fallbackResult.output.message,
                 actionCardId: actionCard?.id,
+                ...(fallbackTaskResults ? { taskResults: fallbackTaskResults } : {}),
               };
               toolExecutions.push(execution);
 
@@ -1653,6 +1700,7 @@ export const runAssistantStream = async (
                 message: fallbackResult.output.message,
                 summary: fallbackSummary,
                 actionCard,
+                ...(fallbackTaskResults ? { taskResults: fallbackTaskResults } : {}),
               });
 
               forcedFallbackText = formatFallbackAssistantText(

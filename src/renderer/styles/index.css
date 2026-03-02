@@ -961,6 +961,102 @@ body.cursor-col-resize * {
   border-radius: 2px;
 }
 
+/* ──────────────────────────────────────────────
+   Chat markdown: scoped styles for AI responses
+   ────────────────────────────────────────────── */
+.chat-markdown {
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.chat-markdown p {
+  margin: 4px 0;
+  white-space: pre-wrap;
+}
+
+.chat-markdown p:first-child { margin-top: 0; }
+.chat-markdown p:last-child  { margin-bottom: 0; }
+
+.chat-md-list {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.chat-md-list li {
+  margin: 2px 0;
+}
+
+.chat-md-list-ordered {
+  list-style-type: decimal;
+}
+
+.chat-md-inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+pre.chat-md-code-block {
+  margin: 6px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.chat-md-code-block-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.chat-md-blockquote {
+  margin: 6px 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--border) 80%, transparent);
+  color: var(--muted-foreground);
+}
+
+.chat-md-link {
+  color: var(--muted-foreground);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+  transition: color 120ms ease;
+}
+
+.chat-md-link:hover {
+  color: var(--foreground);
+}
+
+.chat-md-hr {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  margin: 8px 0;
+}
+
+.chat-md-table-flat {
+  margin: 4px 0;
+}
+
+.chat-md-table-header {
+  margin-bottom: 2px;
+}
+
+.chat-md-table-cell + .chat-md-table-cell::before {
+  content: " / ";
+  color: var(--muted-foreground);
+  opacity: 0.5;
+}
+
 /* Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   .task-navigated,

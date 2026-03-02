@@ -30,6 +30,15 @@ export type ChipAction = {
   responseText?: string;
 };
 
+export type ChatTaskSummary = {
+  id: string;
+  title: string;
+  status: string;
+  priority: string | null;
+  dueDate: string | null;
+  today: boolean;
+};
+
 export type ChatActionCard = {
   id: string;
   toolName: string;
@@ -53,6 +62,7 @@ export type ChatToolExecutionSummary = {
   status: ChatToolStatus;
   message: string;
   actionCardId?: string;
+  taskResults?: ChatTaskSummary[];
 };
 
 export type ChatTurnTelemetry = {
@@ -86,6 +96,10 @@ export type TurnStep =
       status: 'running' | 'success' | 'error' | 'confirmation_required';
       summary?: string;
       actionCard?: ChatActionCard;
+    }
+  | {
+      kind: 'task_results';
+      tasks: ChatTaskSummary[];
     };
 
 export type ChatStreamEvent =
@@ -121,6 +135,7 @@ export type ChatStreamEvent =
       summary?: string;
       actionCard?: ChatActionCard;
       chips?: ChipAction[];
+      taskResults?: ChatTaskSummary[];
     }
   | {
       type: 'assistant_done';
