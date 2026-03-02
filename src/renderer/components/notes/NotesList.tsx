@@ -253,70 +253,79 @@ const NoteListItem = ({
         ) : null}
       </div>
 
-      {/* Hover actions for active notes */}
-      {onPin || onUnpin || onArchive ? (
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          {note.isPinned && onUnpin ? (
-            <button
-              type="button"
-              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-              onClick={(e) => { e.stopPropagation(); onUnpin(note.id); }}
-              aria-label="Unpin note"
-            >
-              <Pin size={12} aria-hidden="true" />
-            </button>
-          ) : onPin ? (
-            <button
-              type="button"
-              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-              onClick={(e) => { e.stopPropagation(); onPin(note.id); }}
-              aria-label="Pin note"
-            >
-              <Pin size={12} aria-hidden="true" />
-            </button>
-          ) : null}
-          {onArchive ? (
-            <button
-              type="button"
-              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-              onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
-              aria-label="Archive note"
-            >
-              <Archive size={12} aria-hidden="true" />
-            </button>
-          ) : null}
+      {/* Trailing slot: timestamp and hover actions occupy the same space */}
+      <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: '3.5rem' }}>
+        {/* Timestamp — fades out on hover when actions are available */}
+        <span className={cn(
+          'font-mono text-[10px] text-muted-foreground',
+          (onPin || onUnpin || onArchive || onRestore || (onDelete && !onArchive))
+            ? 'transition-opacity group-hover:opacity-0 group-focus-within:opacity-0'
+            : '',
+        )}>
+          {formatRelativeTime(note.updatedAt)}
         </span>
-      ) : null}
 
-      {/* Hover actions for archived notes */}
-      {onRestore ? (
-        <button
-          type="button"
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 group-focus-within:opacity-100"
-          onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
-          aria-label="Restore note"
-        >
-          <ArchiveRestore size={12} aria-hidden="true" />
-        </button>
-      ) : null}
-      {onDelete && !onArchive ? (
-        <button
-          type="button"
-          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 group-focus-within:opacity-100"
-          onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-          aria-label="Delete note"
-        >
-          <Trash2 size={12} aria-hidden="true" />
-        </button>
-      ) : null}
+        {/* Hover actions for active notes — absolute, overlays timestamp */}
+        {onPin || onUnpin || onArchive ? (
+          <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            {note.isPinned && onUnpin ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => { e.stopPropagation(); onUnpin(note.id); }}
+                aria-label="Unpin note"
+              >
+                <Pin size={12} aria-hidden="true" />
+              </button>
+            ) : onPin ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => { e.stopPropagation(); onPin(note.id); }}
+                aria-label="Pin note"
+              >
+                <Pin size={12} aria-hidden="true" />
+              </button>
+            ) : null}
+            {onArchive ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
+                aria-label="Archive note"
+              >
+                <Archive size={12} aria-hidden="true" />
+              </button>
+            ) : null}
+          </span>
+        ) : null}
 
-      {/* Timestamp — hidden on hover when actions are visible */}
-      <span className={cn(
-        'shrink-0 font-mono text-[10px] text-muted-foreground',
-        (onPin || onRestore) && 'opacity-100 transition-opacity group-hover:opacity-0',
-      )}>
-        {formatRelativeTime(note.updatedAt)}
-      </span>
+        {/* Hover actions for archived notes — absolute, overlays timestamp */}
+        {onRestore || (onDelete && !onArchive) ? (
+          <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            {onRestore ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
+                aria-label="Restore note"
+              >
+                <ArchiveRestore size={12} aria-hidden="true" />
+              </button>
+            ) : null}
+            {onDelete && !onArchive ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+                aria-label="Delete note"
+              >
+                <Trash2 size={12} aria-hidden="true" />
+              </button>
+            ) : null}
+          </span>
+        ) : null}
+      </div>
     </button>
   );
 };
