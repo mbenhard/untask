@@ -27,7 +27,7 @@ import {
 } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
-import { createSdkTools, executeToolCall, INCEPTION_ALLOWED_TOOLS, OLLAMA_ALLOWED_TOOLS } from './tools';
+import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
 import {
   loadPendingActions,
   removePendingAction,
@@ -497,6 +497,7 @@ const shouldForceToolChoiceBySemanticIntent = async (input: {
   try {
     const { text } = await generateText({
       model: input.model,
+      ...(isInceptionProvider() ? { maxTokens: 200 } : {}),
       system: [
         'You are an intent classifier for a local productivity app.',
         'Decide whether the latest user message requires a TASK/NOTE tool action.',
@@ -1200,6 +1201,7 @@ export const runAssistantStream = async (
             ? `${builtPrompt.modelInputPrompt}\n\n${noteContextPrompt}`
             : builtPrompt.modelInputPrompt,
           messages: sdkMessages,
+          ...(inceptionMode ? { maxTokens: 4096 } : {}),
           toolChoice: requireToolChoice ? 'required' : 'auto',
           stopWhen: stepCountIs(ollamaSlim ? OLLAMA_TOOL_LOOP_MAX_STEPS : STREAM_TOOL_LOOP_MAX_STEPS),
           prepareStep: async ({ steps }) => {
@@ -1270,9 +1272,7 @@ export const runAssistantStream = async (
             const effectiveAllowedTools =
               ollamaSlim && !input.allowedTools
                 ? OLLAMA_ALLOWED_TOOLS
-                : inceptionMode && !input.allowedTools
-                  ? INCEPTION_ALLOWED_TOOLS
-                  : input.allowedTools;
+                : input.allowedTools;
 
             const sdkTools = createSdkTools({
               requestId: input.requestId,
