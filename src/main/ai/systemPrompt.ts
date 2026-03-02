@@ -81,6 +81,8 @@ export const formatRelativeTime = (dateStr: string | null, now: Date): string =>
   if (Number.isNaN(date.getTime())) return '';
 
   const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 0) return 'just now';
+
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -94,7 +96,7 @@ export const formatRelativeTime = (dateStr: string | null, now: Date): string =>
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffWeeks === 1) return 'last week';
   if (diffWeeks < 4) return `${diffWeeks} weeks ago`;
-  if (diffMonths === 1) return 'last month';
+  if (diffMonths <= 1) return 'last month';
   return `${diffMonths} months ago`;
 };
 
@@ -150,7 +152,7 @@ const buildNotesSection = (
   now: Date,
   noteLimit = 10,
 ): string => {
-  const notes = liveContext.notes ?? [];
+  const notes = (liveContext.notes ?? []).filter((n) => n.title.trim().length > 0);
   if (notes.length === 0) return '';
 
   const limited = notes.slice(0, noteLimit);

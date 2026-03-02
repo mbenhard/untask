@@ -42,6 +42,7 @@ import {
 } from '../../stores/chat';
 import { selectActiveView, useAppStore } from '../../stores/appStore';
 import { useNotesStore } from '../../stores/notesStore';
+import { getDisplayTitle as getNoteDisplayTitle } from '../../lib/noteUtils';
 import { Button } from '../ui/button';
 
 const formatTimestamp = (createdAt: string | null): string => {
@@ -393,7 +394,8 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
     if (!activeNoteId) return null;
     const note = activeNotes.find((n) => n.id === activeNoteId);
     if (!note) return null;
-    return note.title || null;
+    const title = getNoteDisplayTitle(note.title, note.content);
+    return title === 'Empty note' ? null : title;
   }, [activeNoteId, activeNotes]);
 
   const showNoteHint =
