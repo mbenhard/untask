@@ -11,6 +11,7 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useMenuActions } from '../../hooks/useMenuActions';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { isTaskRefreshSuppressed } from '../../lib/editorSaveGuard';
 import { createTaskRefreshCoalescer } from '../../lib/taskRefreshCoalescer';
 import { cn } from '../../lib/utils';
@@ -65,6 +66,14 @@ const LazyChatInput = lazy(async () => {
 export const AppShell = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openPanelRef = useRef<HTMLElement>(null);
+  const { width: chatPanelWidth, isResizing, isResizingRef, handleProps: resizeHandleProps } =
+    useResizablePanel({
+      panelRef: openPanelRef,
+      storageKey: 'untask-chat-width',
+      minWidth: 320,
+      maxWidth: 680,
+      viewportPadding: 80,
+    });
   const taskRefreshStatsRef = useRef({ notifications: 0, refreshes: 0 });
   const [chatInputValue, setChatInputValue] = useState('');
 
@@ -351,6 +360,8 @@ export const AppShell = () => {
     }
 
     const onPointerDown = (event: PointerEvent): void => {
+      if (isResizingRef.current) return;
+
       const target = event.target;
       if (!(target instanceof Node)) {
         return;
@@ -444,10 +455,27 @@ export const AppShell = () => {
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
                     transition={overlayTransition}
                     style={{
-                      width: 'min(clamp(340px, 30vw, 460px), calc(100vw - 24px))',
+                      width:
+                        chatPanelWidth !== null
+                          ? `${chatPanelWidth}px`
+                          : 'min(clamp(340px, 30vw, 460px), calc(100vw - 24px))',
                     }}
-                    className="pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm"
+                    className={cn(
+                      'pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm',
+                      isResizing && 'select-none',
+                    )}
                   >
+                    {/* Resize handle — left edge */}
+                    <div
+                      {...resizeHandleProps}
+                      className={cn(
+                        'absolute inset-y-0 -left-0.5 z-10 w-2 cursor-resize-horizontal',
+                        'before:absolute before:inset-y-2 before:left-[3px] before:w-px before:rounded-full',
+                        'before:bg-border/0 before:transition-colors before:duration-150',
+                        isResizing ? 'before:bg-border/70' : 'hover:before:bg-border/40',
+                      )}
+                    />
+
                     {/* Header: adapts based on chatView */}
                     <header className="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
                       <AnimatePresence mode="wait" initial={false}>

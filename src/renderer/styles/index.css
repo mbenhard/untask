@@ -983,6 +983,16 @@ body.cursor-grabbing * {
   cursor: grabbing !important;
 }
 
+/* Panel resize: custom unfold-horizontal cursor from Lucide */
+.cursor-resize-horizontal {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 12h6'/%3E%3Cpath d='M8 12H2'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 8v2'/%3E%3Cpath d='M12 14v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m19 15 3-3-3-3'/%3E%3Cpath d='m5 9-3 3 3 3'/%3E%3C/svg%3E") 12 12, col-resize;
+}
+
+body.cursor-col-resize,
+body.cursor-col-resize * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 12h6'/%3E%3Cpath d='M8 12H2'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 8v2'/%3E%3Cpath d='M12 14v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m19 15 3-3-3-3'/%3E%3Cpath d='m5 9-3 3 3 3'/%3E%3C/svg%3E") 12 12, col-resize !important;
+}
+
 @keyframes field-changed-pulse {
   0%   { background-color: color-mix(in srgb, var(--foreground) 12%, transparent); }
   100% { background-color: transparent; }
