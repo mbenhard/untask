@@ -90,6 +90,7 @@ describe('useKeyboardShortcuts', () => {
   let root: Root;
   let requestHide: ReturnType<typeof vi.fn<() => Promise<void>>>;
   let undoLastUserAction: ReturnType<typeof vi.fn<() => Promise<{ ok: true; undone: false }>>>;
+  let redoLastUserAction: ReturnType<typeof vi.fn<() => Promise<{ ok: true; undone: false }>>>;
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -102,6 +103,10 @@ describe('useKeyboardShortcuts', () => {
       ok: true,
       undone: false,
     });
+    redoLastUserAction = vi.fn<() => Promise<{ ok: true; undone: false }>>().mockResolvedValue({
+      ok: true,
+      undone: false,
+    });
     const untaskWindow = window as unknown as {
       untask?: {
         app?: {
@@ -109,6 +114,7 @@ describe('useKeyboardShortcuts', () => {
         };
         tasks?: {
           undoLastUserAction?: () => Promise<{ ok: true; undone: false }>;
+          redoLastUserAction?: () => Promise<{ ok: true; undone: false }>;
         };
         notes?: {
           list?: () => Promise<{ active: unknown[]; archived: unknown[] }>;
@@ -128,6 +134,7 @@ describe('useKeyboardShortcuts', () => {
       },
       tasks: {
         undoLastUserAction,
+        redoLastUserAction,
       },
       notes: {
         list: vi.fn(async () => ({ active: [], archived: [] })),
@@ -578,5 +585,69 @@ describe('useKeyboardShortcuts', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', key: '1', metaKey: true }));
     });
     expect(useAppStore.getState().activeView).toBe('today');
+  });
+
+  it('Cmd+Shift+Z triggers redo in tasks view', async () => {
+    useAppStore.setState({ activeView: 'today', chatOverlayState: 'peek' });
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, shiftKey: true }));
+    });
+
+    await Promise.resolve();
+
+    expect(redoLastUserAction).toHaveBeenCalledTimes(1);
+    expect(undoLastUserAction).not.toHaveBeenCalled();
+  });
+
+  it('Cmd+Shift+Z does not trigger redo in notes view', () => {
+    useAppStore.setState({ activeView: 'notes', chatOverlayState: 'peek' });
+    useNotesStore.setState({ subView: 'list', layoutMode: 'list', activeNoteId: null });
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, shiftKey: true }));
+    });
+
+    expect(redoLastUserAction).not.toHaveBeenCalled();
+  });
+
+  it('Cmd+Shift+Z does not trigger redo when a text input is focused', () => {
+    useAppStore.setState({ activeView: 'today', chatOverlayState: 'peek' });
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    const inputRef = {
+      current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
+    };
+
+    flushSync(() => {
+      root.render(createElement(HookHarness, { inputRef, inputValue: '', clearInput: vi.fn() }));
+    });
+
+    flushSync(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, shiftKey: true }));
+    });
+
+    document.body.removeChild(input);
+
+    expect(redoLastUserAction).not.toHaveBeenCalled();
   });
 });

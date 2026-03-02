@@ -27,6 +27,7 @@ import {
   toggleToday,
   reorderTasks,
   undoLastUserTaskEvent,
+  redoLastUserTaskEvent,
   getTaskStatusConfig,
   setTaskStatusConfig,
 } from '../services/taskService';
@@ -150,6 +151,29 @@ export const registerTaskHandlers = (): void => {
           message: result.undone
             ? 'Undid action successfully.'
             : (result.reason ?? 'No changes were made by undo.'),
+          targetTaskId: result.targetTaskId,
+          originalEventId: result.originalEventId,
+          originalAction: result.originalAction,
+        };
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.TASK_REDO_LAST_USER_ACTION,
+    withIpcLogging(
+      'TASK_REDO_LAST_USER_ACTION',
+      (): import('../../types/ipc').TaskUndoResultPayload => {
+        const result = redoLastUserTaskEvent();
+        if (!result) {
+          return { ok: true, undone: false, message: 'No user action available to redo.' };
+        }
+        return {
+          ok: true,
+          undone: result.undone,
+          message: result.undone
+            ? 'Redid action successfully.'
+            : (result.reason ?? 'No changes were made by redo.'),
           targetTaskId: result.targetTaskId,
           originalEventId: result.originalEventId,
           originalAction: result.originalAction,

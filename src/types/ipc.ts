@@ -74,6 +74,7 @@ export const IPC_CHANNELS = {
   TASK_GET_STATUSES: 'task:get-statuses',
   TASK_SET_STATUSES: 'task:set-statuses',
   TASK_UNDO_LAST_USER_ACTION: 'task:undo-last-user-action',
+  TASK_REDO_LAST_USER_ACTION: 'task:redo-last-user-action',
   TASK_DATA_CHANGED: 'task:data-changed',
   CHAT_SEND: 'chat:send',
   CHAT_STREAM_EVENT: 'chat:stream-event',

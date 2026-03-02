@@ -226,6 +226,29 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'z') {
+        if (isTextInputElement(document.activeElement)) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (chatOverlayState === 'open') {
+          return;
+        }
+
+        if (notesActive) {
+          return;
+        }
+
+        void (async () => {
+          await getUntask().tasks.redoLastUserAction();
+          await useTaskStore.getState().refreshTasks();
+          useToastStore.getState().showToast('Redone');
+        })();
+        return;
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
         event.preventDefault();
         onToggleTheme?.();

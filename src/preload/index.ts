@@ -225,6 +225,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_SET_STATUSES, config),
     undoLastUserAction: (): Promise<TaskUndoResultPayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_UNDO_LAST_USER_ACTION),
+    redoLastUserAction: (): Promise<TaskUndoResultPayload> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_REDO_LAST_USER_ACTION),
   },
   chat: {
     send: (message: ChatSendRequest): Promise<ChatSendResult> =>

@@ -84,9 +84,11 @@ const emitTaskChange = (event: TaskChangeEvent): void => {
 const USER_UNDO_STACK_SIZE = 20;
 const TASK_UNDO_STATE_KEY = 'tasks.undo_state';
 const userUndoStack: string[] = [];
+const userRedoStack: string[] = [];
 
-// Maps a parent event ID -> child event IDs so recursive user actions can undo atomically.
+// Maps a parent event ID -> child event IDs so recursive user actions can undo/redo atomically.
 const cascadeUndoGroups = new Map<string, string[]>();
+const cascadeRedoGroups = new Map<string, string[]>();
 let persistUndoStackTimer: NodeJS.Timeout | null = null;
 
 const persistUndoStackNow = (): void => {
@@ -94,6 +96,8 @@ const persistUndoStackNow = (): void => {
     const payload = {
       stack: userUndoStack,
       cascadeGroups: Object.fromEntries(cascadeUndoGroups.entries()),
+      redoStack: userRedoStack,
+      cascadeRedoGroups: Object.fromEntries(cascadeRedoGroups.entries()),
     };
     setSetting(TASK_UNDO_STATE_KEY, JSON.stringify(payload));
   } catch {
@@ -115,6 +119,8 @@ const restoreUndoStack = (): void => {
   const raw = getSetting(TASK_UNDO_STATE_KEY);
   userUndoStack.splice(0, userUndoStack.length);
   cascadeUndoGroups.clear();
+  userRedoStack.splice(0, userRedoStack.length);
+  cascadeRedoGroups.clear();
 
   if (!raw) {
     return;
@@ -124,6 +130,8 @@ const restoreUndoStack = (): void => {
     const parsed = JSON.parse(raw) as {
       stack?: unknown;
       cascadeGroups?: Record<string, unknown>;
+      redoStack?: unknown;
+      cascadeRedoGroups?: Record<string, unknown>;
     };
 
     if (Array.isArray(parsed.stack)) {
@@ -152,6 +160,33 @@ const restoreUndoStack = (): void => {
         }
       }
     }
+
+    if (Array.isArray(parsed.redoStack)) {
+      for (const eventId of parsed.redoStack) {
+        if (typeof eventId === 'string' && eventId.length > 0) {
+          userRedoStack.push(eventId);
+          if (userRedoStack.length >= USER_UNDO_STACK_SIZE) {
+            break;
+          }
+        }
+      }
+    }
+
+    const redoGroups = parsed.cascadeRedoGroups;
+    if (redoGroups && typeof redoGroups === 'object') {
+      for (const [parentEventId, childIds] of Object.entries(redoGroups)) {
+        if (typeof parentEventId !== 'string' || !Array.isArray(childIds)) {
+          continue;
+        }
+
+        const normalizedChildren = childIds.filter(
+          (childId): childId is string => typeof childId === 'string' && childId.length > 0,
+        );
+        if (normalizedChildren.length > 0) {
+          cascadeRedoGroups.set(parentEventId, normalizedChildren);
+        }
+      }
+    }
   } catch {
     // Corrupt persisted state should not prevent app startup.
   }
@@ -175,11 +210,48 @@ const pushUserUndoEvent = (eventId: string): void => {
     const evicted = userUndoStack.pop();
     if (evicted) cascadeUndoGroups.delete(evicted);
   }
+  // Any new user action invalidates the redo stack.
+  userRedoStack.splice(0, userRedoStack.length);
+  cascadeRedoGroups.clear();
   schedulePersistUndoStack();
 };
 
 const popUserUndoEvent = (): string | null => {
   const popped = userUndoStack.shift() ?? null;
+  if (popped) {
+    // Transfer to redo stack so the undone action can be redone.
+    userRedoStack.unshift(popped);
+    if (userRedoStack.length > USER_UNDO_STACK_SIZE) {
+      const evicted = userRedoStack.pop();
+      if (evicted) cascadeRedoGroups.delete(evicted);
+    }
+    // Transfer any cascade group so redo is also atomic.
+    const group = cascadeUndoGroups.get(popped);
+    if (group) {
+      cascadeRedoGroups.set(popped, group);
+      cascadeUndoGroups.delete(popped);
+    }
+  }
+  schedulePersistUndoStack();
+  return popped;
+};
+
+const popUserRedoEvent = (): string | null => {
+  const popped = userRedoStack.shift() ?? null;
+  if (popped) {
+    // Transfer back to undo stack so the redone action can be undone again.
+    userUndoStack.unshift(popped);
+    if (userUndoStack.length > USER_UNDO_STACK_SIZE) {
+      const evicted = userUndoStack.pop();
+      if (evicted) cascadeUndoGroups.delete(evicted);
+    }
+    // Transfer any cascade group back to undo.
+    const group = cascadeRedoGroups.get(popped);
+    if (group) {
+      cascadeUndoGroups.set(popped, group);
+      cascadeRedoGroups.delete(popped);
+    }
+  }
   schedulePersistUndoStack();
   return popped;
 };
@@ -643,6 +715,159 @@ export function undoLastUserTaskEvent(): UndoTaskEventResult | null {
   }
 
   return undoTaskEvent(eventId, 'undo');
+}
+
+export function redoTaskEvent(
+  eventId: string,
+): UndoTaskEventResult {
+  const db = getDb();
+  const [targetEvent] = db
+    .select()
+    .from(taskEvents)
+    .where(eq(taskEvents.id, eventId))
+    .all();
+
+  if (!targetEvent) {
+    throw new Error(`Task event not found: ${eventId}`);
+  }
+
+  const before = parseTaskSnapshot(targetEvent.before);
+  const after = parseTaskSnapshot(targetEvent.after);
+
+  // Redo a create: the task was hard-deleted by undo, re-insert from the `after` snapshot.
+  if (targetEvent.action === 'create') {
+    if (!after) {
+      throw new Error(`Cannot redo create event ${eventId}: missing after snapshot.`);
+    }
+
+    const existing = getTaskByIdIncludeDeleted(targetEvent.taskId);
+    const restored = existing
+      ? existing.deletedAt
+        ? db
+          .update(tasks)
+          .set({ deletedAt: null })
+          .where(eq(tasks.id, targetEvent.taskId))
+          .returning()
+          .all()[0]
+        : existing
+      : db
+        .insert(tasks)
+        .values(after as NewTask)
+        .returning()
+        .all()[0];
+
+    const redoEvent = logTaskEvent(
+      targetEvent.taskId,
+      'create',
+      'undo',
+      existing,
+      restored,
+    );
+
+    emitTaskChange({ taskId: targetEvent.taskId, action: 'create' });
+    return {
+      undone: true,
+      targetTaskId: targetEvent.taskId,
+      originalEventId: targetEvent.id,
+      originalAction: targetEvent.action,
+      undoEventId: redoEvent.id,
+    };
+  }
+
+  // Redo a delete: the task was restored by undo, re-delete it.
+  if (targetEvent.action === 'delete') {
+    const existing = getTaskById(targetEvent.taskId);
+    if (!existing) {
+      return {
+        undone: false,
+        targetTaskId: targetEvent.taskId,
+        originalEventId: targetEvent.id,
+        originalAction: targetEvent.action,
+        reason: 'Task no longer exists.',
+      };
+    }
+
+    db.delete(tasks).where(eq(tasks.id, targetEvent.taskId)).run();
+    const redoEvent = logTaskEvent(
+      targetEvent.taskId,
+      'delete',
+      'undo',
+      existing,
+      null,
+    );
+
+    // Also re-delete grouped child events (e.g., cascade delete) so redo is atomic.
+    redoGroupedChildEvents(eventId);
+
+    emitTaskChange({ taskId: targetEvent.taskId, action: 'delete' });
+    return {
+      undone: true,
+      targetTaskId: targetEvent.taskId,
+      originalEventId: targetEvent.id,
+      originalAction: targetEvent.action,
+      undoEventId: redoEvent.id,
+    };
+  }
+
+  // Redo an update/complete/cancel: apply the `after` snapshot.
+  if (!after) {
+    throw new Error(`Cannot redo event ${eventId}: missing after snapshot.`);
+  }
+
+  const existing = getTaskById(targetEvent.taskId);
+  const restored = existing
+    ? updateTaskFromSnapshot(targetEvent.taskId, after)
+    : db
+      .insert(tasks)
+      .values(after as NewTask)
+      .returning()
+      .all()[0];
+
+  const redoEvent = logTaskEvent(
+    targetEvent.taskId,
+    'update',
+    'undo',
+    existing ?? before,
+    restored,
+  );
+
+  // Also redo grouped child events (e.g., completeChildren) so redo is atomic.
+  redoGroupedChildEvents(eventId);
+
+  emitTaskChange({ taskId: targetEvent.taskId, action: 'update' });
+  return {
+    undone: true,
+    targetTaskId: targetEvent.taskId,
+    originalEventId: targetEvent.id,
+    originalAction: targetEvent.action,
+    undoEventId: redoEvent.id,
+  };
+}
+
+const redoGroupedChildEvents = (eventId: string): void => {
+  const childEventIds = cascadeRedoGroups.get(eventId);
+  if (!childEventIds) {
+    return;
+  }
+
+  for (const childEventId of childEventIds) {
+    try {
+      redoTaskEvent(childEventId);
+    } catch {
+      // Child may have been modified by other means; skip.
+    }
+  }
+  cascadeRedoGroups.delete(eventId);
+  schedulePersistUndoStack();
+};
+
+export function redoLastUserTaskEvent(): UndoTaskEventResult | null {
+  const eventId = popUserRedoEvent();
+  if (!eventId) {
+    return null;
+  }
+
+  return redoTaskEvent(eventId);
 }
 
 export function createTask(

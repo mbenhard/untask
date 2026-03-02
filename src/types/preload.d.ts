@@ -143,6 +143,7 @@ export type UntaskApi = {
     getStatuses: () => Promise<TaskStatusConfig>;
     setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
     undoLastUserAction: () => Promise<TaskUndoResultPayload>;
+    redoLastUserAction: () => Promise<TaskUndoResultPayload>;
   };
   chat: {
     send: (message: ChatSendRequest) => Promise<ChatSendResult>;
