@@ -24,8 +24,9 @@ export function readDockMode(): DockMode {
   return sanitizeDockMode(getSetting(DOCK_MODE_KEY));
 }
 
-export function applyDockMode(mode?: DockMode): void {
+export function applyDockMode(mode?: DockMode, onComplete?: () => void): void {
   if (process.platform !== 'darwin' || !app.dock) {
+    onComplete?.();
     return;
   }
 
@@ -33,13 +34,13 @@ export function applyDockMode(mode?: DockMode): void {
 
   switch (resolved) {
     case 'normal':
-      void app.dock.show();
+      void app.dock.show().finally(() => onComplete?.());
       if (!getTray()) {
         setupTray();
       }
       break;
     case 'dock-only':
-      void app.dock.show();
+      void app.dock.show().finally(() => onComplete?.());
       destroyTray();
       break;
     case 'menu-bar-only':
@@ -47,6 +48,8 @@ export function applyDockMode(mode?: DockMode): void {
       if (!getTray()) {
         setupTray();
       }
+      // dock.hide() is synchronous but the blur event arrives on the next tick
+      setTimeout(() => onComplete?.(), 50);
       break;
   }
 }

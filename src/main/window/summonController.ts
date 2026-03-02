@@ -21,10 +21,14 @@ const BOUNDS_SAVE_DELAY_MS = 500;
 const BLUR_SUPPRESSION_MS = 150;
 const PULL_ON_FOCUS_MIN_INTERVAL_MS = 30_000; // Don't pull more than once every 30s on focus
 
+const DOCK_TRANSITION_SAFETY_MS = 1000;
+
 let win: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
 let boundsSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastPullOnFocusAt = 0;
+let dockModeTransitioning = false;
+let dockTransitionTimer: ReturnType<typeof setTimeout> | null = null;
 
 function shouldQuickHide(): boolean {
   const dockMode = sanitizeDockMode(getSetting(DOCK_MODE_KEY));
@@ -48,6 +52,9 @@ export function initSummonController(mainWindow: BrowserWindow): void {
   mainWindow.on('resize', scheduleBoundsSave);
 
   mainWindow.on('blur', () => {
+    if (dockModeTransitioning) {
+      return;
+    }
     if (Date.now() < blurSuppressedUntil) {
       return;
     }
@@ -109,6 +116,23 @@ export function onEscapeLayerExit(): void {
 
 export function getMainWindow(): BrowserWindow | null {
   return win;
+}
+
+export function beginDockModeTransition(): void {
+  dockModeTransitioning = true;
+  if (dockTransitionTimer) clearTimeout(dockTransitionTimer);
+  dockTransitionTimer = setTimeout(() => {
+    dockModeTransitioning = false;
+    dockTransitionTimer = null;
+  }, DOCK_TRANSITION_SAFETY_MS);
+}
+
+export function endDockModeTransition(): void {
+  dockModeTransitioning = false;
+  if (dockTransitionTimer) {
+    clearTimeout(dockTransitionTimer);
+    dockTransitionTimer = null;
+  }
 }
 
 function suppressBlur(): void {

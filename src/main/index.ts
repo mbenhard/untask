@@ -192,6 +192,7 @@ const emitIdentityContextDebugSnapshot = (): void => {
 
 app.on('second-instance', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    applyDockMode();
     summonWindow();
   }
 });
@@ -264,7 +265,9 @@ app.whenReady().then(() => {
     if (!existingMain || existingMain.isDestroyed()) {
       mainWindow = createMainWindow();
       initSummonController(mainWindow);
+      applyDockMode();
     } else {
+      applyDockMode();
       summonWindow();
     }
     void checkForUpdates(false);

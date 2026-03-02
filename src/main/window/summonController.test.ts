@@ -26,6 +26,8 @@ import {
   onEscapeLayerExit,
   requestHideFromRenderer,
   summonWindow,
+  beginDockModeTransition,
+  endDockModeTransition,
 } from './summonController';
 
 type ListenerMap = {
@@ -163,5 +165,66 @@ describe('summonController dismiss mode behavior', () => {
     onEscapeLayerExit();
 
     expect(window.hide).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('dock mode transition blur suppression', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-16T12:00:00.000Z'));
+    mockGetSetting.mockReset();
+    mockSetSetting.mockReset();
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'app.dockMode') return 'menu-bar-only';
+      return null;
+    });
+    // Ensure no stale transition state from prior tests
+    endDockModeTransition();
+  });
+
+  afterEach(() => {
+    endDockModeTransition();
+    vi.useRealTimers();
+  });
+
+  it('suppresses blur during dock mode transition', () => {
+    const { window, listeners } = createMockWindow();
+    initSummonController(window as never);
+
+    beginDockModeTransition();
+    listeners.blur?.();
+
+    expect(window.hide).not.toHaveBeenCalled();
+  });
+
+  it('allows blur after endDockModeTransition', () => {
+    const { window, listeners } = createMockWindow();
+    initSummonController(window as never);
+
+    // Advance past any stale blur suppression from prior tests
+    vi.advanceTimersByTime(200);
+
+    beginDockModeTransition();
+    endDockModeTransition();
+    listeners.blur?.();
+
+    expect(window.hide).toHaveBeenCalledTimes(1);
+  });
+
+  it('safety timeout clears transition flag after 1s', () => {
+    const { window, listeners } = createMockWindow();
+    initSummonController(window as never);
+
+    beginDockModeTransition();
+
+    // Still suppressed before timeout
+    listeners.blur?.();
+    expect(window.hide).not.toHaveBeenCalled();
+
+    // Advance past the 1s safety timeout
+    vi.advanceTimersByTime(1000);
+
+    listeners.blur?.();
+    expect(window.hide).toHaveBeenCalledTimes(1);
   });
 });

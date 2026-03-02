@@ -21,6 +21,8 @@ import { SETTING_KEY_APP_LAUNCH_AT_LOGIN } from '../defaultSettings';
 import {
   requestHideFromRenderer,
   onEscapeLayerExit,
+  beginDockModeTransition,
+  endDockModeTransition,
 } from '../window/summonController';
 import { dockModeSchema, readDockMode, applyDockMode, DOCK_MODE_KEY } from '../window/dockMode';
 import { reRegisterShortcuts, getShortcutRegistrationStatus } from '../shortcuts';
@@ -111,7 +113,8 @@ export const registerAppHandlers = (): void => {
       (_event: Electron.IpcMainInvokeEvent, modeInput: unknown): DockModeResult => {
         const mode = dockModeSchema.parse(modeInput);
         setSetting(DOCK_MODE_KEY, mode);
-        applyDockMode(mode);
+        beginDockModeTransition();
+        applyDockMode(mode, endDockModeTransition);
         return { mode };
       },
     ),
