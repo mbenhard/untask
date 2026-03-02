@@ -292,7 +292,7 @@ export const TaskDueDatePicker = ({
             variant="ghost"
             size="xs"
             className={cn(
-              'w-full text-muted-foreground',
+              'w-full text-destructive hover:bg-destructive/10 hover:text-destructive',
               !dueDate && 'pointer-events-none opacity-50',
             )}
             disabled={!dueDate}

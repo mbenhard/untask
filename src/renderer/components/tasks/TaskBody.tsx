@@ -488,7 +488,7 @@ const RecurrenceSegment = ({
               void onUpdate({ id: task.id, recurrence: null });
               setOpen(false);
             }}
-            className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             Remove
           </button>
