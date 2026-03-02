@@ -21,12 +21,13 @@ import { buildCanonicalRuntimeContext } from './contextBuilder';
 import { getActiveProvider } from './providers';
 import {
   getModelWebSearchConfig,
+  isInceptionProvider,
   isOllamaProvider,
   modelSupportsVision,
 } from './models';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
-import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
+import { createSdkTools, executeToolCall, INCEPTION_ALLOWED_TOOLS, OLLAMA_ALLOWED_TOOLS } from './tools';
 import {
   loadPendingActions,
   removePendingAction,
@@ -1035,6 +1036,7 @@ export const runAssistantStream = async (
 
       try {
         const ollamaSlim = OLLAMA_SLIM_MODE && isOllamaProvider();
+        const inceptionMode = isInceptionProvider();
 
         let builtPrompt: ReturnType<typeof buildSystemPrompt> | null = cachedPrompt;
         if (!builtPrompt) {
@@ -1268,7 +1270,9 @@ export const runAssistantStream = async (
             const effectiveAllowedTools =
               ollamaSlim && !input.allowedTools
                 ? OLLAMA_ALLOWED_TOOLS
-                : input.allowedTools;
+                : inceptionMode && !input.allowedTools
+                  ? INCEPTION_ALLOWED_TOOLS
+                  : input.allowedTools;
 
             const sdkTools = createSdkTools({
               requestId: input.requestId,

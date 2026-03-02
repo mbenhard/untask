@@ -1,6 +1,6 @@
 import type { LanguageModel } from 'ai';
 
-export type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
+export type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama' | 'inception';
 
 export interface ProviderConfig {
   type: ProviderType;

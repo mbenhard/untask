@@ -16,13 +16,14 @@ import { SettingsSection } from './SettingsSection';
 
 // ─── Provider types ──────────────────────────────────────────────────────────
 
-type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
+type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama' | 'inception';
 
 const PROVIDER_LABELS: Record<ProviderType, string> = {
   openrouter: 'OpenRouter',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   ollama: 'Ollama',
+  inception: 'Inception Labs',
 };
 
 // ─── Setting key constants ────────────────────────────────────────────────────
@@ -35,7 +36,9 @@ const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const isValidProvider = (value: string): value is ProviderType =>
-  ['openrouter', 'openai', 'anthropic', 'ollama'].includes(value);
+  ['openrouter', 'openai', 'anthropic', 'ollama', 'inception'].includes(value);
+
+const SETTING_KEY_AI_INCEPTION_DIFFUSION_MODE = 'ai_inception_diffusion_mode';
 
 // ─── Hook: AI tab state ──────────────────────────────────────────────────────
 
@@ -74,6 +77,10 @@ const useAITabState = (
 
   // Ollama pull
   const [pullProgress, setPullProgress] = useState<OllamaPullProgressPayload | null>(null);
+
+  // Inception diffusion mode
+  const [inceptionMode, setInceptionMode] = useState<'streaming' | 'diffusion'>('streaming');
+  const [isLoadingInceptionMode, setIsLoadingInceptionMode] = useState(false);
 
   // Model
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -202,6 +209,19 @@ const useAITabState = (
     }
   }, [setError]);
 
+  const loadInceptionMode = useCallback(async () => {
+    try {
+      setIsLoadingInceptionMode(true);
+      const stored = await getUntask().settings.get(SETTING_KEY_AI_INCEPTION_DIFFUSION_MODE);
+      const resolved = stored === 'diffusion' ? 'diffusion' : 'streaming';
+      setInceptionMode(resolved);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load inception mode.');
+    } finally {
+      setIsLoadingInceptionMode(false);
+    }
+  }, [setError]);
+
   useEffect(() => {
     void (async () => {
       await loadAiEnabled();
@@ -215,6 +235,9 @@ const useAITabState = (
       if (resolvedProvider === 'ollama') {
         void loadOllamaStatus();
       }
+      if (resolvedProvider === 'inception') {
+        void loadInceptionMode();
+      }
     })();
   }, [
     loadAiEnabled,
@@ -225,6 +248,7 @@ const useAITabState = (
     loadSelectedModel,
     loadAutonomyMode,
     loadRetentionMode,
+    loadInceptionMode,
   ]);
 
   // ─── Ollama pull progress listener ────────────────────────────────────────
@@ -288,6 +312,10 @@ const useAITabState = (
           // Load key status for new provider
           await loadApiKeyStatus(value);
 
+          if (value === 'inception') {
+            void loadInceptionMode();
+          }
+
           // Reset selected model to provider default
           const providerModels = getCuratedModelsForProvider(value);
           const defaultModel = providerModels.find((m) => m.isDefault) ?? providerModels[0];
@@ -303,7 +331,7 @@ const useAITabState = (
         setError(e instanceof Error ? e.message : 'Failed to update provider.');
       }
     },
-    [provider, setError, setNotice, loadApiKeyStatus, loadOllamaStatus],
+    [provider, setError, setNotice, loadApiKeyStatus, loadOllamaStatus, loadInceptionMode],
   );
 
   const handleSaveApiKey = useCallback(async () => {
@@ -457,6 +485,24 @@ const useAITabState = (
     [retentionMode, setError, setNotice],
   );
 
+  const handleInceptionModeChange = useCallback(
+    async (mode: 'streaming' | 'diffusion') => {
+      const previousMode = inceptionMode;
+      setInceptionMode(mode);
+      setNotice(null);
+      setError(null);
+
+      try {
+        await getUntask().settings.set(SETTING_KEY_AI_INCEPTION_DIFFUSION_MODE, mode);
+        setNotice(`Output mode set to ${mode}.`);
+      } catch (e) {
+        setInceptionMode(previousMode);
+        setError(e instanceof Error ? e.message : 'Failed to update output mode.');
+      }
+    },
+    [inceptionMode, setError, setNotice],
+  );
+
   const handleApiKeyInputChange = useCallback((value: string) => {
     setApiKeyInput(value);
     setApiKeyValid(null);
@@ -527,6 +573,10 @@ const useAITabState = (
     pullProgress,
     handlePullModel,
     handleCancelPull,
+    // Inception
+    inceptionMode,
+    isLoadingInceptionMode,
+    handleInceptionModeChange,
     // Model
     selectedModelId,
     isLoadingModel,
@@ -600,6 +650,26 @@ export const SettingsAI = ({ setError, setNotice }: SettingsAIProps) => {
                 detectedBaseUrl={state.detectedBaseUrl}
               />
             </SettingsSection>
+
+            {/* ── Inception Output Mode ──────────────────────────────────── */}
+            {state.provider === 'inception' && (
+              <SettingsSection title="Output Mode">
+                <SettingsRow
+                  label="Decoding strategy"
+                  hint="Diffusion mode refines multiple tokens in parallel for a unique streaming effect."
+                  loading={state.isLoadingInceptionMode}
+                >
+                  <SegmentedControl
+                    options={[
+                      { value: 'streaming' as const, label: 'Streaming' },
+                      { value: 'diffusion' as const, label: 'Diffusion' },
+                    ]}
+                    value={state.inceptionMode}
+                    onChange={(v) => void state.handleInceptionModeChange(v as 'streaming' | 'diffusion')}
+                  />
+                </SettingsRow>
+              </SettingsSection>
+            )}
 
             {/* ── Model ─────────────────────────────────────────────────────── */}
             <SettingsSection title="Model">

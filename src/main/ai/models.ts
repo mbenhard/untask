@@ -20,6 +20,8 @@ export const SUPPORTED_MODEL_IDS = [
   // Anthropic direct models
   'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
+  // Inception Labs models
+  'mercury-coder-small',
 ] as const;
 
 export type ChatModelId = (typeof SUPPORTED_MODEL_IDS)[number];
@@ -59,6 +61,7 @@ const PROVIDER_DEFAULT_MODEL_IDS: Record<ProviderType, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-6',
   ollama: '',
+  inception: 'mercury-coder-small',
 };
 
 const MODEL_SETTING_KEY = SETTING_KEY_AI_MODEL;
@@ -189,6 +192,17 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
+  // Mercury Coder Small — Inception Labs
+  {
+    id: 'mercury-coder-small',
+    name: 'Mercury Coder Small',
+    provider: 'inception',
+    contextWindow: 128_000,
+    costTier: 'cheap',
+    capabilities: ['tools'],
+    isDefault: true,
+    isRecommended: true,
+  },
 ] as const;
 
 // ─── Legacy catalog (used by IPC / renderer) ──────────────────────────────────
@@ -317,6 +331,16 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsVision: true,
     webSearchMethod: 'claude_native',
   },
+  {
+    id: 'mercury-coder-small',
+    label: 'Mercury Coder Small',
+    inputCostPerMillion: 0.25,
+    outputCostPerMillion: 1.0,
+    defaultSelected: true,
+    supportsReasoning: false,
+    supportsWebSearch: false,
+    supportsVision: false,
+  },
 ] as const;
 
 // ─── Error class ──────────────────────────────────────────────────────────────
@@ -358,11 +382,16 @@ export const isOllamaProvider = (): boolean => {
   return stored === 'ollama';
 };
 
+export const isInceptionProvider = (): boolean => {
+  const stored = getSetting(SETTING_KEY_AI_PROVIDER)?.trim() ?? '';
+  return stored === 'inception';
+};
+
 // ─── Legacy accessors (used by IPC, chat.ts) ───────────
 
 export const getDefaultModelId = (): string => {
   const storedProvider = getSetting(SETTING_KEY_AI_PROVIDER)?.trim() ?? '';
-  const validProviders: ProviderType[] = ['openrouter', 'openai', 'anthropic', 'ollama'];
+  const validProviders: ProviderType[] = ['openrouter', 'openai', 'anthropic', 'ollama', 'inception'];
   const provider = validProviders.includes(storedProvider as ProviderType)
     ? (storedProvider as ProviderType)
     : 'openrouter';

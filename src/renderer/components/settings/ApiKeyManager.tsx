@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
-type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
+type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama' | 'inception';
 
 const PROVIDER_LABELS: Record<ProviderType, string> = {
   openrouter: 'OpenRouter',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   ollama: 'Ollama',
+  inception: 'Inception Labs',
 };
 
 const PROVIDER_KEY_LINKS: Record<ProviderType, string | null> = {
@@ -17,6 +18,7 @@ const PROVIDER_KEY_LINKS: Record<ProviderType, string | null> = {
   openai: 'https://platform.openai.com/api-keys',
   anthropic: 'https://console.anthropic.com/settings/keys',
   ollama: 'https://ollama.com/download',
+  inception: 'https://platform.inceptionlabs.ai',
 };
 
 const PROVIDER_KEY_PLACEHOLDER: Record<ProviderType, string> = {
@@ -24,6 +26,7 @@ const PROVIDER_KEY_PLACEHOLDER: Record<ProviderType, string> = {
   openai: 'sk-...',
   anthropic: 'sk-ant-...',
   ollama: '',
+  inception: 'ink-...',
 };
 
 // ─── Keyed Provider (API Key) ────────────────────────────────────────────────

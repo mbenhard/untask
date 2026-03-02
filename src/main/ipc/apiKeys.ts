@@ -53,6 +53,12 @@ const API_KEY_VALIDATORS: Record<string, {
     isValid: (response) => response.status !== 401,
     errorMessage: () => 'Invalid API key',
   },
+  inception: {
+    url: 'https://api.inceptionlabs.ai/v1/models',
+    headers: (key) => ({ Authorization: `Bearer ${key}` }),
+    isValid: (response) => response.ok,
+    errorMessage: (response) => `Invalid API key (HTTP ${response.status})`,
+  },
 };
 
 export const registerApiKeyHandlers = (): void => {

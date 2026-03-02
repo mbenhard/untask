@@ -3,7 +3,7 @@ import type { OllamaConnectionStatus } from './ApiKeyManager';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSelect } from './SettingsSelect';
 
-type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama';
+type ProviderType = 'openrouter' | 'openai' | 'anthropic' | 'ollama' | 'inception';
 
 type CostTier = 'free' | 'cheap' | 'moderate' | 'premium';
 
@@ -117,6 +117,15 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     provider: 'openrouter',
     costTier: 'cheap',
     capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  {
+    id: 'mercury-coder-small',
+    name: 'Mercury Coder Small',
+    provider: 'inception',
+    costTier: 'cheap',
+    capabilities: ['tools'],
+    isDefault: true,
     isRecommended: true,
   },
 ];

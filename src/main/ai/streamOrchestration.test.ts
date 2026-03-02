@@ -83,6 +83,7 @@ vi.mock('./tools', () => ({
   executeToolCall: executeToolCallMock,
   createSdkTools: vi.fn(() => ({})),
   OLLAMA_ALLOWED_TOOLS: new Set(['list_notes']),
+  INCEPTION_ALLOWED_TOOLS: new Set(['list_notes']),
 }));
 
 vi.mock('./autonomy', () => ({
@@ -117,6 +118,7 @@ vi.mock('./models', () => ({
     webSearchMethod: null,
   })),
   isOllamaProvider: vi.fn(() => false),
+  isInceptionProvider: vi.fn(() => false),
   modelSupportsVision: vi.fn(() => false),
 }));
 

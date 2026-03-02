@@ -148,7 +148,7 @@ export function migrateApiKeysToSafeStorage(): void {
     return;
   }
 
-  const providers = ['openrouter', 'openai', 'anthropic'] as const;
+  const providers = ['openrouter', 'openai', 'anthropic', 'inception'] as const;
 
   for (const provider of providers) {
     const legacyValue = getSetting(plaintextKey(provider));

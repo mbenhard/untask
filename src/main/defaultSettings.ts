@@ -12,6 +12,7 @@ export const SETTING_KEY_AI_PROVIDER = 'ai_provider' as const;
 export const SETTING_KEY_AI_OPENAI_KEY = 'ai_openai_key' as const;
 export const SETTING_KEY_AI_ANTHROPIC_KEY = 'ai_anthropic_key' as const;
 export const SETTING_KEY_AI_OLLAMA_BASE_URL = 'ai_ollama_base_url' as const;
+export const SETTING_KEY_AI_INCEPTION_DIFFUSION_MODE = 'ai_inception_diffusion_mode' as const;
 export const SETTING_KEY_AI_RUNTIME_DETERMINISTIC_ROUTER = 'ai_runtime_deterministic_router' as const;
 export const SETTING_KEY_AI_RUNTIME_PENDING_SCOPE_GUARD = 'ai_runtime_pending_scope_guard' as const;
 export const SETTING_KEY_AI_RUNTIME_DUPLICATE_FAILURE_GUARD = 'ai_runtime_duplicate_failure_guard' as const;
@@ -59,6 +60,7 @@ export const DEFAULT_SETTINGS: Readonly<Record<string, string>> = {
   [SETTING_KEY_AI_OPENAI_KEY]: '',
   [SETTING_KEY_AI_ANTHROPIC_KEY]: '',
   [SETTING_KEY_AI_OLLAMA_BASE_URL]: 'http://localhost:11434',
+  [SETTING_KEY_AI_INCEPTION_DIFFUSION_MODE]: 'streaming',
   [SETTING_KEY_AI_RUNTIME_DETERMINISTIC_ROUTER]: 'false',
   [SETTING_KEY_AI_RUNTIME_PENDING_SCOPE_GUARD]: 'true',
   [SETTING_KEY_AI_RUNTIME_DUPLICATE_FAILURE_GUARD]: 'true',

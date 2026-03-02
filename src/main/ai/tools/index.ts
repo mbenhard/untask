@@ -395,6 +395,10 @@ export const OLLAMA_ALLOWED_TOOLS: ReadonlySet<AiToolName> = new Set([
   'emit_chips',
 ]);
 
+// ─── INCEPTION_ALLOWED_TOOLS ──────────────────────────────────
+// Mercury models have limited tool calling — use the same slim set as Ollama.
+export const INCEPTION_ALLOWED_TOOLS: ReadonlySet<AiToolName> = OLLAMA_ALLOWED_TOOLS;
+
 // ─── SDK tools factory ──────────────────────────────────────────
 
 export const createSdkTools = (

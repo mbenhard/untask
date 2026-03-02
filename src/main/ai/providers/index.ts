@@ -5,6 +5,7 @@ import {
 import { getApiKey } from '../../services/keyStorage';
 import { getSetting } from '../../services/settingsService';
 import { createAnthropicProviderInstance } from './anthropic';
+import { createInceptionProviderInstance } from './inception';
 import { createOllamaProviderInstance } from './ollama';
 import { createOpenAIProviderInstance } from './openai';
 import { createOpenRouterProviderInstance } from './openrouter';
@@ -16,7 +17,7 @@ export type { ProviderConfig, ProviderInstance, ProviderType };
 
 const resolveProviderType = (): ProviderType => {
   const stored = getSetting(SETTING_KEY_AI_PROVIDER)?.trim() ?? '';
-  const valid: ProviderType[] = ['openrouter', 'openai', 'anthropic', 'ollama'];
+  const valid: ProviderType[] = ['openrouter', 'openai', 'anthropic', 'ollama', 'inception'];
   return valid.includes(stored as ProviderType)
     ? (stored as ProviderType)
     : 'openrouter';
@@ -39,6 +40,9 @@ const resolveAnthropicKey = (): string =>
 const resolveOllamaBaseUrl = (): string =>
   getSetting(SETTING_KEY_AI_OLLAMA_BASE_URL) ?? '';
 
+const resolveInceptionKey = (): string =>
+  getApiKey('inception') ?? '';
+
 // ─── Public factory ────────────────────────────────────────────────────────────
 
 /**
@@ -56,6 +60,8 @@ export function createProviderInstance(config: ProviderConfig): ProviderInstance
       return createAnthropicProviderInstance(config.apiKey ?? '');
     case 'ollama':
       return createOllamaProviderInstance(config.baseUrl);
+    case 'inception':
+      return createInceptionProviderInstance(config.apiKey ?? '');
     default: {
       // Exhaustive check — TypeScript will flag this if ProviderType grows
       const _exhaustive: never = config.type;
@@ -83,6 +89,8 @@ export function getActiveProvider(): ProviderInstance {
       return createAnthropicProviderInstance(resolveAnthropicKey());
     case 'ollama':
       return createOllamaProviderInstance(resolveOllamaBaseUrl());
+    case 'inception':
+      return createInceptionProviderInstance(resolveInceptionKey());
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown provider type: ${String(_exhaustive)}`);
