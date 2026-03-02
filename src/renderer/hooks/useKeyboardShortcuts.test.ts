@@ -30,7 +30,7 @@ const defaultNotesActions = {
   enterNotesView: useNotesStore.getState().enterNotesView,
   processWithAI: useNotesStore.getState().processWithAI,
   archiveNote: useNotesStore.getState().archiveNote,
-  deleteNote: useNotesStore.getState().deleteNote,
+  permanentlyDeleteNote: useNotesStore.getState().permanentlyDeleteNote,
   openAdjacentNote: useNotesStore.getState().openAdjacentNote,
   backToList: useNotesStore.getState().backToList,
   selectRelativeActive: useNotesStore.getState().selectRelativeActive,
@@ -415,8 +415,8 @@ describe('useKeyboardShortcuts', () => {
     expect(archiveNote).toHaveBeenCalledWith('note-1');
   });
 
-  it('runs Cmd/Ctrl+Backspace to delete selected archived note from list', () => {
-    const deleteNote = vi.fn(async () => undefined);
+  it('Cmd/Ctrl+Backspace is a no-op for selected archived note from list', () => {
+    const archiveNote = vi.fn(async () => undefined);
     useAppStore.setState({ activeView: 'notes' });
     useNotesStore.setState({
       subView: 'list',
@@ -433,7 +433,7 @@ describe('useKeyboardShortcuts', () => {
         createdAt: null,
         updatedAt: null,
       }],
-      deleteNote: deleteNote as never,
+      archiveNote: archiveNote as never,
     });
 
     const inputRef = {
@@ -448,7 +448,7 @@ describe('useKeyboardShortcuts', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', metaKey: true }));
     });
 
-    expect(deleteNote).toHaveBeenCalledWith('note-archived-1');
+    expect(archiveNote).not.toHaveBeenCalled();
   });
 
   it('runs toast undo callback on Cmd+Z even when a contentEditable element is focused', () => {

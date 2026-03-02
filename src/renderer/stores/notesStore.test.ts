@@ -24,8 +24,7 @@ type MockNotesApi = {
   save: ReturnType<typeof vi.fn<(id: string, content: string) => Promise<Note>>>;
   archive: ReturnType<typeof vi.fn<() => Promise<void>>>;
   restore: ReturnType<typeof vi.fn<() => Promise<void>>>;
-  restoreFromTrash: ReturnType<typeof vi.fn<(id: string) => Promise<Note | undefined>>>;
-  delete: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  permanentDelete: ReturnType<typeof vi.fn<(id: string) => Promise<boolean>>>;
   pin: ReturnType<typeof vi.fn<() => Promise<void>>>;
   unpin: ReturnType<typeof vi.fn<() => Promise<void>>>;
   duplicate: ReturnType<typeof vi.fn<(id: string) => Promise<Note | undefined>>>;
@@ -49,8 +48,7 @@ const createMockNotesApi = (): MockNotesApi => ({
   }),
   archive: vi.fn(async () => undefined as void),
   restore: vi.fn(async () => undefined as void),
-  restoreFromTrash: vi.fn(async (id: string) => mockNote({ id })),
-  delete: vi.fn(async () => undefined as void),
+  permanentDelete: vi.fn(async () => true),
   pin: vi.fn(async () => undefined as void),
   unpin: vi.fn(async () => undefined as void),
   duplicate: vi.fn(async (id: string) => {
@@ -506,51 +504,20 @@ describe('notesStore', () => {
     expect(useNotesStore.getState().selectedListNoteId).toBe('note-c');
   });
 
-  it('deleteNote keeps list selection on adjacent note when selected note is deleted', async () => {
+  it('permanentlyDeleteNote calls permanentDelete API and reloads list', async () => {
     const api = getMockApi();
-    const noteA = mockNote({ id: 'note-a' });
-    const noteB = mockNote({ id: 'note-b' });
-    const noteC = mockNote({ id: 'note-c' });
-
-    useNotesStore.setState({
-      activeNoteId: null,
-      subView: 'list',
-      layoutMode: 'list',
-      activeNotes: [noteA, noteB, noteC],
-      selectedListNoteId: 'note-b',
+    api.list.mockResolvedValueOnce({
+      active: [mockNote({ id: 'note-a' })],
+      archived: [mockNote({ id: 'note-archived', status: 'archived' })],
     });
-    api.list.mockResolvedValue({ active: [noteA, noteC], archived: [] });
+    await useNotesStore.getState().loadList();
 
-    await useNotesStore.getState().deleteNote('note-b');
-
-    expect(useNotesStore.getState().selectedListNoteId).toBe('note-c');
-  });
-
-  it('deleteNote undo restores the same note from soft-delete trash', async () => {
-    const api = getMockApi();
-    useNotesStore.setState({
-      activeNotes: [],
-      archivedNotes: [mockNote({
-        id: 'note-archived',
-        status: 'archived',
-        content: 'hello',
-        isPinned: true,
-      })],
+    api.list.mockResolvedValueOnce({
+      active: [mockNote({ id: 'note-a' })],
+      archived: [],
     });
+    await useNotesStore.getState().permanentlyDeleteNote('note-archived');
 
-    await useNotesStore.getState().deleteNote('note-archived');
-
-    expect(api.delete).toHaveBeenCalledWith('note-archived');
-    const toast = useToastStore.getState().toast;
-    expect(toast?.label).toBe('Note deleted');
-    expect(toast?.onUndo).toBeTypeOf('function');
-
-    if (toast?.onUndo) {
-      await toast.onUndo();
-    }
-
-    expect(api.restoreFromTrash).toHaveBeenCalledWith('note-archived');
-    expect(api.create).not.toHaveBeenCalled();
-    expect(api.save).not.toHaveBeenCalled();
+    expect(api.permanentDelete).toHaveBeenCalledWith('note-archived');
   });
 });
