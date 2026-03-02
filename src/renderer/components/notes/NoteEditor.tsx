@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BlockNoteEditor } from '@blocknote/core';
 import { Archive, ArchiveRestore, ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
@@ -18,6 +18,7 @@ import {
 } from '../../stores/notesStore';
 import { selectAiEnabled, useAppStore } from '../../stores/appStore';
 import { Button } from '../ui/button';
+import { Popover, PopoverContent } from '../ui/popover';
 import { EditorBlockSkeleton } from '../ui/loadingShells';
 import { Skeleton } from '../ui/skeleton';
 import { BlockEditor, type BlockEditorSlashMenuItem, type BlockEditorSlashMenuParams } from '../editor/BlockEditor';
@@ -109,8 +110,10 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
   const backToList = useNotesStore((s) => s.backToList);
   const archiveNote = useNotesStore((s) => s.archiveNote);
   const restoreNote = useNotesStore((s) => s.restoreNote);
-  const deleteNote = useNotesStore((s) => s.deleteNote);
+  const permanentlyDeleteNote = useNotesStore((s) => s.permanentlyDeleteNote);
   const processWithAI = useNotesStore((s) => s.processWithAI);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorHostRef = useRef<HTMLDivElement | null>(null);
@@ -136,6 +139,10 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     }
     return undefined;
   }, []);
+
+  useEffect(() => {
+    setShowDeleteConfirm(false);
+  }, [activeNoteId]);
 
   // 2s debounced auto-save
   const handleChange = useCallback(
@@ -177,10 +184,10 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
     void restoreNote(activeNoteId);
   }, [activeNoteId, restoreNote]);
 
-  const handleDelete = useCallback(() => {
+  const handlePermanentDelete = useCallback(() => {
     if (!activeNoteId) return;
-    void deleteNote(activeNoteId);
-  }, [activeNoteId, deleteNote]);
+    void permanentlyDeleteNote(activeNoteId);
+  }, [activeNoteId, permanentlyDeleteNote]);
 
   const handleProcess = useCallback(() => {
     void processWithAI();
@@ -390,16 +397,40 @@ export const NoteEditor = ({ showBackButton = true }: NoteEditorProps) => {
                 <ArchiveRestore size={12} />
                 restore
               </Button>
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-destructive"
-                onClick={handleDelete}
-              >
-                <Trash2 size={12} />
-                delete
-              </Button>
+              <Popover.Root open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <Popover.Trigger asChild>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="h-6 gap-1 px-1.5 text-[11px] text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 size={12} />
+                    delete
+                  </Button>
+                </Popover.Trigger>
+                <PopoverContent className="w-auto min-w-[200px] p-2" align="end" sideOffset={4}>
+                  <div className="flex flex-col gap-1.5 px-1 py-1.5">
+                    <p className="text-xs text-muted-foreground">Delete permanently?</p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowDeleteConfirm(false); handlePermanentDelete(); }}
+                        className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover.Root>
             </>
           ) : (
             <Button
