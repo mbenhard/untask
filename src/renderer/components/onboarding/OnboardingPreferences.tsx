@@ -160,7 +160,7 @@ export const OnboardingPreferences = ({ onNext, nav, isActive }: OnboardingPrefe
               <div className="flex shrink-0 items-center gap-1">
                 <Key k="cmd" />
                 <Key k="shift" />
-                <Key>Q</Key>
+                <Key>A</Key>
               </div>
               <span className="text-[12px] text-muted-foreground">Quick-add a task</span>
             </div>
