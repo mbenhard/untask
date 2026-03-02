@@ -19,7 +19,8 @@ import {
   type NewTask,
 } from '../db/schema';
 import { calculateNextOccurrence } from './recurrenceEngine';
-import { getSetting, setSetting } from './settingsService';
+import { getSetting, setSetting, getSettingWithDefault } from './settingsService';
+import { SETTING_KEY_TASKS_AUTO_CLEAN_DAYS } from '../defaultSettings';
 import { getMainWindow } from '../window/summonController';
 import { IPC_CHANNELS } from '../../types/ipc';
 
@@ -413,6 +414,43 @@ export function purgeOldSoftDeletedTasks(maxAgeDays = 30): number {
     .all();
 
   return purged.length;
+}
+
+/**
+ * Auto-clean terminal tasks (done/cancelled) older than the user-configured threshold.
+ * Sets `deletedAt` so they enter the existing soft-delete → purge pipeline.
+ * Called once on app startup alongside other cleanup functions.
+ */
+export function autoCleanTerminalTasks(): number {
+  const raw = getSettingWithDefault(SETTING_KEY_TASKS_AUTO_CLEAN_DAYS);
+  if (!raw || raw === 'never') return 0;
+
+  const maxAgeDays = Number.parseInt(raw, 10);
+  if (Number.isNaN(maxAgeDays) || maxAgeDays <= 0) return 0;
+
+  const db = getDb();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - maxAgeDays);
+  const cutoffIso = cutoff.toISOString();
+
+  const cleaned = db
+    .update(tasks)
+    .set({ deletedAt: new Date().toISOString() })
+    .where(
+      and(
+        isNull(tasks.deletedAt),
+        inArray(tasks.status, [...TERMINAL_STATUSES]),
+        sql`coalesce(${tasks.completedAt}, ${tasks.cancelledAt}) < ${cutoffIso}`,
+      ),
+    )
+    .returning({ id: tasks.id })
+    .all();
+
+  for (const { id } of cleaned) {
+    emitTaskChange({ taskId: id, action: 'delete' });
+  }
+
+  return cleaned.length;
 }
 
 export function getTaskById(id: string): Task | null {

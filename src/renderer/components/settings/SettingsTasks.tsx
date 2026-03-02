@@ -26,9 +26,20 @@ import {
   type TaskStatusConfig,
 } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { getUntask } from '../../lib/untask';
 import { useTaskStore } from '../../stores/taskStore';
 import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
+import { SettingsRow } from './SettingsRow';
 import { SettingsSection } from './SettingsSection';
+import { SettingsSelect } from './SettingsSelect';
+
+const AUTO_CLEAN_OPTIONS = [
+  { value: 'never', label: 'Never' },
+  { value: '7', label: 'After 7 days' },
+  { value: '14', label: 'After 14 days' },
+  { value: '30', label: 'After 30 days' },
+  { value: '90', label: 'After 90 days' },
+];
 
 type StatusRowProps = {
   id: PredefinedStatusId;
@@ -138,6 +149,20 @@ export const SettingsTasks = () => {
   const enabledSet = useMemo(() => new Set(config.enabled), [config.enabled]);
 
   // Confirmation dialog state for disabling a status with tasks
+  const [autoCleanDays, setAutoCleanDays] = useState('never');
+
+  useEffect(() => {
+    void (async () => {
+      const stored = await getUntask().settings.get('tasks.auto_clean_days');
+      if (stored) setAutoCleanDays(stored);
+    })();
+  }, []);
+
+  const handleAutoCleanChange = useCallback((value: string) => {
+    setAutoCleanDays(value);
+    void getUntask().settings.set('tasks.auto_clean_days', value);
+  }, []);
+
   const [pendingDisable, setPendingDisable] = useState<{
     statusId: PredefinedStatusId;
     taskCount: number;
@@ -351,6 +376,24 @@ export const SettingsTasks = () => {
             </div>
           </div>
         )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Cleanup"
+        description="Automatically move completed and cancelled tasks to trash after a set period."
+      >
+        <SettingsRow
+          label="Auto-clean done tasks"
+          hint="Done and cancelled tasks will be moved to trash, then permanently deleted after 30 days."
+        >
+          <SettingsSelect
+            options={AUTO_CLEAN_OPTIONS}
+            value={autoCleanDays}
+            onChange={handleAutoCleanChange}
+            aria-label="Auto-clean done tasks"
+            className="w-36"
+          />
+        </SettingsRow>
       </SettingsSection>
     </div>
   );

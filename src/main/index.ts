@@ -32,6 +32,7 @@ import {
   initUndoStack,
   flushUndoStackPersistence,
   purgeOldSoftDeletedTasks,
+  autoCleanTerminalTasks,
 } from './services/taskService';
 import { purgeOldArchivedNotes } from './services/notesService';
 import { migrateLegacyMemoryLayers, migrateIdentityV2 } from './ai/memory';
@@ -155,6 +156,7 @@ const bootstrap = (): void => {
   initUndoStack();
   ensureDefaultTaskStatusConfig();
   clearStaleTodayFlags();
+  autoCleanTerminalTasks();
   purgeOldSoftDeletedTasks();
   purgeOldArchivedNotes();
   migrateLegacyMemoryLayers();
