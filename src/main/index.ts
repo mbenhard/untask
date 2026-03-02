@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, nativeImage, screen, shell } from 'electron';
 import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -79,13 +79,16 @@ const canApplyLaunchAtLogin = (): boolean => {
 };
 
 const createMainWindow = (): BrowserWindow => {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  
   const window = new BrowserWindow({
     width: 680,
     height: 720,
     minWidth: 620,
     minHeight: 600,
-    maxWidth: 800,
-    maxHeight: 800,
+    maxWidth: Math.floor(screenWidth * 0.5),
+    maxHeight: screenHeight,
     frame: false,
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 12, y: 12 },

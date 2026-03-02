@@ -39,6 +39,7 @@ import {
   getNextStatusInCycle,
   getStatusAfterToggleComplete,
 } from './taskInteraction';
+import { resolveTaskNavigationView } from '../layout/taskNavigation';
 import { reconcileScopedReorder } from './statusLaneDrag';
 import { DragPreview } from './DragPreview';
 import { TaskBody } from './TaskBody';
@@ -398,24 +399,50 @@ export const TaskList = ({
 
   const handleCycleStatus = useCallback(
     (taskId: string): void => {
-      const currentTask = tasks.find((candidate) => candidate.id === taskId);
-      if (!currentTask || currentTask.parentId !== null) {
-        return;
+      const currentTask = tasks.find((candidate) => candidate.id === taskId)
+        ?? allTasks.find((candidate) => candidate.id === taskId);
+      if (!currentTask) return;
+
+      // If this is a subtask, target the parent task instead
+      let targetTask = currentTask;
+      if (currentTask.parentId !== null) {
+        const parent = allTasks.find((candidate) => candidate.id === currentTask.parentId);
+        if (!parent) return;
+        targetTask = parent;
       }
 
-      const nextStatus = getNextStatusInCycle(
-        currentTask.status,
-        enabledNonTerminal,
-      );
+      const nextStatus = getNextStatusInCycle(targetTask.status, enabledNonTerminal);
+      void updateTask({ id: targetTask.id, status: nextStatus });
 
-      void updateTask({ id: taskId, status: nextStatus });
       const label = statusLabelMap.get(nextStatus as PredefinedStatusId) ?? nextStatus;
       useToastStore.getState().showToast(`Moved to ${label}`, async () => {
         await getUntask().tasks.undoLastUserAction();
         await useTaskStore.getState().refreshTasks();
       });
+
+      // Navigate to the task in its destination view with highlight animation
+      const resolvedView = resolveTaskNavigationView({
+        ...targetTask,
+        status: nextStatus,
+      });
+      const currentView = useAppStore.getState().activeView;
+      useAppStore.getState().setView(resolvedView);
+
+      if (resolvedView !== currentView) {
+        // View switch: defer navigation so AnimatePresence mode="wait" can
+        // unmount the old view and mount the new one before we set
+        // selectedTaskId. Two rAFs: first lets the exit complete, second
+        // lets the entering view render and attach its effects.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            selectTask(targetTask.id);
+          });
+        });
+      } else {
+        selectTask(targetTask.id);
+      }
     },
-    [enabledNonTerminal, tasks, updateTask],
+    [allTasks, enabledNonTerminal, selectTask, tasks, updateTask],
   );
 
   const handleDragStart = useCallback((event: DragStartEvent): void => {
