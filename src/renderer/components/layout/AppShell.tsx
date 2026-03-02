@@ -264,7 +264,12 @@ export const AppShell = () => {
   }, [chatInputValue, sendMessage]);
 
   const transition = { duration: 0, ease: 'easeOut' as const };
-  const overlayTransition = { duration: 0, ease: 'easeOut' as const };
+  const overlayButtonTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] as const };
+  const overlayPanelTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.2, ease: [0.32, 0.72, 0, 1] as const };
 
   const viewVariants = {
     enter: { opacity: 0 },
@@ -431,10 +436,11 @@ export const AppShell = () => {
                   <motion.button
                     key="chat-overlay-peek"
                     type="button"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={overlayTransition}
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }}
+                    transition={overlayButtonTransition}
+                    style={{ transformOrigin: 'center center' }}
                     className="pointer-events-auto absolute bottom-3 right-3 flex h-8 w-14 items-center justify-center rounded-lg border border-border/60 bg-card/90 text-[10px] font-medium tracking-wide text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:text-foreground"
                     aria-label="Open chat"
                     onClick={openChatFromOverlay}
@@ -450,11 +456,12 @@ export const AppShell = () => {
                   <motion.aside
                     ref={openPanelRef}
                     key="chat-overlay-open"
-                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
-                    transition={overlayTransition}
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 6 }}
+                    transition={overlayPanelTransition}
                     style={{
+                      transformOrigin: 'bottom right',
                       width:
                         chatPanelWidth !== null
                           ? `${chatPanelWidth}px`
