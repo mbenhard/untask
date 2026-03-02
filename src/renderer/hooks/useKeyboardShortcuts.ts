@@ -231,8 +231,6 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        event.preventDefault();
-
         if (chatOverlayState === 'open') {
           return;
         }
@@ -240,6 +238,8 @@ export const useKeyboardShortcuts = ({
         if (notesActive) {
           return;
         }
+
+        event.preventDefault();
 
         void (async () => {
           await getUntask().tasks.redoLastUserAction();

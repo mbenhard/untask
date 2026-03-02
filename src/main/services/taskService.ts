@@ -225,15 +225,21 @@ const popUserUndoEvent = (): string | null => {
       const evicted = userRedoStack.pop();
       if (evicted) cascadeRedoGroups.delete(evicted);
     }
-    // Transfer any cascade group so redo is also atomic.
-    const group = cascadeUndoGroups.get(popped);
-    if (group) {
-      cascadeRedoGroups.set(popped, group);
-      cascadeUndoGroups.delete(popped);
-    }
+    // NOTE: the cascade group stays in cascadeUndoGroups until after
+    // undoGroupedChildEvents() has consumed it. transferUndoCascadeToRedo()
+    // must be called by the caller once the undo has completed.
   }
   schedulePersistUndoStack();
   return popped;
+};
+
+const transferUndoCascadeToRedo = (eventId: string): void => {
+  const group = cascadeUndoGroups.get(eventId);
+  if (group) {
+    cascadeRedoGroups.set(eventId, group);
+    cascadeUndoGroups.delete(eventId);
+    schedulePersistUndoStack();
+  }
 };
 
 const popUserRedoEvent = (): string | null => {
@@ -714,7 +720,11 @@ export function undoLastUserTaskEvent(): UndoTaskEventResult | null {
     return null;
   }
 
-  return undoTaskEvent(eventId, 'undo');
+  const result = undoTaskEvent(eventId, 'undo');
+  // Now that undoGroupedChildEvents has consumed the cascade group from
+  // cascadeUndoGroups, transfer it to cascadeRedoGroups for future redo.
+  transferUndoCascadeToRedo(eventId);
+  return result;
 }
 
 export function redoTaskEvent(
@@ -774,7 +784,7 @@ export function redoTaskEvent(
     };
   }
 
-  // Redo a delete: the task was restored by undo, re-delete it.
+  // Redo a delete: the task was restored by undo, re-delete it (soft-delete, matching deleteTask).
   if (targetEvent.action === 'delete') {
     const existing = getTaskById(targetEvent.taskId);
     if (!existing) {
@@ -787,7 +797,13 @@ export function redoTaskEvent(
       };
     }
 
-    db.delete(tasks).where(eq(tasks.id, targetEvent.taskId)).run();
+    db
+      .update(tasks)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(tasks.id, targetEvent.taskId))
+      .run();
+    db.delete(remindersMappings).where(eq(remindersMappings.taskId, targetEvent.taskId)).run();
+
     const redoEvent = logTaskEvent(
       targetEvent.taskId,
       'delete',
