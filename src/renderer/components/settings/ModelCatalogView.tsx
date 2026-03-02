@@ -120,13 +120,20 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isRecommended: true,
   },
   {
+    id: 'mercury-2',
+    name: 'Mercury 2',
+    provider: 'inception',
+    costTier: 'cheap',
+    capabilities: ['tools', 'reasoning'],
+    isDefault: true,
+    isRecommended: true,
+  },
+  {
     id: 'mercury-coder-small',
     name: 'Mercury Coder Small',
     provider: 'inception',
     costTier: 'cheap',
     capabilities: ['tools'],
-    isDefault: true,
-    isRecommended: true,
   },
 ];
 

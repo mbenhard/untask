@@ -21,6 +21,7 @@ export const SUPPORTED_MODEL_IDS = [
   'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
   // Inception Labs models
+  'mercury-2',
   'mercury-coder-small',
 ] as const;
 
@@ -61,7 +62,7 @@ const PROVIDER_DEFAULT_MODEL_IDS: Record<ProviderType, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-6',
   ollama: '',
-  inception: 'mercury-coder-small',
+  inception: 'mercury-2',
 };
 
 const MODEL_SETTING_KEY = SETTING_KEY_AI_MODEL;
@@ -192,6 +193,17 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
+  // Mercury 2 — Inception Labs
+  {
+    id: 'mercury-2',
+    name: 'Mercury 2',
+    provider: 'inception',
+    contextWindow: 128_000,
+    costTier: 'cheap',
+    capabilities: ['tools', 'reasoning'],
+    isDefault: true,
+    isRecommended: true,
+  },
   // Mercury Coder Small — Inception Labs
   {
     id: 'mercury-coder-small',
@@ -200,8 +212,6 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     contextWindow: 128_000,
     costTier: 'cheap',
     capabilities: ['tools'],
-    isDefault: true,
-    isRecommended: true,
   },
 ] as const;
 
@@ -332,11 +342,21 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     webSearchMethod: 'claude_native',
   },
   {
+    id: 'mercury-2',
+    label: 'Mercury 2',
+    inputCostPerMillion: 0.25,
+    outputCostPerMillion: 0.75,
+    defaultSelected: true,
+    supportsReasoning: true,
+    supportsWebSearch: false,
+    supportsVision: false,
+  },
+  {
     id: 'mercury-coder-small',
     label: 'Mercury Coder Small',
     inputCostPerMillion: 0.25,
     outputCostPerMillion: 1.0,
-    defaultSelected: true,
+    defaultSelected: false,
     supportsReasoning: false,
     supportsWebSearch: false,
     supportsVision: false,
