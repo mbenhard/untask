@@ -172,12 +172,6 @@ export const useKeyboardShortcuts = ({
           return;
         }
 
-        const isArchived = notesState.archivedNotes.some((note) => note.id === selectedId);
-        if (isArchived) {
-          void notesState.deleteNote(selectedId);
-          return;
-        }
-
         const isActive = notesState.activeNotes.some((note) => note.id === selectedId);
         if (isActive) {
           void notesState.archiveNote(selectedId);
