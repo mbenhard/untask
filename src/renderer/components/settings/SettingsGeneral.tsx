@@ -205,10 +205,10 @@ export const SettingsGeneral = ({ setError, setNotice }: SettingsGeneralProps) =
   );
 
   const launchHint = isLoadingLaunchAtLogin
-    ? 'Checking availability...'
+    ? undefined
     : launchAtLoginApplied
-      ? 'Supported in this runtime.'
-      : 'Not supported in this runtime (preference is still saved).';
+      ? undefined
+      : 'Launch at login is not available in this environment.';
 
   return (
     <div role="tabpanel" id="settings-panel-general" className="space-y-3">
