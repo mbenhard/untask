@@ -36,7 +36,7 @@ const GLOBAL_SHORTCUT_SETTINGS: GlobalShortcutSetting[] = [
     key: 'shortcut.quickAdd',
     label: 'Quick add',
     defaultAccelerator: 'CommandOrControl+Shift+A',
-    action: 'Open quick add and prefill from clipboard when available.',
+    action: 'Open quick add window.',
   },
 ];
 
