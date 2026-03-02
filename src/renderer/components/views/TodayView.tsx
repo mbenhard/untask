@@ -70,7 +70,7 @@ export const TodayView = ({
             isCollapsed={isTodayCollapsed}
             onToggle={() => setIsTodayCollapsed((c) => !c)}
             addTaskConfig={{
-              defaultStatus: 'active',
+              defaultStatus: 'in_progress',
               defaultToday: true,
               showMetadata: true,
               placeholder: 'Add to today...',
