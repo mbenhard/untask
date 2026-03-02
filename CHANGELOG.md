@@ -2,6 +2,29 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.1.16] - 2026-03-02
+
+Inception Labs AI provider, notes awareness, archive-only model, and chat panel resize.
+
+### Changes
+
+**Added**
+- **Inception Labs provider** — New experimental AI provider with Mercury 2 as default model, supporting real-time diffusion visual output (~1000+ tokens/sec) and tool calling
+- **Diffusion visual effect** — Mercury 2's parallel token generation renders as garbled text that progressively sharpens into coherent output in real-time
+- **Notes awareness** — AI now sees your recent note titles in context and suggests relevant notes proactively; "Attach note?" hint when opening chat from a note
+- **Chat panel resize** — Draggable handle on the left edge of the chat panel with keyboard support; width persists across sessions
+- **Delete confirmation** — Permanent delete requires explicit confirmation via popover in the editor and context menu
+
+**Improved**
+- **Reminder UX** — Progressive disclosure: time picker appears after selecting a date, reminder offset after setting a time; removed separate reminder time concept
+- **Archive-only model** — Removed soft-delete in favor of archive as the single "away" state for notes; simpler mental model
+
+**Fixed**
+- Dock mode switch no longer hides the window unexpectedly when transitioning to menu-bar-only mode
+- Note attachment hint and banner unified into a single NoteContextBar component
+- First and last chat bubbles no longer sit flush against container edges
+- Launch at Login setting no longer shows developer-facing hint text
+
 ## [0.1.15] - 2026-02-27
 
 Onboarding redesign, animated interactions, backup overhaul, and tray menu redesign.
@@ -360,6 +383,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.1.16]: https://github.com/mbenhard/untask/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/mbenhard/untask/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/mbenhard/untask/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/mbenhard/untask/compare/v0.1.12...v0.1.13
