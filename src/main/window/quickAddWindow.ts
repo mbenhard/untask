@@ -8,6 +8,7 @@ import { summonWindow, getMainWindow } from './summonController';
 const WINDOW_WIDTH = 600;
 const COLLAPSED_HEIGHT = 60;
 const BLUR_SUPPRESSION_MS = 150;
+const ACTIVATION_SUPPRESSION_MS = 1500;
 
 let quickAddWin: BrowserWindow | null = null;
 let blurSuppressedUntil = 0;
@@ -138,7 +139,7 @@ export function showQuickAdd(): void {
   }
 
   // Safety net: suppress app activation handler in case macOS fires it.
-  activationSuppressedUntil = Date.now() + 500;
+  activationSuppressedUntil = Date.now() + ACTIVATION_SUPPRESSION_MS;
 
   suppressBlur();
   positionOnActiveDisplay();
@@ -167,7 +168,7 @@ export function hideQuickAdd(): void {
   if (!quickAddWin || quickAddWin.isDestroyed()) return;
 
   // Safety net: suppress app activation handler.
-  activationSuppressedUntil = Date.now() + 500;
+  activationSuppressedUntil = Date.now() + ACTIVATION_SUPPRESSION_MS;
 
   // Suppress blur to prevent re-entry from the blur event
   // that fires when the focused window is hidden.

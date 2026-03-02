@@ -139,6 +139,33 @@ describe('quickAddWindow', () => {
     expect(mockBrowserWindow.hide).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps activation suppression active long enough after hide', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-16T12:00:00.000Z'));
+    try {
+      const quickAdd = await loadModule();
+      quickAdd.createQuickAddWindow();
+
+      quickAdd.showQuickAdd();
+      expect(quickAdd.isActivationSuppressed()).toBe(true);
+
+      // Regression guard: old 500ms suppression would already be false here.
+      vi.advanceTimersByTime(900);
+      expect(quickAdd.isActivationSuppressed()).toBe(true);
+
+      quickAdd.hideQuickAdd();
+      expect(quickAdd.isActivationSuppressed()).toBe(true);
+
+      vi.advanceTimersByTime(900);
+      expect(quickAdd.isActivationSuppressed()).toBe(true);
+
+      vi.advanceTimersByTime(700);
+      expect(quickAdd.isActivationSuppressed()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('routes quick-add navigate IPC to summon + task navigation', async () => {
     const quickAdd = await loadModule();
     quickAdd.createQuickAddWindow();
