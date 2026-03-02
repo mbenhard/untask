@@ -64,7 +64,7 @@ type NoteContextMenuProps = ContextMenuState & {
   onRestore: (id: string) => void;
   onDuplicate: (id: string) => void;
   onCopyMarkdown: (id: string) => void;
-  onDelete: (id: string) => void;
+  onPermanentDelete: (id: string) => void;
 };
 
 const NoteContextMenu = ({
@@ -80,9 +80,10 @@ const NoteContextMenu = ({
   onRestore,
   onDuplicate,
   onCopyMarkdown,
-  onDelete,
+  onPermanentDelete,
 }: NoteContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -140,15 +141,37 @@ const NoteContextMenu = ({
             <span>Copy as Markdown</span>
           </button>
           <div className="my-1 h-px bg-border/60" />
-          <button
-            type="button"
-            role="menuitem"
-            className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
-            onClick={action(onDelete)}
-          >
-            <Trash2 className="size-3.5" aria-hidden="true" />
-            <span>Delete</span>
-          </button>
+          {confirmingDelete ? (
+            <div className="flex flex-col gap-1.5 px-1 py-1">
+              <p className="text-xs text-muted-foreground">Delete permanently?</p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={action(onPermanentDelete)}
+                  className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              <span>Delete permanently</span>
+            </button>
+          )}
         </>
       ) : (
         <>
@@ -168,16 +191,6 @@ const NoteContextMenu = ({
             <Clipboard className="size-3.5" aria-hidden="true" />
             <span>Copy as Markdown</span>
           </button>
-          <div className="my-1 h-px bg-border/60" />
-          <button
-            type="button"
-            role="menuitem"
-            className={cn(itemClass, 'hover:bg-destructive/10 hover:text-destructive')}
-            onClick={action(onDelete)}
-          >
-            <Trash2 className="size-3.5" aria-hidden="true" />
-            <span>Delete</span>
-          </button>
         </>
       )}
     </div>
@@ -194,7 +207,6 @@ type NoteListItemProps = {
   onContextMenu: (e: React.MouseEvent, note: Note) => void;
   // Archived-only hover actions
   onRestore?: (id: string) => void;
-  onDelete?: (id: string) => void;
   // Active-only hover actions
   onPin?: (id: string) => void;
   onUnpin?: (id: string) => void;
@@ -208,7 +220,6 @@ const NoteListItem = ({
   onFocusSelect,
   onContextMenu,
   onRestore,
-  onDelete,
   onPin,
   onUnpin,
   onArchive,
@@ -258,7 +269,7 @@ const NoteListItem = ({
         {/* Timestamp — fades out on hover when actions are available */}
         <span className={cn(
           'font-mono text-[10px] text-muted-foreground',
-          (onPin || onUnpin || onArchive || onRestore || (onDelete && !onArchive))
+          (onPin || onUnpin || onArchive || onRestore)
             ? 'transition-opacity group-hover:opacity-0 group-focus-within:opacity-0'
             : '',
         )}>
@@ -301,28 +312,16 @@ const NoteListItem = ({
         ) : null}
 
         {/* Hover actions for archived notes — absolute, overlays timestamp */}
-        {onRestore || (onDelete && !onArchive) ? (
+        {onRestore && !onArchive ? (
           <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-            {onRestore ? (
-              <button
-                type="button"
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
-                aria-label="Restore note"
-              >
-                <ArchiveRestore size={12} aria-hidden="true" />
-              </button>
-            ) : null}
-            {onDelete && !onArchive ? (
-              <button
-                type="button"
-                className="rounded p-0.5 text-muted-foreground hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-                aria-label="Delete note"
-              >
-                <Trash2 size={12} aria-hidden="true" />
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
+              aria-label="Restore note"
+            >
+              <ArchiveRestore size={12} aria-hidden="true" />
+            </button>
           </span>
         ) : null}
       </div>
@@ -345,7 +344,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
   const createNote = useNotesStore((s) => s.createNote);
   const openNote = useNotesStore((s) => s.openNote);
   const restoreNote = useNotesStore((s) => s.restoreNote);
-  const deleteNote = useNotesStore((s) => s.deleteNote);
+  const permanentlyDeleteNote = useNotesStore((s) => s.permanentlyDeleteNote);
   const archiveNote = useNotesStore((s) => s.archiveNote);
   const pinNote = useNotesStore((s) => s.pinNote);
   const unpinNote = useNotesStore((s) => s.unpinNote);
@@ -417,9 +416,9 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
     [restoreNote],
   );
 
-  const handleDelete = useCallback(
-    (id: string) => { void deleteNote(id); },
-    [deleteNote],
+  const handlePermanentDelete = useCallback(
+    (id: string) => { void permanentlyDeleteNote(id); },
+    [permanentlyDeleteNote],
   );
 
   const handleArchive = useCallback(
@@ -572,7 +571,6 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
                           onFocusSelect={handleFocusSelect}
                           onContextMenu={handleContextMenu}
                           onRestore={handleRestore}
-                          onDelete={handleDelete}
                         />
                       ))}
                     </div>
@@ -594,7 +592,7 @@ export const NotesList = ({ compact = false }: NotesListProps) => {
           onRestore={handleRestore}
           onDuplicate={handleDuplicate}
           onCopyMarkdown={handleCopyMarkdown}
-          onDelete={handleDelete}
+          onPermanentDelete={handlePermanentDelete}
         />
       ) : null}
     </div>
