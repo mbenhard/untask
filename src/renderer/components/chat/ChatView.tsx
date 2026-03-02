@@ -856,7 +856,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         ) : null}
       </AnimatePresence>
 
-      <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 pb-0">
+      <div ref={scrollContainerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-4 overflow-y-auto pr-1 py-3">
         {renderedMessages.length > 0 ? (
           renderedMessages
         ) : (
