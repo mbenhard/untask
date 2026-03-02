@@ -43,7 +43,7 @@ function transformDiffusionResponse(response: Response): Response {
     .pipeThrough(
       new TransformStream<string, string>({
         buffer: '',
-        transform(chunk, controller) {
+        transform(chunk: string, controller: TransformStreamDefaultController<string>) {
           this.buffer += chunk;
 
           // Process complete SSE events (separated by double newline)
@@ -53,7 +53,7 @@ function transformDiffusionResponse(response: Response): Response {
           for (const event of events) {
             if (!event.trim()) continue;
 
-            const dataLine = event.split('\n').find((l) => l.startsWith('data: '));
+            const dataLine = event.split('\n').find((l: string) => l.startsWith('data: '));
             if (!dataLine) {
               controller.enqueue(event + '\n\n');
               continue;
@@ -104,7 +104,7 @@ function transformDiffusionResponse(response: Response): Response {
             }
           }
         },
-        flush(controller) {
+        flush(controller: TransformStreamDefaultController<string>) {
           // If stream ends without [DONE], emit whatever we buffered
           if (latestFullText.length > 0 && lastContentEvent) {
             lastContentEvent.choices[0].delta.content = latestFullText;
@@ -119,7 +119,7 @@ function transformDiffusionResponse(response: Response): Response {
             controller.enqueue(this.buffer);
           }
         },
-      } as Transformer<string, string> & { buffer: string }),
+      } as { buffer: string; transform: (chunk: string, controller: TransformStreamDefaultController<string>) => void; flush: (controller: TransformStreamDefaultController<string>) => void }),
     )
     .pipeThrough(new TextEncoderStream());
 

@@ -1037,6 +1037,8 @@ export const runAssistantStream = async (
       let attemptHadToolExecution = false;
       forcedFallbackText = null;
 
+      let unsubDiffusion: (() => void) | null = null;
+
       try {
         const ollamaSlim = OLLAMA_SLIM_MODE && isOllamaProvider();
         const inceptionMode = isInceptionProvider();
@@ -1196,7 +1198,6 @@ export const runAssistantStream = async (
 
         resetInactivityTimer();
 
-        let unsubDiffusion: (() => void) | null = null;
         if (inceptionMode) {
           let lastFrameTime = 0;
           unsubDiffusion = onDiffusionFrame((text) => {
@@ -1584,7 +1585,6 @@ export const runAssistantStream = async (
         flushThinkBuffer();
 
         if (chatState.isCanceled(input.requestId)) {
-          unsubDiffusion?.();
           return;
         }
 
@@ -1629,7 +1629,6 @@ export const runAssistantStream = async (
             });
 
             if (chatState.isCanceled(input.requestId)) {
-              unsubDiffusion?.();
               return;
             }
 
@@ -1689,7 +1688,6 @@ export const runAssistantStream = async (
           throw new Error('Provider returned empty response.');
         }
         if (chatState.isCanceled(input.requestId)) {
-          unsubDiffusion?.();
           return;
         }
 
