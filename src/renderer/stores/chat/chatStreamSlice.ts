@@ -265,8 +265,67 @@ const handleReasoning: StreamEventHandler = ({ set, event, inFlight }) => {
   }));
 };
 
+const handleDiffusionFrame: StreamEventHandler = ({ set, event, inFlight }) => {
+  if (!inFlight || event.type !== 'diffusion_frame') return;
+
+  const nextSteps = [...inFlight.steps];
+  const lastStep = nextSteps[nextSteps.length - 1];
+  if (lastStep?.kind === 'text') {
+    nextSteps[nextSteps.length - 1] = { ...lastStep, content: event.text };
+  } else {
+    nextSteps.push({ kind: 'text', content: event.text });
+  }
+
+  set((state) => ({
+    inFlightByRequestId: {
+      ...state.inFlightByRequestId,
+      [event.requestId]: { ...inFlight, steps: nextSteps, isDiffusing: true },
+    },
+    messages: state.messages.map((message) =>
+      message.id === inFlight.placeholderId
+        ? {
+          ...message,
+          content: event.text,
+          steps: nextSteps,
+          streamPhase: undefined,
+        }
+        : message,
+    ),
+  }));
+};
+
 const handleToken: StreamEventHandler = ({ set, event, inFlight }) => {
   if (!inFlight || event.type !== 'token') return;
+
+  // After diffusion frames, the first AI SDK token is the authoritative final
+  // text — replace instead of append, then clear the diffusing flag.
+  if (inFlight.isDiffusing) {
+    const nextSteps = [...inFlight.steps];
+    const lastStep = nextSteps[nextSteps.length - 1];
+    if (lastStep?.kind === 'text') {
+      nextSteps[nextSteps.length - 1] = { ...lastStep, content: event.text };
+    } else {
+      nextSteps.push({ kind: 'text', content: event.text });
+    }
+
+    set((state) => ({
+      inFlightByRequestId: {
+        ...state.inFlightByRequestId,
+        [event.requestId]: { ...inFlight, steps: nextSteps, isDiffusing: false },
+      },
+      messages: state.messages.map((message) =>
+        message.id === inFlight.placeholderId
+          ? {
+            ...message,
+            content: event.text,
+            steps: nextSteps,
+            streamPhase: undefined,
+          }
+          : message,
+      ),
+    }));
+    return;
+  }
 
   const nextSteps = [...inFlight.steps];
   const lastStep = nextSteps[nextSteps.length - 1];
@@ -607,6 +666,7 @@ const handleError: StreamEventHandler = ({ set, get, event }) => {
 
 const streamEventHandlers: Record<ChatStreamEvent['type'], StreamEventHandler> = {
   reasoning: handleReasoning,
+  diffusion_frame: handleDiffusionFrame,
   token: handleToken,
   tool_call_started: handleToolCallStarted,
   tool_call_completed: handleToolCallCompleted,
@@ -635,6 +695,7 @@ export const createStreamActions = (
 
     // Peek reveal for certain event types
     if (
+      event.type === 'diffusion_frame' ||
       event.type === 'reasoning' ||
       event.type === 'token' ||
       event.type === 'tool_call_started' ||

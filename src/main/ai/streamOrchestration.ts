@@ -25,6 +25,7 @@ import {
   isOllamaProvider,
   modelSupportsVision,
 } from './models';
+import { onDiffusionFrame } from './providers/inception';
 import { buildSystemPrompt } from './systemPrompt';
 import type { AiToolCall, AiToolName, ToolExecutionEnvelope } from './tools';
 import { createSdkTools, executeToolCall, OLLAMA_ALLOWED_TOOLS } from './tools';
@@ -50,6 +51,7 @@ const STREAM_RETRY_BASE_DELAY_MS = 400;
 const HISTORY_WINDOW_LIMIT = 20;
 const STREAM_TOOL_LOOP_MAX_STEPS = 25;
 const NOTE_CONTEXT_CHAR_LIMIT = 12_000;
+const DIFFUSION_FRAME_INTERVAL_MS = 66; // ~15fps
 
 // ─── Ollama slim mode ───────────────────────────────────────
 // When true, Ollama gets fewer tools, shorter prompt, reduced history.
@@ -1194,6 +1196,17 @@ export const runAssistantStream = async (
 
         resetInactivityTimer();
 
+        let unsubDiffusion: (() => void) | null = null;
+        if (inceptionMode) {
+          let lastFrameTime = 0;
+          unsubDiffusion = onDiffusionFrame((text) => {
+            const now = performance.now();
+            if (now - lastFrameTime < DIFFUSION_FRAME_INTERVAL_MS) return;
+            lastFrameTime = now;
+            emit({ type: 'diffusion_frame', requestId: input.requestId, text });
+          });
+        }
+
         const result = streamText({
           model,
           abortSignal: inactivityAbort.signal,
@@ -1428,6 +1441,7 @@ export const runAssistantStream = async (
 
           if (chatState.isCanceled(input.requestId)) {
             clearInactivityTimer();
+            unsubDiffusion?.();
             return;
           }
 
@@ -1562,12 +1576,15 @@ export const runAssistantStream = async (
         }
 
         clearInactivityTimer();
+        unsubDiffusion?.();
+        unsubDiffusion = null;
 
         // Flush any remaining content in the think tag buffer
         // If still inThinking, treat remaining as reasoning (unclosed tag)
         flushThinkBuffer();
 
         if (chatState.isCanceled(input.requestId)) {
+          unsubDiffusion?.();
           return;
         }
 
@@ -1612,6 +1629,7 @@ export const runAssistantStream = async (
             });
 
             if (chatState.isCanceled(input.requestId)) {
+              unsubDiffusion?.();
               return;
             }
 
@@ -1671,12 +1689,16 @@ export const runAssistantStream = async (
           throw new Error('Provider returned empty response.');
         }
         if (chatState.isCanceled(input.requestId)) {
+          unsubDiffusion?.();
           return;
         }
 
         streamCompleted = true;
         break;
       } catch (error) {
+        unsubDiffusion?.();
+        unsubDiffusion = null;
+
         if (chatState.isCanceled(input.requestId)) {
           return;
         }

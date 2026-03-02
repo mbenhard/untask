@@ -43,6 +43,7 @@ export type InFlightStream = {
   steps: TurnStep[];
   chips?: ChipAction[];
   safetyTimeoutId?: ReturnType<typeof setTimeout>;
+  isDiffusing?: boolean;
 };
 
 export type PendingViewSwitch = {

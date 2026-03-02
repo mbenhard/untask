@@ -7,6 +7,15 @@ import type { ProviderInstance } from './types';
 
 export const INCEPTION_BASE_URL = 'https://api.inceptionlabs.ai/v1';
 
+// ─── Diffusion frame callback ────────────────────────────────
+export type DiffusionFrameListener = (text: string) => void;
+const diffusionListeners = new Set<DiffusionFrameListener>();
+
+export const onDiffusionFrame = (listener: DiffusionFrameListener): (() => void) => {
+  diffusionListeners.add(listener);
+  return () => { diffusionListeners.delete(listener); };
+};
+
 /**
  * Transform a diffusion-mode SSE response.
  *
@@ -75,6 +84,10 @@ function transformDiffusionResponse(response: Response): Response {
                 latestFullText = content;
                 lastContentEvent = json;
                 chunkCount++;
+
+                for (const listener of diffusionListeners) {
+                  try { listener(content); } catch { /* don't break stream */ }
+                }
 
                 if (isDev && chunkCount <= 3) {
                   console.log(

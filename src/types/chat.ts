@@ -100,6 +100,11 @@ export type ChatStreamEvent =
       text: string;
     }
   | {
+      type: 'diffusion_frame';
+      requestId: string;
+      text: string;
+    }
+  | {
       type: 'tool_call_started';
       requestId: string;
       toolName: string;
