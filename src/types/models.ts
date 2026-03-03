@@ -74,8 +74,6 @@ export type Task = {
   dueDate: string | null;
   // TODO(untask-task-ux): Remove after assistant risk/cashflow signal replacements ship.
   dueType: 'hard' | 'soft' | null;
-  // TODO(untask-task-ux): Remove after assistant risk/cashflow signal replacements ship.
-  effort: 'unknown' | 'tiny' | 'small' | 'medium' | 'deep' | null;
   recurrence: string | null;
   recurrenceSourceId: string | null;
   reminderOffset: string | null;

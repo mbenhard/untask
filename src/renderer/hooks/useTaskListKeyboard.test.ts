@@ -25,7 +25,6 @@ const makeTask = (id: string): Task => ({
   client: null,
   dueDate: null,
   dueType: null,
-  effort: null,
   recurrence: null,
   recurrenceSourceId: null,
   reminderOffset: null,

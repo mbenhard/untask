@@ -408,7 +408,6 @@ export const listTasksTool = {
             today: task.today,
             parentId: task.parentId,
             body: task.body,
-            effort: task.effort,
             recurrence: task.recurrence,
             childCount: children.length,
           }],

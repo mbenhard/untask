@@ -110,7 +110,6 @@ const makeTask = (overrides: Partial<Task> = {}): Task => ({
   client: null,
   dueDate: null,
   dueType: null,
-  effort: 'unknown',
   recurrence: null,
   recurrenceSourceId: null,
   reminderOffset: 'at_due',

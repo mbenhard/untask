@@ -30,7 +30,6 @@ vi.mock('../services/taskService', () => {
     client: z.string().nullable().optional(),
     dueDate: z.string().nullable().optional(),
     dueType: z.enum(['hard', 'soft']).nullable().optional(),
-    effort: z.enum(['unknown', 'tiny', 'small', 'medium', 'deep']).optional(),
     order: z.number().optional(),
   });
 

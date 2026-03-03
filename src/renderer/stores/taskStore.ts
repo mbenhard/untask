@@ -21,8 +21,6 @@ export type TaskCreateInput = {
   reminderOffset?: ReminderOffset | null;
   // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
-  // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
-  effort?: Task['effort'];
   order?: number;
 };
 
@@ -40,8 +38,6 @@ export type TaskUpdateInput = {
   reminderOffset?: ReminderOffset | null;
   // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
   dueType?: Task['dueType'];
-  // TODO(untask-task-ux): Transitional backend-only fields; do not add new primary UI controls.
-  effort?: Task['effort'];
   order?: number;
 };
 
@@ -290,7 +286,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       client: input.client ?? null,
       dueDate: input.dueDate ?? null,
       dueType: input.dueType ?? null,
-      effort: input.effort ?? 'unknown',
       recurrence: input.recurrence ?? null,
       recurrenceSourceId: null,
       reminderOffset: resolvedReminderOffset ?? null,
