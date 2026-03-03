@@ -615,8 +615,40 @@ const formatFallbackAssistantText = (
   return envelope.message;
 };
 
-const TASK_LIST_LINE_PATTERN = /(?:^|\n)\s*(?:[-*•]|\d+[.)])\s+/m;
-const TASK_HEADING_PATTERN = /(here are|these are|tasks?(?:\s+that)?\s+(?:are|for|due|found|matching))/i;
+type TaskQueryMode = 'retrieval' | 'analysis';
+
+const TASK_QUERY_ANALYSIS_PATTERN =
+  /\b(summarize|summary|summarise|recap|overview|snapshot|week|weekly|progress|focus)\b/i;
+const TASK_QUERY_RETRIEVAL_PATTERN =
+  /\b(what(?:'s| is)?\s+due|due\s+today|show|list|find|which|high(?:\s|-)?priority|overdue)\b/i;
+const TASK_QUERY_DIRECT_REQUEST_PATTERN = /\b(task|tasks|todo|to-?do)\b/i;
+
+const classifyTaskQueryMode = (userMessage: string): TaskQueryMode => {
+  const normalized = userMessage.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return 'retrieval';
+  }
+
+  const isAnalysis = TASK_QUERY_ANALYSIS_PATTERN.test(normalized);
+  const isRetrieval = TASK_QUERY_RETRIEVAL_PATTERN.test(normalized);
+  const isDirectTaskRequest = TASK_QUERY_DIRECT_REQUEST_PATTERN.test(normalized);
+
+  if (isAnalysis && !isRetrieval) {
+    return 'analysis';
+  }
+
+  if (isRetrieval || isDirectTaskRequest) {
+    return 'retrieval';
+  }
+
+  return 'retrieval';
+};
+
+const shouldAttachTaskResultsToMessage = (
+  mode: TaskQueryMode,
+  toolName: string,
+): boolean =>
+  !(mode === 'analysis' && toolName === 'list_tasks');
 
 const buildTaskResultsRemark = (tasks: ChatTaskSummary[]): string => {
   const count = tasks.length;
@@ -634,44 +666,6 @@ const buildTaskResultsRemark = (tasks: ChatTaskSummary[]): string => {
   return count === 1
     ? 'I found 1 matching task.'
     : `I found ${count} matching tasks.`;
-};
-
-const maybeCondenseTaskListNarration = (
-  text: string,
-  toolExecutions: ChatToolExecutionSummary[],
-): string => {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) {
-    return text;
-  }
-
-  const listTasksExecution = [...toolExecutions]
-    .reverse()
-    .find((execution) => execution.toolName === 'list_tasks' && execution.taskResults && execution.taskResults.length > 0);
-  if (!listTasksExecution?.taskResults || listTasksExecution.taskResults.length === 0) {
-    return text;
-  }
-
-  const tasks = listTasksExecution.taskResults;
-  const lower = trimmed.toLowerCase();
-  const titleMentions = tasks.reduce((count, task) => {
-    const title = task.title.trim().toLowerCase();
-    if (title.length === 0) {
-      return count;
-    }
-    return lower.includes(title) ? count + 1 : count;
-  }, 0);
-
-  const hasListFormatting = TASK_LIST_LINE_PATTERN.test(trimmed);
-  const hasTaskHeading = TASK_HEADING_PATTERN.test(trimmed);
-  const mentionsEnoughTitles = titleMentions >= Math.min(2, tasks.length);
-  const shouldCondense = mentionsEnoughTitles || (hasTaskHeading && hasListFormatting);
-
-  if (!shouldCondense) {
-    return text;
-  }
-
-  return buildTaskResultsRemark(tasks);
 };
 
 export const shouldRequireToolChoice = (input: {
@@ -747,6 +741,7 @@ export const runAssistantStream = async (
     startedAt: new Date().toISOString(),
     attemptCount: 0,
   };
+  const taskQueryMode = classifyTaskQueryMode(input.userMessage);
 
   const isDev = !app.isPackaged;
   const t0 = isDev ? performance.now() : 0;
@@ -1628,7 +1623,10 @@ export const runAssistantStream = async (
                 emittedChips = toolChips;
               }
 
-              const taskResults = extractTaskResults(part.toolName, status, envelope?.data);
+              const extractedTaskResults = extractTaskResults(part.toolName, status, envelope?.data);
+              const taskResults = shouldAttachTaskResultsToMessage(taskQueryMode, part.toolName)
+                ? extractedTaskResults
+                : undefined;
 
               const execution: ChatToolExecutionSummary = {
                 toolName: part.toolName,
@@ -1755,11 +1753,17 @@ export const runAssistantStream = async (
               const actionCard = fallbackResult.output.actionCard;
               const fallbackSummary = generateToolCallSummary(fallbackResult.toolName, fallbackResult.output);
 
-              const fallbackTaskResults = extractTaskResults(
+              const extractedFallbackTaskResults = extractTaskResults(
                 fallbackResult.toolName,
                 fallbackResult.output.status,
                 fallbackResult.output.data,
               );
+              const fallbackTaskResults = shouldAttachTaskResultsToMessage(
+                taskQueryMode,
+                fallbackResult.toolName,
+              )
+                ? extractedFallbackTaskResults
+                : undefined;
 
               const execution: ChatToolExecutionSummary = {
                 toolName: fallbackResult.toolName,
@@ -1892,7 +1896,17 @@ export const runAssistantStream = async (
     if (!emittedChips && inlineChips?.chips) {
       emittedChips = inlineChips.chips;
     }
-    const normalizedOutputText = maybeCondenseTaskListNarration(outputText, toolExecutions);
+    const listTasksExecution = [...toolExecutions]
+      .reverse()
+      .find((execution) =>
+        execution.toolName === 'list_tasks'
+        && execution.taskResults
+        && execution.taskResults.length > 0,
+      );
+    const normalizedOutputText =
+      taskQueryMode === 'retrieval' && listTasksExecution?.taskResults
+        ? buildTaskResultsRemark(listTasksExecution.taskResults)
+        : outputText;
     if (normalizedOutputText.trim().length > 0) {
       pushStepOrder('text');
     }

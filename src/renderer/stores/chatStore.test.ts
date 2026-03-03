@@ -630,6 +630,132 @@ describe('chatStore stream reliability', () => {
     expect(state.isSending).toBe(false);
   });
 
+  it('uses persisted mapped steps over in-flight steps on assistant_done', () => {
+    const now = new Date().toISOString();
+    const assistantMessage: ChatMessage = {
+      id: 'assistant-canonical-1',
+      conversationId: 'thread-1',
+      role: 'assistant',
+      content: 'Here is your task for today.',
+      toolCalls: JSON.stringify({
+        requestId: 'req-canonical-1',
+        modelId: 'openai/gpt-5-mini',
+        actionCards: [],
+        toolExecutions: [
+          {
+            toolName: 'list_tasks',
+            toolCallId: 'tc-canonical-1',
+            status: 'success',
+            message: 'Found 1 task.',
+            taskResults: [
+              {
+                id: 'task-1',
+                title: 'La Diosa',
+                status: 'active',
+                priority: 'high',
+                dueDate: null,
+                today: true,
+                client: null,
+              },
+            ],
+          },
+        ],
+        stepOrder: ['tool:0', 'task_results:0', 'text'],
+      }),
+      chips: null,
+      createdAt: now,
+    };
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'assistant-stream-req-canonical-1',
+          conversationId: 'thread-1',
+          role: 'assistant',
+          content: 'Here are the tasks that are due today:\n- La Diosa',
+          createdAt: now,
+          isStreaming: true,
+          actionCards: [],
+          steps: [
+            {
+              kind: 'tool',
+              toolName: 'list_tasks',
+              toolCallId: 'tc-canonical-1',
+              description: 'Listing tasks',
+              status: 'success',
+              summary: 'Found 1 task.',
+            },
+            {
+              kind: 'task_results',
+              tasks: [
+                {
+                  id: 'task-1',
+                  title: 'La Diosa',
+                  status: 'active',
+                  priority: 'high',
+                  dueDate: null,
+                  today: true,
+                  client: null,
+                },
+              ],
+            },
+            { kind: 'text', content: 'Here are the tasks that are due today:\n- La Diosa' },
+          ],
+        },
+      ],
+      inFlightByRequestId: {
+        'req-canonical-1': {
+          placeholderId: 'assistant-stream-req-canonical-1',
+          actionCards: [],
+          steps: [
+            {
+              kind: 'tool',
+              toolName: 'list_tasks',
+              toolCallId: 'tc-canonical-1',
+              description: 'Listing tasks',
+              status: 'success',
+              summary: 'Found 1 task.',
+            },
+            {
+              kind: 'task_results',
+              tasks: [
+                {
+                  id: 'task-1',
+                  title: 'La Diosa',
+                  status: 'active',
+                  priority: 'high',
+                  dueDate: null,
+                  today: true,
+                  client: null,
+                },
+              ],
+            },
+            { kind: 'text', content: 'Here are the tasks that are due today:\n- La Diosa' },
+          ],
+        },
+      },
+    });
+
+    useChatStore.getState().applyStreamEvent({
+      type: 'assistant_done',
+      requestId: 'req-canonical-1',
+      assistantMessage,
+      actionCards: [],
+    });
+
+    const finalMessage = useChatStore
+      .getState()
+      .messages
+      .find((message) => message.id === 'assistant-canonical-1');
+    expect(finalMessage).toBeDefined();
+    expect(finalMessage?.steps.map((step) => step.kind)).toEqual(['tool', 'task_results', 'text']);
+
+    const finalTextStep = finalMessage?.steps.find(
+      (step): step is Extract<TurnStep, { kind: 'text' }> => step.kind === 'text',
+    );
+    expect(finalTextStep?.content).toBe('Here is your task for today.');
+  });
+
   it('replaces orphaned placeholder when assistant_done arrives without inFlight state', () => {
     const assistantMessage: ChatMessage = {
       id: 'assistant-late-final-1',

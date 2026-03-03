@@ -551,7 +551,9 @@ const handleAssistantDone: StreamEventHandler = ({ set, get, event, inFlight }) 
     const baseMessages = state.messages.filter(
       (message) => message.id !== placeholderId,
     );
-    const finalizedSteps = collapseConsecutiveTextSteps(inFlight?.steps ?? mapped.steps);
+    const finalizedSteps = collapseConsecutiveTextSteps(
+      mapped.steps.length > 0 ? mapped.steps : (inFlight?.steps ?? []),
+    );
     const finalizedChips = event.chips ?? inFlight?.chips ?? mapped.chips;
     const finalizedAssistantMessage: ChatUiMessage = {
       ...mapped,

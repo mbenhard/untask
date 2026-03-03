@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatTaskSummary } from '../../../types/chat';
+import { PRIORITY_DOT } from '../../lib/taskConstants';
 import { ChatTaskCard, ChatTaskResults } from './ChatTaskCard';
 
 describe('ChatTaskCard', () => {
@@ -53,6 +54,13 @@ describe('ChatTaskCard', () => {
     expect(container.textContent).toContain('High');
   });
 
+  it('uses shared task priority dot classes for low priority', () => {
+    renderCard(makeTask({ priority: 'low' }));
+    const dot = container.querySelector('span.rounded-full');
+    expect(dot).not.toBeNull();
+    expect(dot?.className).toContain(PRIORITY_DOT.low);
+  });
+
   it('applies completed task styling for terminal statuses', () => {
     renderCard(makeTask({ title: 'Ship invoice', status: 'done' }));
 
@@ -98,6 +106,19 @@ describe('ChatTaskCard', () => {
 
     renderCard(makeTask({ dueDate: '2026-03-03T14:30' }));
     expect(container.textContent).toContain('today');
+  });
+
+  it('does not render overdue date in destructive color for completed tasks', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-03T10:00:00Z'));
+
+    renderCard(makeTask({ status: 'done', dueDate: '2026-03-01' }));
+
+    const dueLabel = container.querySelector('.shrink-0.text-\\[11px\\]');
+    expect(dueLabel).not.toBeNull();
+    expect(dueLabel?.textContent).toContain('overdue');
+    expect(dueLabel?.className).not.toContain('text-red-400');
+    expect(dueLabel?.className).toContain('text-muted-foreground/70');
   });
 });
 

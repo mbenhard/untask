@@ -540,6 +540,126 @@ describe('list_tasks tool', () => {
       });
     }
   });
+
+  it('hides terminal tasks by default when status is not explicitly provided', async () => {
+    listTasksMock.mockReturnValue([
+      {
+        id: 'task-active-1',
+        title: 'La Diosa',
+        status: 'active',
+        priority: 'high',
+        client: null,
+        dueDate: null,
+        today: true,
+        parentId: null,
+      },
+      {
+        id: 'task-done-1',
+        title: 'Old completed task',
+        status: 'done',
+        priority: 'high',
+        client: null,
+        dueDate: null,
+        today: false,
+        parentId: null,
+      },
+    ] as never);
+
+    const result = await executeToolCall({
+      name: 'list_tasks',
+      input: { priority: 'high', limit: 20 },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
+      expect(result.output.data).toEqual({
+        tasks: [
+          expect.objectContaining({
+            id: 'task-active-1',
+            status: 'active',
+          }),
+        ],
+      });
+    }
+  });
+
+  it('includes terminal tasks when includeTerminal is true', async () => {
+    listTasksMock.mockReturnValue([
+      {
+        id: 'task-active-1',
+        title: 'La Diosa',
+        status: 'active',
+        priority: 'high',
+        client: null,
+        dueDate: null,
+        today: true,
+        parentId: null,
+      },
+      {
+        id: 'task-done-1',
+        title: 'Old completed task',
+        status: 'done',
+        priority: 'high',
+        client: null,
+        dueDate: null,
+        today: false,
+        parentId: null,
+      },
+    ] as never);
+
+    const result = await executeToolCall({
+      name: 'list_tasks',
+      input: { priority: 'high', includeTerminal: true, limit: 20 },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const tasks = (result.output.data as { tasks: Array<{ id: string; status: string }> }).tasks;
+      expect(tasks).toHaveLength(2);
+      expect(tasks.map((task) => task.id)).toEqual(['task-active-1', 'task-done-1']);
+    }
+  });
+
+  it('keeps explicit terminal status queries working', async () => {
+    listTasksMock.mockReturnValue([
+      {
+        id: 'task-done-2',
+        title: 'Archive invoices',
+        status: 'done',
+        priority: 'medium',
+        client: null,
+        dueDate: null,
+        today: false,
+        parentId: null,
+      },
+    ] as never);
+
+    const result = await executeToolCall({
+      name: 'list_tasks',
+      input: { status: 'done', limit: 10 },
+    });
+
+    expect(listTasksMock).toHaveBeenCalledWith({
+      status: 'done',
+      priority: undefined,
+      client: undefined,
+      today: undefined,
+      search: undefined,
+      limit: 10,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.data).toEqual({
+        tasks: [
+          expect.objectContaining({
+            id: 'task-done-2',
+            status: 'done',
+          }),
+        ],
+      });
+    }
+  });
 });
 
 describe('note tools', () => {

@@ -5,13 +5,8 @@ import { Check, Circle } from 'lucide-react';
 import type { ChatTaskSummary } from '../../../types/chat';
 import { getStatusLabel, isTerminalStatus, type PredefinedStatusId } from '../../../types/models';
 import { heightVariants } from '../../lib/animation';
+import { PRIORITY_DOT } from '../../lib/taskConstants';
 import { cn } from '../../lib/utils';
-
-const PRIORITY_COLORS: Record<string, string> = {
-  high: 'text-red-400',
-  medium: 'text-amber-400',
-  low: 'text-blue-400',
-};
 
 const formatRelativeDue = (dueDate: string): string => {
   const dateOnly = dueDate.replace(/T.*$/, '').replace(/Z$/, '');
@@ -44,10 +39,12 @@ type ChatTaskCardProps = {
 export const ChatTaskCard = ({ task, onClick }: ChatTaskCardProps) => {
   const priority = task.priority && task.priority !== 'none' ? task.priority : null;
   const hasPriority = Boolean(priority);
-  const priorityColor = priority ? PRIORITY_COLORS[priority] ?? 'text-muted-foreground' : '';
+  const priorityDot = priority && priority in PRIORITY_DOT
+    ? PRIORITY_DOT[priority as keyof typeof PRIORITY_DOT]
+    : 'bg-foreground/30';
   const dueLabel = task.dueDate ? formatRelativeDue(task.dueDate) : '';
-  const isOverdue = dueLabel.includes('overdue');
   const isCompleted = isTerminalStatus(task.status as PredefinedStatusId);
+  const isOverdue = !isCompleted && dueLabel.includes('overdue');
   const statusLabel = getStatusLabel(task.status as PredefinedStatusId);
   const clientLabel = typeof task.client === 'string' ? task.client.trim() : '';
 
@@ -86,7 +83,7 @@ export const ChatTaskCard = ({ task, onClick }: ChatTaskCardProps) => {
         ) : null}
       </div>
       <div className="ml-4 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/60">
-        {hasPriority ? <span className={cn('shrink-0 text-[10px]', priorityColor)} aria-hidden="true">●</span> : null}
+        {hasPriority ? <span className={cn('size-1.5 shrink-0 rounded-full', priorityDot)} aria-hidden="true" /> : null}
         {priority ? <span>{formatPriorityLabel(priority)}</span> : null}
         {hasPriority ? <span aria-hidden="true">·</span> : null}
         <span>{statusLabel}</span>

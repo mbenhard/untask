@@ -593,4 +593,82 @@ describe('runAssistantStream deterministic routing', () => {
       }),
     );
   });
+
+  it('keeps analysis-mode narrative text and suppresses task result cards for list_tasks', async () => {
+    streamTextMock.mockReturnValue(
+      buildStreamResult(
+        [
+          {
+            type: 'tool-result',
+            toolName: 'list_tasks',
+            toolCallId: 'tc-list-analysis-1',
+            output: {
+              status: 'success',
+              message: 'Found 2 tasks',
+              data: {
+                tasks: [
+                  {
+                    id: 'task-1',
+                    title: 'La Diosa',
+                    status: 'active',
+                    priority: 'high',
+                    dueDate: null,
+                    today: true,
+                    client: null,
+                  },
+                  {
+                    id: 'task-2',
+                    title: 'Siby Yoga',
+                    status: 'in_progress',
+                    priority: 'none',
+                    dueDate: null,
+                    today: false,
+                    client: null,
+                  },
+                ],
+              },
+            },
+          },
+          {
+            type: 'text-delta',
+            text: 'Weekly snapshot: you are focused on two active projects and one is high priority.',
+          },
+        ],
+        'Weekly snapshot: you are focused on two active projects and one is high priority.',
+      ),
+    );
+
+    const events: Array<Record<string, unknown>> = [];
+
+    await runAssistantStream(
+      {
+        requestId: 'req-list-tasks-analysis',
+        conversationId: 'thread-1',
+        requestOrigin: 'user',
+        userMessage: 'Summarize my week',
+        modelId: 'openai/gpt-5-mini',
+        emit: (event) => {
+          events.push(event as unknown as Record<string, unknown>);
+        },
+      },
+      chatState,
+    );
+
+    expect(saveChatMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: 'Weekly snapshot: you are focused on two active projects and one is high priority.',
+      }),
+    );
+
+    const metadataArg = saveChatMessageMock.mock.calls.at(-1)?.[0] as { toolCalls: string };
+    const parsedMetadata = JSON.parse(metadataArg.toolCalls) as {
+      toolExecutions?: Array<{ toolName?: string; taskResults?: unknown }>;
+    };
+    expect(parsedMetadata.toolExecutions?.[0]?.toolName).toBe('list_tasks');
+    expect(parsedMetadata.toolExecutions?.[0]).not.toHaveProperty('taskResults');
+
+    const toolCompletedEvent = events.find((event) => event.type === 'tool_call_completed');
+    expect(toolCompletedEvent).toBeDefined();
+    expect(toolCompletedEvent).not.toHaveProperty('taskResults');
+  });
 });

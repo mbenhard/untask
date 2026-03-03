@@ -69,6 +69,7 @@ export const undoLastActionInputSchema = z.object({
 export const listTasksToolInputSchema = z.object({
   id: z.string().optional().describe('Return a single task by ID (ignores other filters when set).'),
   status: z.enum(TASK_STATUS_VALUES).optional(),
+  includeTerminal: z.boolean().optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   client: z.string().optional(),
   today: z.boolean().optional(),
@@ -381,7 +382,7 @@ export const undoLastActionTool = {
 
 export const listTasksTool = {
   name: 'list_tasks',
-  description: 'Search and filter the full task list, or retrieve a single task by ID. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Pass id to look up one task. Accepts optional filters: status, priority, client (case-insensitive partial match), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
+  description: 'Search and filter the full task list, or retrieve a single task by ID. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Pass id to look up one task. Accepts optional filters: status, includeTerminal, priority, client (case-insensitive partial match), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
   schema: listTasksToolInputSchema,
   execute: async (input: z.infer<typeof listTasksToolInputSchema>): Promise<ToolExecutionEnvelope> => {
     // Single-task lookup by ID (absorbs get_task)
@@ -424,7 +425,15 @@ export const listTasksTool = {
       limit: input.limit,
     });
 
-    const taskSummaries = results.map((task) => ({
+    const shouldHideTerminalByDefault =
+      input.status == null && input.includeTerminal !== true;
+    const filteredResults = shouldHideTerminalByDefault
+      ? results.filter(
+        (task) => !TERMINAL_STATUSES.includes(task.status as PredefinedStatusId),
+      )
+      : results;
+
+    const taskSummaries = filteredResults.map((task) => ({
       id: task.id,
       title: task.title,
       status: task.status,
