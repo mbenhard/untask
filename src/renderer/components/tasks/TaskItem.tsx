@@ -3,18 +3,15 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useStat
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlignLeft, ArrowRightLeft, Ban, Bookmark, Check, ChevronDown, Copy, FolderInput, GripVertical, Trash2 } from 'lucide-react';
+import { AlignLeft, Bookmark, Check, GripVertical } from 'lucide-react';
 
-import { TERMINAL_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
+import { type Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
 import { SNAPPY, fadeVariants, heightVariants } from '../../lib/animation';
-import { getUntask } from '../../lib/untask';
 import { PRIORITY_DOT } from '../../lib/taskConstants';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
 import { useAppStore } from '../../stores/appStore';
-import { useTaskStatusConfigStore } from '../../stores/taskStatusConfigStore';
-import { type ReminderOffset, type TaskUpdateInput, useTaskStore } from '../../stores/taskStore';
-import { useToastStore } from '../../stores/toastStore';
+import { useTaskStore } from '../../stores/taskStore';
 import { Popover, PopoverContent, Tooltip, TooltipContent, TooltipTrigger } from '../ui';
 import { formatDueDateDisplay, isDueDateOverdue, parseDueDate, parseDueTime } from './dueDate';
 import { getNextPriority } from './taskInteraction';
@@ -42,11 +39,10 @@ export interface TaskItemProps {
   onCompleteWithChildren: (id: string) => void;
   onToggleToday: (id: string) => void;
   onOpenDetail?: (id: string) => void;
+  onContextMenu?: (event: React.MouseEvent, taskId: string) => void;
   onFocus?: () => void;
   completeConfirmTrigger?: { taskId: string; ts: number } | null;
-  deleteConfirmTrigger?: { taskId: string; ts: number } | null;
   onCompleteConfirmTriggerHandled?: (taskId: string) => void;
-  onDeleteConfirmTriggerHandled?: (taskId: string) => void;
   children?: ReactNode;
 }
 
@@ -54,11 +50,6 @@ const SORTABLE_TRANSITION = {
   duration: 220,
   easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
 } as const;
-
-const REMINDER_OFFSETS: ReminderOffset[] = ['at_due', '15m', '1h', '1d'];
-
-const isReminderOffset = (value: string | null): value is ReminderOffset =>
-  value !== null && REMINDER_OFFSETS.includes(value as ReminderOffset);
 
 export const TaskItem = ({
   task,
@@ -76,25 +67,16 @@ export const TaskItem = ({
   onCompleteWithChildren,
   onToggleToday,
   onOpenDetail,
+  onContextMenu,
   onFocus,
   completeConfirmTrigger,
-  deleteConfirmTrigger,
   onCompleteConfirmTriggerHandled,
-  onDeleteConfirmTriggerHandled,
   children,
 }: TaskItemProps) => {
   const updateTask = useTaskStore((state) => state.updateTask);
-  const createTask = useTaskStore((state) => state.createTask);
-  const deleteTask = useTaskStore((state) => state.deleteTask);
-  const cancelTask = useTaskStore((state) => state.cancelTask);
-  const allTasks = useTaskStore((state) => state.tasks);
-  const enabledStatuses = useTaskStatusConfigStore((s) => s.config.enabled);
   const [titleDraft, setTitleDraft] = useState(task.title);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuView, setMenuView] = useState<'main' | 'projects' | 'delete-confirm'>('main');
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const completeConfirmAllButtonRef = useRef<HTMLButtonElement>(null);
-  const deleteConfirmButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setTitleDraft(task.title);
@@ -118,24 +100,6 @@ export const TaskItem = ({
     onCompleteConfirmTriggerHandled,
   ]);
 
-  // Open delete confirmation via the menu popover when triggered (e.g. from keyboard Cmd+Backspace).
-  useEffect(() => {
-    if (deleteConfirmTrigger?.taskId !== task.id) return;
-    setMenuOpen(true);
-    setMenuView('delete-confirm');
-    onDeleteConfirmTriggerHandled?.(task.id);
-  }, [deleteConfirmTrigger, task.id, onDeleteConfirmTriggerHandled]);
-
-  useEffect(() => {
-    if (!menuOpen || menuView !== 'delete-confirm') return;
-
-    const frameId = requestAnimationFrame(() => {
-      deleteConfirmButtonRef.current?.focus();
-    });
-
-    return () => cancelAnimationFrame(frameId);
-  }, [menuOpen, menuView]);
-
   useEffect(() => {
     if (!completeConfirmOpen) return;
 
@@ -145,16 +109,6 @@ export const TaskItem = ({
 
     return () => cancelAnimationFrame(frameId);
   }, [completeConfirmOpen]);
-
-  useEffect(() => {
-    if (menuOpen) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setMenuView('main');
-    }, 120);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [menuOpen]);
 
   const {
     attributes,
@@ -189,8 +143,6 @@ export const TaskItem = ({
   }, [task.today, flashBookmark]);
 
   const isCompleted = task.status === 'done';
-  const isTerminal = TERMINAL_STATUSES.includes(task.status as PredefinedStatusId);
-  const cancelledEnabled = enabledStatuses.includes('cancelled');
   const isToday = task.today === true;
   const priority = task.priority ?? 'none';
   const dueDateLabel = useMemo(
@@ -239,70 +191,6 @@ export const TaskItem = ({
     onEndTitleEdit();
   };
 
-  const canMoveToProject =
-    task.parentId === null && !hasChildren;
-
-  const projects = useMemo(
-    () =>
-      canMoveToProject
-        ? allTasks.filter(
-          (t) =>
-            t.parentId === null &&
-            t.id !== task.id &&
-            !TERMINAL_STATUSES.includes(t.status as PredefinedStatusId),
-        )
-        : [],
-    [allTasks, canMoveToProject, task.id],
-  );
-
-  const showMoveToProject = canMoveToProject && projects.length > 0;
-
-  const handleDuplicate = () => {
-    setMenuOpen(false);
-
-    // Capture current tasks to find children without being affected by optimistic additions
-    const currentTasks = allTasks;
-
-    const duplicateRecursive = async (taskToCopy: Task, newParentId: string | null) => {
-      const isTaskTerminal = TERMINAL_STATUSES.includes(taskToCopy.status as PredefinedStatusId);
-      const created = await createTask({
-        title: taskToCopy.title,
-        parentId: newParentId,
-        body: taskToCopy.body,
-        status: isTaskTerminal ? 'active' : taskToCopy.status,
-        priority: taskToCopy.priority,
-        today: taskToCopy.today ?? undefined,
-        client: taskToCopy.client,
-        dueDate: taskToCopy.dueDate,
-        dueType: taskToCopy.dueType,
-        effort: taskToCopy.effort,
-        reminderOffset: isReminderOffset(taskToCopy.reminderOffset)
-          ? taskToCopy.reminderOffset
-          : null,
-        recurrence: taskToCopy.recurrence,
-      });
-
-      if (created) {
-        const children = currentTasks
-          .filter((t) => t.parentId === taskToCopy.id)
-          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-        for (const child of children) {
-          await duplicateRecursive(child, created.id);
-        }
-      }
-    };
-
-    void duplicateRecursive(task, task.parentId);
-  };
-
-  const activeChildrenCount = childrenCount - childrenDoneCount;
-
-  const handleDelete = (cascade?: boolean) => {
-    void deleteTask(task.id, cascade);
-    setMenuOpen(false);
-  };
-
   return (
     <div
       ref={setNodeRef}
@@ -314,6 +202,11 @@ export const TaskItem = ({
       onFocus={(event) => {
         event.stopPropagation();
         onFocus?.();
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onContextMenu?.(event, task.id);
       }}
       className={cn(
         'group/row overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
@@ -616,7 +509,7 @@ export const TaskItem = ({
                     onOpenDetail(task.id);
                   }}
                   aria-label={`Open detail page for "${task.title}"`}
-                  className="inline-flex size-6 items-center justify-center text-muted-foreground opacity-0 outline-none transition-all hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/row:opacity-100"
+                  className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <ArrowRightIcon />
                 </button>
@@ -649,179 +542,6 @@ export const TaskItem = ({
               {isToday ? 'Remove from Today' : 'Add to Today'}
             </TooltipContent>
           </Tooltip>
-
-          <Popover.Root
-            open={menuOpen}
-            onOpenChange={(open) => {
-              setMenuOpen(open);
-            }}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Popover.Trigger asChild>
-                  <button
-                    type="button"
-                    onClick={(event) => event.stopPropagation()}
-                    aria-label={`More actions for "${task.title}"`}
-                    className="inline-flex size-6 items-center justify-center text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <ChevronDown aria-hidden="true" className="size-3.5" />
-                  </button>
-                </Popover.Trigger>
-              </TooltipTrigger>
-              <TooltipContent>More actions</TooltipContent>
-            </Tooltip>
-            <PopoverContent
-              className="w-auto min-w-[160px] p-1"
-              align="end"
-              onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {menuView === 'main' ? (
-                  <motion.div key="menu-main" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }} role="menu">
-                    {task.status === 'inbox' && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          void updateTask({ id: task.id, status: 'active' });
-                          useToastStore.getState().showToast('Moved to Tasks', async () => {
-                            await getUntask().tasks.undoLastUserAction();
-                            await useTaskStore.getState().refreshTasks();
-                          });
-                          setMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <ArrowRightLeft aria-hidden="true" className="size-3" />
-                        Move to Tasks
-                      </button>
-                    )}
-                    {task.status !== 'inbox' && !isTerminal && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          void updateTask({ id: task.id, status: 'inbox' });
-                          useToastStore.getState().showToast('Moved to Inbox', async () => {
-                            await getUntask().tasks.undoLastUserAction();
-                            await useTaskStore.getState().refreshTasks();
-                          });
-                          setMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <ArrowRightLeft aria-hidden="true" className="size-3" />
-                        Move to Inbox
-                      </button>
-                    )}
-                    {cancelledEnabled && !isTerminal && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          void cancelTask(task.id);
-                          setMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <Ban aria-hidden="true" className="size-3" />
-                        Cancel task
-                      </button>
-                    )}
-                    {showMoveToProject && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => setMenuView('projects')}
-                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <FolderInput aria-hidden="true" className="size-3" />
-                        <span className="flex-1 text-left">Move to project</span>
-                        <span className="text-border">&rarr;</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleDuplicate}
-                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <Copy aria-hidden="true" className="size-3" />
-                      Duplicate
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => setMenuView('delete-confirm')}
-                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 aria-hidden="true" className="size-3" />
-                      Delete
-                    </button>
-                  </motion.div>
-                ) : menuView === 'projects' ? (
-                  <motion.div key="menu-projects" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }} role="menu">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => setMenuView('main')}
-                      className="flex w-full items-center gap-1 rounded-sm px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <span>&larr;</span> Back
-                    </button>
-                    {projects.map((project) => (
-                      <button
-                        key={project.id}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          const updates: TaskUpdateInput = {
-                            id: task.id,
-                            parentId: project.id,
-                          };
-                          if (task.status === 'inbox')
-                            updates.status = 'active';
-                          void updateTask(updates);
-                          setMenuOpen(false);
-                          setMenuView('main');
-                        }}
-                        className="flex w-full items-center truncate rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        {project.title}
-                      </button>
-                    ))}
-                  </motion.div>
-                ) : (
-                  <motion.div key="menu-delete" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.1 }} className="flex flex-col gap-1.5 px-1 py-1.5">
-                    <p className="text-xs text-muted-foreground">
-                      {activeChildrenCount > 0
-                        ? `Delete this task and ${activeChildrenCount} active subtask${activeChildrenCount > 1 ? 's' : ''}?`
-                        : 'Delete this task?'}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex flex-1 items-center justify-center rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        ref={deleteConfirmButtonRef}
-                        type="button"
-                        onClick={() => handleDelete(activeChildrenCount > 0)}
-                        className="flex flex-1 items-center justify-center rounded-sm bg-destructive/10 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive/20"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </PopoverContent>
-          </Popover.Root>
 
           <Tooltip>
             <TooltipTrigger asChild>

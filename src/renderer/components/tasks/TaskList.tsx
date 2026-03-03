@@ -43,6 +43,7 @@ import { resolveTaskNavigationView } from '../layout/taskNavigation';
 import { reconcileScopedReorder } from './statusLaneDrag';
 import { DragPreview } from './DragPreview';
 import { TaskBody } from './TaskBody';
+import { TaskContextMenu } from './TaskOverflowMenu';
 import { TaskItem } from './TaskItem';
 
 const SHARED_DROP_ANIMATION: DropAnimation = {
@@ -119,7 +120,7 @@ export const TaskList = ({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
   const [completeConfirmTrigger, setCompleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
-  const [deleteConfirmTrigger, setDeleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ taskId: string; x: number; y: number; initialView: 'main' | 'delete-confirm' } | null>(null);
 
   const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = controlledOnFocusedIndexChange ?? setInternalFocusedIndex;
@@ -346,10 +347,15 @@ export const TaskList = ({
     ));
   }, []);
 
-  const handleDeleteConfirmTriggerHandled = useCallback((taskId: string): void => {
-    setDeleteConfirmTrigger((current) => (
-      current?.taskId === taskId ? null : current
-    ));
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent, taskId: string): void => {
+      setContextMenu({ taskId, x: event.clientX, y: event.clientY, initialView: 'main' });
+    },
+    [],
+  );
+
+  const handleCloseContextMenu = useCallback((): void => {
+    setContextMenu(null);
   }, []);
 
   const handleDelete = useCallback(
@@ -361,7 +367,13 @@ export const TaskList = ({
         (t) => !isTerminalStatus(t.status as never),
       ).length;
       if (activeChildren > 0) {
-        setDeleteConfirmTrigger({ taskId, ts: Date.now() });
+        // Open context menu at the task element's position with delete-confirm view
+        const container = containerRef.current;
+        const el = container?.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          setContextMenu({ taskId, x: rect.right - 8, y: rect.top + rect.height / 2, initialView: 'delete-confirm' });
+        }
         return;
       }
       void deleteTask(taskId, false);
@@ -566,6 +578,30 @@ export const TaskList = ({
     </motion.div>
   );
 
+  const contextMenuTask = contextMenu
+    ? (tasks.find((t) => t.id === contextMenu.taskId)
+      ?? allTasks.find((t) => t.id === contextMenu.taskId))
+    : null;
+
+  const contextMenuElement = contextMenu && contextMenuTask ? (() => {
+    const subtasks = allTasks.filter((t) => t.parentId === contextMenuTask.id);
+    const activeChildren = subtasks.filter(
+      (t) => !isTerminalStatus(t.status as never),
+    ).length;
+    return (
+      <TaskContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        task={contextMenuTask}
+        allTasks={allTasks}
+        activeChildrenCount={activeChildren}
+        canMoveToProject={contextMenuTask.parentId === null && subtasks.length === 0}
+        initialView={contextMenu.initialView}
+        onClose={handleCloseContextMenu}
+      />
+    );
+  })() : null;
+
   const listContent = (
     <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
       <div
@@ -610,11 +646,10 @@ export const TaskList = ({
               onCompleteWithChildren={handleCompleteWithChildren}
               onToggleToday={handleToggleToday}
               onOpenDetail={onOpenDetail}
+              onContextMenu={handleContextMenu}
               onFocus={() => setFocusedIndex(index)}
               completeConfirmTrigger={completeConfirmTrigger}
-              deleteConfirmTrigger={deleteConfirmTrigger}
               onCompleteConfirmTriggerHandled={handleCompleteConfirmTriggerHandled}
-              onDeleteConfirmTriggerHandled={handleDeleteConfirmTriggerHandled}
             >
               <TaskBody
                 task={task}
@@ -723,6 +758,7 @@ export const TaskList = ({
             </motion.div>
           )}
         </AnimatePresence>
+        {contextMenuElement}
       </div>
     );
   }
@@ -748,6 +784,7 @@ export const TaskList = ({
           </motion.div>
         )}
       </AnimatePresence>
+      {contextMenuElement}
     </div>
   );
 };
