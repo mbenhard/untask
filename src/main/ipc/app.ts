@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { app, ipcMain, shell } from 'electron';
 import {
   IPC_CHANNELS,
@@ -304,6 +305,27 @@ export const registerAppHandlers = (): void => {
           throw new Error(`Refusing to open URL with scheme: ${parsed.protocol}`);
         }
         await shell.openExternal(url);
+      },
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SHELL_OPEN_IN_TERMINAL,
+    withIpcLogging(
+      'SHELL_OPEN_IN_TERMINAL',
+      async (_event: Electron.IpcMainInvokeEvent, command: string): Promise<void> => {
+        if (process.platform !== 'darwin') {
+          throw new Error('Open in Terminal is only supported on macOS.');
+        }
+        const escaped = command.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const script = `tell application "Terminal" to do script "${escaped}"
+tell application "Terminal" to activate`;
+        await new Promise<void>((resolve, reject) => {
+          execFile('osascript', ['-e', script], (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
       },
     ),
   );

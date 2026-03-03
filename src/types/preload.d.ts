@@ -261,6 +261,7 @@ export type UntaskApi = {
   };
   shell: {
     openExternal: (url: string) => Promise<void>;
+    openInTerminal: (command: string) => Promise<void>;
   };
 };
 

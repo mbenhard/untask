@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { X } from 'lucide-react';
+import { Check, Clipboard, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import type { UpdateInfo } from '../../../types/ipc';
 import { getUntask } from '../../lib/untask';
 import { heightVariants } from '../../lib/animation';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
+const BREW_COMMAND = 'brew update && brew upgrade untask';
 const DISMISSED_KEY_PREFIX = 'untask-update-dismissed-v';
 
 const isDismissed = (version: string): boolean => {
@@ -28,6 +30,20 @@ const dismiss = (version: string): void => {
 export const UpdateBanner = () => {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(BREW_COMMAND).then(() => {
+      setCopied(true);
+      clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    });
+  }, []);
+
+  const handleOpenTerminal = useCallback(() => {
+    void getUntask().shell.openInTerminal(BREW_COMMAND);
+  }, []);
 
   useEffect(() => {
     const show = (info: UpdateInfo): void => {
@@ -72,23 +88,48 @@ export const UpdateBanner = () => {
           <div className="relative flex items-center justify-between gap-2 border-b border-border/50 bg-muted/60 px-3 py-1.5 text-[11px] text-muted-foreground">
             <span>
               Untask{' '}
-              <span className="font-medium text-foreground">v{updateInfo.latestVersion}</span>{' '}
-              available.{' '}
+              <a
+                href={updateInfo.releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                v{updateInfo.latestVersion}
+              </a>{' '}
+              available. {' '}
               {updateInfo.installMethod === 'homebrew' ? (
                 <>
-                  Run{' '}
-                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">
-                    brew update && brew upgrade untask
-                  </code>
-                  {' · '}
-                  <a
-                    href={updateInfo.releaseUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-muted-foreground underline-offset-2 hover:underline"
-                  >
-                    View release
-                  </a>
+                  Update with{' '}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="cursor-pointer rounded bg-foreground/[0.06] px-1 py-0.5 font-mono text-[10px] text-foreground transition-colors hover:bg-foreground/[0.1]"
+                      >
+                        {BREW_COMMAND}
+                        {copied ? (
+                          <Check className="ml-1 inline size-2.5 align-[-1px] text-green-400" aria-hidden="true" />
+                        ) : (
+                          <Clipboard className="ml-1 inline size-2.5 align-[-1px] opacity-40" aria-hidden="true" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Click to copy</TooltipContent>
+                  </Tooltip>
+                  {' or via '}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleOpenTerminal}
+                        className="font-medium text-foreground underline-offset-2 hover:underline"
+                      >
+                        Terminal
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Opens Terminal.app and runs the command</TooltipContent>
+                  </Tooltip>
                 </>
               ) : (
                 <a

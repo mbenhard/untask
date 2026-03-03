@@ -178,6 +178,7 @@ export const IPC_CHANNELS = {
   ATTACHMENT_PICK_AND_SAVE: 'attachment:pick-and-save',
   // --- Shell channels ---
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
+  SHELL_OPEN_IN_TERMINAL: 'shell:open-in-terminal',
 } as const;
 
 export type SettingsBootstrapState = {

@@ -477,6 +477,8 @@ const untaskApi: UntaskApi = {
   shell: {
     openExternal: (url: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_EXTERNAL, url),
+    openInTerminal: (command: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SHELL_OPEN_IN_TERMINAL, command),
   },
 };
 
