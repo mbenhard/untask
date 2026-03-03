@@ -37,6 +37,12 @@ const defaultNotesActions = {
   openSelectedNote: useNotesStore.getState().openSelectedNote,
 };
 
+const defaultToastActions = {
+  showToast: useToastStore.getState().showToast,
+  clearToast: useToastStore.getState().clearToast,
+  markUndoing: useToastStore.getState().markUndoing,
+};
+
 const resetStores = (): void => {
   useAppStore.setState({
     activeView: 'today',
@@ -82,6 +88,7 @@ const resetStores = (): void => {
   useToastStore.setState({
     toast: null,
     isUndoing: false,
+    ...defaultToastActions,
   });
 };
 
@@ -589,6 +596,8 @@ describe('useKeyboardShortcuts', () => {
 
   it('Cmd+Shift+Z triggers redo in tasks view', async () => {
     useAppStore.setState({ activeView: 'today', chatOverlayState: 'peek' });
+    const showToastSpy = vi.fn();
+    useToastStore.setState({ showToast: showToastSpy });
 
     const inputRef = {
       current: { focus: vi.fn(), blur: vi.fn() } as unknown as HTMLTextAreaElement,
@@ -603,9 +612,11 @@ describe('useKeyboardShortcuts', () => {
     });
 
     await Promise.resolve();
+    await Promise.resolve();
 
     expect(redoLastUserAction).toHaveBeenCalledTimes(1);
     expect(undoLastUserAction).not.toHaveBeenCalled();
+    expect(showToastSpy).not.toHaveBeenCalled();
   });
 
   it('Cmd+Shift+Z does not trigger redo in notes view', () => {

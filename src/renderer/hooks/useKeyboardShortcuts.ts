@@ -242,7 +242,10 @@ export const useKeyboardShortcuts = ({
         event.preventDefault();
 
         void (async () => {
-          await getUntask().tasks.redoLastUserAction();
+          const result = await getUntask().tasks.redoLastUserAction();
+          if (!result.undone) {
+            return;
+          }
           await useTaskStore.getState().refreshTasks();
           useToastStore.getState().showToast('Redone');
         })();
