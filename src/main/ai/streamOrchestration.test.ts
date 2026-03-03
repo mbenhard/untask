@@ -179,7 +179,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'show my notes',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -215,7 +215,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'remove kkot task',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -243,7 +243,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'proactive',
         userMessage: 'show my notes',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -342,7 +342,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -398,7 +398,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -452,7 +452,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -492,7 +492,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'no',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -517,7 +517,7 @@ describe('runAssistantStream deterministic routing', () => {
         requestOrigin: 'user',
         userMessage: 'yes',
         modelId: 'openai/gpt-5-mini',
-        emit: () => {},
+        emit: vi.fn(),
       },
       chatState,
     );
@@ -527,6 +527,69 @@ describe('runAssistantStream deterministic routing', () => {
     expect(saveChatMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
         content: expect.stringContaining('cleared 1 outdated pending approval'),
+      }),
+    );
+  });
+
+  it('condenses duplicated list_tasks narration into a short contextual remark', async () => {
+    streamTextMock.mockReturnValue(
+      buildStreamResult(
+        [
+          {
+            type: 'tool-result',
+            toolName: 'list_tasks',
+            toolCallId: 'tc-list-1',
+            output: {
+              status: 'success',
+              message: 'Found 2 tasks',
+              data: {
+                tasks: [
+                  {
+                    id: 'task-1',
+                    title: 'La Diosa',
+                    status: 'active',
+                    priority: 'high',
+                    dueDate: null,
+                    today: true,
+                    client: null,
+                  },
+                  {
+                    id: 'task-2',
+                    title: 'Siby Yoga',
+                    status: 'in_progress',
+                    priority: 'none',
+                    dueDate: null,
+                    today: true,
+                    client: null,
+                  },
+                ],
+              },
+            },
+          },
+          {
+            type: 'text-delta',
+            text: 'Here are the tasks that are due today:\\n- La Diosa\\n- Siby Yoga',
+          },
+        ],
+        'Here are the tasks that are due today:\n- La Diosa\n- Siby Yoga',
+      ),
+    );
+
+    await runAssistantStream(
+      {
+        requestId: 'req-list-tasks-condense',
+        conversationId: 'thread-1',
+        requestOrigin: 'user',
+        userMessage: "What's due today?",
+        modelId: 'openai/gpt-5-mini',
+        emit: vi.fn(),
+      },
+      chatState,
+    );
+
+    expect(saveChatMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: 'Here are your 2 tasks for today.',
       }),
     );
   });

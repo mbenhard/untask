@@ -605,20 +605,6 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     }
 
                     if (step.kind === 'text') {
-                      const previousStep = message.steps[index - 1];
-                      const isAfterTaskResults = previousStep?.kind === 'task_results';
-
-                      if (isAfterTaskResults) {
-                        return (
-                          <div
-                            key={`text-${index}`}
-                            className="px-1 text-xs text-muted-foreground/60"
-                          >
-                            <ChatMarkdown content={step.content} />
-                          </div>
-                        );
-                      }
-
                       return (
                         <div
                           key={`text-${index}`}

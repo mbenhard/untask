@@ -615,6 +615,65 @@ const formatFallbackAssistantText = (
   return envelope.message;
 };
 
+const TASK_LIST_LINE_PATTERN = /(?:^|\n)\s*(?:[-*•]|\d+[.)])\s+/m;
+const TASK_HEADING_PATTERN = /(here are|these are|tasks?(?:\s+that)?\s+(?:are|for|due|found|matching))/i;
+
+const buildTaskResultsRemark = (tasks: ChatTaskSummary[]): string => {
+  const count = tasks.length;
+  if (count <= 0) {
+    return '';
+  }
+
+  const allToday = tasks.every((task) => task.today);
+  if (allToday) {
+    return count === 1
+      ? 'Here is your task for today.'
+      : `Here are your ${count} tasks for today.`;
+  }
+
+  return count === 1
+    ? 'I found 1 matching task.'
+    : `I found ${count} matching tasks.`;
+};
+
+const maybeCondenseTaskListNarration = (
+  text: string,
+  toolExecutions: ChatToolExecutionSummary[],
+): string => {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return text;
+  }
+
+  const listTasksExecution = [...toolExecutions]
+    .reverse()
+    .find((execution) => execution.toolName === 'list_tasks' && execution.taskResults && execution.taskResults.length > 0);
+  if (!listTasksExecution?.taskResults || listTasksExecution.taskResults.length === 0) {
+    return text;
+  }
+
+  const tasks = listTasksExecution.taskResults;
+  const lower = trimmed.toLowerCase();
+  const titleMentions = tasks.reduce((count, task) => {
+    const title = task.title.trim().toLowerCase();
+    if (title.length === 0) {
+      return count;
+    }
+    return lower.includes(title) ? count + 1 : count;
+  }, 0);
+
+  const hasListFormatting = TASK_LIST_LINE_PATTERN.test(trimmed);
+  const hasTaskHeading = TASK_HEADING_PATTERN.test(trimmed);
+  const mentionsEnoughTitles = titleMentions >= Math.min(2, tasks.length);
+  const shouldCondense = mentionsEnoughTitles || (hasTaskHeading && hasListFormatting);
+
+  if (!shouldCondense) {
+    return text;
+  }
+
+  return buildTaskResultsRemark(tasks);
+};
+
 export const shouldRequireToolChoice = (input: {
   userMessage: string;
   history: ConversationMessage[];
@@ -1833,7 +1892,8 @@ export const runAssistantStream = async (
     if (!emittedChips && inlineChips?.chips) {
       emittedChips = inlineChips.chips;
     }
-    if (outputText.trim().length > 0) {
+    const normalizedOutputText = maybeCondenseTaskListNarration(outputText, toolExecutions);
+    if (normalizedOutputText.trim().length > 0) {
       pushStepOrder('text');
     }
 
@@ -1861,8 +1921,8 @@ export const runAssistantStream = async (
       conversationId: input.conversationId,
       role: 'assistant',
       content:
-        outputText.length > 0
-          ? outputText
+        normalizedOutputText.length > 0
+          ? normalizedOutputText
           : 'No assistant text was generated for this turn.',
       toolCalls: JSON.stringify(metadata),
       chips: emittedChips ? JSON.stringify(emittedChips) : null,
