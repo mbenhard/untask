@@ -6,28 +6,35 @@ import {
   ArrowLeft,
   Bookmark,
   Ellipsis,
-  Plus,
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import {
+  isTerminalStatus,
+  PREDEFINED_STATUSES,
   TERMINAL_STATUSES,
   type PredefinedStatusId,
   type Task,
 } from '../../../types/models';
 import { fadeVariants, SNAPPY } from '../../lib/animation';
-import { suppressTaskRefresh, unsuppressTaskRefresh } from '../../lib/editorSaveGuard';
 import { SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { getUntask } from '../../lib/untask';
 import { cn } from '../../lib/utils';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
+import { useTaskDetailKeyboard } from '../../hooks/useTaskDetailKeyboard';
 import {
   selectActiveView,
   useAppStore,
 } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
-import { isEmptyDocument } from '../editor/editorUtils';
+import {
+  useTaskStatusConfigStore,
+  selectEnabledNonTerminal,
+} from '../../stores/taskStatusConfigStore';
+import { useToastStore } from '../../stores/toastStore';
+import { useAutoSaveBody } from '../../hooks/useAutoSaveBody';
 import { BlockEditor } from '../editor/BlockEditor';
 import { Button } from '../ui/button';
-import { Popover, PopoverContent } from '../ui';
+import { Popover } from '../ui';
 
 import {
   StatusSegment,
@@ -35,12 +42,18 @@ import {
   DueDateSegment,
   ClientSegment,
   RecurrenceSegment,
+  AttachmentSegment,
   MetaDot,
+  countAttachments,
   type UpdateTaskAction,
   getAttachmentSlashMenuItems,
 } from './TaskBody';
 import { SubtaskSection } from './SubtaskSection';
+import { getNextPriority, getNextStatusInCycle } from './taskInteraction';
 import { TaskOverflowMenu } from './TaskOverflowMenu';
+import { resolveTaskNavigationView } from '../layout/taskNavigation';
+
+const statusLabelMap = new Map(PREDEFINED_STATUSES.map((s) => [s.id, s.label]));
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -48,96 +61,6 @@ const VIEW_LABELS: Record<string, string> = {
   today: 'Today',
   tasks: 'Tasks',
   inbox: 'Inbox',
-};
-
-const EFFORT_OPTIONS = [
-  { value: 'tiny', label: 'Tiny' },
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'deep', label: 'Deep' },
-] as const;
-
-const EFFORT_LABELS: Record<string, string> = {
-  unknown: 'Unknown',
-  tiny: 'Tiny',
-  small: 'Small',
-  medium: 'Medium',
-  deep: 'Deep',
-};
-
-// ─── Effort Segment ─────────────────────────────────────────
-
-const EffortSegment = ({
-  task,
-  onUpdate,
-}: {
-  task: Task;
-  onUpdate: UpdateTaskAction;
-}) => {
-  const [open, setOpen] = useState(false);
-  const effort = task.effort ?? 'unknown';
-  const label = EFFORT_LABELS[effort] ?? effort;
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const flash = useFlashHighlight(triggerRef);
-  const prevEffort = useRef(effort);
-
-  useEffect(() => {
-    if (effort !== prevEffort.current) {
-      prevEffort.current = effort;
-      flash();
-    }
-  }, [effort, flash]);
-
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          ref={triggerRef}
-          type="button"
-          tabIndex={0}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className={SEGMENT}
-          aria-label={`Effort: ${label}`}
-        >
-          {label}
-        </button>
-      </Popover.Trigger>
-      <PopoverContent
-        className="w-auto min-w-[120px] p-1"
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {EFFORT_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => {
-              void onUpdate({ id: task.id, effort: opt.value });
-              setOpen(false);
-            }}
-            className={cn(
-              'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-              effort === opt.value && 'text-foreground',
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => {
-            void onUpdate({ id: task.id, effort: null });
-            setOpen(false);
-          }}
-          className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
-        >
-          Remove
-        </button>
-      </PopoverContent>
-    </Popover.Root>
-  );
 };
 
 // ─── Today Segment ──────────────────────────────────────────
@@ -179,68 +102,8 @@ const TodaySegment = ({
         className="mr-0.5 size-3"
         fill={isToday ? 'currentColor' : 'none'}
       />
-      {isToday ? 'Today' : '+ today'}
+      {isToday ? 'today' : '+ today'}
     </button>
-  );
-};
-
-// ─── Add Metadata Button ────────────────────────────────────
-
-type MetadataOption = 'dueDate' | 'effort' | 'client' | 'recurrence';
-
-const AddMetadataButton = ({
-  unsetOptions,
-  onAdd,
-}: {
-  unsetOptions: MetadataOption[];
-  onAdd: (option: MetadataOption) => void;
-}) => {
-  const [open, setOpen] = useState(false);
-
-  if (unsetOptions.length === 0) return null;
-
-  const labels: Record<MetadataOption, string> = {
-    dueDate: 'Due date',
-    effort: 'Effort',
-    client: 'Client',
-    recurrence: 'Repeat',
-  };
-
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          tabIndex={0}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className={cn(SEGMENT, SEGMENT_EMPTY)}
-          aria-label="Add metadata"
-        >
-          <Plus aria-hidden="true" className="size-3" />
-        </button>
-      </Popover.Trigger>
-      <PopoverContent
-        className="w-auto min-w-[120px] p-1"
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {unsetOptions.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => {
-              onAdd(opt);
-              setOpen(false);
-            }}
-            className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            {labels[opt]}
-          </button>
-        ))}
-      </PopoverContent>
-    </Popover.Root>
   );
 };
 
@@ -250,75 +113,34 @@ const DetailMetadataLine = ({
   task,
   onUpdate,
   onToggleToday,
+  attachmentCount,
+  onAttach,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
   onToggleToday: () => void;
+  attachmentCount: number;
+  onAttach: () => void;
 }) => {
-  // Track which conditional fields have been explicitly added via `+` button
-  const [addedFields, setAddedFields] = useState<Set<MetadataOption>>(new Set());
-
-  const hasDueDate = task.dueDate !== null || addedFields.has('dueDate');
-  const hasEffort = (task.effort !== null && task.effort !== 'unknown') || addedFields.has('effort');
-  const hasClient = (task.client !== null && task.client !== '') || addedFields.has('client');
-  const hasRecurrence = task.recurrence !== null || addedFields.has('recurrence');
-
-  const unsetOptions: MetadataOption[] = [];
-  if (!hasDueDate) unsetOptions.push('dueDate');
-  if (!hasEffort) unsetOptions.push('effort');
-  if (!hasClient) unsetOptions.push('client');
-  if (!hasRecurrence) unsetOptions.push('recurrence');
-
-  const handleAddMetadata = useCallback((option: MetadataOption) => {
-    setAddedFields((prev) => new Set(prev).add(option));
-  }, []);
-
   return (
     <div
       role="toolbar"
       aria-label="Task metadata"
       className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-muted-foreground"
     >
-      {/* Core — always visible */}
-      <StatusSegment task={task} onUpdate={onUpdate} />
+      <DueDateSegment task={task} onUpdate={onUpdate} />
       <MetaDot />
       <PrioritySegment task={task} onUpdate={onUpdate} />
       <MetaDot />
       <TodaySegment task={task} onToggle={onToggleToday} />
-
-      {/* Conditional — shown when set or explicitly added */}
-      {hasDueDate && (
-        <>
-          <MetaDot />
-          <DueDateSegment task={task} onUpdate={onUpdate} />
-        </>
-      )}
-      {hasEffort && (
-        <>
-          <MetaDot />
-          <EffortSegment task={task} onUpdate={onUpdate} />
-        </>
-      )}
-      {hasClient && (
-        <>
-          <MetaDot />
-          <ClientSegment task={task} onUpdate={onUpdate} />
-        </>
-      )}
-      {hasRecurrence && (
-        <>
-          <MetaDot />
-          <RecurrenceSegment task={task} onUpdate={onUpdate} />
-        </>
-      )}
-
-      {/* Add button for unset metadata */}
-      {unsetOptions.length > 0 && (
-        <>
-          <MetaDot />
-          <AddMetadataButton unsetOptions={unsetOptions} onAdd={handleAddMetadata} />
-        </>
-      )}
+      <MetaDot />
+      <RecurrenceSegment task={task} onUpdate={onUpdate} />
+      <MetaDot />
+      <StatusSegment task={task} onUpdate={onUpdate} />
+      <MetaDot />
+      <ClientSegment task={task} onUpdate={onUpdate} />
+      <MetaDot />
+      <AttachmentSegment count={attachmentCount} onAttach={onAttach} />
     </div>
   );
 };
@@ -341,14 +163,19 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
   );
   const allTasks = useTaskStore((state) => state.tasks);
   const updateTask = useTaskStore((state) => state.updateTask);
+  const completeTask = useTaskStore((state) => state.completeTask);
+  const reopenTask = useTaskStore((state) => state.reopenTask);
+  const deleteTask = useTaskStore((state) => state.deleteTask);
   const toggleToday = useTaskStore((state) => state.toggleToday);
+  const selectTask = useTaskStore((state) => state.selectTask);
+  const enabledNonTerminal = useTaskStatusConfigStore(useShallow(selectEnabledNonTerminal));
 
   const [titleDraft, setTitleDraft] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteConfirmTrigger, setDeleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
 
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingBodyRef = useRef<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -379,41 +206,46 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
     setIsEditingTitle(false);
   }, [task]);
 
+  // ── Attachments ──
+
+  const [attachmentCount, setAttachmentCount] = useState(() => countAttachments(task?.body ?? null));
+
+  const handleAttach = useCallback(async () => {
+    const result = await window.untask?.attachments.pickAndSave();
+    if (!result || result.canceled || result.urls.length === 0) return;
+
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const newBlocks = result.urls.map((url) => {
+      const isImage = /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
+      if (isImage) {
+        return { type: 'image' as const, props: { url } };
+      }
+      return { type: 'file' as const, props: { url } };
+    });
+
+    const lastBlock = editor.document[editor.document.length - 1];
+    editor.insertBlocks(newBlocks, lastBlock, 'after');
+  }, []);
+
   // ── Body auto-save ──
 
-  const handleBodyChange = useCallback(
-    (json: string) => {
-      if (!task) return;
-      pendingBodyRef.current = json;
-
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-
-      saveTimerRef.current = setTimeout(() => {
-        saveTimerRef.current = null;
-        const body = isEmptyDocument(json) ? null : json;
-        suppressTaskRefresh();
-        void getUntask().tasks.update({ id: task.id, body }).finally(() => {
-          setTimeout(unsuppressTaskRefresh, 200);
-        });
-      }, 2000);
+  const { handleBodyChange } = useAutoSaveBody({
+    taskId,
+    onContentChange: (json: string) => {
+      const newCount = countAttachments(json);
+      setAttachmentCount((prev) => (prev !== newCount ? newCount : prev));
     },
-    [task],
-  );
+  });
 
-  // Flush on unmount
+  // ── Bridge navigatedSubtaskId → TaskList's selectedTaskId ──
+
   useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (pendingBodyRef.current !== null) {
-        const currentTask = useTaskStore.getState().tasks.find((t) => t.id === taskId);
-        if (currentTask) {
-          const body = isEmptyDocument(pendingBodyRef.current) ? null : pendingBodyRef.current;
-          pendingBodyRef.current = null;
-          void useTaskStore.getState().updateTask({ id: currentTask.id, body });
-        }
-      }
-    };
-  }, [taskId]);
+    if (navigatedSubtaskId) {
+      selectTask(navigatedSubtaskId);
+    }
+  }, [navigatedSubtaskId, selectTask]);
 
   // ── Today toggle ──
 
@@ -421,6 +253,88 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
     if (!task) return;
     void toggleToday(task.id);
   }, [task, toggleToday]);
+
+  // ── Keyboard shortcut handlers ──
+
+  const handleCyclePriority = useCallback(() => {
+    if (!task) return;
+    const nextPriority = getNextPriority(task.priority);
+    void updateTask({ id: task.id, priority: nextPriority });
+  }, [task, updateTask]);
+
+  const handleCycleStatus = useCallback(() => {
+    if (!task) return;
+    const nextStatus = getNextStatusInCycle(task.status, enabledNonTerminal);
+    void updateTask({ id: task.id, status: nextStatus });
+
+    const label = statusLabelMap.get(nextStatus as PredefinedStatusId) ?? nextStatus;
+    useToastStore.getState().showToast(`Moved to ${label}`, async () => {
+      await getUntask().tasks.undoLastUserAction();
+      await useTaskStore.getState().refreshTasks();
+    });
+
+    const resolvedView = resolveTaskNavigationView({ ...task, status: nextStatus });
+    const currentView = useAppStore.getState().activeView;
+    useAppStore.getState().setView(resolvedView);
+
+    if (resolvedView !== currentView) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          selectTask(task.id);
+        });
+      });
+    } else {
+      selectTask(task.id);
+    }
+  }, [task, enabledNonTerminal, updateTask, selectTask]);
+
+  const handleToggleComplete = useCallback(() => {
+    if (!task) return;
+    if (isTerminalStatus(task.status as never)) {
+      void reopenTask(task.id);
+    } else {
+      void completeTask(task.id);
+    }
+  }, [task, completeTask, reopenTask]);
+
+  const handleStartTitleEdit = useCallback(() => {
+    setIsEditingTitle(true);
+  }, []);
+
+  const handleDelete = useCallback(() => {
+    if (!task) return;
+    const subtaskList = allTasks.filter((t) => t.parentId === task.id);
+    const activeChildren = subtaskList.filter(
+      (t) => !isTerminalStatus(t.status as never),
+    ).length;
+    if (activeChildren > 0) {
+      setDeleteConfirmTrigger({ taskId: task.id, ts: Date.now() });
+      return;
+    }
+    void deleteTask(task.id, false);
+  }, [task, allTasks, deleteTask]);
+
+  const handleDeleteConfirmTriggerHandled = useCallback(() => {
+    setDeleteConfirmTrigger(null);
+  }, []);
+
+  // ── Keyboard hook ──
+
+  const handleKeyDown = useTaskDetailKeyboard({
+    task,
+    isEditingTitle,
+    onToggleToday: handleToggleToday,
+    onCyclePriority: handleCyclePriority,
+    onCycleStatus: handleCycleStatus,
+    onToggleComplete: handleToggleComplete,
+    onStartTitleEdit: handleStartTitleEdit,
+    onDelete: handleDelete,
+  });
+
+  // Auto-focus container on mount so it receives keyboard events
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, [taskId]);
 
   // ── Computed values ──
 
@@ -447,28 +361,29 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
 
   return (
     <motion.div
+      ref={containerRef}
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
       variants={fadeVariants}
       initial="initial"
       animate="animate"
       exit="exit"
       transition={SNAPPY}
-      className="flex h-full flex-col overflow-hidden"
+      className="flex h-full flex-col overflow-hidden outline-none"
     >
       {/* ── Header ── */}
       <header className="flex items-center gap-2 px-3 py-2">
         <Button
           type="button"
-          size="icon-xs"
+          size="xs"
           variant="ghost"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
           onClick={handleBack}
           aria-label={`Back to ${viewLabel}`}
         >
           <ArrowLeft size={14} />
-        </Button>
-        <span className="text-[11px] text-muted-foreground">
           Back to {viewLabel}
-        </span>
+        </Button>
 
         <div className="min-w-0 flex-1" />
 
@@ -481,6 +396,8 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
           activeChildrenCount={activeChildrenCount}
           canMoveToProject={canMoveToProject}
           onDeleted={handleMenuDeleted}
+          deleteConfirmTrigger={deleteConfirmTrigger}
+          onDeleteConfirmTriggerHandled={handleDeleteConfirmTriggerHandled}
         >
           <Popover.Trigger asChild>
             <Button
@@ -541,6 +458,8 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
               task={task}
               onUpdate={updateTask}
               onToggleToday={handleToggleToday}
+              attachmentCount={attachmentCount}
+              onAttach={handleAttach}
             />
           </div>
 
@@ -569,7 +488,6 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
             parentTask={task}
             subtasks={subtasks}
             allTasks={allTasks}
-            navigatedSubtaskId={navigatedSubtaskId}
           />
         </div>
       </div>
