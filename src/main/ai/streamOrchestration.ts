@@ -136,6 +136,30 @@ export const toToolExecutionEnvelope = (
   return null;
 };
 
+const extractTaskResults = (
+  toolName: string,
+  status: 'success' | 'error' | 'confirmation_required',
+  data: unknown,
+): ChatTaskSummary[] | undefined => {
+  if (toolName !== 'list_tasks' || status !== 'success') return undefined;
+  if (!data || typeof data !== 'object' || !('tasks' in data)) return undefined;
+  const tasks = (data as Record<string, unknown>).tasks;
+  if (!Array.isArray(tasks)) return undefined;
+
+  return tasks.map((task) => {
+    const t = task as Record<string, unknown>;
+    return {
+      id: String(t.id ?? ''),
+      title: String(t.title ?? ''),
+      status: String(t.status ?? ''),
+      priority: t.priority != null ? String(t.priority) : null,
+      dueDate: t.dueDate != null ? String(t.dueDate) : null,
+      today: Boolean(t.today),
+      client: t.client != null ? String(t.client) : null,
+    };
+  });
+};
+
 // ─── Chip extraction helpers ────────────────────────────────────
 
 const CHIP_SECTION_HEADING_PATTERN =
@@ -677,10 +701,19 @@ export const runAssistantStream = async (
   let assistantText = '';
   let reasoningText = '';
   const stepDescriptions: string[] = [];
+  const stepOrder: string[] = [];
   let finalizedTextFromModel = '';
   let forcedFallbackText: string | null = null;
   let emittedChips: ChipAction[] | undefined;
   let cachedPrompt: ReturnType<typeof buildSystemPrompt> | null = null;
+
+  const pushStepOrder = (stepId: string, options?: { dedupeConsecutive?: boolean }): void => {
+    const dedupeConsecutive = options?.dedupeConsecutive ?? true;
+    if (dedupeConsecutive && stepOrder[stepOrder.length - 1] === stepId) {
+      return;
+    }
+    stepOrder.push(stepId);
+  };
 
   try {
     let legacyPendingRemovedCount = 0;
@@ -751,13 +784,14 @@ export const runAssistantStream = async (
           const actionCard = deterministicResult.output.actionCard;
           const summary = generateToolCallSummary(deterministicResult.toolName, deterministicResult.output);
 
-          toolExecutions.push({
+          const executionIndex = toolExecutions.push({
             toolName: deterministicResult.toolName,
             toolCallId: deterministicToolCallId,
             status: deterministicResult.output.status,
             message: deterministicResult.output.message,
             actionCardId: actionCard?.id,
-          });
+          }) - 1;
+          pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
 
           emit({
             type: 'tool_call_completed',
@@ -775,12 +809,13 @@ export const runAssistantStream = async (
             deterministicResult.output,
           );
         } else {
-          toolExecutions.push({
+          const executionIndex = toolExecutions.push({
             toolName: deterministicResult.toolName,
             toolCallId: deterministicToolCallId,
             status: 'error',
             message: deterministicResult.error.message,
-          });
+          }) - 1;
+          pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
 
           emit({
             type: 'tool_call_completed',
@@ -938,13 +973,14 @@ export const runAssistantStream = async (
 
             const summary = generateToolCallSummary(approvedResult.toolName, approvedResult.output);
 
-            toolExecutions.push({
+            const executionIndex = toolExecutions.push({
               toolName: approvedResult.toolName,
               toolCallId: deterministicToolCallId,
               status: approvedResult.output.status,
               message: approvedResult.output.message,
               actionCardId: resolvedActionCard?.id,
-            });
+            }) - 1;
+            pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
 
             emit({
               type: 'tool_call_completed',
@@ -965,12 +1001,13 @@ export const runAssistantStream = async (
               : approvedResult.error.message;
             const failureStatus = approvedResult.ok ? approvedResult.output.status : 'error';
 
-            toolExecutions.push({
+            const executionIndex = toolExecutions.push({
               toolName: approvedResult.toolName,
               toolCallId: deterministicToolCallId,
               status: failureStatus,
               message: failureMessage,
-            });
+            }) - 1;
+            pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
 
             emit({
               type: 'tool_call_completed',
@@ -988,6 +1025,14 @@ export const runAssistantStream = async (
         }
       }
 
+      const deterministicContent =
+        deterministicResponseText.trim().length > 0
+          ? deterministicResponseText.trim()
+          : 'Done.';
+      if (deterministicContent.length > 0) {
+        pushStepOrder('text');
+      }
+
       const metadata: PersistedChatToolMetadata = {
         requestId: input.requestId,
         modelId: input.modelId,
@@ -999,6 +1044,7 @@ export const runAssistantStream = async (
           completedAt: new Date().toISOString(),
         },
         ...(stepDescriptions.length > 0 ? { stepDescriptions } : {}),
+        ...(stepOrder.length > 0 ? { stepOrder } : {}),
       };
 
       if (chatState.isCanceled(input.requestId)) {
@@ -1008,10 +1054,7 @@ export const runAssistantStream = async (
       const assistantMessage = saveChatMessage({
         conversationId: input.conversationId,
         role: 'assistant',
-        content:
-          deterministicResponseText.trim().length > 0
-            ? deterministicResponseText.trim()
-            : 'Done.',
+        content: deterministicContent,
         toolCalls: JSON.stringify(metadata),
         chips: null,
       });
@@ -1328,6 +1371,7 @@ export const runAssistantStream = async (
           if (thinkBuffer.length === 0) return;
           if (state === 'inThinking') {
             reasoningText += thinkBuffer;
+            pushStepOrder('thinking');
             emit({ type: 'reasoning', requestId: input.requestId, text: thinkBuffer });
             if (isDev && !tFirstReasoning) {
               tFirstReasoning = performance.now();
@@ -1336,6 +1380,7 @@ export const runAssistantStream = async (
             if (isDev) reasoningTokenCount++;
           } else {
             assistantText += thinkBuffer;
+            pushStepOrder('text');
             emit({ type: 'token', requestId: input.requestId, text: thinkBuffer });
             if (isDev && !tFirstToken) {
               tFirstToken = performance.now();
@@ -1358,6 +1403,7 @@ export const runAssistantStream = async (
                 const before = thinkBuffer.slice(0, openIdx);
                 if (before.length > 0) {
                   assistantText += before;
+                  pushStepOrder('text');
                   emit({ type: 'token', requestId: input.requestId, text: before });
                   if (isDev && !tFirstToken) {
                     tFirstToken = performance.now();
@@ -1380,6 +1426,7 @@ export const runAssistantStream = async (
                 if (safeEnd > 0) {
                   const safe = thinkBuffer.slice(0, safeEnd);
                   assistantText += safe;
+                  pushStepOrder('text');
                   emit({ type: 'token', requestId: input.requestId, text: safe });
                   if (isDev && !tFirstToken) {
                     tFirstToken = performance.now();
@@ -1401,6 +1448,7 @@ export const runAssistantStream = async (
                 const before = thinkBuffer.slice(0, closeIdx);
                 if (before.length > 0) {
                   reasoningText += before;
+                  pushStepOrder('thinking');
                   emit({ type: 'reasoning', requestId: input.requestId, text: before });
                   if (isDev && !tFirstReasoning) {
                     tFirstReasoning = performance.now();
@@ -1421,6 +1469,7 @@ export const runAssistantStream = async (
                 if (safeEnd > 0) {
                   const safe = thinkBuffer.slice(0, safeEnd);
                   reasoningText += safe;
+                  pushStepOrder('thinking');
                   emit({ type: 'reasoning', requestId: input.requestId, text: safe });
                   if (isDev && !tFirstReasoning) {
                     tFirstReasoning = performance.now();
@@ -1450,6 +1499,7 @@ export const runAssistantStream = async (
           switch (part.type) {
             case 'reasoning-delta': {
               reasoningText += part.text;
+              pushStepOrder('thinking');
               emit({
                 type: 'reasoning',
                 requestId: input.requestId,
@@ -1519,26 +1569,7 @@ export const runAssistantStream = async (
                 emittedChips = toolChips;
               }
 
-              // Extract task results from list_tasks tool
-              let taskResults: ChatTaskSummary[] | undefined;
-              if (
-                part.toolName === 'list_tasks' &&
-                status === 'success' &&
-                envelope?.data &&
-                typeof envelope.data === 'object' &&
-                'tasks' in envelope.data &&
-                Array.isArray((envelope.data as Record<string, unknown>).tasks)
-              ) {
-                const rawTasks = (envelope.data as Record<string, unknown>).tasks as Array<Record<string, unknown>>;
-                taskResults = rawTasks.map((t) => ({
-                  id: String(t.id ?? ''),
-                  title: String(t.title ?? ''),
-                  status: String(t.status ?? ''),
-                  priority: t.priority != null ? String(t.priority) : null,
-                  dueDate: t.dueDate != null ? String(t.dueDate) : null,
-                  today: Boolean(t.today),
-                }));
-              }
+              const taskResults = extractTaskResults(part.toolName, status, envelope?.data);
 
               const execution: ChatToolExecutionSummary = {
                 toolName: part.toolName,
@@ -1548,7 +1579,11 @@ export const runAssistantStream = async (
                 actionCardId: actionCard?.id,
                 ...(taskResults ? { taskResults } : {}),
               };
-              toolExecutions.push(execution);
+              const executionIndex = toolExecutions.push(execution) - 1;
+              pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
+              if (taskResults && taskResults.length > 0) {
+                pushStepOrder(`task_results:${executionIndex}`, { dedupeConsecutive: false });
+              }
 
               emit({
                 type: 'tool_call_completed',
@@ -1575,12 +1610,13 @@ export const runAssistantStream = async (
                   : null;
               const message = maybeErrorText ?? `${part.toolName} failed.`;
 
-              toolExecutions.push({
+              const executionIndex = toolExecutions.push({
                 toolName: part.toolName,
                 toolCallId: part.toolCallId,
                 status: 'error',
                 message,
-              });
+              }) - 1;
+              pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
 
               emit({
                 type: 'tool_call_completed',
@@ -1660,26 +1696,11 @@ export const runAssistantStream = async (
               const actionCard = fallbackResult.output.actionCard;
               const fallbackSummary = generateToolCallSummary(fallbackResult.toolName, fallbackResult.output);
 
-              // Extract task results from fallback list_tasks execution
-              let fallbackTaskResults: ChatTaskSummary[] | undefined;
-              if (
-                fallbackResult.toolName === 'list_tasks' &&
-                fallbackResult.output.status === 'success' &&
-                fallbackResult.output.data &&
-                typeof fallbackResult.output.data === 'object' &&
-                'tasks' in fallbackResult.output.data &&
-                Array.isArray((fallbackResult.output.data as Record<string, unknown>).tasks)
-              ) {
-                const rawTasks = (fallbackResult.output.data as Record<string, unknown>).tasks as Array<Record<string, unknown>>;
-                fallbackTaskResults = rawTasks.map((t) => ({
-                  id: String(t.id ?? ''),
-                  title: String(t.title ?? ''),
-                  status: String(t.status ?? ''),
-                  priority: t.priority != null ? String(t.priority) : null,
-                  dueDate: t.dueDate != null ? String(t.dueDate) : null,
-                  today: Boolean(t.today),
-                }));
-              }
+              const fallbackTaskResults = extractTaskResults(
+                fallbackResult.toolName,
+                fallbackResult.output.status,
+                fallbackResult.output.data,
+              );
 
               const execution: ChatToolExecutionSummary = {
                 toolName: fallbackResult.toolName,
@@ -1689,7 +1710,11 @@ export const runAssistantStream = async (
                 actionCardId: actionCard?.id,
                 ...(fallbackTaskResults ? { taskResults: fallbackTaskResults } : {}),
               };
-              toolExecutions.push(execution);
+              const executionIndex = toolExecutions.push(execution) - 1;
+              pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
+              if (fallbackTaskResults && fallbackTaskResults.length > 0) {
+                pushStepOrder(`task_results:${executionIndex}`, { dedupeConsecutive: false });
+              }
 
               emit({
                 type: 'tool_call_completed',
@@ -1708,12 +1733,13 @@ export const runAssistantStream = async (
                 fallbackResult.output,
               );
             } else {
-              toolExecutions.push({
+              const executionIndex = toolExecutions.push({
                 toolName: fallbackResult.toolName,
                 toolCallId: fallbackToolCallId,
                 status: 'error',
                 message: fallbackResult.error.message,
-              });
+              }) - 1;
+              pushStepOrder(`tool:${executionIndex}`, { dedupeConsecutive: false });
 
               emit({
                 type: 'tool_call_completed',
@@ -1807,6 +1833,9 @@ export const runAssistantStream = async (
     if (!emittedChips && inlineChips?.chips) {
       emittedChips = inlineChips.chips;
     }
+    if (outputText.trim().length > 0) {
+      pushStepOrder('text');
+    }
 
     const metadata: PersistedChatToolMetadata = {
       requestId: input.requestId,
@@ -1820,6 +1849,7 @@ export const runAssistantStream = async (
       },
       ...(reasoningText.length > 0 ? { reasoningText } : {}),
       ...(stepDescriptions.length > 0 ? { stepDescriptions } : {}),
+      ...(stepOrder.length > 0 ? { stepOrder } : {}),
       ...(emittedChips ? { chips: emittedChips } : {}),
     };
 

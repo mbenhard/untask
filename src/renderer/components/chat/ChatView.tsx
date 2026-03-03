@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
 import { useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
+import { useToastStore } from '../../stores/toastStore';
 import { BirdMascot } from './BirdMascot';
 
 const AvatarIcon = ({ size, className }: { size: number; className?: string }) => (
@@ -388,16 +389,21 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
 
   const handleTaskCardClick = useCallback((taskId: string) => {
     const task = allTasks.find((t) => t.id === taskId);
-    if (task) {
-      if (task.status === 'inbox') {
-        setView('inbox');
-      } else if (task.today) {
-        setView('today');
-      } else {
-        setView('tasks');
-      }
-      selectTask(taskId);
+    if (!task) {
+      useToastStore.getState().showToast('Task no longer exists');
+      return;
     }
+
+    if (task.status === 'inbox') {
+      setView('inbox');
+    } else if (task.today) {
+      setView('today');
+    } else {
+      setView('tasks');
+    }
+
+    selectTask(taskId);
+    useAppStore.getState().peekChatOverlay();
   }, [allTasks, setView, selectTask]);
 
   const prefersReducedMotion = useReducedMotion();
@@ -599,6 +605,20 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
                     }
 
                     if (step.kind === 'text') {
+                      const previousStep = message.steps[index - 1];
+                      const isAfterTaskResults = previousStep?.kind === 'task_results';
+
+                      if (isAfterTaskResults) {
+                        return (
+                          <div
+                            key={`text-${index}`}
+                            className="px-1 text-xs text-muted-foreground/60"
+                          >
+                            <ChatMarkdown content={step.content} />
+                          </div>
+                        );
+                      }
+
                       return (
                         <div
                           key={`text-${index}`}
@@ -711,7 +731,7 @@ export const ChatView = ({ onSuggestionClick }: ChatViewProps) => {
         );
       });
     },
-    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion, isOllama],
+    [messages, isSending, undoAction, handleApprove, rejectPendingAction, handleChipClick, prefersReducedMotion, isOllama, handleTaskCardClick],
   );
 
   return (

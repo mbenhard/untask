@@ -236,6 +236,9 @@ export const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata
     }
 
     const normalizedMetadataChips = normalizeChips(parsed.chips);
+    const normalizedStepOrder = Array.isArray(parsed.stepOrder)
+      ? parsed.stepOrder.filter((entry): entry is string => typeof entry === 'string')
+      : undefined;
     const normalizedOrigin = parsed.origin === 'user' || parsed.origin === 'proactive'
       ? parsed.origin
       : undefined;
@@ -251,6 +254,7 @@ export const parseToolMetadata = (raw: string | null): PersistedChatToolMetadata
       ...(parsed.telemetry ? { telemetry: parsed.telemetry } : {}),
       ...(typeof parsed.reasoningText === 'string' ? { reasoningText: parsed.reasoningText } : {}),
       ...(Array.isArray(parsed.stepDescriptions) ? { stepDescriptions: parsed.stepDescriptions } : {}),
+      ...(normalizedStepOrder ? { stepOrder: normalizedStepOrder } : {}),
       ...(typeof parsed.imageCount === 'number' ? { imageCount: parsed.imageCount } : {}),
       ...(normalizedMetadataChips ? { chips: normalizedMetadataChips } : {}),
     };
@@ -268,20 +272,129 @@ export const reconstructStepsFromMetadata = (
   }
 
   const steps: TurnStep[] = [];
-
-  if (metadata.reasoningText && metadata.reasoningText.trim().length > 0) {
-    steps.push({ kind: 'thinking', content: metadata.reasoningText });
-  }
-
-  if (content.trim().length > 0) {
-    steps.push({ kind: 'text', content });
-  }
+  const reasoningContent =
+    typeof metadata.reasoningText === 'string'
+      ? metadata.reasoningText
+      : '';
+  const hasReasoning = reasoningContent.trim().length > 0;
+  const hasContent = content.trim().length > 0;
 
   const actionCardMap = new Map<string, ChatActionCard>();
   for (const card of metadata.actionCards) {
     if (card.id) {
       actionCardMap.set(card.id, card);
     }
+  }
+
+  const buildToolStep = (executionIndex: number): TurnStep | null => {
+    const exec = metadata.toolExecutions[executionIndex];
+    if (!exec) {
+      return null;
+    }
+
+    const card = exec.actionCardId ? actionCardMap.get(exec.actionCardId) : undefined;
+    return {
+      kind: 'tool',
+      toolName: exec.toolName,
+      toolCallId: exec.toolCallId ?? '',
+      description: card?.title ?? exec.toolName,
+      status: exec.status === 'confirmation_required' ? 'confirmation_required' : exec.status,
+      summary: exec.message,
+      actionCard: card,
+    };
+  };
+
+  const hasStepOrder = Array.isArray(metadata.stepOrder) && metadata.stepOrder.length > 0;
+  if (hasStepOrder) {
+    const usedToolIndexes = new Set<number>();
+    const usedTaskIndexes = new Set<number>();
+    let addedThinking = false;
+    let addedText = false;
+    let addedAny = false;
+
+    for (const entry of metadata.stepOrder ?? []) {
+      if (entry === 'thinking') {
+        if (!addedThinking && hasReasoning) {
+          steps.push({ kind: 'thinking', content: reasoningContent });
+          addedThinking = true;
+          addedAny = true;
+        }
+        continue;
+      }
+
+      if (entry === 'text') {
+        if (!addedText && hasContent) {
+          steps.push({ kind: 'text', content });
+          addedText = true;
+          addedAny = true;
+        }
+        continue;
+      }
+
+      if (entry.startsWith('tool:')) {
+        const executionIndex = Number.parseInt(entry.slice('tool:'.length), 10);
+        if (!Number.isNaN(executionIndex)) {
+          const toolStep = buildToolStep(executionIndex);
+          if (toolStep) {
+            steps.push(toolStep);
+            usedToolIndexes.add(executionIndex);
+            addedAny = true;
+          }
+        }
+        continue;
+      }
+
+      if (entry.startsWith('task_results:')) {
+        const executionIndex = Number.parseInt(entry.slice('task_results:'.length), 10);
+        if (Number.isNaN(executionIndex)) {
+          continue;
+        }
+        const execution = metadata.toolExecutions[executionIndex];
+        if (execution?.taskResults && execution.taskResults.length > 0) {
+          steps.push({
+            kind: 'task_results',
+            tasks: execution.taskResults,
+          });
+          usedTaskIndexes.add(executionIndex);
+          addedAny = true;
+        }
+      }
+    }
+
+    metadata.toolExecutions.forEach((execution, executionIndex) => {
+      if (!usedToolIndexes.has(executionIndex)) {
+        const toolStep = buildToolStep(executionIndex);
+        if (toolStep) {
+          steps.push(toolStep);
+        }
+      }
+      if (!usedTaskIndexes.has(executionIndex) && execution.taskResults && execution.taskResults.length > 0) {
+        steps.push({
+          kind: 'task_results',
+          tasks: execution.taskResults,
+        });
+      }
+    });
+
+    if (!addedThinking && hasReasoning) {
+      steps.unshift({ kind: 'thinking', content: reasoningContent });
+    }
+
+    if (!addedText && hasContent) {
+      steps.push({ kind: 'text', content });
+    }
+
+    if (addedAny || steps.length > 0) {
+      return steps;
+    }
+  }
+
+  if (hasReasoning) {
+    steps.push({ kind: 'thinking', content: reasoningContent });
+  }
+
+  if (hasContent) {
+    steps.push({ kind: 'text', content });
   }
 
   for (const exec of metadata.toolExecutions) {

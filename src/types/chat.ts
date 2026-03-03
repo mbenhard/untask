@@ -37,6 +37,7 @@ export type ChatTaskSummary = {
   priority: string | null;
   dueDate: string | null;
   today: boolean;
+  client: string | null;
 };
 
 export type ChatActionCard = {
@@ -81,6 +82,7 @@ export type PersistedChatToolMetadata = {
   telemetry?: ChatTurnTelemetry;
   reasoningText?: string;
   stepDescriptions?: string[];
+  stepOrder?: string[];
   imageCount?: number;
   chips?: ChipAction[];
 };

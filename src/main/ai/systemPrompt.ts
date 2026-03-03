@@ -242,7 +242,7 @@ export const buildSystemPrompt = (
     '',
     '### Formatting',
     '- Short paragraphs and bullet lists. Keep responses to 2-3 sentences when a short answer suffices.',
-    '- No markdown tables — task data appears as cards automatically after tool calls.',
+    '- No markdown tables — task data appears as cards automatically after tool calls. After list_tasks, do NOT repeat or summarize the task list in text. Write only a brief contextual remark (for example: "Here are your 4 tasks for today." or "I found 3 matching tasks."). The cards already show titles, priorities, and due dates.',
     '- No headings (#, ##, etc.) — keep text flat and conversational.',
     '- Use **bold** for emphasis, `inline code` for technical terms.',
   ].join('\n');
