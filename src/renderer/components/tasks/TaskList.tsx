@@ -68,6 +68,7 @@ export interface TaskListProps {
   ariaLabel: string;
   scopeId: string;
   indentPx?: number;
+  hideParentRef?: boolean;
   dndMode?: 'local' | 'shared';
   sharedActiveDragId?: string | null;
   autoFocus?: boolean;
@@ -87,6 +88,7 @@ export const TaskList = ({
   ariaLabel,
   scopeId,
   indentPx = 0,
+  hideParentRef = false,
   dndMode = 'local',
   sharedActiveDragId = null,
   isPrimaryList = false,
@@ -656,6 +658,7 @@ export const TaskList = ({
                 isExpanded={isExpanded}
                 subtaskCount={subtasks.length}
                 indentPx={indentPx}
+                hideParentRef={hideParentRef}
                 onRequestAddSubtask={
                   canOwnSubtasks
                     ? () => setAddingSubtaskForId(task.id)

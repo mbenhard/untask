@@ -415,7 +415,7 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
 
       {/* ── Scrollable content ── */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl p-3 pb-14">
+        <div className="mx-auto max-w-3xl px-5 pt-3 pb-14">
           {/* Title */}
           <div className="mb-2">
             {isEditingTitle ? (

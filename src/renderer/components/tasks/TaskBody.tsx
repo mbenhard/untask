@@ -8,7 +8,7 @@ import { PREDEFINED_STATUSES } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
-import { suppressTaskRefresh, unsuppressTaskRefresh } from '../../lib/editorSaveGuard';
+import { useAutoSaveBody } from '../../hooks/useAutoSaveBody';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
 import { PRIORITY_DOT as SHARED_PRIORITY_DOT, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { useAppStore } from '../../stores/appStore';
@@ -19,7 +19,6 @@ import {
   selectEnabledNonTerminal,
   selectEnabledTerminal,
 } from '../../stores/taskStatusConfigStore';
-import { isEmptyDocument } from '../editor/editorUtils';
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { getNextPriority } from './taskInteraction';
@@ -529,7 +528,7 @@ const SubtasksSegment = ({
 
 // ─── Attachment helpers ─────────────────────────────────────
 
-function countAttachments(body: string | null): number {
+export function countAttachments(body: string | null): number {
   if (!body) return 0;
   try {
     const blocks = JSON.parse(body) as Array<{ type?: string }>;
@@ -543,7 +542,7 @@ function countAttachments(body: string | null): number {
 
 // ─── Attachment Segment ─────────────────────────────────────
 
-const AttachmentSegment = ({
+export const AttachmentSegment = ({
   count,
   onAttach,
 }: {
@@ -646,6 +645,7 @@ export type TaskBodyProps = {
   isExpanded: boolean;
   subtaskCount: number;
   indentPx?: number;
+  hideParentRef?: boolean;
   onRequestAddSubtask?: () => void;
   onBodyEditModeChange?: (editing: boolean) => void;
 };
@@ -655,6 +655,7 @@ export const TaskBody = ({
   isExpanded,
   subtaskCount,
   indentPx = 0,
+  hideParentRef = false,
   onRequestAddSubtask,
   onBodyEditModeChange,
 }: TaskBodyProps) => {
@@ -670,8 +671,6 @@ export const TaskBody = ({
   );
   const selectTask = useTaskStore((state) => state.selectTask);
   const setView = useAppStore((state) => state.setView);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingBodyRef = useRef<string | null>(null);
   const editorRef = useRef<BlockNoteEditor | null>(null);
   const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
   const openMetricKeyRef = useRef<string | null>(null);
@@ -714,66 +713,24 @@ export const TaskBody = ({
     editor.insertBlocks(newBlocks, lastBlock, 'after');
   }, []);
 
-  const flushSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-
-    if (pendingBodyRef.current !== null) {
-      const body = isEmptyDocument(pendingBodyRef.current)
-        ? null
-        : pendingBodyRef.current;
-      pendingBodyRef.current = null;
-      void updateTask({ id: task.id, body });
-    }
-  }, [task.id, updateTask]);
-
-  const handleBodyChange = useCallback(
-    (json: string) => {
+  const { handleBodyChange, flushSave } = useAutoSaveBody({
+    taskId: task.id,
+    onContentChange: (json: string) => {
       const metricKey = openMetricKeyRef.current;
       if (!hasRecordedOpenLatencyRef.current && metricKey) {
         hasRecordedOpenLatencyRef.current = true;
         devLatencyRef.current.end('task-editor-open', metricKey);
       }
-      pendingBodyRef.current = json;
-
       const newCount = countAttachments(json);
       setAttachmentCount((prev) => (prev !== newCount ? newCount : prev));
-
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-
-      saveTimerRef.current = setTimeout(() => {
-        saveTimerRef.current = null;
-        const body = isEmptyDocument(json) ? null : json;
-        // Do NOT clear pendingBodyRef here — only flushSave should clear it.
-        // flushSave goes through updateTask() which syncs the Zustand store,
-        // ensuring task.body is up-to-date before the editor unmounts on collapse.
-        // Persist directly via IPC — bypass Zustand to avoid re-render/focus loss.
-        // Suppress the TASK_DATA_CHANGED refresh so the broadcast from the main
-        // process doesn't trigger a full store reload that steals editor focus.
-        suppressTaskRefresh();
-        void getUntask().tasks.update({ id: task.id, body }).finally(() => {
-          setTimeout(unsuppressTaskRefresh, 200);
-        });
-      }, 2000);
     },
-    [task.id],
-  );
+  });
 
   useEffect(() => {
     if (!isExpanded) {
       flushSave();
     }
   }, [isExpanded, flushSave]);
-
-  useEffect(() => {
-    return () => {
-      flushSave();
-    };
-  }, [flushSave]);
 
   // Dev-only latency probe: expanded task editor -> first content change.
   useEffect(() => {
@@ -812,7 +769,7 @@ export const TaskBody = ({
   return (
     <div className="overflow-hidden">
       {/* Part-of reference — subtask context */}
-      {parentTask && indentPx === 0 && (
+      {parentTask && indentPx === 0 && !hideParentRef && (
         <div className="border-t border-border/30 px-3 pt-2">
           <button
             type="button"
