@@ -96,6 +96,14 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isRecommended: true,
   },
   {
+    id: 'google/gemini-3.1-flash-lite-preview',
+    name: 'Gemini 3.1 Flash Lite (Preview)',
+    provider: 'openrouter',
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
+  {
     id: 'minimax/minimax-m2.5',
     name: 'MiniMax m2.5',
     provider: 'openrouter',
@@ -168,7 +176,7 @@ export const buildModelOptions = (
     if (provider === 'openrouter') {
       const topIds = [
         'anthropic/claude-haiku-4-5',
-        'google/gemini-3-flash-preview',
+        'google/gemini-3.1-flash-lite-preview',
         'openai/gpt-4.1-mini',
       ];
 

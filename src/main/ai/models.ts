@@ -11,6 +11,7 @@ export const SUPPORTED_MODEL_IDS = [
   'anthropic/claude-sonnet-4-6',
   'anthropic/claude-haiku-4-5',
   'google/gemini-3-flash-preview',
+  'google/gemini-3.1-flash-lite-preview',
   'minimax/minimax-m2.5',
   'z-ai/glm-5',
   'moonshotai/kimi-k2.5',
@@ -163,6 +164,16 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
+  // Gemini 3.1 Flash Lite (Preview) — OpenRouter
+  {
+    id: 'google/gemini-3.1-flash-lite-preview',
+    name: 'Gemini 3.1 Flash Lite (Preview)',
+    provider: 'openrouter',
+    contextWindow: 1_048_576,
+    costTier: 'cheap',
+    capabilities: ['tools', 'vision', 'reasoning'],
+    isRecommended: true,
+  },
   // MiniMax m2.5 — OpenRouter
   {
     id: 'minimax/minimax-m2.5',
@@ -264,6 +275,16 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     label: 'Gemini 3 Flash (OpenRouter)',
     inputCostPerMillion: 0.5,
     outputCostPerMillion: 3.0,
+    defaultSelected: false,
+    supportsReasoning: true,
+    supportsWebSearch: false,
+    supportsVision: true,
+  },
+  {
+    id: 'google/gemini-3.1-flash-lite-preview',
+    label: 'Gemini 3.1 Flash Lite (Preview) (OpenRouter)',
+    inputCostPerMillion: null,
+    outputCostPerMillion: null,
     defaultSelected: false,
     supportsReasoning: true,
     supportsWebSearch: false,
