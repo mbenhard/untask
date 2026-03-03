@@ -4,20 +4,27 @@ All notable changes to Untask will be documented in this file.
 
 ## [0.2.0] - 2026-03-03
 
-Task detail workflow and major AI chat response polish.
+Task detail workflow, smarter AI task execution, and smoother update flow.
 
 ### Changes
 
 **Added**
 - **Task detail page** — Open any task into a dedicated detail view from Inbox, Today, and Tasks
 - **Task detail shortcuts** — New keyboard actions in detail view: `T` (today), `P` (priority), `S` (status), `Space` (complete/reopen), `E` (edit title), `Cmd+Backspace` (delete)
+- **Update banner quick actions** — Copy the Homebrew upgrade command and open Terminal with the command prefilled
+- **New model option** — Added OpenRouter Gemini 3.1 Flash Lite (preview) in the model catalog
 
 **Improved**
-- **Task interactions** — Replaced row chevron menus with right-click context menus and a clearer “Open detail” flow
-- **AI task responses** — Refined task card layout, ordering, and intent handling for cleaner, more reliable chat actions
+- **Task row interactions** — Replaced chevron overflow menus with right-click context menus and a clearer "Open detail" flow
+- **Detail page readability** — Improved spacing and cleaner subtask presentation in task detail view
+- **AI task responses** — Refined task card layout, ordering, and deterministic intent behavior
 
 **Fixed**
 - Chat task-result text duplication and bubble rendering issues
+- Redo shortcut no longer shows a success toast when nothing was redone
+
+**Removed**
+- Removed the legacy `effort` field from the task model and related AI/task plumbing
 
 ## [0.1.17] - 2026-03-02
 
