@@ -31,12 +31,14 @@ export const UpdateBanner = () => {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [visible, setVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(BREW_COMMAND).then(() => {
       setCopied(true);
-      clearTimeout(copiedTimerRef.current);
+      if (copiedTimerRef.current !== null) {
+        clearTimeout(copiedTimerRef.current);
+      }
       copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     });
   }, []);
