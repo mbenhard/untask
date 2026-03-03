@@ -2,6 +2,23 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.2.0] - 2026-03-03
+
+Task detail workflow and major AI chat response polish.
+
+### Changes
+
+**Added**
+- **Task detail page** — Open any task into a dedicated detail view from Inbox, Today, and Tasks
+- **Task detail shortcuts** — New keyboard actions in detail view: `T` (today), `P` (priority), `S` (status), `Space` (complete/reopen), `E` (edit title), `Cmd+Backspace` (delete)
+
+**Improved**
+- **Task interactions** — Replaced row chevron menus with right-click context menus and a clearer “Open detail” flow
+- **AI task responses** — Refined task card layout, ordering, and intent handling for cleaner, more reliable chat actions
+
+**Fixed**
+- Chat task-result text duplication and bubble rendering issues
+
 ## [0.1.17] - 2026-03-02
 
 Redo, UI scale, auto-cleanup, and chat rendering improvements.
@@ -406,6 +423,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.2.0]: https://github.com/mbenhard/untask/compare/v0.1.17...v0.2.0
 [0.1.17]: https://github.com/mbenhard/untask/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/mbenhard/untask/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/mbenhard/untask/compare/v0.1.14...v0.1.15
