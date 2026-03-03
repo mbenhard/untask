@@ -27,7 +27,7 @@ import { BlockEditor, type BlockEditorSlashMenuItem, type BlockEditorSlashMenuPa
 
 // ─── Types & Constants ──────────────────────────────────────
 
-type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
+export type UpdateTaskAction = (input: TaskUpdateInput) => Promise<Task | null>;
 
 type DevLatencyApi = {
   start: (flow: string, key: string | number) => void;
@@ -57,7 +57,7 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
 
 const UNSUPPORTED_MEDIA_ITEMS = new Set(['Video', 'Audio']);
 
-const getAttachmentSlashMenuItems = (
+export const getAttachmentSlashMenuItems = (
   { defaultItems }: BlockEditorSlashMenuParams,
 ): BlockEditorSlashMenuItem[] =>
   defaultItems.filter(
@@ -66,7 +66,7 @@ const getAttachmentSlashMenuItems = (
 
 // ─── Dot Separator ──────────────────────────────────────────
 
-const MetaDot = () => (
+export const MetaDot = () => (
   <span aria-hidden="true" className="text-border select-none">
     ·
   </span>
@@ -74,7 +74,7 @@ const MetaDot = () => (
 
 // ─── Priority Segment ───────────────────────────────────────
 
-const PrioritySegment = ({
+export const PrioritySegment = ({
   task,
   onUpdate,
 }: {
@@ -121,7 +121,7 @@ const PrioritySegment = ({
 
 // ─── Due Date Segment ───────────────────────────────────────
 
-const DueDateSegment = ({
+export const DueDateSegment = ({
   task,
   onUpdate,
 }: {
@@ -159,7 +159,7 @@ const DueDateSegment = ({
 
 // ─── Client Segment ─────────────────────────────────────────
 
-const ClientSegment = ({
+export const ClientSegment = ({
   task,
   onUpdate,
 }: {
@@ -232,7 +232,7 @@ const ClientSegment = ({
 
 // ─── Status Segment ─────────────────────────────────────────
 
-const StatusSegment = ({
+export const StatusSegment = ({
   task,
   onUpdate,
 }: {
@@ -345,7 +345,7 @@ const RECURRENCE_PRESETS = [
   { value: 'every weekday', label: 'Every weekday' },
 ];
 
-const RecurrenceSegment = ({
+export const RecurrenceSegment = ({
   task,
   onUpdate,
 }: {

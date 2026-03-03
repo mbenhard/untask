@@ -73,6 +73,7 @@ export interface TaskListProps {
   isPrimaryList?: boolean;
   focusedIndex?: number;
   onFocusedIndexChange?: (index: number) => void;
+  onOpenDetail?: (id: string) => void;
   onNavigateNextGroup?: () => void;
   onNavigatePrevGroup?: () => void;
 }
@@ -90,6 +91,7 @@ export const TaskList = ({
   isPrimaryList = false,
   focusedIndex: controlledFocusedIndex,
   onFocusedIndexChange: controlledOnFocusedIndexChange,
+  onOpenDetail,
   onNavigateNextGroup,
   onNavigatePrevGroup,
 }: TaskListProps) => {
@@ -528,6 +530,7 @@ export const TaskList = ({
     onFocusedIndexChange: setFocusedIndex,
     expandedTaskId,
     onToggleExpand: handleToggleExpand,
+    onOpenDetail,
     onToggleComplete: handleRequestCompleteConfirm,
     onToggleToday: handleToggleToday,
     onCyclePriority: handleCyclePriority,
@@ -606,6 +609,7 @@ export const TaskList = ({
               onComplete={handleComplete}
               onCompleteWithChildren={handleCompleteWithChildren}
               onToggleToday={handleToggleToday}
+              onOpenDetail={onOpenDetail}
               onFocus={() => setFocusedIndex(index)}
               completeConfirmTrigger={completeConfirmTrigger}
               deleteConfirmTrigger={deleteConfirmTrigger}

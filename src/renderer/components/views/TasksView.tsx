@@ -15,10 +15,11 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { AnimatePresence } from 'framer-motion';
 import type { Task, PredefinedStatusId, TaskStatus } from '../../../types/models';
 import { isTerminalStatus, getStatusLabel } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '../../stores/appStore';
+import { selectFocusedTaskId, useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
 import {
   useTaskStatusConfigStore,
@@ -26,6 +27,7 @@ import {
 } from '../../stores/taskStatusConfigStore';
 import { DragPreview } from '../tasks/DragPreview';
 import { type AddTaskConfig, SectionGroup } from '../tasks/SectionGroup';
+import { TaskDetailPage } from '../tasks/TaskDetailPage';
 import { TaskList } from '../tasks/TaskList';
 import {
   flattenStatusLaneTaskIds,
@@ -67,6 +69,7 @@ type StatusGroupSectionProps = {
   isPrimaryList?: boolean;
   focusedIndex?: number;
   onFocusedIndexChange?: (index: number) => void;
+  onOpenDetail?: (id: string) => void;
   onNavigateNextGroup?: () => void;
   onNavigatePrevGroup?: () => void;
   onRequestFocus?: () => void;
@@ -85,6 +88,7 @@ const StatusGroupSection = ({
   isPrimaryList,
   focusedIndex,
   onFocusedIndexChange,
+  onOpenDetail,
   onNavigateNextGroup,
   onNavigatePrevGroup,
   onRequestFocus,
@@ -117,6 +121,7 @@ const StatusGroupSection = ({
         isPrimaryList={isPrimaryList}
         focusedIndex={focusedIndex}
         onFocusedIndexChange={onFocusedIndexChange}
+        onOpenDetail={onOpenDetail}
         onNavigateNextGroup={onNavigateNextGroup}
         onNavigatePrevGroup={onNavigatePrevGroup}
       />
@@ -130,6 +135,8 @@ export const TasksView = ({
 }: TasksViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
   const activeView = useAppStore((state) => state.activeView);
+  const focusedTaskId = useAppStore(selectFocusedTaskId);
+  const setFocusedTaskId = useAppStore((state) => state.setFocusedTaskId);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
   const reorderTasks = useTaskStore((state) => state.reorderTasks);
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -360,6 +367,26 @@ export const TasksView = ({
     ],
   );
 
+  const handleOpenDetail = useCallback(
+    (taskId: string) => {
+      const task = allTasks.find((t) => t.id === taskId);
+      if (task?.parentId) {
+        setFocusedTaskId(task.parentId);
+      } else {
+        setFocusedTaskId(taskId);
+      }
+    },
+    [allTasks, setFocusedTaskId],
+  );
+
+  if (focusedTaskId) {
+    return (
+      <AnimatePresence mode="wait">
+        <TaskDetailPage key={focusedTaskId} taskId={focusedTaskId} />
+      </AnimatePresence>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
@@ -414,6 +441,7 @@ export const TasksView = ({
                   isPrimaryList={isPrimary}
                   focusedIndex={effectiveFocusedIndex}
                   onFocusedIndexChange={handleFocusedIndexChange}
+                  onOpenDetail={handleOpenDetail}
                   onNavigateNextGroup={() => handleNavigateNextGroup(key)}
                   onNavigatePrevGroup={() => handleNavigatePrevGroup(key)}
                   onRequestFocus={() => {

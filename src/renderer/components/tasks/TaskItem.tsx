@@ -19,6 +19,13 @@ import { Popover, PopoverContent, Tooltip, TooltipContent, TooltipTrigger } from
 import { formatDueDateDisplay, isDueDateOverdue, parseDueDate, parseDueTime } from './dueDate';
 import { getNextPriority } from './taskInteraction';
 
+const ArrowRightIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </svg>
+);
+
 export interface TaskItemProps {
   task: Task;
   isExpanded: boolean;
@@ -34,6 +41,7 @@ export interface TaskItemProps {
   onComplete: (id: string) => void;
   onCompleteWithChildren: (id: string) => void;
   onToggleToday: (id: string) => void;
+  onOpenDetail?: (id: string) => void;
   onFocus?: () => void;
   completeConfirmTrigger?: { taskId: string; ts: number } | null;
   deleteConfirmTrigger?: { taskId: string; ts: number } | null;
@@ -67,6 +75,7 @@ export const TaskItem = ({
   onComplete,
   onCompleteWithChildren,
   onToggleToday,
+  onOpenDetail,
   onFocus,
   completeConfirmTrigger,
   deleteConfirmTrigger,
@@ -307,7 +316,7 @@ export const TaskItem = ({
         onFocus?.();
       }}
       className={cn(
-        'overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
+        'group/row overflow-hidden border-b border-border/40 last:border-b-0 outline-none transition-colors duration-100',
         isFocused && 'bg-accent/40',
         isNavigatedTo && 'task-navigated',
         isDragging && 'z-10 opacity-30',
@@ -596,6 +605,25 @@ export const TaskItem = ({
               </motion.span>
             ) : null}
           </AnimatePresence>
+
+          {onOpenDetail && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenDetail(task.id);
+                  }}
+                  aria-label={`Open detail page for "${task.title}"`}
+                  className="inline-flex size-6 items-center justify-center text-muted-foreground opacity-0 outline-none transition-all hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/row:opacity-100"
+                >
+                  <ArrowRightIcon />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Open detail</TooltipContent>
+            </Tooltip>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>

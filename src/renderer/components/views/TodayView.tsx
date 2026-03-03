@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { AnimatePresence } from 'framer-motion';
 
 import type { Task, PredefinedStatusId } from '../../../types/models';
 import { TERMINAL_STATUSES } from '../../../types/models';
 
-import { useAppStore } from '../../stores/appStore';
+import { selectFocusedTaskId, useAppStore } from '../../stores/appStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { SectionGroup } from '../tasks/SectionGroup';
+import { TaskDetailPage } from '../tasks/TaskDetailPage';
 import { TaskList } from '../tasks/TaskList';
 
 type TodayViewProps = {
@@ -19,10 +22,15 @@ export const TodayView = ({
 }: TodayViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
   const activeView = useAppStore((state) => state.activeView);
+  const focusedTaskId = useAppStore(selectFocusedTaskId);
+  const setFocusedTaskId = useAppStore((state) => state.setFocusedTaskId);
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId);
+
   const [isTodayCollapsed, setIsTodayCollapsed] = useState(false);
   const [isDoneCollapsed, setIsDoneCollapsed] = useState(true);
   const [focusedIndex, setFocusedIndex] = useState(0);
+  // Track the subtask that triggered navigation to parent detail page
+  const [navigatedSubtaskId, setNavigatedSubtaskId] = useState<string | null>(null);
 
   const activeTodayTasks = useMemo(
     () => allTasks.filter(
@@ -52,6 +60,42 @@ export const TodayView = ({
       setIsTodayCollapsed(false);
     }
   }, [allTasks, selectedTaskId]);
+
+  const handleOpenDetail = useCallback(
+    (taskId: string) => {
+      const task = allTasks.find((t) => t.id === taskId);
+      if (!task) return;
+
+      // If this is a subtask, navigate to the parent task's detail page
+      if (task.parentId) {
+        setNavigatedSubtaskId(taskId);
+        setFocusedTaskId(task.parentId);
+      } else {
+        setNavigatedSubtaskId(null);
+        setFocusedTaskId(taskId);
+      }
+    },
+    [allTasks, setFocusedTaskId],
+  );
+
+  // Clear navigated subtask highlight after animation
+  useEffect(() => {
+    if (!navigatedSubtaskId) return;
+    const timer = setTimeout(() => setNavigatedSubtaskId(null), 1200);
+    return () => clearTimeout(timer);
+  }, [navigatedSubtaskId]);
+
+  if (focusedTaskId) {
+    return (
+      <AnimatePresence mode="wait">
+        <TaskDetailPage
+          key={focusedTaskId}
+          taskId={focusedTaskId}
+          navigatedSubtaskId={navigatedSubtaskId}
+        />
+      </AnimatePresence>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
@@ -87,6 +131,7 @@ export const TodayView = ({
               isPrimaryList
               focusedIndex={focusedIndex}
               onFocusedIndexChange={setFocusedIndex}
+              onOpenDetail={handleOpenDetail}
             />
           </SectionGroup>
 
@@ -103,6 +148,7 @@ export const TodayView = ({
               emptyMessage="No done tasks today."
               ariaLabel="Done today tasks"
               scopeId="today-done"
+              onOpenDetail={handleOpenDetail}
             />
           </SectionGroup>
         </>

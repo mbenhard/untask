@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+
+import { AnimatePresence } from 'framer-motion';
 
 import type { Task } from '../../../types/models';
 
-import { useAppStore } from '../../stores/appStore';
+import { selectFocusedTaskId, useAppStore } from '../../stores/appStore';
 import { SectionGroup } from '../tasks/SectionGroup';
+import { TaskDetailPage } from '../tasks/TaskDetailPage';
 import { TaskList } from '../tasks/TaskList';
 
 type InboxViewProps = {
@@ -17,6 +20,8 @@ export const InboxView = ({
 }: InboxViewProps) => {
   const newTaskTrigger = useAppStore((state) => state.newTaskTrigger);
   const activeView = useAppStore((state) => state.activeView);
+  const focusedTaskId = useAppStore(selectFocusedTaskId);
+  const setFocusedTaskId = useAppStore((state) => state.setFocusedTaskId);
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -30,6 +35,27 @@ export const InboxView = ({
       ),
     [allTasks],
   );
+
+  const handleOpenDetail = useCallback(
+    (taskId: string) => {
+      // For subtasks in the list, navigate to the parent task's detail page
+      const task = allTasks.find((t) => t.id === taskId);
+      if (task?.parentId) {
+        setFocusedTaskId(task.parentId);
+      } else {
+        setFocusedTaskId(taskId);
+      }
+    },
+    [allTasks, setFocusedTaskId],
+  );
+
+  if (focusedTaskId) {
+    return (
+      <AnimatePresence mode="wait">
+        <TaskDetailPage key={focusedTaskId} taskId={focusedTaskId} />
+      </AnimatePresence>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto p-3 pb-14">
@@ -63,6 +89,7 @@ export const InboxView = ({
             isPrimaryList
             focusedIndex={focusedIndex}
             onFocusedIndexChange={setFocusedIndex}
+            onOpenDetail={handleOpenDetail}
           />
         </SectionGroup>
       </div>

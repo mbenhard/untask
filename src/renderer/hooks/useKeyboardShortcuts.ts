@@ -258,7 +258,7 @@ export const useKeyboardShortcuts = ({
         return;
       }
 
-      // Escape layers: search → notes editor back-to-list → clear chat input → leave settings → close chat overlay
+      // Escape layers: search → notes editor back-to-list → detail page → clear chat input → leave settings → close chat overlay
       if (event.key === 'Escape') {
         if (isSearchOpenRef.current) {
           event.preventDefault();
@@ -270,6 +270,16 @@ export const useKeyboardShortcuts = ({
           event.preventDefault();
           void notesState.backToList();
           return;
+        }
+
+        // Detail page: ESC returns to list view (unless focus is in a text input)
+        const focusedTaskId = useAppStore.getState().focusedTaskId;
+        if (focusedTaskId !== null && chatOverlayState === 'peek') {
+          if (!isTextInputElement(document.activeElement)) {
+            event.preventDefault();
+            useAppStore.getState().setFocusedTaskId(null);
+            return;
+          }
         }
 
         if (chatOverlayState === 'open' && inputValueRef.current.length > 0) {

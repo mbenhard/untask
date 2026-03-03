@@ -10,6 +10,7 @@ export type ChatView = 'threads' | 'conversation';
 
 type AppStore = {
   activeView: AppView;
+  focusedTaskId: string | null;
   manualNavigationVersion: number;
   chatOverlayState: ChatOverlayState;
   chatView: ChatView;
@@ -18,6 +19,7 @@ type AppStore = {
   aiEnabled: boolean;
   setView: (view: AppView) => void;
   setViewFromAssistant: (view: AppView) => void;
+  setFocusedTaskId: (taskId: string | null) => void;
   openChatOverlay: () => void;
   peekChatOverlay: () => void;
   toggleChatOverlay: () => void;
@@ -30,6 +32,7 @@ type AppStore = {
 
 export const useAppStore = create<AppStore>((set) => ({
   activeView: 'today',
+  focusedTaskId: null,
   manualNavigationVersion: 0,
   chatOverlayState: 'peek',
   chatView: 'threads',
@@ -38,12 +41,13 @@ export const useAppStore = create<AppStore>((set) => ({
   aiEnabled: true,
   setView: (view) =>
     set((state) => {
-      if (state.activeView === view) {
+      if (state.activeView === view && state.focusedTaskId === null) {
         return state;
       }
 
       return {
         activeView: view,
+        focusedTaskId: null,
         manualNavigationVersion: state.manualNavigationVersion + 1,
       };
     }),
@@ -55,8 +59,10 @@ export const useAppStore = create<AppStore>((set) => ({
 
       return {
         activeView: view,
+        focusedTaskId: null,
       };
     }),
+  setFocusedTaskId: (taskId) => set({ focusedTaskId: taskId }),
   openChatOverlay: () => {
     const hasActiveConversation = useChatStore.getState().activeConversationId !== null;
     set({
@@ -94,6 +100,7 @@ export const useAppStore = create<AppStore>((set) => ({
 }));
 
 export const selectActiveView = (state: AppStore) => state.activeView;
+export const selectFocusedTaskId = (state: AppStore) => state.focusedTaskId;
 export const selectManualNavigationVersion = (state: AppStore) =>
   state.manualNavigationVersion;
 export const selectChatOverlayState = (state: AppStore) => state.chatOverlayState;

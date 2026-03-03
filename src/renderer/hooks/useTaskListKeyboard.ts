@@ -8,6 +8,7 @@ type UseTaskListKeyboardOptions = {
   onFocusedIndexChange: (index: number) => void;
   expandedTaskId: string | null;
   onToggleExpand: (id: string) => void;
+  onOpenDetail?: (id: string) => void;
   onToggleComplete: (id: string) => void;
   onToggleToday: (id: string) => void;
   onCyclePriority: (id: string) => void;
@@ -42,6 +43,7 @@ export const useTaskListKeyboard = ({
   onFocusedIndexChange,
   expandedTaskId,
   onToggleExpand,
+  onOpenDetail,
   onToggleComplete,
   onToggleToday,
   onCyclePriority,
@@ -126,6 +128,27 @@ export const useTaskListKeyboard = ({
         return;
       }
 
+      // ArrowRight → expand subtasks inline
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        event.stopPropagation();
+        const focusedTask = tasks[focusedIndex];
+        if (focusedTask && expandedTaskId !== focusedTask.id) {
+          onToggleExpand(focusedTask.id);
+        }
+        return;
+      }
+
+      // ArrowLeft → collapse subtasks inline
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (expandedTaskId) {
+          onToggleExpand(expandedTaskId);
+        }
+        return;
+      }
+
       const isTaskKey = [
         'enter',
         't',
@@ -133,7 +156,7 @@ export const useTaskListKeyboard = ({
         'p',
         's',
         'e',
-        'escape'
+        'escape',
       ].includes(event.key.toLowerCase());
 
       if (isTaskKey) {
@@ -150,7 +173,11 @@ export const useTaskListKeyboard = ({
       }
 
       if (event.key === 'Enter') {
-        onToggleExpand(focusedTask.id);
+        if (onOpenDetail) {
+          onOpenDetail(focusedTask.id);
+        } else {
+          onToggleExpand(focusedTask.id);
+        }
         return;
       }
 
@@ -196,6 +223,7 @@ export const useTaskListKeyboard = ({
       onFocusedIndexChange,
       focusedIndex,
       onToggleExpand,
+      onOpenDetail,
       onToggleComplete,
       onToggleToday,
       onCyclePriority,
