@@ -68,7 +68,7 @@ export const SubtaskSection = ({
       </div>
 
       {/* Subtask list or empty state */}
-      <div className="-mx-2">
+      <div>
         {subtasks.length === 0 && !isAdding ? (
           <motion.div
             variants={fadeVariants}

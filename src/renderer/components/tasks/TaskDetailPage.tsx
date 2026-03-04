@@ -625,10 +625,8 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
             onBodyChange={(hasContent) => setNoteHasContent(hasContent)}
           />
 
-          {/* Divider before subtasks */}
-          <div className="mb-4 border-t border-border/30" />
-
           {/* Subtask section */}
+          <div className="mt-4" />
           <SubtaskSection
             parentTask={task}
             subtasks={subtasks}

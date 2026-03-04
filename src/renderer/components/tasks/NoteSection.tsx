@@ -51,26 +51,36 @@ export const NoteSection = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const isOpenRef = useRef(isOpen);
   const lastFocusRequestIdRef = useRef<number | null>(focusRequestId ?? null);
+  const pendingFocusRef = useRef(false);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
 
   const focusEditor = useCallback(() => {
+    // If editor is already mounted, focus immediately via rAF
+    if (editorRef.current) {
+      pendingFocusRef.current = false;
+      requestAnimationFrame(() => editorRef.current?.focus());
+      return;
+    }
+    // Editor not mounted yet — mark pending so onEditorReady picks it up,
+    // and also retry via rAF as a fallback for when onEditorReady isn't called.
+    pendingFocusRef.current = true;
     const tryFocus = (attempt: number) => {
       requestAnimationFrame(() => {
+        if (!pendingFocusRef.current) return; // already handled by onEditorReady
         if (editorRef.current) {
+          pendingFocusRef.current = false;
           editorRef.current.focus();
           return;
         }
-        if (attempt < 4) {
-          tryFocus(attempt + 1);
-        }
+        if (attempt < 6) tryFocus(attempt + 1);
       });
     };
-
     tryFocus(0);
   }, []);
+
 
   const collapseIfEmpty = useCallback((): boolean => {
     if (!isOpenRef.current || !editorRef.current) {
@@ -171,6 +181,12 @@ export const NoteSection = ({
 
   const handleEditorReady = useCallback(
     (editor: BlockNoteEditor) => {
+      // Focus editor if a pending focus request was queued before mount
+      if (pendingFocusRef.current) {
+        pendingFocusRef.current = false;
+        requestAnimationFrame(() => editor.focus());
+      }
+
       // Intercept paste events to redirect image pastes to attachments
       if (onPasteImages) {
         const el = editor.domElement;

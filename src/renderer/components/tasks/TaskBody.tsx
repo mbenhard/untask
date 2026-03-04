@@ -555,7 +555,9 @@ export const OverflowMenu = ({
 
   const handleOpenTagPopover = () => {
     setOpen(false);
-    setTagOpen(true);
+    // Defer tag popover open so the overflow popover fully unmounts first,
+    // preventing Radix focus-trap from stealing focus from the tag input.
+    requestAnimationFrame(() => setTagOpen(true));
   };
 
   const handleAttach = () => {
@@ -569,6 +571,8 @@ export const OverflowMenu = ({
   useEffect(() => {
     if (tagOpen) {
       void getTagSuggestions().then(setTagSuggestions).catch(() => setTagSuggestions([]));
+      // Ensure focus lands on the tag input after popover mounts
+      requestAnimationFrame(() => tagInputRef.current?.focus());
     }
   }, [tagOpen]);
 
