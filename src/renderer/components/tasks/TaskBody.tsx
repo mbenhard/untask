@@ -536,6 +536,7 @@ export const OverflowMenu = ({
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const openingTagPopoverRef = useRef(false);
   const overflowBtnRef = useRef<HTMLButtonElement>(null);
   const [focusIndex, setFocusIndex] = useState(-1);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -554,11 +555,9 @@ export const OverflowMenu = ({
   };
 
   const handleOpenTagPopover = () => {
+    openingTagPopoverRef.current = true;
     setOpen(false);
-    // Defer tag popover open so the overflow popover fully unmounts first,
-    // preventing Radix focus-trap from stealing focus from the tag input.
-    // Use setTimeout (not rAF) to ensure Radix close animation completes.
-    setTimeout(() => setTagOpen(true), 50);
+    setTagOpen(true);
   };
 
   const handleAttach = () => {
@@ -572,19 +571,6 @@ export const OverflowMenu = ({
   useEffect(() => {
     if (tagOpen) {
       void getTagSuggestions().then(setTagSuggestions).catch(() => setTagSuggestions([]));
-      // Ensure focus lands on the tag input after popover mounts.
-      // Retry because Radix popover content may not be in the DOM yet.
-      const tryFocus = (attempt: number) => {
-        requestAnimationFrame(() => {
-          if (!tagOpen) return;
-          if (tagInputRef.current) {
-            tagInputRef.current.focus();
-            return;
-          }
-          if (attempt < 8) tryFocus(attempt + 1);
-        });
-      };
-      tryFocus(0);
     }
   }, [tagOpen]);
 
@@ -727,6 +713,11 @@ export const OverflowMenu = ({
                 className="w-auto min-w-[120px] p-1"
                 align="start"
                 onClick={(e) => e.stopPropagation()}
+                onCloseAutoFocus={(event) => {
+                  if (!openingTagPopoverRef.current) return;
+                  event.preventDefault();
+                  openingTagPopoverRef.current = false;
+                }}
                 onKeyDown={handleMenuKeyDown}
               >
                 {menuItems.map((item) => (
@@ -740,6 +731,10 @@ export const OverflowMenu = ({
           className="w-auto min-w-[180px] max-w-[280px] p-2"
           align="start"
           onClick={(e) => e.stopPropagation()}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            tagInputRef.current?.focus();
+          }}
           onKeyDown={(e) => e.stopPropagation()}
         >
           {tags.length > 0 && (

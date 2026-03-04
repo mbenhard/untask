@@ -57,29 +57,25 @@ export const NoteSection = ({
     isOpenRef.current = isOpen;
   }, [isOpen]);
 
-  const focusEditor = useCallback(() => {
-    pendingFocusRef.current = true;
-    // Try focusing the editor, retrying until it mounts.
-    // Uses both editorRef (BlockNote API) and DOM query as fallback.
-    const tryFocus = (attempt: number) => {
-      requestAnimationFrame(() => {
-        if (!pendingFocusRef.current) return;
-        if (editorRef.current) {
-          pendingFocusRef.current = false;
-          editorRef.current.focus();
-          return;
-        }
-        // Fallback: find the contenteditable element directly
-        const el = containerRef.current?.querySelector<HTMLElement>('[contenteditable="true"]');
-        if (el) {
-          pendingFocusRef.current = false;
-          el.focus();
-          return;
-        }
-        if (attempt < 10) tryFocus(attempt + 1);
-      });
-    };
-    tryFocus(0);
+  const flushPendingFocus = useCallback((): boolean => {
+    if (!pendingFocusRef.current) {
+      return false;
+    }
+
+    const editableEl = containerRef.current?.querySelector<HTMLElement>('[contenteditable="true"]');
+    if (editableEl) {
+      pendingFocusRef.current = false;
+      editableEl.focus();
+      return true;
+    }
+
+    if (editorRef.current) {
+      pendingFocusRef.current = false;
+      editorRef.current.focus();
+      return true;
+    }
+
+    return false;
   }, []);
 
 
@@ -116,8 +112,21 @@ export const NoteSection = ({
       setIsOpen(true);
       onOpenStateChange?.(true);
     }
-    focusEditor();
-  }, [focusRequestId, focusEditor, onOpenStateChange]);
+    pendingFocusRef.current = true;
+  }, [focusRequestId, onOpenStateChange]);
+
+  useEffect(() => {
+    if (!isOpen || !pendingFocusRef.current) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      flushPendingFocus();
+    });
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [isOpen, focusRequestId, flushPendingFocus]);
 
   // Auto-expand when body gets content externally (e.g. from store refresh)
   useEffect(() => {
@@ -182,10 +191,14 @@ export const NoteSection = ({
 
   const handleEditorReady = useCallback(
     (editor: BlockNoteEditor) => {
-      // Focus editor if a pending focus request was queued before mount
+      // Apply any queued focus request now that the editor is mounted.
       if (pendingFocusRef.current) {
-        pendingFocusRef.current = false;
-        requestAnimationFrame(() => editor.focus());
+        requestAnimationFrame(() => {
+          if (!flushPendingFocus()) {
+            editor.focus();
+            pendingFocusRef.current = false;
+          }
+        });
       }
 
       // Intercept paste events to redirect image pastes to attachments
@@ -215,7 +228,7 @@ export const NoteSection = ({
         }
       }
     },
-    [onPasteImages],
+    [flushPendingFocus, onPasteImages],
   );
 
   if (!isOpen) return null;
