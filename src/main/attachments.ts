@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readdirSync, renameSync, statSync, unlinkSync } 
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { isNotNull } from 'drizzle-orm';
+import { getDb } from './db';
+import { attachments, tasks, notes } from './db/schema';
 
 const ATTACHMENTS_DIR_NAME = 'attachments';
 const TRASH_DIR_NAME = '.trash';
@@ -105,13 +108,92 @@ export async function readAttachment(request: { id: string }): Promise<string> {
   return `data:${mime};base64,${data.toString('base64')}`;
 }
 
+type BlockNoteBlock = {
+  type?: string;
+  props?: { url?: string };
+  children?: BlockNoteBlock[];
+  content?: unknown[];
+};
+
+/**
+ * Returns all storedName values currently tracked in the attachments table.
+ */
+function getAllAttachmentStoredNames(): string[] {
+  const db = getDb();
+  const rows = db.select({ storedName: attachments.storedName }).from(attachments).all();
+  return rows.map((r) => r.storedName);
+}
+
+/**
+ * Walks all task bodies and note content fields, finds `untask-file://` URLs
+ * embedded in BlockNote JSON, and returns the corresponding stored filenames.
+ * This covers Notes which still embed files directly in content JSON.
+ */
+function scanBodiesForFileReferences(): string[] {
+  const db = getDb();
+  const storedNames: string[] = [];
+
+  const taskRows = db
+    .select({ body: tasks.body })
+    .from(tasks)
+    .where(isNotNull(tasks.body))
+    .all();
+
+  const noteRows = db
+    .select({ content: notes.content })
+    .from(notes)
+    .where(isNotNull(notes.content))
+    .all();
+
+  const allBodies: (string | null)[] = [
+    ...taskRows.map((r) => r.body),
+    ...noteRows.map((r) => r.content),
+  ];
+
+  for (const body of allBodies) {
+    if (!body) continue;
+
+    let blocks: BlockNoteBlock[];
+    try {
+      blocks = JSON.parse(body);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(blocks)) continue;
+    extractFileUrls(blocks, storedNames);
+  }
+
+  return storedNames;
+}
+
+function extractFileUrls(blocks: BlockNoteBlock[], out: string[]): void {
+  for (const block of blocks) {
+    const url = block.props?.url;
+    if (typeof url === 'string' && url.startsWith('untask-file://')) {
+      const storedName = url.slice('untask-file://'.length);
+      if (storedName) out.push(storedName);
+    }
+    if (Array.isArray(block.children) && block.children.length > 0) {
+      extractFileUrls(block.children, out);
+    }
+  }
+}
+
 /**
  * Remove orphaned attachment files.
- * @param referencedIds Set of filenames (e.g. "uuid.png") currently referenced in task/note content
+ * Builds the set of referenced files from both the attachments DB table and
+ * any `untask-file://` URLs still embedded in task/note body JSON (standalone
+ * Notes embed files in content). Files not in either source and older than the
+ * grace period are moved to trash; trash entries older than 30 days are deleted.
  */
-export function cleanupOrphanedAttachments(referencedIds: Set<string>): void {
+export function cleanupOrphanedAttachments(): void {
   const dir = getAttachmentsDir();
   if (!existsSync(dir)) return;
+
+  const dbRefs = getAllAttachmentStoredNames();
+  const bodyRefs = scanBodiesForFileReferences();
+  const referencedIds = new Set([...dbRefs, ...bodyRefs]);
 
   const now = Date.now();
   ensureTrashDir();

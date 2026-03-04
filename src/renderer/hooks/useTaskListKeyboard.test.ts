@@ -22,7 +22,7 @@ const makeTask = (id: string): Task => ({
   status: 'active',
   priority: 'none',
   today: false,
-  client: null,
+  tags: [],
   dueDate: null,
   dueType: null,
   recurrence: null,

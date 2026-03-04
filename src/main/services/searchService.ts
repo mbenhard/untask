@@ -25,7 +25,7 @@ export type SearchResultItem = {
   body: Task['body'];
   status: Task['status'];
   today: boolean;
-  client: Task['client'];
+  tags: string[];
   priority: Task['priority'];
   dueDate: Task['dueDate'];
   snippet: string;
@@ -78,7 +78,7 @@ export function initSearchFts(): void {
     CREATE VIRTUAL TABLE tasks_fts USING fts5(
       title,
       body,
-      client,
+      tags,
       content='tasks',
       content_rowid='rowid'
     );
@@ -87,8 +87,9 @@ export function initSearchFts(): void {
   db.exec('DROP TRIGGER IF EXISTS tasks_fts_insert;');
   db.exec(`
     CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN
-      INSERT INTO tasks_fts(rowid, title, body, client)
-      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, '')
+      INSERT INTO tasks_fts(rowid, title, body, tags)
+      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''),
+        COALESCE((SELECT group_concat(value, ' ') FROM json_each(NEW.tags)), '')
       WHERE NEW.deleted_at IS NULL;
     END;
   `);
@@ -96,10 +97,12 @@ export function initSearchFts(): void {
   db.exec('DROP TRIGGER IF EXISTS tasks_fts_update;');
   db.exec(`
     CREATE TRIGGER tasks_fts_update AFTER UPDATE ON tasks BEGIN
-      INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client)
-      VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''), COALESCE(OLD.client, ''));
-      INSERT INTO tasks_fts(rowid, title, body, client)
-      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, '')
+      INSERT INTO tasks_fts(tasks_fts, rowid, title, body, tags)
+      VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''),
+        COALESCE((SELECT group_concat(value, ' ') FROM json_each(OLD.tags)), ''));
+      INSERT INTO tasks_fts(rowid, title, body, tags)
+      SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''),
+        COALESCE((SELECT group_concat(value, ' ') FROM json_each(NEW.tags)), '')
       WHERE NEW.deleted_at IS NULL;
     END;
   `);
@@ -107,8 +110,9 @@ export function initSearchFts(): void {
   db.exec('DROP TRIGGER IF EXISTS tasks_fts_delete;');
   db.exec(`
     CREATE TRIGGER tasks_fts_delete AFTER DELETE ON tasks BEGIN
-      INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client)
-      VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''), COALESCE(OLD.client, ''));
+      INSERT INTO tasks_fts(tasks_fts, rowid, title, body, tags)
+      VALUES ('delete', OLD.rowid, COALESCE(OLD.title, ''), COALESCE(OLD.body, ''),
+        COALESCE((SELECT group_concat(value, ' ') FROM json_each(OLD.tags)), ''));
     END;
   `);
 
@@ -211,19 +215,23 @@ export function rebuildSearchIndex(): void {
   db.exec("INSERT INTO tasks_fts(tasks_fts) VALUES ('rebuild');");
 
   const deletedRows = db
-    .prepare('SELECT rowid, title, body, client FROM tasks WHERE deleted_at IS NOT NULL')
+    .prepare('SELECT rowid, title, body, tags FROM tasks WHERE deleted_at IS NOT NULL')
     .all() as Array<{
     rowid: number;
     title: string | null;
     body: string | null;
-    client: string | null;
+    tags: string | null;
   }>;
 
   const deleteRow = db.prepare(
-    "INSERT INTO tasks_fts(tasks_fts, rowid, title, body, client) VALUES ('delete', ?, ?, ?, ?)",
+    "INSERT INTO tasks_fts(tasks_fts, rowid, title, body, tags) VALUES ('delete', ?, ?, ?, ?)",
   );
   for (const row of deletedRows) {
-    deleteRow.run(row.rowid, row.title ?? '', row.body ?? '', row.client ?? '');
+    const tagsText = (() => {
+      try { const arr = JSON.parse(row.tags ?? '[]'); return Array.isArray(arr) ? arr.join(' ') : ''; }
+      catch { return ''; }
+    })();
+    deleteRow.run(row.rowid, row.title ?? '', row.body ?? '', tagsText);
   }
 }
 
@@ -363,7 +371,7 @@ function executeTaskSearch(sanitized: string, limit: number): SearchQueryResult 
     .prepare(
       `
       SELECT
-        t.id, t.parent_id, t.title, t.body, t.status, t.today, t.client, t.priority, t.due_date,
+        t.id, t.parent_id, t.title, t.body, t.status, t.today, t.tags, t.priority, t.due_date,
         snippet(tasks_fts, 0, '<mark>', '</mark>', '...', 32) AS snippet
       FROM tasks_fts
       JOIN tasks t ON t.rowid = tasks_fts.rowid
@@ -380,11 +388,17 @@ function executeTaskSearch(sanitized: string, limit: number): SearchQueryResult 
     body: string | null;
     status: string | null;
     today: number | null;
-    client: string | null;
+    tags: string | null;
     priority: string | null;
     due_date: string | null;
     snippet: string;
   }>;
+
+  const parseTags = (raw: string | null): string[] => {
+    if (!raw) return [];
+    try { const arr = JSON.parse(raw); return Array.isArray(arr) ? arr : []; }
+    catch { return []; }
+  };
 
   const results: SearchResultItem[] = rows.map((row) => ({
     id: row.id,
@@ -393,7 +407,7 @@ function executeTaskSearch(sanitized: string, limit: number): SearchQueryResult 
     body: row.body,
     status: row.status as Task['status'],
     today: Boolean(row.today),
-    client: row.client,
+    tags: parseTags(row.tags),
     priority: row.priority as Task['priority'],
     dueDate: row.due_date,
     snippet: row.snippet,

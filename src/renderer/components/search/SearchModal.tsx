@@ -206,9 +206,9 @@ export const SearchModal = () => {
                       <span className={`min-w-0 flex-1 truncate text-[13px] text-foreground ${isDone ? 'line-through' : ''}`}>
                         {result.title}
                       </span>
-                      {result.client && (
+                      {result.tags.length > 0 && (
                         <span className="shrink-0 truncate text-[10px] text-muted-foreground/40">
-                          {result.client}
+                          {result.tags[0]}{result.tags.length > 1 ? ` +${result.tags.length - 1}` : ''}
                         </span>
                       )}
                     </button>

@@ -5,7 +5,7 @@
  * Runs once after the 0013 SQL migration creates the table.
  * Idempotent: tracked via a settings key so it never runs twice.
  */
-import { eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
@@ -59,6 +59,33 @@ function getFileSize(storedName: string): number {
 
 function isFileOrImageBlock(block: BlockNoteBlock): boolean {
   return block.type === 'image' || block.type === 'file';
+}
+
+function collectFileBlocks(blocks: BlockNoteBlock[], out: BlockNoteBlock[]): void {
+  for (const block of blocks) {
+    if (isFileOrImageBlock(block)) {
+      out.push(block);
+    }
+    if (Array.isArray(block.children) && block.children.length > 0) {
+      collectFileBlocks(block.children, out);
+    }
+  }
+}
+
+function pruneFileBlocks(blocks: BlockNoteBlock[]): BlockNoteBlock[] {
+  const result: BlockNoteBlock[] = [];
+  for (const block of blocks) {
+    if (isFileOrImageBlock(block)) continue;
+    if (Array.isArray(block.children) && block.children.length > 0) {
+      result.push({
+        ...block,
+        children: pruneFileBlocks(block.children),
+      });
+    } else {
+      result.push(block);
+    }
+  }
+  return result;
 }
 
 function extractStoredName(url: string): string | null {
@@ -144,7 +171,8 @@ function migrateTaskBody(
 
   if (!Array.isArray(blocks)) return;
 
-  const fileBlocks = blocks.filter(isFileOrImageBlock);
+  const fileBlocks: BlockNoteBlock[] = [];
+  collectFileBlocks(blocks, fileBlocks);
   if (fileBlocks.length === 0) return;
 
   // Run per-task in a transaction
@@ -161,7 +189,7 @@ function migrateTaskBody(
       const [existingAttachment] = tx
         .select({ id: attachments.id })
         .from(attachments)
-        .where(eq(attachments.storedName, storedName))
+        .where(and(eq(attachments.taskId, taskId), eq(attachments.storedName, storedName)))
         .all();
 
       if (existingAttachment) continue;
@@ -184,7 +212,7 @@ function migrateTaskBody(
     }
 
     // Remove file/image blocks from body
-    const remainingBlocks = blocks.filter((b) => !isFileOrImageBlock(b));
+    const remainingBlocks = pruneFileBlocks(blocks);
 
     if (isBodyEmpty(remainingBlocks)) {
       tx.update(tasks)

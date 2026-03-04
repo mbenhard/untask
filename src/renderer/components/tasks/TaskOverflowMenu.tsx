@@ -102,7 +102,7 @@ const TaskMenuContent = ({
         status: isTaskTerminal ? 'active' : taskToCopy.status,
         priority: taskToCopy.priority,
         today: taskToCopy.today ?? undefined,
-        client: taskToCopy.client,
+        tags: taskToCopy.tags,
         dueDate: taskToCopy.dueDate,
         dueType: taskToCopy.dueType,
         reminderOffset: isReminderOffset(taskToCopy.reminderOffset)

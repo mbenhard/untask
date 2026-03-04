@@ -70,7 +70,7 @@ export type Task = {
   status: TaskStatus | null;
   priority: 'none' | 'low' | 'medium' | 'high' | null;
   today: boolean | null;
-  client: string | null;
+  tags: string[];
   dueDate: string | null;
   // TODO(untask-task-ux): Remove after assistant risk/cashflow signal replacements ship.
   dueType: 'hard' | 'soft' | null;

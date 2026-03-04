@@ -1,5 +1,6 @@
 import { app, BrowserWindow, nativeImage, screen, shell } from 'electron';
 import { registerAttachmentScheme, registerAttachmentProtocol } from './protocol';
+import { cleanupOrphanedAttachments } from './attachments';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -9,6 +10,7 @@ import { initReminderScheduler, stopReminderScheduler } from './services/reminde
 import { initRemindersSync, stopRemindersSync } from './services/remindersSync';
 import { initDatabase, closeDatabase } from './db';
 import { runMigrations } from './db/migrate';
+import { runAttachmentMigration } from './db/migrateAttachments';
 import { registerIpcHandlers } from './ipc';
 import { IPC_CHANNELS } from '../types/ipc';
 import {
@@ -154,12 +156,14 @@ const bootstrap = (): void => {
   registerAttachmentProtocol();
   initDatabase();
   runMigrations();
+  runAttachmentMigration();
   initUndoStack();
   ensureDefaultTaskStatusConfig();
   clearStaleTodayFlags();
   autoCleanTerminalTasks();
   purgeOldSoftDeletedTasks();
   purgeOldArchivedNotes();
+  cleanupOrphanedAttachments();
   migrateLegacyMemoryLayers();
   migrateIdentityV2();
   // Migrate any plaintext API keys to encrypted safeStorage.

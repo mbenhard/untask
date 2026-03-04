@@ -46,7 +46,9 @@ export const ChatTaskCard = ({ task, onClick }: ChatTaskCardProps) => {
   const isCompleted = isTerminalStatus(task.status as PredefinedStatusId);
   const isOverdue = !isCompleted && dueLabel.includes('overdue');
   const statusLabel = getStatusLabel(task.status as PredefinedStatusId);
-  const clientLabel = typeof task.client === 'string' ? task.client.trim() : '';
+  const tagsLabel = Array.isArray(task.tags) && task.tags.length > 0
+    ? task.tags[0] + (task.tags.length > 1 ? ` +${task.tags.length - 1}` : '')
+    : '';
 
   return (
     <button
@@ -87,8 +89,8 @@ export const ChatTaskCard = ({ task, onClick }: ChatTaskCardProps) => {
         {priority ? <span>{formatPriorityLabel(priority)}</span> : null}
         {hasPriority ? <span aria-hidden="true">·</span> : null}
         <span>{statusLabel}</span>
-        {clientLabel ? <span aria-hidden="true">·</span> : null}
-        {clientLabel ? <span className="truncate">{clientLabel}</span> : null}
+        {tagsLabel ? <span aria-hidden="true">·</span> : null}
+        {tagsLabel ? <span className="truncate">{tagsLabel}</span> : null}
       </div>
     </button>
   );

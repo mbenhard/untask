@@ -6,7 +6,7 @@ import type { StoreApi } from 'zustand';
 import type { ActionLifecycle, ChatActionCard, ChatNoteContext, TurnStep } from '../../../types/chat';
 import { toErrorMessage } from '../../lib/errors';
 import { getUntask } from '../../lib/untask';
-import { resolveBlockNoteImages } from '../../utils/imageResize';
+import { resolveBlockNoteImages, resolveTaskAttachmentImages } from '../../utils/imageResize';
 import { useAppStore } from '../appStore';
 import { getActiveNoteDraftContent } from '../notesDraftBridge';
 import { useTaskStore } from '../taskStore';
@@ -190,9 +190,9 @@ export const createMessageActions = (
       ? taskState.tasks.find((t) => t.id === taskState.selectedTaskId)
       : null;
 
-    if (selectedTask?.body) {
+    if (selectedTask?.id) {
       try {
-        const taskImages = await resolveBlockNoteImages(selectedTask.body);
+        const taskImages = await resolveTaskAttachmentImages(selectedTask.id);
         images.push(...taskImages);
       } catch {
         // Non-fatal -- send without task attachment images

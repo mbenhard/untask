@@ -77,6 +77,7 @@ export const IPC_CHANNELS = {
   TASK_SET_STATUSES: 'task:set-statuses',
   TASK_UNDO_LAST_USER_ACTION: 'task:undo-last-user-action',
   TASK_REDO_LAST_USER_ACTION: 'task:redo-last-user-action',
+  TASK_GET_TAGS: 'task:get-tags',
   TASK_DATA_CHANGED: 'task:data-changed',
   CHAT_SEND: 'chat:send',
   CHAT_STREAM_EVENT: 'chat:stream-event',
@@ -176,6 +177,11 @@ export const IPC_CHANNELS = {
   ATTACHMENT_DELETE: 'attachment:delete',
   ATTACHMENT_READ: 'attachment:read',
   ATTACHMENT_PICK_AND_SAVE: 'attachment:pick-and-save',
+  ATTACHMENT_SAVE_FOR_TASK: 'attachment:save-for-task',
+  ATTACHMENT_LIST_BY_TASK: 'attachment:list-by-task',
+  ATTACHMENT_DELETE_RECORD: 'attachment:delete-record',
+  ATTACHMENT_PICK_AND_SAVE_FOR_TASK: 'attachment:pick-and-save-for-task',
+  ATTACHMENT_GET_COUNTS_BY_TASK_IDS: 'attachment:get-counts-by-task-ids',
   // --- Shell channels ---
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
   SHELL_OPEN_IN_TERMINAL: 'shell:open-in-terminal',
@@ -428,7 +434,7 @@ export type TaskSearchResultItem = {
   body: string | null;
   status: Task['status'];
   today: boolean;
-  client: Task['client'];
+  tags: string[];
   priority: Task['priority'];
   dueDate: string | null;
   snippet: string;
@@ -514,6 +520,50 @@ export type AttachmentIdRequest = {
 export type AttachmentPickAndSaveResult = {
   canceled: boolean;
   urls: string[];
+};
+
+export type AttachmentRecord = {
+  id: string;
+  taskId: string;
+  storedName: string;
+  originalName: string;
+  size: number;
+  mimeType: string | null;
+  createdAt: string | null;
+  exists?: boolean;
+};
+
+export type AttachmentSaveForTaskRequest = {
+  taskId: string;
+  data: Uint8Array;
+  filename: string;
+  size?: number;
+  mimeType?: string | null;
+};
+
+export type AttachmentListByTaskRequest = {
+  taskId: string;
+};
+
+export type AttachmentDeleteRecordRequest = {
+  id: string;
+};
+
+export type AttachmentPickAndSaveForTaskRequest = {
+  taskId: string;
+};
+
+export type AttachmentPickAndSaveForTaskResult = {
+  canceled: boolean;
+  attachments: AttachmentRecord[];
+};
+
+export type AttachmentGetCountsByTaskIdsRequest = {
+  taskIds: string[];
+};
+
+export type AttachmentGetCountsByTaskIdsResult = {
+  counts: Record<string, number>;
 };
 
 // ─── Notification payloads ────────────────────────────────

@@ -8,6 +8,7 @@ import {
   type BlockEditorSlashMenuItem,
   type BlockEditorSlashMenuParams,
 } from '../editor/BlockEditor';
+import { hasNoteContent } from './noteContent';
 
 // ─── Slash menu filter ───────────────────────────────────────
 
@@ -44,7 +45,7 @@ export const NoteSection = ({
   onEditModeChange,
   onPasteImages,
 }: NoteSectionProps) => {
-  const hasContent = body !== null && body.trim() !== '';
+  const hasContent = hasNoteContent(body);
   const [isOpen, setIsOpen] = useState(hasContent);
   const editorRef = useRef<BlockNoteEditor | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,7 +61,7 @@ export const NoteSection = ({
         editorRef.current?.focus();
       });
     }
-  }, [forceOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [forceOpen, isOpen, onOpenStateChange]);
 
   // Auto-expand when body gets content externally (e.g. from store refresh)
   useEffect(() => {
@@ -68,12 +69,12 @@ export const NoteSection = ({
       setIsOpen(true);
       onOpenStateChange?.(true);
     }
-  }, [hasContent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasContent, isOpen, onOpenStateChange]);
 
   const { handleBodyChange, flushSave } = useAutoSaveBody({
     taskId,
     onContentChange: (json: string) => {
-      const isEmpty = isEmptyBody(json);
+      const isEmpty = !hasNoteContent(json);
       onBodyChange?.(!isEmpty);
     },
   });
@@ -95,7 +96,7 @@ export const NoteSection = ({
     // Auto-collapse if editor is empty
     if (editorRef.current) {
       const content = JSON.stringify(editorRef.current.document);
-      if (isEmptyBody(content)) {
+      if (!hasNoteContent(content)) {
         isBlurCollapseRef.current = true;
         setIsOpen(false);
         onOpenStateChange?.(false);
@@ -139,7 +140,7 @@ export const NoteSection = ({
   if (!isOpen) return null;
 
   return (
-    <div ref={containerRef} className="border-t border-border/30 px-3 py-2">
+    <div ref={containerRef} data-note-section="true" className="border-t border-border/30 px-3 py-2">
       <div className="mb-1">
         <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">
           Note
@@ -160,24 +161,3 @@ export const NoteSection = ({
     </div>
   );
 };
-
-// ─── Helpers ─────────────────────────────────────────────────
-
-function isEmptyBody(json: string): boolean {
-  try {
-    const blocks = JSON.parse(json) as Array<{
-      type?: string;
-      content?: Array<{ type?: string; text?: string }>;
-    }>;
-    if (blocks.length === 0) return true;
-    return blocks.every((block) => {
-      if (block.type !== 'paragraph') return false;
-      if (!block.content || block.content.length === 0) return true;
-      return block.content.every(
-        (item) => item.type === 'text' && (!item.text || item.text.trim() === ''),
-      );
-    });
-  } catch {
-    return true;
-  }
-}

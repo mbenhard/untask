@@ -72,8 +72,16 @@ import {
   type ApiKeysValidateResult,
   type UpdateInfo,
   type AttachmentSaveRequest,
+  type AttachmentSaveForTaskRequest,
   type AttachmentIdRequest,
   type AttachmentPickAndSaveResult,
+  type AttachmentRecord,
+  type AttachmentListByTaskRequest,
+  type AttachmentDeleteRecordRequest,
+  type AttachmentPickAndSaveForTaskRequest,
+  type AttachmentPickAndSaveForTaskResult,
+  type AttachmentGetCountsByTaskIdsRequest,
+  type AttachmentGetCountsByTaskIdsResult,
   type NotificationPermissionResult,
   type RemindersStatusResult,
   type RemindersSyncStatusPayload,
@@ -183,7 +191,7 @@ const untaskApi: UntaskApi = {
       parentId?: string | null;
       today?: boolean;
       priority?: Task['priority'];
-      client?: string;
+      tag?: string;
       search?: string;
       limit?: number;
     }) =>
@@ -233,6 +241,8 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.TASK_UNDO_LAST_USER_ACTION),
     redoLastUserAction: (): Promise<TaskUndoResultPayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.TASK_REDO_LAST_USER_ACTION),
+    getTagsWithCount: (): Promise<Array<{ tag: string; count: number }>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_TAGS),
   },
   chat: {
     send: (message: ChatSendRequest): Promise<ChatSendResult> =>
@@ -435,6 +445,16 @@ const untaskApi: UntaskApi = {
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_READ, request),
     pickAndSave: (): Promise<AttachmentPickAndSaveResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE),
+    saveForTask: (request: AttachmentSaveForTaskRequest): Promise<AttachmentRecord> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_SAVE_FOR_TASK, request),
+    listByTask: (request: AttachmentListByTaskRequest): Promise<AttachmentRecord[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_LIST_BY_TASK, request),
+    deleteRecord: (request: AttachmentDeleteRecordRequest): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_DELETE_RECORD, request),
+    pickAndSaveForTask: (request: AttachmentPickAndSaveForTaskRequest): Promise<AttachmentPickAndSaveForTaskResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_PICK_AND_SAVE_FOR_TASK, request),
+    getCountsByTaskIds: (request: AttachmentGetCountsByTaskIdsRequest): Promise<AttachmentGetCountsByTaskIdsResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ATTACHMENT_GET_COUNTS_BY_TASK_IDS, request),
   },
   notifications: {
     fireTest: (): Promise<NotificationPermissionResult> =>

@@ -12,7 +12,7 @@ const createMockSearchApi = () => ({
         body: 'some body',
         status: 'active',
         today: false,
-        client: 'Acme',
+        tags: ['acme'],
         priority: 'high',
         dueDate: null,
         snippet: '<mark>Active</mark> task',
@@ -24,7 +24,7 @@ const createMockSearchApi = () => ({
         body: null,
         status: 'done',
         today: false,
-        client: null,
+        tags: [],
         priority: 'none',
         dueDate: null,
         snippet: '<mark>Done</mark> task',
@@ -90,8 +90,8 @@ describe('searchStore', () => {
       isOpen: true,
       query: 'task',
       results: [
-        { type: 'task', id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
-        { type: 'task', id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, tags: [], priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, tags: [], priority: 'none', dueDate: null, snippet: '' },
       ],
       types: ['task'],
       total: 2,
@@ -114,8 +114,8 @@ describe('searchStore', () => {
   it('getSelectedResult returns correct item', () => {
     useSearchStore.setState({
       results: [
-        { type: 'task', id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
-        { type: 'task', id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, client: null, priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '1', parentId: null, title: 'A', body: null, status: 'active', today: false, tags: [], priority: 'none', dueDate: null, snippet: '' },
+        { type: 'task', id: '2', parentId: 'p1', title: 'B', body: null, status: 'done', today: false, tags: [], priority: 'none', dueDate: null, snippet: '' },
       ],
       types: ['task'],
       total: 2,

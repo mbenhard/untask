@@ -107,7 +107,7 @@ const makeTask = (overrides: Partial<Task> = {}): Task => ({
   status: 'active',
   priority: 'none',
   today: false,
-  client: null,
+  tags: [],
   dueDate: null,
   dueType: null,
   recurrence: null,

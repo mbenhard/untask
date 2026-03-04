@@ -44,6 +44,36 @@ export const readFileAsDataUrl = (file: File): Promise<string> =>
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 /**
+ * Resolve image attachments for a task from the attachments table.
+ * Fetches attachment records via IPC, filters for images, reads each as a
+ * base64 data URL, resizes for AI consumption, and returns the results.
+ */
+export const resolveTaskAttachmentImages = async (taskId: string): Promise<string[]> => {
+  const untask = window.untask;
+  if (!untask) return [];
+
+  const attachmentList = await untask.attachments.listByTask({ taskId });
+  const imageAttachments = attachmentList.filter(
+    (att) => att.mimeType?.startsWith('image/'),
+  );
+
+  if (imageAttachments.length === 0) return [];
+
+  const results: string[] = [];
+  for (const att of imageAttachments) {
+    try {
+      const dataUrl = await untask.attachments.read({ id: att.storedName });
+      const resized = await resizeImageIfNeeded(dataUrl);
+      results.push(resized);
+    } catch {
+      // Skip unresolvable attachments
+    }
+  }
+
+  return results;
+};
+
+/**
  * Extract image attachment data URLs from a BlockNote JSON body.
  * Resolves `untask-file://` URLs via IPC and resizes for AI consumption.
  * Works for both task bodies and note content.

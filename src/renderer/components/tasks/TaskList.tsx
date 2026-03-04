@@ -121,6 +121,7 @@ export const TaskList = ({
   const [addingSubtaskForId, setAddingSubtaskForId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [navigatedTaskId, setNavigatedTaskId] = useState<string | null>(null);
+  const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({});
   const [completeConfirmTrigger, setCompleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ taskId: string; x: number; y: number; initialView: 'main' | 'delete-confirm' } | null>(null);
 
@@ -140,6 +141,31 @@ export const TaskList = ({
   );
 
   const prevTasksLengthRef = useRef(tasks.length);
+
+  useEffect(() => {
+    const api = window.untask?.attachments;
+    if (!api || taskIds.length === 0) {
+      setAttachmentCounts({});
+      return;
+    }
+
+    let cancelled = false;
+    void api.getCountsByTaskIds({ taskIds })
+      .then((result) => {
+        if (!cancelled) {
+          setAttachmentCounts(result?.counts ?? {});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAttachmentCounts({});
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [taskIds]);
 
   useEffect(() => {
     const prevLength = prevTasksLengthRef.current;
@@ -650,6 +676,7 @@ export const TaskList = ({
               onOpenDetail={onOpenDetail}
               onContextMenu={handleContextMenu}
               onFocus={() => setFocusedIndex(index)}
+              attachmentCount={attachmentCounts[task.id] ?? 0}
               completeConfirmTrigger={completeConfirmTrigger}
               onCompleteConfirmTriggerHandled={handleCompleteConfirmTriggerHandled}
             >

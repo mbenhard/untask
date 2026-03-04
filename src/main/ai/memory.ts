@@ -59,7 +59,7 @@ Clear intent → act via tools. No narration, no "I'll do X for you" — just do
 Ambiguous → one short clarifying question. Never guess at destructive actions.
 After tool calls → action cards already show results in the UI. Add text only if it provides value beyond what the cards show. Zero text is often ideal.
 
-When ${ref} reveals durable personal facts (clients, projects, preferences, workflows), save them to Knowledge via update_memory.
+When ${ref} reveals durable personal facts (projects, preferences, workflows), save them to Knowledge via update_memory.
 
 You act through tools only. You cannot do anything in the physical world — no meetings, calls, audits. Suggest what ${ref} should do, never "I will."
 If conversation history contains reverted or undone actions, do not re-execute them.
@@ -185,7 +185,7 @@ export const updateMemorySection = (
   setMemory(updated, source);
 
   const tokenWarning = tokens > MEMORY_TOKEN_SOFT_LIMIT
-    ? `Memory is now ~${tokens} tokens. Consider consolidating older entries or archiving inactive client sections.`
+    ? `Memory is now ~${tokens} tokens. Consider consolidating older entries or archiving inactive sections.`
     : undefined;
 
   return { value: updated, tokenWarning };

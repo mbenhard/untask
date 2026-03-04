@@ -26,7 +26,7 @@ export const tasks = sqliteTable(
       enum: ['none', 'low', 'medium', 'high'],
     }).default('none'),
     today: integer('today', { mode: 'boolean' }).default(false),
-    client: text('client'),
+    tags: text('tags').default('[]'),
     dueDate: text('due_date'),
     dueType: text('due_type', { enum: ['hard', 'soft'] }),
     effort: text('effort', {
@@ -48,6 +48,25 @@ export const tasks = sqliteTable(
     index('tasks_due_date_idx').on(table.dueDate),
     index('tasks_deleted_at_idx').on(table.deletedAt),
   ],
+);
+
+// ─── attachments ───────────────────────────────────────────
+export const attachments = sqliteTable(
+  'attachments',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    storedName: text('stored_name').notNull(),
+    originalName: text('original_name').notNull(),
+    size: integer('size').notNull(),
+    mimeType: text('mime_type'),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [index('attachments_task_id_idx').on(table.taskId)],
 );
 
 // ─── notes ──────────────────────────────────────────────────
@@ -238,6 +257,9 @@ export type AiJournal = typeof aiJournal.$inferSelect;
 export type NewAiJournal = typeof aiJournal.$inferInsert;
 export type AiJournalArchive = typeof aiJournalArchive.$inferSelect;
 export type NewAiJournalArchive = typeof aiJournalArchive.$inferInsert;
+
+export type Attachment = typeof attachments.$inferSelect;
+export type NewAttachment = typeof attachments.$inferInsert;
 
 export type Setting = typeof settings.$inferSelect;
 export type MemoryEvent = typeof memoryEvents.$inferSelect;

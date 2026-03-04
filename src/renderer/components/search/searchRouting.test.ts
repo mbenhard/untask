@@ -11,7 +11,7 @@ const baseResult: TaskSearchResultItem = {
   body: null,
   status: 'active',
   today: false,
-  client: null,
+  tags: [],
   priority: 'none',
   dueDate: null,
   snippet: '',

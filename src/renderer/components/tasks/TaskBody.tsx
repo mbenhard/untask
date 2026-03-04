@@ -8,6 +8,7 @@ import type { AttachmentRecord } from '../../../types/ipc';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
+import { hasNoteContent } from './noteContent';
 import {
   type TagSuggestion,
   getTagSuggestions,
@@ -198,7 +199,7 @@ export const TagsSegment = ({
           invalidateTagSuggestionsCache();
         }
       })
-      .catch(() => {});
+      .catch(() => undefined);
     setDraft('');
     setSelectedSuggestionIndex(-1);
   };
@@ -211,7 +212,7 @@ export const TagsSegment = ({
           invalidateTagSuggestionsCache();
         }
       })
-      .catch(() => {});
+      .catch(() => undefined);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -785,6 +786,7 @@ export const TaskBody = ({
   );
   const selectTask = useTaskStore((state) => state.selectTask);
   const setView = useAppStore((state) => state.setView);
+  const containerRef = useRef<HTMLDivElement>(null);
   const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
   const openMetricKeyRef = useRef<string | null>(null);
   const hasRecordedOpenLatencyRef = useRef(false);
@@ -828,20 +830,102 @@ export const TaskBody = ({
 
   // ── Note state ──
 
-  const [noteHasContent, setNoteHasContent] = useState(() => {
-    if (!task.body) return false;
-    try {
-      const blocks = JSON.parse(task.body) as Array<{ type?: string; content?: unknown[] }>;
-      return blocks.some((b) => b.type === 'paragraph' && Array.isArray(b.content) && b.content.length > 0);
-    } catch {
-      return false;
-    }
-  });
+  const [noteHasContent, setNoteHasContent] = useState(() => hasNoteContent(task.body));
   const [noteForceOpen, setNoteForceOpen] = useState(false);
 
   const handleNoteClick = useCallback(() => {
     setNoteForceOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const noteSection = containerRef.current?.querySelector<HTMLElement>('[data-note-section="true"]');
+        noteSection?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    });
   }, []);
+
+  useEffect(() => {
+    setNoteHasContent(hasNoteContent(task.body));
+  }, [task.id, task.body]);
+
+  const handleAttachFiles = useCallback(
+    async (files: File[]) => {
+      const api = window.untask?.attachments;
+      if (!api || files.length === 0) return;
+
+      for (const file of files) {
+        const data = new Uint8Array(await file.arrayBuffer());
+        const filename = file.name || `pasted-image-${Date.now()}.png`;
+        await api.saveForTask({
+          taskId: task.id,
+          data,
+          filename,
+          mimeType: file.type || null,
+          size: file.size,
+        });
+      }
+
+      void loadAttachments();
+    },
+    [task.id, loadAttachments],
+  );
+
+  const handlePasteImages = useCallback(
+    async (files: File[]) => {
+      await handleAttachFiles(files);
+    },
+    [handleAttachFiles],
+  );
+
+  useEffect(() => {
+    const host = containerRef.current;
+    if (!host) return;
+
+    const onPaste = (event: ClipboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.untask-task-editor')) {
+        return;
+      }
+
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (const item of items) {
+        if (!item.type.startsWith('image/')) continue;
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+
+      if (imageFiles.length === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      void handleAttachFiles(imageFiles);
+    };
+
+    const onDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer || event.dataTransfer.files.length === 0) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    };
+
+    const onDrop = (event: DragEvent) => {
+      const files = event.dataTransfer ? Array.from(event.dataTransfer.files) : [];
+      if (files.length === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void handleAttachFiles(files);
+    };
+
+    host.addEventListener('paste', onPaste, true);
+    host.addEventListener('dragover', onDragOver, true);
+    host.addEventListener('drop', onDrop, true);
+    return () => {
+      host.removeEventListener('paste', onPaste, true);
+      host.removeEventListener('dragover', onDragOver, true);
+      host.removeEventListener('drop', onDrop, true);
+    };
+  }, [handleAttachFiles]);
 
   // Dev-only latency probe: expanded task editor -> first content change.
   useEffect(() => {
@@ -870,7 +954,7 @@ export const TaskBody = ({
   }, [isExpanded, task.id]);
 
   return (
-    <div className="overflow-hidden">
+    <div ref={containerRef} className="overflow-hidden">
       {/* Part-of reference — subtask context */}
       {parentTask && indentPx === 0 && !hideParentRef && (
         <div className="border-t border-border/30 px-3 pt-2">
@@ -916,6 +1000,7 @@ export const TaskBody = ({
         taskId={task.id}
         body={task.body}
         forceOpen={noteForceOpen}
+        onPasteImages={handlePasteImages}
         onBodyChange={(hasContent) => {
           setNoteHasContent(hasContent);
           const metricKey = openMetricKeyRef.current;

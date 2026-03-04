@@ -1,6 +1,7 @@
 import type {
   AssistantLiveContext,
   NoteMetadata,
+  Task,
 } from '../../types/assistant';
 import { listTasks } from '../services/taskService';
 import { listNotes, getDisplayTitle } from '../services/notesService';
@@ -10,7 +11,9 @@ export type CanonicalRuntimeContext = {
 };
 
 const buildLiveContextSnapshot = (): AssistantLiveContext => {
-  const tasks = listTasks();
+  // listTasks() returns hydrated tasks (tags: string[]) but Drizzle's
+  // inferred type still shows tags as string | null. Cast is safe here.
+  const tasks = listTasks() as unknown as Task[];
 
   const { active } = listNotes();
   const notesMeta: NoteMetadata[] = active

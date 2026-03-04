@@ -3,10 +3,11 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useStat
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlignLeft, Bookmark, Check, GripVertical } from 'lucide-react';
+import { AlignLeft, Bookmark, Check, GripVertical, Paperclip } from 'lucide-react';
 
 import { type Task } from '../../../types/models';
 import { cn } from '../../lib/utils';
+import { hasNoteContent } from './noteContent';
 import { SNAPPY, fadeVariants, heightVariants } from '../../lib/animation';
 import { PRIORITY_DOT } from '../../lib/taskConstants';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
@@ -41,6 +42,7 @@ export interface TaskItemProps {
   onOpenDetail?: (id: string) => void;
   onContextMenu?: (event: React.MouseEvent, taskId: string) => void;
   onFocus?: () => void;
+  attachmentCount?: number;
   completeConfirmTrigger?: { taskId: string; ts: number } | null;
   onCompleteConfirmTriggerHandled?: (taskId: string) => void;
   children?: ReactNode;
@@ -69,6 +71,7 @@ export const TaskItem = ({
   onOpenDetail,
   onContextMenu,
   onFocus,
+  attachmentCount = 0,
   completeConfirmTrigger,
   onCompleteConfirmTriggerHandled,
   children,
@@ -436,7 +439,7 @@ export const TaskItem = ({
 
         <div className="ml-auto flex items-center gap-1">
           <AnimatePresence>
-            {task.body && task.body.trim() !== '' && task.body !== '<p></p>' ? (
+            {hasNoteContent(task.body) ? (
               <motion.div key="body-badge" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.08 }}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -449,6 +452,15 @@ export const TaskItem = ({
                   <TooltipContent>Has notes</TooltipContent>
                 </Tooltip>
               </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {attachmentCount > 0 ? (
+              <motion.span key="attachment-badge" variants={fadeVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.08 }} className="inline-flex h-5 items-center gap-1 rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
+                <Paperclip aria-hidden="true" className="size-2.5" />
+                {attachmentCount}
+              </motion.span>
             ) : null}
           </AnimatePresence>
 

@@ -30,6 +30,7 @@ import {
   redoLastUserTaskEvent,
   getTaskStatusConfig,
   setTaskStatusConfig,
+  getTagsWithCount,
 } from '../services/taskService';
 import { refreshTodayBadge } from '../tray';
 
@@ -180,5 +181,10 @@ export const registerTaskHandlers = (): void => {
         };
       },
     ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.TASK_GET_TAGS,
+    withIpcLogging('TASK_GET_TAGS', () => getTagsWithCount()),
   );
 };

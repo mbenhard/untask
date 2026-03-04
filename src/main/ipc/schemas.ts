@@ -136,7 +136,7 @@ export const taskListFilterSchema = z.object({
   parentId: z.string().nullable().optional(),
   today: z.boolean().optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
-  client: z.string().optional(),
+  tag: z.string().optional(),
   search: z.string().optional(),
   limit: z.number().int().min(1).max(500).optional(),
 }).optional();

@@ -18,7 +18,7 @@ describe('ChatTaskCard', () => {
     priority: 'high',
     dueDate: '2026-03-03',
     today: true,
-    client: null,
+    tags: [],
     ...overrides,
   });
 
@@ -73,11 +73,11 @@ describe('ChatTaskCard', () => {
     expect(container.textContent).toContain('Done');
   });
 
-  it('shows client when present and hides it when null', () => {
-    renderCard(makeTask({ client: 'Acme Corp' }));
+  it('shows tags when present and hides them when empty', () => {
+    renderCard(makeTask({ tags: ['Acme Corp'] }));
     expect(container.textContent).toContain('Acme Corp');
 
-    renderCard(makeTask({ client: null }));
+    renderCard(makeTask({ tags: [] }));
     expect(container.textContent).not.toContain('Acme Corp');
   });
 
@@ -133,7 +133,7 @@ describe('ChatTaskResults', () => {
     priority: 'none',
     dueDate: null,
     today: false,
-    client: null,
+    tags: [],
   });
 
   const renderResults = (tasks: ChatTaskSummary[], onTaskClick = vi.fn()) => {

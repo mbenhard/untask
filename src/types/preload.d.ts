@@ -69,8 +69,16 @@ import type {
   ApiKeysValidateResult,
   UpdateInfo,
   AttachmentSaveRequest,
+  AttachmentSaveForTaskRequest,
   AttachmentIdRequest,
   AttachmentPickAndSaveResult,
+  AttachmentRecord,
+  AttachmentListByTaskRequest,
+  AttachmentDeleteRecordRequest,
+  AttachmentPickAndSaveForTaskRequest,
+  AttachmentPickAndSaveForTaskResult,
+  AttachmentGetCountsByTaskIdsRequest,
+  AttachmentGetCountsByTaskIdsResult,
   NotificationPermissionResult,
   RemindersStatusResult,
   RemindersSyncStatusPayload,
@@ -130,7 +138,7 @@ export type UntaskApi = {
       parentId?: string | null;
       today?: boolean;
       priority?: Task['priority'];
-      client?: string;
+      tag?: string;
       search?: string;
       limit?: number;
     }) => Promise<Task[]>;
@@ -148,6 +156,7 @@ export type UntaskApi = {
     setStatuses: (config: TaskStatusConfig) => Promise<TaskStatusConfig>;
     undoLastUserAction: () => Promise<TaskUndoResultPayload>;
     redoLastUserAction: () => Promise<TaskUndoResultPayload>;
+    getTagsWithCount: () => Promise<Array<{ tag: string; count: number }>>;
   };
   chat: {
     send: (message: ChatSendRequest) => Promise<ChatSendResult>;
@@ -243,6 +252,11 @@ export type UntaskApi = {
     delete: (request: AttachmentIdRequest) => Promise<void>;
     read: (request: AttachmentIdRequest) => Promise<string>;
     pickAndSave: () => Promise<AttachmentPickAndSaveResult>;
+    saveForTask: (request: AttachmentSaveForTaskRequest) => Promise<AttachmentRecord>;
+    listByTask: (request: AttachmentListByTaskRequest) => Promise<AttachmentRecord[]>;
+    deleteRecord: (request: AttachmentDeleteRecordRequest) => Promise<void>;
+    pickAndSaveForTask: (request: AttachmentPickAndSaveForTaskRequest) => Promise<AttachmentPickAndSaveForTaskResult>;
+    getCountsByTaskIds: (request: AttachmentGetCountsByTaskIdsRequest) => Promise<AttachmentGetCountsByTaskIdsResult>;
   };
   notifications: {
     fireTest: () => Promise<NotificationPermissionResult>;

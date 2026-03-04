@@ -162,34 +162,34 @@ describeIfNativeSqlite('taskService SQL filtering', () => {
     sqlite?.close();
   });
 
-  it('applies client/search/limit filters in listTasks', () => {
+  it('applies tag/search/limit filters in listTasks', () => {
     createTask({
       title: 'Send invoice follow-up',
       status: 'active',
-      client: 'Acme Corp',
+      tags: ['acme corp'],
       order: 0,
     });
     createTask({
       title: 'Draft meeting agenda',
       status: 'active',
-      client: 'Acme Corp',
+      tags: ['acme corp'],
       order: 1,
     });
     createTask({
       title: 'Send invoice reminder',
       status: 'active',
-      client: 'Beta LLC',
+      tags: ['beta llc'],
       order: 2,
     });
 
     const results = listTasks({
-      client: 'acme',
+      tag: 'acme',
       search: 'invoice',
       limit: 1,
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]?.client).toBe('Acme Corp');
+    expect(results[0]?.tags).toContain('acme corp');
     expect(results[0]?.title.toLowerCase()).toContain('invoice');
   });
 });

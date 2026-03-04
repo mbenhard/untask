@@ -155,7 +155,7 @@ const extractTaskResults = (
       priority: t.priority != null ? String(t.priority) : null,
       dueDate: t.dueDate != null ? String(t.dueDate) : null,
       today: Boolean(t.today),
-      client: t.client != null ? String(t.client) : null,
+      tags: Array.isArray(t.tags) ? (t.tags as string[]) : [],
     };
   });
 };

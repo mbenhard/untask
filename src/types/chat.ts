@@ -37,7 +37,7 @@ export type ChatTaskSummary = {
   priority: string | null;
   dueDate: string | null;
   today: boolean;
-  client: string | null;
+  tags: string[];
 };
 
 export type ChatActionCard = {

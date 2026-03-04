@@ -10,7 +10,7 @@ const taskResults = [
     priority: 'high',
     dueDate: '2026-03-03',
     today: true,
-    client: null,
+    tags: [] as string[],
   },
   {
     id: 'task-2',
@@ -19,7 +19,7 @@ const taskResults = [
     priority: 'medium',
     dueDate: null,
     today: false,
-    client: 'Acme',
+    tags: ['acme'] as string[],
   },
 ] as const;
 

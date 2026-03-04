@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { BlockNoteEditor } from '@blocknote/core';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -15,10 +14,12 @@ import {
   type PredefinedStatusId,
   type Task,
 } from '../../../types/models';
+import type { AttachmentRecord } from '../../../types/ipc';
 import { fadeVariants, SNAPPY } from '../../lib/animation';
 import { SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { getUntask } from '../../lib/untask';
 import { cn } from '../../lib/utils';
+import { hasNoteContent } from './noteContent';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
 import { useTaskDetailKeyboard } from '../../hooks/useTaskDetailKeyboard';
 import {
@@ -31,8 +32,6 @@ import {
   selectEnabledNonTerminal,
 } from '../../stores/taskStatusConfigStore';
 import { useToastStore } from '../../stores/toastStore';
-import { useAutoSaveBody } from '../../hooks/useAutoSaveBody';
-import { BlockEditor } from '../editor/BlockEditor';
 import { Button } from '../ui/button';
 import { Popover } from '../ui';
 
@@ -40,14 +39,14 @@ import {
   StatusSegment,
   PrioritySegment,
   DueDateSegment,
-  ClientSegment,
+  TagsSegment,
   RecurrenceSegment,
   AttachmentSegment,
   MetaDot,
-  countAttachments,
   type UpdateTaskAction,
-  getAttachmentSlashMenuItems,
 } from './TaskBody';
+import { AttachmentList } from './AttachmentList';
+import { NoteSection } from './NoteSection';
 import { SubtaskSection } from './SubtaskSection';
 import { getNextPriority, getNextStatusInCycle } from './taskInteraction';
 import { TaskOverflowMenu } from './TaskOverflowMenu';
@@ -107,6 +106,30 @@ const TodaySegment = ({
   );
 };
 
+// ─── Note Segment (detail page) ─────────────────────────────
+
+const NoteSegmentDetail = ({
+  hasContent,
+  onClick,
+}: {
+  hasContent: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    tabIndex={0}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    onKeyDown={(e) => e.stopPropagation()}
+    className={cn(SEGMENT, !hasContent && SEGMENT_EMPTY)}
+    aria-label={hasContent ? 'Note — click to scroll to note' : 'Add note'}
+  >
+    {hasContent ? 'note' : '+ note'}
+  </button>
+);
+
 // ─── Detail Page Metadata Line ──────────────────────────────
 
 const DetailMetadataLine = ({
@@ -115,12 +138,16 @@ const DetailMetadataLine = ({
   onToggleToday,
   attachmentCount,
   onAttach,
+  noteHasContent,
+  onNoteClick,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
   onToggleToday: () => void;
   attachmentCount: number;
   onAttach: () => void;
+  noteHasContent: boolean;
+  onNoteClick: () => void;
 }) => {
   return (
     <div
@@ -138,9 +165,11 @@ const DetailMetadataLine = ({
       <MetaDot />
       <StatusSegment task={task} onUpdate={onUpdate} />
       <MetaDot />
-      <ClientSegment task={task} onUpdate={onUpdate} />
+      <TagsSegment task={task} onUpdate={onUpdate} />
       <MetaDot />
       <AttachmentSegment count={attachmentCount} onAttach={onAttach} />
+      <MetaDot />
+      <NoteSegmentDetail hasContent={noteHasContent} onClick={onNoteClick} />
     </div>
   );
 };
@@ -176,7 +205,6 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
   const [deleteConfirmTrigger, setDeleteConfirmTrigger] = useState<{ taskId: string; ts: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<BlockNoteEditor | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Sync title draft when task changes
@@ -206,38 +234,123 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
     setIsEditingTitle(false);
   }, [task]);
 
-  // ── Attachments ──
+  // ── Attachments from DB ──
 
-  const [attachmentCount, setAttachmentCount] = useState(() => countAttachments(task?.body ?? null));
+  const [attachments, setAttachments] = useState<AttachmentRecord[]>([]);
+
+  const loadAttachments = useCallback(async () => {
+    const result = await window.untask?.attachments.listByTask({ taskId });
+    setAttachments(result ?? []);
+  }, [taskId]);
+
+  useEffect(() => {
+    void loadAttachments();
+  }, [loadAttachments]);
 
   const handleAttach = useCallback(async () => {
-    const result = await window.untask?.attachments.pickAndSave();
-    if (!result || result.canceled || result.urls.length === 0) return;
+    const result = await window.untask?.attachments.pickAndSaveForTask({ taskId });
+    if (!result || result.canceled) return;
+    void loadAttachments();
+  }, [taskId, loadAttachments]);
 
-    const editor = editorRef.current;
-    if (!editor) return;
+  // ── Note state ──
 
-    const newBlocks = result.urls.map((url) => {
-      const isImage = /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
-      if (isImage) {
-        return { type: 'image' as const, props: { url } };
-      }
-      return { type: 'file' as const, props: { url } };
+  const [noteHasContent, setNoteHasContent] = useState(() => hasNoteContent(task?.body));
+  const [noteForceOpen, setNoteForceOpen] = useState(false);
+
+  const handleNoteClick = useCallback(() => {
+    setNoteForceOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const noteSection = containerRef.current?.querySelector<HTMLElement>('[data-note-section="true"]');
+        noteSection?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
     });
-
-    const lastBlock = editor.document[editor.document.length - 1];
-    editor.insertBlocks(newBlocks, lastBlock, 'after');
   }, []);
 
-  // ── Body auto-save ──
+  useEffect(() => {
+    setNoteHasContent(hasNoteContent(task?.body));
+  }, [task?.id, task?.body]);
 
-  const { handleBodyChange } = useAutoSaveBody({
-    taskId,
-    onContentChange: (json: string) => {
-      const newCount = countAttachments(json);
-      setAttachmentCount((prev) => (prev !== newCount ? newCount : prev));
+  const handleAttachFiles = useCallback(
+    async (files: File[]) => {
+      const api = window.untask?.attachments;
+      if (!api || files.length === 0) return;
+
+      for (const file of files) {
+        const data = new Uint8Array(await file.arrayBuffer());
+        const filename = file.name || `pasted-image-${Date.now()}.png`;
+        await api.saveForTask({
+          taskId,
+          data,
+          filename,
+          mimeType: file.type || null,
+          size: file.size,
+        });
+      }
+
+      void loadAttachments();
     },
-  });
+    [taskId, loadAttachments],
+  );
+
+  const handlePasteImages = useCallback(
+    async (files: File[]) => {
+      await handleAttachFiles(files);
+    },
+    [handleAttachFiles],
+  );
+
+  useEffect(() => {
+    const host = containerRef.current;
+    if (!host) return;
+
+    const onPaste = (event: ClipboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active?.closest('.untask-task-editor')) {
+        return;
+      }
+
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (const item of items) {
+        if (!item.type.startsWith('image/')) continue;
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+
+      if (imageFiles.length === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      void handleAttachFiles(imageFiles);
+    };
+
+    const onDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer || event.dataTransfer.files.length === 0) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    };
+
+    const onDrop = (event: DragEvent) => {
+      const files = event.dataTransfer ? Array.from(event.dataTransfer.files) : [];
+      if (files.length === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void handleAttachFiles(files);
+    };
+
+    host.addEventListener('paste', onPaste, true);
+    host.addEventListener('dragover', onDragOver, true);
+    host.addEventListener('drop', onDrop, true);
+    return () => {
+      host.removeEventListener('paste', onPaste, true);
+      host.removeEventListener('dragover', onDragOver, true);
+      host.removeEventListener('drop', onDrop, true);
+    };
+  }, [handleAttachFiles]);
 
   // ── Bridge navigatedSubtaskId → TaskList's selectedTaskId ──
 
@@ -458,29 +571,36 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
               task={task}
               onUpdate={updateTask}
               onToggleToday={handleToggleToday}
-              attachmentCount={attachmentCount}
+              attachmentCount={attachments.length}
               onAttach={handleAttach}
+              noteHasContent={noteHasContent}
+              onNoteClick={handleNoteClick}
             />
           </div>
 
           {/* Divider */}
           <div className="mb-4 border-t border-border/30" />
 
-          {/* Body editor */}
-          <div className="mb-6">
-            <BlockEditor
-              key={taskId}
-              content={task.body ?? ''}
-              onChange={handleBodyChange}
-              className="untask-task-editor"
-              preset="task"
-              contextMenuMode="off"
-              editorRef={editorRef}
-              getSlashMenuItems={getAttachmentSlashMenuItems}
-            />
-          </div>
+          {/* Attachments section */}
+          <AttachmentList
+            taskId={taskId}
+            attachments={attachments}
+            onAttachmentsChange={loadAttachments}
+          />
 
-          {/* Divider */}
+          {/* Note section (collapsible text-only editor) */}
+          <NoteSection
+            taskId={taskId}
+            body={task.body}
+            forceOpen={noteForceOpen}
+            onPasteImages={handlePasteImages}
+            onBodyChange={(hasContent) => setNoteHasContent(hasContent)}
+            onOpenStateChange={(isOpen) => {
+              if (!isOpen) setNoteForceOpen(false);
+            }}
+          />
+
+          {/* Divider before subtasks */}
           <div className="mb-4 border-t border-border/30" />
 
           {/* Subtask section */}
