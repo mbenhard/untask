@@ -1,0 +1,543 @@
+---
+// ChatPreview — 1:1 CSS recreation of chat overlay panel
+// References: AppShell.tsx chat overlay, ChatView.tsx, ChatInput.tsx, BirdMascot.tsx
+import SectionLabel from './SectionLabel.astro';
+
+interface Props {
+  section: { number: string; heading: string; description: string };
+}
+
+const { section } = Astro.props;
+---
+
+<section id="chat-section" data-reveal class="px-6 py-24 sm:py-32">
+  <div data-thread-content class="mx-auto max-w-2xl">
+
+    <!-- Section label -->
+    <SectionLabel number={section.number} heading={section.heading} description={section.description} />
+
+    <!-- Window frame -->
+    <div class="app-preview overflow-hidden rounded-xl border border-border/70 bg-background shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
+
+      <!-- ═══ TitleBar ═══ -->
+      <header class="flex items-center px-[10px] pt-[4px] pb-1">
+        <div class="traffic-lights flex w-[68px] shrink-0 items-center gap-[6px]">
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FF5F57]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#FEBC2E]/80"></span>
+          <span class="block h-[10px] w-[10px] rounded-full bg-[#28C840]/80"></span>
+        </div>
+        <div class="flex-1"></div>
+        <nav class="flex items-center gap-0.5">
+          <span class="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-foreground">Today</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Tasks</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Inbox</span>
+          <span class="rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-muted-foreground">Notes</span>
+        </nav>
+      </header>
+
+      <!-- ═══ Content area ═══ -->
+      <div class="relative p-3 pb-14" style="min-height: 460px;">
+
+        <!-- Simplified task list (background context) -->
+        <div class="mx-auto flex max-w-3xl flex-col gap-3">
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 rotate-90 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">Today</span>
+                <span id="chat-task-count" class="ml-auto font-mono text-[11px] text-muted-foreground">2</span>
+              </div>
+              <span class="ml-1.5 inline-flex size-5 items-center justify-center text-muted-foreground/55">
+                <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+              </span>
+            </div>
+            <div class="border-t border-border/60 px-1 py-1">
+              <!-- Task row 1 -->
+              <div class="flex min-h-10 items-center gap-2 border-b border-border/40 px-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="inline-flex size-6 items-center justify-center">
+                    <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));"></span>
+                  </span>
+                  <span class="size-[5px] rounded-full bg-foreground/15"></span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[13px] text-foreground">Prepare client presentation</p>
+                </div>
+                <div class="ml-auto flex items-center gap-1">
+                  <span class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">Feb 20</span>
+                </div>
+              </div>
+              <!-- Task row 2 -->
+              <div class="flex min-h-10 items-center gap-2 px-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="inline-flex size-6 items-center justify-center">
+                    <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));"></span>
+                  </span>
+                  <span class="size-[5px] rounded-full bg-rose-500"></span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[13px] text-foreground">Write project brief</p>
+                </div>
+              </div>
+              <!-- New task row (hidden, animated in by demo) -->
+              <div id="chat-new-task" class="flex items-center gap-2 overflow-hidden border-t border-border/40 px-1.5 opacity-0" style="max-height: 0; transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease-out;">
+                <div class="flex min-h-10 w-full items-center gap-2">
+                  <div class="flex items-center gap-1.5">
+                    <span class="inline-flex size-6 items-center justify-center">
+                      <span class="inline-flex size-4 items-center justify-center rounded-full border border-dashed" style="border-color: var(--foreground-muted, rgba(245,245,245,0.35));"></span>
+                    </span>
+                    <span class="size-[5px] rounded-full bg-amber-500"></span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-[13px] text-foreground">Review pitch deck</p>
+                  </div>
+                  <div class="ml-auto flex items-center gap-1">
+                    <span class="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">3 PM</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ═══ SectionGroup: Done today (collapsed) ═══ -->
+          <section class="rounded-md border border-border/60">
+            <div class="flex items-center px-2 py-2">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <svg class="size-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                <span class="text-[12px] font-medium text-foreground">Done today</span>
+                <span class="ml-auto font-mono text-[11px] text-muted-foreground">1</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ═══ Chat overlay panel ═══ -->
+        <aside
+          class="pointer-events-auto absolute inset-y-3 right-3 flex min-h-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-card/90 shadow-[0_8px_20px_-14px_rgba(0,0,0,0.6)] backdrop-blur-sm"
+          style="width: min(clamp(340px, 30vw, 460px), calc(100% - 24px));"
+        >
+          <!-- Chat header -->
+          <header class="flex h-9 items-center justify-between border-b border-dashed border-border/50 px-2">
+            <span class="truncate px-1.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+              New chat
+            </span>
+            <span class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </span>
+          </header>
+
+          <!-- Chat body -->
+          <div class="relative min-h-0 flex-1 overflow-hidden px-4 py-0">
+
+            <!-- Empty state (initial) -->
+            <div id="chat-empty" class="flex h-full flex-col items-center justify-center gap-4 px-4" style="position: absolute; inset: 0; opacity: 1; pointer-events: auto; transition: opacity 0.3s;">
+              <!-- Bird mascot -->
+              <div class="inline-flex flex-col items-center text-muted-foreground" style="width: 27px; height: 36px;">
+                <div class="bird-body-chat relative z-[2] flex-1" style="transform-origin: center bottom; margin-bottom: -10%;">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.89 166.04" class="block h-auto w-full">
+                    <path fill="currentColor" d="M120.39,36.58c1.07-.22,1.56-.39,2.49-1.01-15.26-5.36-30.9-9.88-46.49-14.2C75.08,3.55,51.53-5.85,37.12,3.96c-13.89,9.55-12.2,28.04-16.23,42.7-5.67,28.52-11.32,57.04-17,85.55-3.1,15.47-11.57,36.65,13.69,33.52,16.92-.48,33.84-1.07,50.75-1.85,22.47-.89,39.64,3.24,30.44-26.67-6.31-30.86-12.58-61.72-18.81-92.6,13.56-2.23,26.95-5.41,40.44-8.03ZM59.02,23.22c-.01,9.92-15.48,8.5-13.45-1.25,1.54-7.53,13.49-6.61,13.45,1.25Z"/>
+                  </svg>
+                </div>
+                <div class="relative z-[1]" style="width: 34%;">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40.72 50.38" class="block h-auto w-full">
+                    <path fill="currentColor" d="M1.94,47.87c.23-.13.45-.26.69-.4.41-.22.83-.44,1.25-.65,0-.23,0-.46,0-.7.03-5.6.07-11.19.11-16.79.02-2.71.04-5.41.05-8.12.01-2.36.03-4.72.05-7.08,0-1.25.02-2.5.02-3.75,0-1.18.01-2.35.02-3.53,0-.64,0-1.27.01-1.91,0-.38,0-.76,0-1.15,0-.33,0-.66,0-1q.02-.94.37-2.15c1.17,0,2.34,0,3.55,0,.26,5.66.39,11.31.42,16.98,0,.82.01,1.64.02,2.46.02,1.91.03,3.83.04,5.74.02,2.19.03,4.37.05,6.56.04,4.48.07,8.97.1,13.45,1.37-.27,2.73-.56,4.1-.85.39-.08.77-.15,1.17-.23q3.2-.7,4.14-1.86c.2-.31.4-.62.6-.94q1.22-.75,2.58-.97c0-.37,0-.74,0-1.13,0-3.55-.01-7.1-.01-10.65,0-1.82,0-3.65,0-5.47q-.04-9.78.17-19.55.02-.55.04-1.1,0-1.6.47-3.09,1.64-.04,3.23.32c.4.8.36,1.32.36,2.21,0,.33,0,.66,0,1,0,.36,0,.73,0,1.1,0,.38,0,.76,0,1.15,0,1.05,0,2.09,0,3.14,0,1.09,0,2.19,0,3.28,0,2.07,0,4.14,0,6.21,0,2.36,0,4.71,0,7.07,0,4.85,0,9.7-.02,14.55.28-.07.55-.14.83-.22,1.02-.27,2.05-.53,3.08-.78.44-.11.89-.23,1.33-.34.64-.17,1.28-.33,1.92-.49.38-.1.77-.2,1.16-.3,1.14-.15,1.66-.05,2.66.51q.59.81.97,1.61c-1.59.57-3.19.95-4.84,1.29q.56.02,1.13.04c.5.02.99.04,1.49.06.25,0,.49.01.74.02,1.57.07,2.7.3,4.06,1.17q.74.91.65,1.94-10.55.16-21.31.32c.21.43.43.85.65,1.29-1.18.41-2.32.75-3.55.97.96.32,1.7.39,2.7.44,1.37.12,2.37.22,3.43,1.17.21.53.43,1.07.65,1.61-7.67,0-15.34,0-23.24,0q.63-1.66,1.94-2.5Z"/>
+                  </svg>
+                </div>
+              </div>
+              <p class="max-w-[260px] text-center text-xs leading-relaxed text-muted-foreground/50">
+                Your personal assistant. Asks before acting,
+                double-checks risky changes, and remembers
+                what matters, even after chats are cleared.
+              </p>
+              <div class="flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onclick="activateChat()" class="chat-chip cursor-pointer rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground">
+                  Create a task
+                </button>
+                <button type="button" onclick="activateChat()" class="chat-chip cursor-pointer rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground">
+                  What's due today?
+                </button>
+                <button type="button" onclick="activateChat()" class="chat-chip cursor-pointer rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground">
+                  Summarize my week
+                </button>
+              </div>
+            </div>
+
+            <!-- Conversation state (hidden initially) -->
+            <div id="chat-conversation" class="h-full flex-col justify-end gap-3 px-3 pb-4" style="position: absolute; inset: 0; display: none; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
+              <!-- User bubble -->
+              <div id="chat-msg-user" class="flex w-full flex-col gap-1.5 items-end" style="opacity: 0; transition: opacity 0.3s;">
+                <div class="max-w-[88%] rounded-xl border border-border/70 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
+                  <p id="chat-typing-text" class="whitespace-pre-wrap">remind me to review the pitch deck by 3pm</p>
+                </div>
+              </div>
+
+              <!-- Assistant area: thinking → response (grid overlap so they share same position) -->
+              <div class="grid w-full" style="grid-template-columns: 1fr;">
+                <!-- Thinking shimmer -->
+                <div id="chat-msg-thinking" class="flex w-full max-w-[88%] items-end gap-2" style="grid-area: 1/1; opacity: 0; transition: opacity 0.3s;">
+                  <div class="mb-0.5 shrink-0 text-muted-foreground/55">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.89 166.04" class="size-4">
+                      <path fill="currentColor" d="M120.39,36.58c1.07-.22,1.56-.39,2.49-1.01-15.26-5.36-30.9-9.88-46.49-14.2C75.08,3.55,51.53-5.85,37.12,3.96c-13.89,9.55-12.2,28.04-16.23,42.7-5.67,28.52-11.32,57.04-17,85.55-3.1,15.47-11.57,36.65,13.69,33.52,16.92-.48,33.84-1.07,50.75-1.85,22.47-.89,39.64,3.24,30.44-26.67-6.31-30.86-12.58-61.72-18.81-92.6,13.56-2.23,26.95-5.41,40.44-8.03ZM59.02,23.22c-.01,9.92-15.48,8.5-13.45-1.25,1.54-7.53,13.49-6.61,13.45,1.25Z"/>
+                    </svg>
+                  </div>
+                  <span class="thinking-shimmer text-sm">Thinking...</span>
+                </div>
+
+                <!-- Assistant message with tool step -->
+                <div id="chat-msg-assistant" class="flex w-full flex-col gap-1.5 items-start" style="grid-area: 1/1; opacity: 0; transition: opacity 0.3s;">
+                <div class="flex w-full max-w-[88%] items-start gap-2">
+                  <!-- Bird avatar -->
+                  <div class="mt-0.5 shrink-0 text-muted-foreground/55">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.89 166.04" class="size-4">
+                      <path fill="currentColor" d="M120.39,36.58c1.07-.22,1.56-.39,2.49-1.01-15.26-5.36-30.9-9.88-46.49-14.2C75.08,3.55,51.53-5.85,37.12,3.96c-13.89,9.55-12.2,28.04-16.23,42.7-5.67,28.52-11.32,57.04-17,85.55-3.1,15.47-11.57,36.65,13.69,33.52,16.92-.48,33.84-1.07,50.75-1.85,22.47-.89,39.64,3.24,30.44-26.67-6.31-30.86-12.58-61.72-18.81-92.6,13.56-2.23,26.95-5.41,40.44-8.03ZM59.02,23.22c-.01,9.92-15.48,8.5-13.45-1.25,1.54-7.53,13.49-6.61,13.45,1.25Z"/>
+                    </svg>
+                  </div>
+                  <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <!-- Text bubble -->
+                    <div class="rounded-xl border border-border bg-card/80 px-3 py-2 text-sm">
+                      <p class="text-foreground">Done — added to your list for today at 3 PM.</p>
+                    </div>
+                    <!-- Tool action card -->
+                    <div class="flex items-start gap-2 rounded-md border border-border/60 bg-card/40 px-2.5 py-1.5 text-xs">
+                      <div class="mt-0.5 shrink-0">
+                        <svg class="size-3 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm text-foreground/90">Created task: Review pitch deck</p>
+                      </div>
+                      <div class="flex shrink-0 items-center">
+                        <span class="inline-flex h-5 items-center gap-1 rounded border border-border/60 px-1.5 text-[10px] font-medium text-muted-foreground">
+                          <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+                          Undo
+                        </span>
+                      </div>
+                    </div>
+                    <!-- Suggestion chips -->
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                      <span class="rounded-full border border-border/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">Set priority</span>
+                      <span class="rounded-full border border-border/60 px-2.5 py-1 text-xs font-medium text-muted-foreground">Add details</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Chat input footer -->
+          <div class="border-t border-dashed border-border/50">
+            <div class="flex min-h-11 items-end gap-2 px-3 py-1.5">
+              <span class="mb-0.5 flex size-6 items-center justify-center text-muted-foreground">
+                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </span>
+              <div class="flex w-full items-end">
+                <span id="chat-input-text" class="min-h-[28px] w-full py-1 text-[13px] leading-5 text-muted-foreground/55">Ask Untask...</span>
+              </div>
+              <span id="chat-send-btn" class="mb-0.5 flex size-6 items-center justify-center text-muted-foreground" style="transition: color 0.2s;">
+                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+              </span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- ═══ Bottom bar (no Chat pill — overlay is open) ═══ -->
+        <div class="absolute bottom-3 left-3 flex items-center gap-2">
+          <div class="hidden md:flex shrink-0 items-center gap-1">
+            <span class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" />
+                <path d="m14.207 4.793-3.414 3.414" />
+                <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+                <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" />
+              </svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .thinking-shimmer {
+    background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--foreground) 40%, var(--muted-foreground) 80%);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0.4;
+    animation: thinking-shimmer 2.8s ease-in-out infinite;
+  }
+  @keyframes thinking-shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  .bird-body-chat {
+    animation: bird-wobble-chat 1.2s ease-in-out infinite;
+  }
+  @keyframes bird-wobble-chat {
+    0%   { transform: translateY(0) rotate(0deg); }
+    25%  { transform: translateY(-2px) rotate(2deg); }
+    50%  { transform: translateY(0) rotate(0deg); }
+    75%  { transform: translateY(-2px) rotate(-2deg); }
+    100% { transform: translateY(0) rotate(0deg); }
+  }
+
+  .traffic-lights:hover span:nth-child(1) { background-color: #FF5F57; }
+  .traffic-lights:hover span:nth-child(2) { background-color: #FEBC2E; }
+  .traffic-lights:hover span:nth-child(3) { background-color: #28C840; }
+
+  /* Typing cursor in input bar */
+  .chat-input-typing {
+    color: var(--foreground) !important;
+    opacity: 1 !important;
+  }
+  .chat-input-typing::after {
+    content: '';
+    display: inline-block;
+    width: 1px;
+    height: 1em;
+    background: var(--foreground);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    animation: input-cursor-blink 0.8s step-end infinite;
+  }
+  @keyframes input-cursor-blink {
+    50% { opacity: 0; }
+  }
+
+  /* Highlight glow when new task appears */
+  .task-highlight {
+    animation: task-glow 2s ease-out;
+  }
+  @keyframes task-glow {
+    0%   { background-color: color-mix(in srgb, var(--foreground) 4%, transparent); }
+    100% { background-color: transparent; }
+  }
+
+  /* Send button active state */
+  .chat-send-active {
+    color: var(--foreground) !important;
+  }
+</style>
+
+<script is:inline>
+  var chatAutoTimer = null;
+  var chatPauseTimer = null;
+  var chatDemoTimer = null;
+  var chatDemoPaused = false;
+  var chatTypingInterval = null;
+
+  var CHAT_MESSAGE = 'remind me to review the pitch deck by 3pm';
+
+  function setChatState(state) {
+    var empty = document.getElementById('chat-empty');
+    var conversation = document.getElementById('chat-conversation');
+    var states = { empty: empty, conversation: conversation };
+
+    Object.keys(states).forEach(function(key) {
+      var el = states[key];
+      if (!el) return;
+      if (key === state) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            el.style.opacity = '1';
+          });
+        });
+      } else {
+        el.style.opacity = '0';
+        el.style.pointerEvents = 'none';
+        setTimeout(function() {
+          if (el.style.opacity === '0') el.style.display = 'none';
+        }, 300);
+      }
+    });
+  }
+
+  function resetChatMessages() {
+    var ids = ['chat-msg-user', 'chat-msg-thinking', 'chat-msg-assistant'];
+    ids.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.opacity = '0';
+    });
+    // Reset typing text
+    var typingText = document.getElementById('chat-typing-text');
+    if (typingText) typingText.textContent = CHAT_MESSAGE;
+  }
+
+  // ─── Input bar typing ───
+
+  function typeInInput(text, callback) {
+    var input = document.getElementById('chat-input-text');
+    var sendBtn = document.getElementById('chat-send-btn');
+    if (!input) { if (callback) callback(); return; }
+
+    input.textContent = '';
+    input.classList.add('chat-input-typing');
+    if (sendBtn) sendBtn.classList.add('chat-send-active');
+
+    var i = 0;
+    chatTypingInterval = setInterval(function() {
+      if (chatDemoPaused) { clearInterval(chatTypingInterval); return; }
+      input.textContent = text.substring(0, i + 1);
+      i++;
+      if (i >= text.length) {
+        clearInterval(chatTypingInterval);
+        chatTypingInterval = null;
+        if (callback) setTimeout(callback, 600);
+      }
+    }, 40);
+  }
+
+  function clearInput() {
+    var input = document.getElementById('chat-input-text');
+    var sendBtn = document.getElementById('chat-send-btn');
+    if (input) {
+      input.classList.remove('chat-input-typing');
+      input.textContent = 'Ask Untask...';
+    }
+    if (sendBtn) sendBtn.classList.remove('chat-send-active');
+  }
+
+  // ─── Background task list ───
+
+  function showNewTask() {
+    var task = document.getElementById('chat-new-task');
+    var counter = document.getElementById('chat-task-count');
+    if (task) {
+      task.style.maxHeight = '40px';
+      task.style.opacity = '1';
+      // Add highlight glow
+      task.classList.add('task-highlight');
+    }
+    if (counter) counter.textContent = '3';
+  }
+
+  function resetNewTask() {
+    var task = document.getElementById('chat-new-task');
+    var counter = document.getElementById('chat-task-count');
+    if (task) {
+      task.style.maxHeight = '0';
+      task.style.opacity = '0';
+      task.classList.remove('task-highlight');
+    }
+    if (counter) counter.textContent = '2';
+  }
+
+  // ─── Demo sequence ───
+
+  function runChatDemo() {
+    resetChatMessages();
+    resetNewTask();
+    clearInput();
+    setChatState('empty');
+
+    chatDemoTimer = setTimeout(function() {
+      if (chatDemoPaused) return;
+
+      // Step 1: Start typing in input bar
+      typeInInput(CHAT_MESSAGE, function() {
+        if (chatDemoPaused) return;
+
+        // Step 2: "Send" — clear input, show conversation + user bubble
+        clearInput();
+        setChatState('conversation');
+
+        var user = document.getElementById('chat-msg-user');
+        if (user) {
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() { user.style.opacity = '1'; });
+          });
+        }
+
+        // Step 3: Show thinking after brief pause
+        chatDemoTimer = setTimeout(function() {
+          if (chatDemoPaused) return;
+          var thinking = document.getElementById('chat-msg-thinking');
+          if (thinking) thinking.style.opacity = '1';
+
+          // Step 4: Hide thinking, show assistant response
+          chatDemoTimer = setTimeout(function() {
+            if (chatDemoPaused) return;
+            var thinking = document.getElementById('chat-msg-thinking');
+            var assistant = document.getElementById('chat-msg-assistant');
+            if (thinking) thinking.style.opacity = '0';
+            setTimeout(function() {
+              if (assistant) assistant.style.opacity = '1';
+
+              // Step 5: Animate new task into background list
+              setTimeout(function() {
+                if (chatDemoPaused) return;
+                showNewTask();
+              }, 500);
+            }, 300);
+
+            // Step 6: Hold, then loop
+            chatDemoTimer = setTimeout(function() {
+              if (!chatDemoPaused) runChatDemo();
+            }, 5000);
+          }, 1800);
+        }, 600);
+      });
+    }, 1500);
+  }
+
+  function startChatAutoPlay() {
+    chatDemoPaused = false;
+    chatDemoTimer = setTimeout(runChatDemo, 1000);
+  }
+
+  function stopChatAutoPlay() {
+    chatDemoPaused = true;
+    clearTimeout(chatAutoTimer);
+    clearTimeout(chatDemoTimer);
+    clearTimeout(chatPauseTimer);
+    if (chatTypingInterval) {
+      clearInterval(chatTypingInterval);
+      chatTypingInterval = null;
+    }
+    clearInput();
+  }
+
+  function activateChat() {
+    stopChatAutoPlay();
+    resetChatMessages();
+    resetNewTask();
+    setChatState('conversation');
+    var user = document.getElementById('chat-msg-user');
+    if (user) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() { user.style.opacity = '1'; });
+      });
+    }
+    setTimeout(function() {
+      var thinking = document.getElementById('chat-msg-thinking');
+      if (thinking) thinking.style.opacity = '1';
+      setTimeout(function() {
+        var thinking = document.getElementById('chat-msg-thinking');
+        var assistant = document.getElementById('chat-msg-assistant');
+        if (thinking) thinking.style.opacity = '0';
+        setTimeout(function() {
+          if (assistant) assistant.style.opacity = '1';
+          // Show new task in background
+          setTimeout(showNewTask, 500);
+        }, 300);
+        chatPauseTimer = setTimeout(startChatAutoPlay, 8000);
+      }, 1200);
+    }, 800);
+  }
+
+  window.startChatAutoPlay = startChatAutoPlay;
+  window.stopChatAutoPlay = stopChatAutoPlay;
+  window.activateChat = activateChat;
+</script>

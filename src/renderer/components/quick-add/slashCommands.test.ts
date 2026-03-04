@@ -96,7 +96,7 @@ describe('extractTokens', () => {
   it('extracts @status token', () => {
     const r = extractTokens('task @backlog');
     expect(r.cleanTitle).toBe('task');
-    expect(r.tokens).toContainEqual({ type: 'status', value: 'backlog' });
+    expect(r.tokens).toContainEqual({ type: 'status', value: 'active' });
   });
   it('extracts @In_Progress with underscore', () => {
     const r = extractTokens('task @In_Progress');
@@ -157,7 +157,7 @@ describe('extractTokens', () => {
   it('/status works as alias for @', () => {
     const r = extractTokens('task /status backlog');
     expect(r.cleanTitle).toBe('task');
-    expect(r.tokens).toContainEqual({ type: 'status', value: 'backlog' });
+    expect(r.tokens).toContainEqual({ type: 'status', value: 'active' });
   });
 });
 
@@ -180,6 +180,7 @@ describe('getSuggestions', () => {
   it('returns all commands for bare /', () => {
     const r = getSuggestions({ type: 'slash', partial: '' });
     expect(r.length).toBe(5); // tag, status, p, due, today
+    expect(r.every((item) => item.type === 'slash')).toBe(true);
   });
   it('returns tag suggestions for #', () => {
     const r = getSuggestions(

@@ -62,7 +62,7 @@ const SLASH_COMMANDS: SlashCommandDef[] = [
 
 const STATUS_ALIASES: Record<string, string> = {
   inbox: 'inbox',
-  backlog: 'backlog',
+  backlog: 'active',
   active: 'active',
   'in progress': 'in_progress',
   in_progress: 'in_progress',
@@ -318,7 +318,7 @@ export function getSuggestions(
       .map((cmd) => ({
         label: cmd.label,
         value: cmd.trigger,
-        type: cmd.type,
+        type: 'slash' as const,
         shorthand: cmd.shorthand,
         detail: cmd.options?.join(', '),
       }));

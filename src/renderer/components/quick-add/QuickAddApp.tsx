@@ -4,7 +4,7 @@ import { Bookmark } from 'lucide-react';
 
 import type { Task } from '../../../types/models';
 import type { QuickAddWindowPayload } from '../../../types/ipc';
-import type { SuggestionItem, SuggestionData, DetectedToken } from './slashCommands';
+import type { SuggestionItem, SuggestionData } from './slashCommands';
 import { detectToken, extractTokens, getSuggestions } from './slashCommands';
 import { TokenPopover } from './TokenPopover';
 import { TokenHighlightOverlay } from './TokenHighlightOverlay';
@@ -34,6 +34,32 @@ const DEFAULT_METADATA: MetadataState = {
   status: 'inbox',
 };
 
+type TokenDerivedMetadata = {
+  priority?: MetadataState['priority'];
+  today: boolean;
+  dueDate?: string;
+  tags: string[];
+  status?: string;
+};
+
+function deriveTokenMetadata(text: string): TokenDerivedMetadata {
+  const { tokens } = extractTokens(text);
+  const derived: TokenDerivedMetadata = {
+    today: false,
+    tags: [],
+  };
+
+  for (const token of tokens) {
+    if (token.type === 'priority') derived.priority = token.value as MetadataState['priority'];
+    if (token.type === 'today') derived.today = true;
+    if (token.type === 'due') derived.dueDate = token.value;
+    if (token.type === 'tag') derived.tags.push(token.value);
+    if (token.type === 'status') derived.status = token.value;
+  }
+
+  return derived;
+}
+
 export function QuickAddApp() {
   const [title, setTitle] = useState('');
   const [metadata, setMetadata] = useState<MetadataState>(DEFAULT_METADATA);
@@ -50,9 +76,25 @@ export function QuickAddApp() {
   const priorityRef = useRef<HTMLButtonElement>(null);
   const todayRef = useRef<HTMLButtonElement>(null);
 
+  const tokenMetadata = useMemo(
+    () => deriveTokenMetadata(title),
+    [title],
+  );
+
+  const effectiveMetadata = useMemo<MetadataState>(
+    () => ({
+      priority: tokenMetadata.priority ?? metadata.priority,
+      today: tokenMetadata.today || metadata.today,
+      dueDate: tokenMetadata.dueDate ?? metadata.dueDate,
+      tags: tokenMetadata.tags,
+      status: tokenMetadata.status ?? metadata.status,
+    }),
+    [metadata, tokenMetadata],
+  );
+
   const dueDateLabel = useMemo(
-    () => (metadata.dueDate ? formatDueDateDisplay(metadata.dueDate) : null),
-    [metadata.dueDate],
+    () => (effectiveMetadata.dueDate ? formatDueDateDisplay(effectiveMetadata.dueDate) : null),
+    [effectiveMetadata.dueDate],
   );
 
   const applyTheme = useCallback((theme: 'dark' | 'light') => {
@@ -111,22 +153,8 @@ export function QuickAddApp() {
     const newValue = e.target.value;
     setTitle(newValue);
 
-    // Preview-extract tokens to update metadata row in real-time
     const { tokens: previewTokens } = extractTokens(newValue);
-    if (previewTokens.length > 0) {
-      setMetadata((prev) => {
-        const next = { ...prev };
-        for (const t of previewTokens) {
-          if (t.type === 'priority') next.priority = t.value as MetadataState['priority'];
-          if (t.type === 'today') next.today = true;
-          if (t.type === 'due') next.dueDate = t.value;
-          if (t.type === 'tag') next.tags = [...new Set([...next.tags, t.value])];
-          if (t.type === 'status') next.status = t.value;
-        }
-        return next;
-      });
-      if (!expanded) setExpanded(true);
-    }
+    if (previewTokens.length > 0 && !expanded) setExpanded(true);
 
     // Detect in-progress token for popover
     const cursorPos = e.target.selectionStart ?? newValue.length;
@@ -208,19 +236,11 @@ export function QuickAddApp() {
   }, [title]);
 
   const handleSubmit = useCallback(async () => {
-    const { cleanTitle, tokens } = extractTokens(title);
+    const { cleanTitle } = extractTokens(title);
     const trimmed = cleanTitle.trim();
     if (!trimmed || submitting) return;
 
-    // Merge extracted tokens into metadata
-    const finalMeta = { ...metadata };
-    for (const t of tokens) {
-      if (t.type === 'priority') finalMeta.priority = t.value as MetadataState['priority'];
-      if (t.type === 'today') finalMeta.today = true;
-      if (t.type === 'due') finalMeta.dueDate = t.value;
-      if (t.type === 'tag') finalMeta.tags = [...new Set([...finalMeta.tags, t.value])];
-      if (t.type === 'status') finalMeta.status = t.value;
-    }
+    const finalMeta = effectiveMetadata;
 
     setSubmitting(true);
     try {
@@ -244,7 +264,7 @@ export function QuickAddApp() {
       setSubmitting(false);
       setTimeout(() => setError(false), 600);
     }
-  }, [title, metadata, submitting, reset]);
+  }, [title, effectiveMetadata, submitting, reset]);
 
   const cyclePriority = useCallback(() => {
     setMetadata((prev) => {
@@ -345,13 +365,13 @@ export function QuickAddApp() {
                 style={{ borderColor: 'var(--foreground-muted, rgba(255,255,255,0.35))' }}
               />
             </span>
-            <span
-              className={[
-                'size-[5px] rounded-full transition-colors duration-200',
-                PRIORITY_DOT[metadata.priority],
-              ].join(' ')}
-            />
-          </div>
+                <span
+                  className={[
+                    'size-[5px] rounded-full transition-colors duration-200',
+                    PRIORITY_DOT[effectiveMetadata.priority],
+                  ].join(' ')}
+                />
+              </div>
 
           {/* Input with overlay mirror */}
           <div className="relative flex-1 min-w-0">
@@ -374,6 +394,9 @@ export function QuickAddApp() {
               value={title}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
               placeholder="Add to inbox..."
               autoFocus
               aria-autocomplete={suggestions.length > 0 ? 'list' : undefined}
@@ -394,7 +417,7 @@ export function QuickAddApp() {
                 {dueDateLabel}
               </span>
             )}
-            {metadata.today && !expanded && (
+            {effectiveMetadata.today && !expanded && (
               <span className="inline-flex h-5 items-center rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[10px] text-muted-foreground">
                 today
               </span>
@@ -445,22 +468,22 @@ export function QuickAddApp() {
                   e.preventDefault(); cyclePriority();
                 }
               }}
-              className={[SEGMENT, metadata.priority === 'none' && SEGMENT_EMPTY].filter(Boolean).join(' ')}
-              aria-label={`Priority: ${metadata.priority} — click to cycle`}
+              className={[SEGMENT, effectiveMetadata.priority === 'none' && SEGMENT_EMPTY].filter(Boolean).join(' ')}
+              aria-label={`Priority: ${effectiveMetadata.priority} — click to cycle`}
             >
-              {metadata.priority !== 'none' && (
+              {effectiveMetadata.priority !== 'none' && (
                 <span
-                  className={['mr-1 inline-block size-1.5 rounded-full', PRIORITY_DOT[metadata.priority]].join(' ')}
+                  className={['mr-1 inline-block size-1.5 rounded-full', PRIORITY_DOT[effectiveMetadata.priority]].join(' ')}
                 />
               )}
-              {PRIORITY_LABEL[metadata.priority]}
+              {PRIORITY_LABEL[effectiveMetadata.priority]}
             </button>
 
             <span aria-hidden="true" className="text-border select-none">&middot;</span>
 
             {/* Due date picker */}
             <QuickAddDueDatePicker
-              dueDate={metadata.dueDate}
+              dueDate={effectiveMetadata.dueDate}
               onChange={(next) => setMetadata((prev) => ({ ...prev, dueDate: next }))}
             />
 
@@ -475,14 +498,14 @@ export function QuickAddApp() {
               onKeyDown={(e) => {
                 if (e.key === ' ') { e.preventDefault(); toggleToday(); }
               }}
-              className={[SEGMENT, !metadata.today && SEGMENT_EMPTY].filter(Boolean).join(' ')}
-              aria-label={metadata.today ? 'Remove from today' : 'Add to today'}
-              aria-pressed={metadata.today}
+              className={[SEGMENT, !effectiveMetadata.today && SEGMENT_EMPTY].filter(Boolean).join(' ')}
+              aria-label={effectiveMetadata.today ? 'Remove from today' : 'Add to today'}
+              aria-pressed={effectiveMetadata.today}
             >
               <Bookmark
                 aria-hidden="true"
                 className="mr-0.5 size-3"
-                fill={metadata.today ? 'currentColor' : 'none'}
+                fill={effectiveMetadata.today ? 'currentColor' : 'none'}
               />
               today
             </button>

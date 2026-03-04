@@ -1,0 +1,20 @@
+---
+interface Props {
+  number: string;
+  heading: string;
+  description: string;
+  class?: string;
+}
+const { number, heading, description, class: className = 'mb-8' } = Astro.props;
+---
+
+<div class={`flex flex-col items-center text-center ${className}`}>
+  <div class="flex items-center gap-2.5">
+    <span class="font-mono text-[10px] tabular-nums text-muted-foreground/40">{number}</span>
+    <span class="h-px w-4 border-t border-dashed border-border/60"></span>
+    <h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{heading}</h2>
+  </div>
+  <p class="mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground/55">
+    {description}
+  </p>
+</div>

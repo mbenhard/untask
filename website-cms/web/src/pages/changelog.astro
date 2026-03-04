@@ -1,0 +1,552 @@
+---
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+import ChangelogPreview0110 from '../components/ChangelogPreview0110.astro';
+import ChangelogPreview0109 from '../components/ChangelogPreview0109.astro';
+import ChangelogPreview0107 from '../components/ChangelogPreview0107.astro';
+---
+
+<Base title="Changelog — Untask">
+  <main>
+    <section class="px-6 pt-24 pb-8 sm:pt-32">
+      <div class="mx-auto max-w-2xl">
+        <a href="/" class="mb-6 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/45 transition-colors hover:text-muted-foreground">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Untask
+        </a>
+        <h1 class="font-sans text-2xl font-normal tracking-tight text-foreground sm:text-3xl">
+          What's new in Untask
+        </h1>
+        <p class="mt-2 max-w-md text-[13px] leading-relaxed text-muted-foreground/60">
+          All releases, all the time.
+        </p>
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <a
+            href="https://github.com/mbenhard/untask/releases"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          >
+            GitHub Releases
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hidden preview templates (injected above matching release cards after API fetch) -->
+    <div id="changelog-previews" style="display:none">
+      <div data-preview-version="v0.1.10"><ChangelogPreview0110 /></div>
+      <div data-preview-version="v0.1.9"><ChangelogPreview0109 /></div>
+      <div data-preview-version="v0.1.7"><ChangelogPreview0107 /></div>
+    </div>
+
+    <section class="px-6 pb-24 sm:pb-32">
+      <div class="mx-auto max-w-2xl">
+
+        <div id="releases-container">
+          <div class="flex items-center justify-center gap-3 py-12">
+            <div class="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-muted-foreground"></div>
+            <span class="font-mono text-[11px] text-muted-foreground/55">Loading releases</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <Footer />
+  </main>
+</Base>
+
+<!-- Global styles for dynamically rendered release content (Astro scoped styles don't apply to JS-created DOM) -->
+<style is:global>
+  .release-card {
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .release-card:last-child {
+    border-bottom: none;
+  }
+
+  .release-body h2 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--foreground);
+    margin: 1.5rem 0 0.5rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  }
+
+  .release-body h2:first-child {
+    margin-top: 0.5rem;
+  }
+
+  .release-body h3 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--foreground);
+    margin: 1.25rem 0 0.375rem;
+  }
+
+  .release-body h3:first-child {
+    margin-top: 0.25rem;
+  }
+
+  .release-body ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.25rem 0 0.75rem;
+  }
+
+  .release-body li {
+    position: relative;
+    padding-left: 1.125rem;
+    margin: 0.375rem 0;
+    line-height: 1.65;
+  }
+
+  .release-body li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--muted-foreground);
+    opacity: 0.3;
+  }
+
+  .release-body li strong {
+    color: var(--foreground);
+  }
+
+  .release-body p {
+    margin: 0.5rem 0;
+    line-height: 1.65;
+  }
+
+  .release-body p:first-child {
+    margin-top: 0;
+  }
+
+  .release-body code {
+    background: var(--accent);
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+  }
+
+  .release-body pre {
+    background: var(--accent);
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    margin: 0.625rem 0;
+    overflow-x: auto;
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .release-body pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .release-body a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+    transition: text-decoration-color 0.15s;
+  }
+
+  .release-body a:hover {
+    text-decoration-color: var(--muted-foreground);
+  }
+</style>
+
+<script is:inline>
+  (function() {
+    var CACHE_PREFIX = 'untask-releases-p';
+    var CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+    var PER_PAGE = 10;
+    var API_URL = 'https://api.github.com/repos/mbenhard/untask/releases';
+
+    // Clear old cache keys
+    try {
+      localStorage.removeItem('untask-releases-cache');
+      localStorage.removeItem('untask-releases-cache-v2');
+      localStorage.removeItem('untask-releases-cache-v3');
+    } catch(e) {}
+
+    var currentPage = 1;
+    var totalPages = 1;
+
+    function getPageFromUrl() {
+      var params = new URLSearchParams(window.location.search);
+      var p = parseInt(params.get('page'), 10);
+      return (p && p > 0) ? p : 1;
+    }
+
+    function updateUrl(page) {
+      var url = new URL(window.location);
+      if (page === 1) {
+        url.searchParams.delete('page');
+      } else {
+        url.searchParams.set('page', page);
+      }
+      history.pushState({page: page}, '', url);
+    }
+
+    function parseLinkHeader(header) {
+      if (!header) return {};
+      var links = {};
+      header.split(',').forEach(function(part) {
+        var match = part.match(/<([^>]+)>;\s*rel="([^"]+)"/);
+        if (match) {
+          var url = new URL(match[1]);
+          links[match[2]] = parseInt(url.searchParams.get('page'), 10);
+        }
+      });
+      return links;
+    }
+
+    function formatDate(dateString) {
+      var date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    function cleanBody(body) {
+      if (!body) return '';
+      var cleaned = body.replace(/\r\n/g, '\n');
+      cleaned = cleaned.replace(/^##\s+What[''\u2019]s New[^\n]*\n*/i, '');
+      cleaned = cleaned.replace(/##\s+What[''\u2019]s Changed[\s\S]*/i, '');
+      cleaned = cleaned.replace(/\*\*Full Changelog\*\*[^\n]*/g, '');
+      cleaned = cleaned.replace(/###\s+(Install|Updating)[\s\S]*$/i, '');
+      return cleaned.trim();
+    }
+
+    function parseMarkdown(text) {
+      if (!text) return '';
+      var html = '';
+      var lines = text.replace(/\r\n/g, '\n').split('\n');
+      var inList = false;
+      var inCodeBlock = false;
+      var codeContent = '';
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+
+        if (line.match(/^```/)) {
+          if (inCodeBlock) {
+            html += '<pre><code>' + escapeHtml(codeContent.trim()) + '</code></pre>';
+            codeContent = '';
+            inCodeBlock = false;
+          } else {
+            if (inList) { html += '</ul>'; inList = false; }
+            inCodeBlock = true;
+          }
+          continue;
+        }
+        if (inCodeBlock) { codeContent += line + '\n'; continue; }
+
+        if (line.match(/^### /)) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += '<h3>' + formatInline(line.replace(/^### /, '')) + '</h3>';
+          continue;
+        }
+        if (line.match(/^## /)) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += '<h2>' + formatInline(line.replace(/^## /, '')) + '</h2>';
+          continue;
+        }
+
+        if (line.match(/^- /)) {
+          if (!inList) { html += '<ul>'; inList = true; }
+          html += '<li>' + formatInline(line.replace(/^- /, '')) + '</li>';
+          continue;
+        }
+
+        if (line.trim() === '') {
+          if (inList) { html += '</ul>'; inList = false; }
+          continue;
+        }
+
+        if (inList) { html += '</ul>'; inList = false; }
+        html += '<p>' + formatInline(line) + '</p>';
+      }
+
+      if (inList) html += '</ul>';
+      return html;
+    }
+
+    function formatInline(text) {
+      return text
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="underline underline-offset-2 decoration-muted-foreground/45 hover:decoration-muted-foreground transition-colors">$1</a>');
+    }
+
+    function escapeHtml(text) {
+      var div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function renderPagination() {
+      if (totalPages <= 1) return '';
+
+      var html = '<nav class="flex items-center justify-center gap-1 pt-8 pb-2">';
+
+      // Previous button
+      if (currentPage > 1) {
+        html += '<button data-page="' + (currentPage - 1) + '" class="pagination-btn inline-flex items-center justify-center rounded-md px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground">';
+        html += '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
+        html += '</button>';
+      }
+
+      // Page numbers
+      var pages = getPageNumbers(currentPage, totalPages);
+      for (var i = 0; i < pages.length; i++) {
+        var p = pages[i];
+        if (p === '...') {
+          html += '<span class="px-1.5 py-1.5 font-mono text-[11px] text-muted-foreground/45">...</span>';
+        } else if (p === currentPage) {
+          html += '<span class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-foreground/10 font-mono text-[11px] font-medium text-foreground">' + p + '</span>';
+        } else {
+          html += '<button data-page="' + p + '" class="pagination-btn inline-flex h-7 w-7 items-center justify-center rounded-md font-mono text-[11px] text-muted-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground">' + p + '</button>';
+        }
+      }
+
+      // Next button
+      if (currentPage < totalPages) {
+        html += '<button data-page="' + (currentPage + 1) + '" class="pagination-btn inline-flex items-center justify-center rounded-md px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground">';
+        html += '<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+        html += '</button>';
+      }
+
+      html += '</nav>';
+      return html;
+    }
+
+    function getPageNumbers(current, total) {
+      if (total <= 7) {
+        var all = [];
+        for (var i = 1; i <= total; i++) all.push(i);
+        return all;
+      }
+      var pages = [1];
+      if (current > 3) pages.push('...');
+      var start = Math.max(2, current - 1);
+      var end = Math.min(total - 1, current + 1);
+      for (var j = start; j <= end; j++) pages.push(j);
+      if (current < total - 2) pages.push('...');
+      pages.push(total);
+      return pages;
+    }
+
+    function renderReleases(releases) {
+      var container = document.getElementById('releases-container');
+      var html = '<div>';
+
+      releases.forEach(function(release, index) {
+        var version = release.tag_name;
+        var date = formatDate(release.published_at);
+        var body = cleanBody(release.body);
+        var parsedBody = parseMarkdown(body);
+        var url = release.html_url;
+        var isLatest = currentPage === 1 && index === 0;
+
+        html += '<div class="release-card">';
+
+        // Header
+        html += '<div class="flex items-center gap-3">';
+        html += '<h2 class="font-mono text-[14px] font-semibold text-foreground">' + version + '</h2>';
+        if (isLatest) {
+          html += '<span class="rounded-full border border-border/60 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">Latest</span>';
+        }
+        html += '<span class="ml-auto font-mono text-[11px] text-muted-foreground/50">' + date + '</span>';
+        html += '</div>';
+
+        // Body
+        if (parsedBody) {
+          html += '<div class="release-body mt-3 text-[13px] text-muted-foreground">' + parsedBody + '</div>';
+        }
+
+        // Footer link
+        html += '<a href="' + url + '" target="_blank" rel="noopener" class="mt-4 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/55 transition-colors hover:text-muted-foreground">';
+        html += 'View on GitHub';
+        html += '<svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>';
+        html += '</a>';
+
+        html += '</div>';
+      });
+
+      html += '</div>';
+
+      // Pagination
+      html += renderPagination();
+
+      container.innerHTML = html;
+
+      // Bind pagination clicks
+      container.querySelectorAll('.pagination-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var page = parseInt(btn.getAttribute('data-page'), 10);
+          if (page && page !== currentPage) {
+            goToPage(page);
+          }
+        });
+      });
+
+      // Move preview components above matching release cards
+      var cards = container.querySelectorAll('.release-card');
+      cards.forEach(function(card) {
+        var versionEl = card.querySelector('h2');
+        if (!versionEl) return;
+        var version = versionEl.textContent.trim();
+        var tpl = document.querySelector('#changelog-previews [data-preview-version="' + version + '"]');
+        if (tpl) {
+          tpl.style.display = '';
+          card.insertBefore(tpl, card.firstChild);
+        }
+      });
+
+      // Set up IntersectionObserver for preview auto-play/stop
+      var previews = container.querySelectorAll('[data-changelog-preview]');
+      if (previews.length > 0) {
+        var previewObserver = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            var id = entry.target.getAttribute('data-changelog-preview');
+            if (entry.isIntersecting) {
+              if (window['startPreview_' + id]) window['startPreview_' + id]();
+            } else {
+              if (window['stopPreview_' + id]) window['stopPreview_' + id]();
+            }
+          });
+        }, { threshold: 0.15 });
+        previews.forEach(function(el) { previewObserver.observe(el); });
+      }
+    }
+
+    function showLoading() {
+      var container = document.getElementById('releases-container');
+      container.innerHTML = '<div class="flex items-center justify-center gap-3 py-12">' +
+        '<div class="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-muted-foreground"></div>' +
+        '<span class="font-mono text-[11px] text-muted-foreground/55">Loading releases</span>' +
+        '</div>';
+    }
+
+    function renderError() {
+      var container = document.getElementById('releases-container');
+      container.innerHTML = '<div class="text-center py-12">' +
+        '<p class="text-muted-foreground text-[14px]">Unable to load releases.</p>' +
+        '<a href="https://github.com/mbenhard/untask/releases" target="_blank" rel="noopener" class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:border-border hover:text-foreground">' +
+        'View on GitHub' +
+        '<svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>' +
+        '</a></div>';
+    }
+
+    function getCacheKey(page) {
+      return CACHE_PREFIX + page;
+    }
+
+    function getCache(page) {
+      try {
+        var cached = localStorage.getItem(getCacheKey(page));
+        if (!cached) return null;
+        var data = JSON.parse(cached);
+        if (Date.now() - data.timestamp > CACHE_TTL) {
+          localStorage.removeItem(getCacheKey(page));
+          return null;
+        }
+        return data;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function setCache(page, releases, total) {
+      try {
+        localStorage.setItem(getCacheKey(page), JSON.stringify({
+          timestamp: Date.now(),
+          releases: releases,
+          totalPages: total
+        }));
+      } catch (e) {}
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      updateUrl(page);
+      fetchPage(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function fetchPage(page) {
+      var cached = getCache(page);
+      if (cached) {
+        totalPages = cached.totalPages;
+        renderReleases(cached.releases);
+        return;
+      }
+
+      showLoading();
+
+      fetch(API_URL + '?per_page=' + PER_PAGE + '&page=' + page)
+        .then(function(res) {
+          if (!res.ok) throw new Error('Failed to fetch');
+          var linkHeader = res.headers.get('Link');
+          var links = parseLinkHeader(linkHeader);
+          if (links.last) {
+            totalPages = links.last;
+          } else if (!links.next) {
+            // No "next" and no "last" means we're on the last (or only) page
+            totalPages = page;
+          }
+          return res.json();
+        })
+        .then(function(releases) {
+          if (releases.length === 0 && page > 1) {
+            // Went past the last page, go back to page 1
+            goToPage(1);
+            return;
+          }
+          setCache(page, releases, totalPages);
+          renderReleases(releases);
+        })
+        .catch(function(err) {
+          console.error('Failed to fetch releases:', err);
+          renderError();
+        });
+    }
+
+    // Handle browser back/forward
+    window.addEventListener('popstate', function(e) {
+      var page = (e.state && e.state.page) ? e.state.page : getPageFromUrl();
+      currentPage = page;
+      fetchPage(page);
+    });
+
+    function init() {
+      currentPage = getPageFromUrl();
+      // Replace initial state so popstate works correctly
+      history.replaceState({page: currentPage}, '', window.location);
+      fetchPage(currentPage);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+</script>
