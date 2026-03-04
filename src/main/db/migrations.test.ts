@@ -414,4 +414,52 @@ describeIfNativeSqlite('drizzle migration 0012_replace_client_with_tags', () => 
 
     sqlite.close();
   });
+
+  it('drops legacy task FTS triggers before dropping client column', () => {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = ON');
+
+    executeMigrationsUpTo(sqlite, '0011_add_soft_delete_columns.sql');
+
+    const now = new Date().toISOString();
+    sqlite
+      .prepare(
+        `INSERT INTO tasks (id, title, status, client, "order", created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run('task-with-client-and-trigger', 'Has trigger', 'active', 'Acme Corp', 0, now);
+
+    // Recreate a pre-0012 style FTS table + trigger that references NEW.client.
+    sqlite.exec(`
+      CREATE VIRTUAL TABLE tasks_fts USING fts5(
+        title,
+        body,
+        client,
+        content='tasks',
+        content_rowid='rowid'
+      );
+    `);
+    sqlite.exec(`
+      CREATE TRIGGER tasks_fts_insert AFTER INSERT ON tasks BEGIN
+        INSERT INTO tasks_fts(rowid, title, body, client)
+        SELECT NEW.rowid, COALESCE(NEW.title, ''), COALESCE(NEW.body, ''), COALESCE(NEW.client, '')
+        WHERE NEW.deleted_at IS NULL;
+      END;
+    `);
+
+    expect(() => executeMigrationFile(sqlite, 'drizzle/0012_replace_client_with_tags.sql')).not.toThrow();
+
+    const columns = sqlite
+      .prepare(`PRAGMA table_info('tasks')`)
+      .all() as Array<{ name: string }>;
+    expect(columns.some((c) => c.name === 'client')).toBe(false);
+    expect(columns.some((c) => c.name === 'tags')).toBe(true);
+
+    const triggerRows = sqlite
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'tasks_fts_%'`)
+      .all() as Array<{ name: string }>;
+    expect(triggerRows).toHaveLength(0);
+
+    sqlite.close();
+  });
 });
