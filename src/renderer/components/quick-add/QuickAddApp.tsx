@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { Bookmark } from 'lucide-react';
+
 import type { Task } from '../../../types/models';
 import type { QuickAddWindowPayload } from '../../../types/ipc';
-import type { Suggestion } from './slashCommands';
-import { detectSlashToken, extractTokens, getSuggestions } from './slashCommands';
-import { SlashPopover } from './SlashPopover';
+import type { SuggestionItem, SuggestionData, DetectedToken } from './slashCommands';
+import { detectToken, extractTokens, getSuggestions } from './slashCommands';
+import { TokenPopover } from './TokenPopover';
+import { TokenHighlightOverlay } from './TokenHighlightOverlay';
 import { formatDueDateDisplay } from '../tasks/dueDate';
 import { PRIORITY_DOT, PRIORITY_LABEL, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { QuickAddDueDatePicker } from './QuickAddDueDatePicker';
@@ -19,12 +22,16 @@ type MetadataState = {
   priority: NonNullable<Task['priority']>;
   today: boolean;
   dueDate: string | null;
+  tags: string[];
+  status: string;
 };
 
 const DEFAULT_METADATA: MetadataState = {
   priority: 'none',
   today: false,
   dueDate: null,
+  tags: [],
+  status: 'inbox',
 };
 
 export function QuickAddApp() {
@@ -34,9 +41,10 @@ export function QuickAddApp() {
   const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Slash command popover state
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  // Token popover state
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+  const [suggestionData, setSuggestionData] = useState<SuggestionData>({});
 
   const inputRef = useRef<HTMLInputElement>(null);
   const priorityRef = useRef<HTMLButtonElement>(null);
@@ -69,6 +77,14 @@ export function QuickAddApp() {
       applyTheme(payload.theme);
       setTitle(payload.text);
 
+      // Fetch autocomplete data
+      Promise.all([
+        window.quickAdd.getTags(),
+        window.quickAdd.getStatuses(),
+      ]).then(([tags, statuses]) => {
+        setSuggestionData({ tags, statuses });
+      });
+
       requestAnimationFrame(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -90,66 +106,98 @@ export function QuickAddApp() {
     window.quickAdd.resize(height);
   }, [expanded, suggestions.length]);
 
-  // Handle text changes — detect slash tokens and extract completed tokens
+  // Handle text changes — detect tokens for popover and preview metadata
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setTitle(newValue);
 
-    // Check for completed tokens (after Space key finalizes)
-    const { cleanTitle, chips: newChips } = extractTokens(newValue);
-    if (newChips.length > 0) {
-      setTitle(cleanTitle);
-      // Apply slash command values directly to metadata (no chip system)
-      for (const chip of newChips) {
-        if (chip.type === 'priority') {
-          setMetadata((prev) => ({ ...prev, priority: chip.value as MetadataState['priority'] }));
-        } else if (chip.type === 'today') {
-          setMetadata((prev) => ({ ...prev, today: true }));
-        } else if (chip.type === 'due') {
-          setMetadata((prev) => ({ ...prev, dueDate: chip.value }));
+    // Preview-extract tokens to update metadata row in real-time
+    const { tokens: previewTokens } = extractTokens(newValue);
+    if (previewTokens.length > 0) {
+      setMetadata((prev) => {
+        const next = { ...prev };
+        for (const t of previewTokens) {
+          if (t.type === 'priority') next.priority = t.value as MetadataState['priority'];
+          if (t.type === 'today') next.today = true;
+          if (t.type === 'due') next.dueDate = t.value;
+          if (t.type === 'tag') next.tags = [...new Set([...next.tags, t.value])];
+          if (t.type === 'status') next.status = t.value;
         }
-      }
-      setSuggestions([]);
-      setExpanded(true);
-      return;
+        return next;
+      });
+      if (!expanded) setExpanded(true);
     }
 
-    // Detect in-progress slash command for popover
+    // Detect in-progress token for popover
     const cursorPos = e.target.selectionStart ?? newValue.length;
-    const partial = detectSlashToken(newValue, cursorPos);
-    if (partial) {
-      const matched = getSuggestions(partial);
+    const detected = detectToken(newValue, cursorPos);
+    if (detected) {
+      const matched = getSuggestions(detected, suggestionData);
       setSuggestions(matched);
       setSelectedSuggestion(0);
     } else {
       setSuggestions([]);
     }
-  }, []);
+  }, [suggestionData, expanded]);
 
-  // Insert a slash command from the popover
-  const insertCommand = useCallback((suggestion: Suggestion) => {
-    // Remove the partial slash token from input
+  // Insert a token from the popover
+  const insertToken = useCallback((suggestion: SuggestionItem) => {
     const input = inputRef.current;
     const cursorPos = input?.selectionStart ?? title.length;
-    const beforeCursor = title.slice(0, cursorPos);
-    const slashIdx = beforeCursor.lastIndexOf('/');
+    const before = title.slice(0, cursorPos);
+    const after = title.slice(cursorPos);
 
-    if (!suggestion.command.hasValue) {
-      // Toggle command (e.g. /today) — apply immediately
-      setMetadata((prev) => ({ ...prev, today: !prev.today }));
-      const newTitle = title.slice(0, slashIdx) + title.slice(cursorPos);
-      setTitle(newTitle.trim());
-      setExpanded(true);
-    } else {
-      // Command with value — replace the partial token with the full trigger + space
-      const afterCursor = title.slice(cursorPos);
-      const newTitle = title.slice(0, slashIdx) + suggestion.command.trigger + ' ' + afterCursor;
+    // Find the start of the current token trigger
+    let triggerStart = before.length;
+    while (triggerStart > 0 && before[triggerStart - 1] !== ' ') {
+      triggerStart--;
+    }
+
+    // Handle slash command menu selection
+    if (suggestion.type === 'slash') {
+      if (suggestion.value === '/today') {
+        setMetadata((prev) => ({ ...prev, today: !prev.today }));
+        const newTitle = before.slice(0, triggerStart) + after;
+        setTitle(newTitle.trim());
+        setExpanded(true);
+      } else {
+        const newTitle = before.slice(0, triggerStart) + suggestion.value + ' ' + after;
+        setTitle(newTitle);
+        requestAnimationFrame(() => {
+          if (input) {
+            const newPos = triggerStart + suggestion.value.length + 1;
+            input.setSelectionRange(newPos, newPos);
+            input.focus();
+          }
+        });
+      }
+    } else if (suggestion.type === 'tag') {
+      const newTitle = before.slice(0, triggerStart) + '#' + suggestion.value + ' ' + after;
       setTitle(newTitle);
-
-      // Position cursor after the trigger + space
       requestAnimationFrame(() => {
         if (input) {
-          const newPos = slashIdx + suggestion.command.trigger.length + 1;
+          const newPos = triggerStart + 1 + suggestion.value.length + 1;
+          input.setSelectionRange(newPos, newPos);
+          input.focus();
+        }
+      });
+    } else if (suggestion.type === 'status') {
+      const newTitle = before.slice(0, triggerStart) + '@' + suggestion.value + ' ' + after;
+      setTitle(newTitle);
+      requestAnimationFrame(() => {
+        if (input) {
+          const newPos = triggerStart + 1 + suggestion.value.length + 1;
+          input.setSelectionRange(newPos, newPos);
+          input.focus();
+        }
+      });
+    } else if (suggestion.type === 'priority') {
+      const bangVal = suggestion.shorthand ?? `!!${suggestion.value === 'high' ? '1' : suggestion.value === 'medium' ? '2' : '3'}`;
+      const newTitle = before.slice(0, triggerStart) + bangVal + ' ' + after;
+      setTitle(newTitle);
+      requestAnimationFrame(() => {
+        if (input) {
+          const newPos = triggerStart + bangVal.length + 1;
           input.setSelectionRange(newPos, newPos);
           input.focus();
         }
@@ -160,17 +208,29 @@ export function QuickAddApp() {
   }, [title]);
 
   const handleSubmit = useCallback(async () => {
-    const trimmed = title.trim();
+    const { cleanTitle, tokens } = extractTokens(title);
+    const trimmed = cleanTitle.trim();
     if (!trimmed || submitting) return;
+
+    // Merge extracted tokens into metadata
+    const finalMeta = { ...metadata };
+    for (const t of tokens) {
+      if (t.type === 'priority') finalMeta.priority = t.value as MetadataState['priority'];
+      if (t.type === 'today') finalMeta.today = true;
+      if (t.type === 'due') finalMeta.dueDate = t.value;
+      if (t.type === 'tag') finalMeta.tags = [...new Set([...finalMeta.tags, t.value])];
+      if (t.type === 'status') finalMeta.status = t.value;
+    }
 
     setSubmitting(true);
     try {
       const result = await window.quickAdd.createTask({
         title: trimmed,
-        status: 'inbox',
-        priority: metadata.priority,
-        today: metadata.today,
-        dueDate: metadata.dueDate,
+        status: finalMeta.status,
+        priority: finalMeta.priority,
+        today: finalMeta.today,
+        dueDate: finalMeta.dueDate,
+        tags: finalMeta.tags,
       }) as { id: string } | null;
 
       if (result?.id) {
@@ -214,7 +274,7 @@ export function QuickAddApp() {
       }
       if (event.key === 'Enter' || event.key === 'Tab') {
         event.preventDefault();
-        insertCommand(suggestions[selectedSuggestion]);
+        insertToken(suggestions[selectedSuggestion]);
         return;
       }
       if (event.key === 'Escape') {
@@ -253,7 +313,7 @@ export function QuickAddApp() {
       // Wrap to last metadata field
       todayRef.current?.focus();
     }
-  }, [suggestions, selectedSuggestion, insertCommand, handleSubmit, reset, expanded]);
+  }, [suggestions, selectedSuggestion, insertToken, handleSubmit, reset, expanded]);
 
   // Global key handler for metadata row fields
   const handleMetaKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -293,23 +353,39 @@ export function QuickAddApp() {
             />
           </div>
 
-          <input
-            ref={inputRef}
-            type="text"
-            value={title}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Add to inbox..."
-            autoFocus
-            aria-autocomplete={suggestions.length > 0 ? 'list' : undefined}
-            aria-expanded={suggestions.length > 0 ? true : undefined}
-            className={[
-              'flex-1 min-w-0 bg-transparent text-foreground text-[13px]',
-              'placeholder:text-muted-foreground/50',
-              'outline-none border-none',
-              'font-sans',
-            ].join(' ')}
-          />
+          {/* Input with overlay mirror */}
+          <div className="relative flex-1 min-w-0">
+            {/* Mirror div — highlighted text */}
+            <div
+              className={[
+                'absolute inset-0 pointer-events-none',
+                'text-foreground text-[13px] font-sans',
+                'whitespace-pre overflow-hidden',
+                'flex items-center',
+              ].join(' ')}
+              aria-hidden="true"
+            >
+              <TokenHighlightOverlay text={title} />
+            </div>
+            {/* Real input — transparent text, visible caret */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={title}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Add to inbox..."
+              autoFocus
+              aria-autocomplete={suggestions.length > 0 ? 'list' : undefined}
+              aria-expanded={suggestions.length > 0 ? true : undefined}
+              className={[
+                'w-full bg-transparent text-transparent caret-[var(--foreground)] text-[13px]',
+                'placeholder:text-muted-foreground/50',
+                'outline-none border-none',
+                'font-sans',
+              ].join(' ')}
+            />
+          </div>
 
           {/* Right badges — show set metadata as compact badges */}
           <div className="ml-auto flex items-center gap-1">
@@ -340,17 +416,17 @@ export function QuickAddApp() {
           </button>
         </div>
 
-        {/* Slash command popover */}
-        <SlashPopover
+        {/* Token popover */}
+        <TokenPopover
           suggestions={suggestions}
           selectedIndex={selectedSuggestion}
-          onSelect={insertCommand}
+          onSelect={insertToken}
         />
 
         {/* Metadata row — matches InlineTaskInput design */}
         {expanded && (
           <div
-            className="flex items-center gap-1.5 px-3 pb-2.5 pt-0.5 text-[11px] font-mono text-muted-foreground border-t border-border/40 mx-1"
+            className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono text-muted-foreground border-t border-border/40 mx-1"
             onKeyDown={handleMetaKeyDown}
           >
             {/* Priority toggle */}
@@ -403,6 +479,11 @@ export function QuickAddApp() {
               aria-label={metadata.today ? 'Remove from today' : 'Add to today'}
               aria-pressed={metadata.today}
             >
+              <Bookmark
+                aria-hidden="true"
+                className="mr-0.5 size-3"
+                fill={metadata.today ? 'currentColor' : 'none'}
+              />
               today
             </button>
           </div>

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { IPC_CHANNELS, type QuickAddWindowPayload } from '../types/ipc';
+import { PREDEFINED_STATUSES } from '../types/models';
 
 export type QuickAddApi = {
   createTask: (input: Record<string, unknown>) => Promise<unknown>;
@@ -9,6 +10,8 @@ export type QuickAddApi = {
   navigateToTask: (taskId: string) => void;
   onPayload: (listener: (payload: QuickAddWindowPayload) => void) => () => void;
   getSetting: (key: string) => Promise<string | null>;
+  getTags: () => Promise<{ tag: string; count: number }[]>;
+  getStatuses: () => Promise<{ id: string; label: string }[]>;
 };
 
 const quickAddApi: QuickAddApi = {
@@ -42,6 +45,24 @@ const quickAddApi: QuickAddApi = {
 
   getSetting: (key: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),
+
+  getTags: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_TAGS),
+
+  getStatuses: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.TASK_GET_STATUSES).then(
+      (config: { enabled: string[]; order: string[] }) => {
+        return config.enabled
+          .filter((id: string) => {
+            const def = PREDEFINED_STATUSES.find((s) => s.id === id);
+            return def && !def.terminal;
+          })
+          .map((id: string) => {
+            const def = PREDEFINED_STATUSES.find((s) => s.id === id);
+            return { id, label: def?.label ?? id };
+          });
+      }
+    ),
 };
 
 contextBridge.exposeInMainWorld('quickAdd', quickAddApi);

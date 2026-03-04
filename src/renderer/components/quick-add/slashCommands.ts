@@ -1,122 +1,378 @@
 import * as chrono from 'chrono-node';
 
-export type SlashCommandType = 'priority' | 'due' | 'today';
+// ─── Types ────────────────────────────────────────────────
 
-export type SlashCommandDef = {
-  type: SlashCommandType;
-  trigger: string;
-  label: string;
-  hasValue: boolean;
-  options?: string[];
+export type TokenType = 'tag' | 'status' | 'priority' | 'due' | 'today';
+
+export type DetectedToken = {
+  type: TokenType | 'slash';  // 'slash' = user typed / for the command menu
+  partial: string;            // text after the trigger, e.g. 'per' for '#per'
 };
 
-export const SLASH_COMMANDS: SlashCommandDef[] = [
-  { type: 'priority', trigger: '/p', label: 'Priority', hasValue: true, options: ['high', 'medium', 'low', 'none'] },
-  { type: 'due', trigger: '/due', label: 'Due date', hasValue: true },
-  { type: 'today', trigger: '/today', label: 'Today', hasValue: false },
-];
-
-export type ChipToken = {
-  type: SlashCommandType;
-  label: string;
+export type ExtractedToken = {
+  type: TokenType;
   value: string;
 };
 
 export type ParsedInput = {
   cleanTitle: string;
-  chips: ChipToken[];
+  tokens: ExtractedToken[];
 };
 
-// Match a slash command token anywhere in the text.
-// Token format: /command or /command value
-// Returns the first complete token found and its position.
-const TOKEN_PATTERNS: { type: SlashCommandType; regex: RegExp; hasValue: boolean }[] = [
-  { type: 'today', regex: /\/today(?=\s|$)/, hasValue: false },
-  { type: 'priority', regex: /\/p\s+(high|medium|med|low|none)(?=\s|$)/i, hasValue: true },
-  { type: 'due', regex: /\/due\s+(.+?)(?=\s*\/|$)/, hasValue: true },
+export type HighlightRange = {
+  start: number;
+  end: number;
+  type: TokenType;
+};
+
+export type SuggestionItem = {
+  label: string;
+  value: string;
+  type: TokenType | 'slash';
+  shorthand?: string;       // symbol alias shown in / menu
+  detail?: string;          // e.g. usage count, options list
+  isCreate?: boolean;       // "Create #newtag" item
+};
+
+export type SuggestionData = {
+  tags?: { tag: string; count: number }[];
+  statuses?: { id: string; label: string }[];
+};
+
+// ─── Slash command definitions (for / menu) ───────────────
+
+type SlashCommandDef = {
+  type: TokenType;
+  trigger: string;
+  label: string;
+  shorthand?: string;
+  hasValue: boolean;
+  options?: string[];
+};
+
+const SLASH_COMMANDS: SlashCommandDef[] = [
+  { type: 'tag',      trigger: '/tag',    label: 'Tag',      shorthand: '#',  hasValue: true },
+  { type: 'status',   trigger: '/status', label: 'Status',   shorthand: '@',  hasValue: true },
+  { type: 'priority', trigger: '/p',      label: 'Priority', shorthand: '!!', hasValue: true, options: ['high', 'medium', 'low'] },
+  { type: 'due',      trigger: '/due',    label: 'Due date',                  hasValue: true },
+  { type: 'today',    trigger: '/today',  label: 'Today',                     hasValue: false },
 ];
 
-function normalizePriority(val: string): string {
+// ─── Status mapping ───────────────────────────────────────
+
+const STATUS_ALIASES: Record<string, string> = {
+  inbox: 'inbox',
+  backlog: 'backlog',
+  active: 'active',
+  'in progress': 'in_progress',
+  in_progress: 'in_progress',
+  'on hold': 'waiting',
+  on_hold: 'waiting',
+  waiting: 'waiting',
+  review: 'review',
+  someday: 'someday',
+};
+
+function resolveStatusId(raw: string): string {
+  const lower = raw.toLowerCase().replace(/_/g, '_');
+  return STATUS_ALIASES[lower] ?? lower;
+}
+
+// ─── Priority mapping ─────────────────────────────────────
+
+const BANG_PRIORITY: Record<string, string> = {
+  '1': 'high',
+  '2': 'medium',
+  '3': 'low',
+};
+
+function normalizePriority(val: string): string | null {
   const v = val.toLowerCase();
   if (v === 'med') return 'medium';
-  return v;
+  if (['high', 'medium', 'low', 'none'].includes(v)) return v;
+  return BANG_PRIORITY[v] ?? null;
 }
+
+// ─── Date parsing ─────────────────────────────────────────
 
 export function parseDate(input: string): string | null {
   const results = chrono.parse(input, new Date(), { forwardDate: true });
   if (results.length === 0) return null;
   const d = results[0].start.date();
-  // Return YYYY-MM-DD format
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
+// ─── Detection (for popover while typing) ─────────────────
+
+/**
+ * Detect if the cursor is inside a token trigger.
+ * Returns the token type and partial text, or null.
+ */
+export function detectToken(text: string, cursorPos: number): DetectedToken | null {
+  const before = text.slice(0, cursorPos);
+
+  // Walk backwards to find the start of the current word
+  let wordStart = before.length;
+  while (wordStart > 0 && before[wordStart - 1] !== ' ') {
+    wordStart--;
+  }
+  const word = before.slice(wordStart);
+
+  // !! priority
+  if (word.startsWith('!!')) {
+    const partial = word.slice(2);
+    if (partial.length <= 1 && !/\s/.test(partial)) {
+      return { type: 'priority', partial };
+    }
+    return null;
+  }
+
+  // # tag
+  if (word.startsWith('#') && word.length >= 1) {
+    return { type: 'tag', partial: word.slice(1) };
+  }
+
+  // @ status
+  if (word.startsWith('@') && word.length >= 1) {
+    return { type: 'status', partial: word.slice(1) };
+  }
+
+  // / slash command
+  if (word.startsWith('/')) {
+    // If there's a space in the word, user is typing the value — don't show command menu
+    if (word.includes(' ')) return null;
+    return { type: 'slash', partial: word.slice(1) };
+  }
+
+  return null;
+}
+
+// ─── Extraction (on submit) ──────────────────────────────
+
+const TOKEN_REGEXES: { type: TokenType; regex: RegExp; extract: (match: RegExpMatchArray) => ExtractedToken | null }[] = [
+  // /today
+  {
+    type: 'today',
+    regex: /(?<=^|\s)\/today(?=\s|$)/g,
+    extract: () => ({ type: 'today', value: 'true' }),
+  },
+  // /p <value>
+  {
+    type: 'priority',
+    regex: /(?<=^|\s)\/p\s+(high|medium|med|low|none)(?=\s|$)/gi,
+    extract: (m) => {
+      const val = normalizePriority(m[1]);
+      return val ? { type: 'priority', value: val } : null;
+    },
+  },
+  // /due <date text> — captures until next token trigger or end
+  {
+    type: 'due',
+    regex: /(?<=^|\s)\/due\s+(.+?)(?=\s*(?:\/|#|@|!!)|$)/gi,
+    extract: (m) => {
+      const parsed = parseDate(m[1].trim());
+      return parsed ? { type: 'due', value: parsed } : null;
+    },
+  },
+  // /tag <value>
+  {
+    type: 'tag',
+    regex: /(?<=^|\s)\/tag\s+(\S+)(?=\s|$)/gi,
+    extract: (m) => ({ type: 'tag', value: m[1].toLowerCase() }),
+  },
+  // /status <value>
+  {
+    type: 'status',
+    regex: /(?<=^|\s)\/status\s+(\S+)(?=\s|$)/gi,
+    extract: (m) => ({ type: 'status', value: resolveStatusId(m[1]) }),
+  },
+  // #tag
+  {
+    type: 'tag',
+    regex: /(?<=^|\s)#(\w+)(?=\s|$)/g,
+    extract: (m) => ({ type: 'tag', value: m[1].toLowerCase() }),
+  },
+  // @status
+  {
+    type: 'status',
+    regex: /(?<=^|\s)@(\w+)(?=\s|$)/g,
+    extract: (m) => ({ type: 'status', value: resolveStatusId(m[1]) }),
+  },
+  // !!N priority
+  {
+    type: 'priority',
+    regex: /(?<=^|\s)!!([1-3])(?=\s|$)/g,
+    extract: (m) => {
+      const val = BANG_PRIORITY[m[1]];
+      return val ? { type: 'priority', value: val } : null;
+    },
+  },
+];
+
 export function extractTokens(text: string): ParsedInput {
-  const chips: ChipToken[] = [];
+  const tokens: ExtractedToken[] = [];
   let remaining = text;
 
-  for (const pattern of TOKEN_PATTERNS) {
-    const match = remaining.match(pattern.regex);
-    if (!match || typeof match.index !== 'number') continue;
+  const removals: { start: number; end: number }[] = [];
 
-    const matchStart = match.index;
-    const matchEnd = matchStart + match[0].length;
-
-    if (pattern.type === 'today') {
-      chips.push({ type: 'today', label: 'Today', value: 'true' });
-      remaining = remaining.slice(0, matchStart) + remaining.slice(matchEnd);
-    } else if (pattern.type === 'priority') {
-      const val = normalizePriority(match[1]);
-      chips.push({ type: 'priority', label: `Priority: ${val}`, value: val });
-      remaining = remaining.slice(0, matchStart) + remaining.slice(matchEnd);
-    } else if (pattern.type === 'due') {
-      const rawDate = match[1].trim();
-      const parsed = parseDate(rawDate);
-      if (parsed) {
-        chips.push({ type: 'due', label: `Due: ${rawDate}`, value: parsed });
-        remaining = remaining.slice(0, matchStart) + remaining.slice(matchEnd);
+  for (const pattern of TOKEN_REGEXES) {
+    const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(remaining)) !== null) {
+      const token = pattern.extract(match);
+      if (token) {
+        removals.push({ start: match.index, end: match.index + match[0].length });
+        tokens.push(token);
       }
     }
   }
 
+  // Remove matched regions from title (in reverse order to preserve indices)
+  removals.sort((a, b) => b.start - a.start);
+  for (const { start, end } of removals) {
+    remaining = remaining.slice(0, start) + remaining.slice(end);
+  }
+
+  // Deduplicate: tags keep all unique, status/priority last wins
+  const uniqueTags = new Set<string>();
+  const deduped: ExtractedToken[] = [];
+  let lastStatus: ExtractedToken | null = null;
+  let lastPriority: ExtractedToken | null = null;
+
+  for (const t of tokens) {
+    if (t.type === 'tag') {
+      if (!uniqueTags.has(t.value)) {
+        uniqueTags.add(t.value);
+        deduped.push(t);
+      }
+    } else if (t.type === 'status') {
+      lastStatus = t;
+    } else if (t.type === 'priority') {
+      lastPriority = t;
+    } else {
+      deduped.push(t); // today, due — keep all
+    }
+  }
+  if (lastStatus) deduped.push(lastStatus);
+  if (lastPriority) deduped.push(lastPriority);
+
   return {
     cleanTitle: remaining.replace(/\s{2,}/g, ' ').trim(),
-    chips,
+    tokens: deduped,
   };
 }
 
-// Get slash command suggestions for an in-progress token.
-// Returns matching commands based on the partial input after `/`.
-export type Suggestion = {
-  command: SlashCommandDef;
-  matchText: string;
-};
+// ─── Highlight ranges (for overlay mirror) ────────────────
 
-export function getSuggestions(partialToken: string): Suggestion[] {
-  // partialToken starts with '/' e.g. '/p', '/du', '/'
-  const lower = partialToken.toLowerCase();
-  return SLASH_COMMANDS
-    .filter((cmd) => cmd.trigger.startsWith(lower) || lower === '/')
-    .map((cmd) => ({ command: cmd, matchText: cmd.trigger }));
+/**
+ * Return character ranges where tokens appear in the text.
+ * Used by the overlay mirror to render highlighted spans.
+ */
+export function highlightRanges(text: string): HighlightRange[] {
+  const ranges: HighlightRange[] = [];
+
+  const HIGHLIGHT_PATTERNS: { type: TokenType; regex: RegExp }[] = [
+    { type: 'today',    regex: /(?<=^|\s)\/today(?=\s|$)/g },
+    { type: 'priority', regex: /(?<=^|\s)\/p\s+(?:high|medium|med|low|none)(?=\s|$)/gi },
+    { type: 'due',      regex: /(?<=^|\s)\/due\s+.+?(?=\s*(?:\/|#|@|!!)|$)/gi },
+    { type: 'tag',      regex: /(?<=^|\s)\/tag\s+\S+(?=\s|$)/gi },
+    { type: 'status',   regex: /(?<=^|\s)\/status\s+\S+(?=\s|$)/gi },
+    { type: 'tag',      regex: /(?<=^|\s)#\w+(?=\s|$)/g },
+    { type: 'status',   regex: /(?<=^|\s)@\w+(?=\s|$)/g },
+    { type: 'priority', regex: /(?<=^|\s)!![1-3](?=\s|$)/g },
+  ];
+
+  for (const pattern of HIGHLIGHT_PATTERNS) {
+    const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      ranges.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type: pattern.type,
+      });
+    }
+  }
+
+  return ranges.sort((a, b) => a.start - b.start);
 }
 
-// Detect if the cursor is currently typing a slash command.
-// Returns the partial token (e.g. '/p', '/du') or null.
-export function detectSlashToken(text: string, cursorPos: number): string | null {
-  // Walk backwards from cursor to find a '/'
-  const beforeCursor = text.slice(0, cursorPos);
-  const slashIdx = beforeCursor.lastIndexOf('/');
-  if (slashIdx === -1) return null;
+// ─── Suggestions (for popover) ────────────────────────────
 
-  // Must be at start of text or preceded by whitespace
-  if (slashIdx > 0 && beforeCursor[slashIdx - 1] !== ' ') return null;
+export function getSuggestions(
+  detected: DetectedToken,
+  data?: SuggestionData,
+): SuggestionItem[] {
+  const { type, partial } = detected;
 
-  const partial = beforeCursor.slice(slashIdx);
-  // Only return if it's still a command prefix (no space means still typing command name)
-  // If there's a space, the user is typing the value — don't show command suggestions
-  if (partial.includes(' ')) return null;
+  if (type === 'slash') {
+    // Show command menu filtered by partial
+    return SLASH_COMMANDS
+      .filter((cmd) => {
+        const trigger = cmd.trigger.slice(1); // remove leading /
+        return trigger.startsWith(partial.toLowerCase()) || partial === '';
+      })
+      .map((cmd) => ({
+        label: cmd.label,
+        value: cmd.trigger,
+        type: cmd.type,
+        shorthand: cmd.shorthand,
+        detail: cmd.options?.join(', '),
+      }));
+  }
 
-  return partial;
+  if (type === 'tag') {
+    const tags = data?.tags ?? [];
+    const lower = partial.toLowerCase();
+    const matches = tags
+      .filter((t) => t.tag.startsWith(lower))
+      .map((t) => ({
+        label: t.tag,
+        value: t.tag,
+        type: 'tag' as const,
+        detail: String(t.count),
+      }));
+
+    // If no prefix matches and partial is non-empty, add "Create" option
+    if (lower && matches.length === 0) {
+      matches.push({
+        label: lower,
+        value: lower,
+        type: 'tag' as const,
+        detail: 'create',
+        isCreate: true,
+      });
+    }
+
+    return matches;
+  }
+
+  if (type === 'status') {
+    const statuses = data?.statuses ?? [];
+    const lower = partial.toLowerCase();
+    return statuses
+      .filter((s) => s.label.toLowerCase().startsWith(lower) || s.id.startsWith(lower))
+      .map((s) => ({
+        label: s.label,
+        value: s.id,
+        type: 'status' as const,
+      }));
+  }
+
+  if (type === 'priority') {
+    const options = [
+      { label: 'High', value: 'high', shorthand: '!!1' },
+      { label: 'Medium', value: 'medium', shorthand: '!!2' },
+      { label: 'Low', value: 'low', shorthand: '!!3' },
+    ];
+    if (!partial) return options.map((o) => ({ ...o, type: 'priority' as const }));
+    return options
+      .filter((o) => o.shorthand.endsWith(partial) || o.value.startsWith(partial.toLowerCase()))
+      .map((o) => ({ ...o, type: 'priority' as const }));
+  }
+
+  return [];
 }
