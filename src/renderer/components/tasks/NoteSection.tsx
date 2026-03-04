@@ -58,24 +58,25 @@ export const NoteSection = ({
   }, [isOpen]);
 
   const focusEditor = useCallback(() => {
-    // If editor is already mounted, focus immediately via rAF
-    if (editorRef.current) {
-      pendingFocusRef.current = false;
-      requestAnimationFrame(() => editorRef.current?.focus());
-      return;
-    }
-    // Editor not mounted yet — mark pending so onEditorReady picks it up,
-    // and also retry via rAF as a fallback for when onEditorReady isn't called.
     pendingFocusRef.current = true;
+    // Try focusing the editor, retrying until it mounts.
+    // Uses both editorRef (BlockNote API) and DOM query as fallback.
     const tryFocus = (attempt: number) => {
       requestAnimationFrame(() => {
-        if (!pendingFocusRef.current) return; // already handled by onEditorReady
+        if (!pendingFocusRef.current) return;
         if (editorRef.current) {
           pendingFocusRef.current = false;
           editorRef.current.focus();
           return;
         }
-        if (attempt < 6) tryFocus(attempt + 1);
+        // Fallback: find the contenteditable element directly
+        const el = containerRef.current?.querySelector<HTMLElement>('[contenteditable="true"]');
+        if (el) {
+          pendingFocusRef.current = false;
+          el.focus();
+          return;
+        }
+        if (attempt < 10) tryFocus(attempt + 1);
       });
     };
     tryFocus(0);
