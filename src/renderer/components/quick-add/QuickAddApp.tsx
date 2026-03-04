@@ -5,7 +5,7 @@ import { Bookmark } from 'lucide-react';
 import type { Task } from '../../../types/models';
 import type { QuickAddWindowPayload } from '../../../types/ipc';
 import type { SuggestionItem, SuggestionData } from './slashCommands';
-import { detectToken, extractTokens, getSuggestions } from './slashCommands';
+import { detectToken, extractTokens, getSuggestions, highlightRanges } from './slashCommands';
 import { TokenPopover } from './TokenPopover';
 import { TokenHighlightOverlay } from './TokenHighlightOverlay';
 import { formatDueDateDisplay } from '../tasks/dueDate';
@@ -153,8 +153,7 @@ export function QuickAddApp() {
     const newValue = e.target.value;
     setTitle(newValue);
 
-    const { tokens: previewTokens } = extractTokens(newValue);
-    if (previewTokens.length > 0 && !expanded) setExpanded(true);
+    if (!expanded && highlightRanges(newValue).length > 0) setExpanded(true);
 
     // Detect in-progress token for popover
     const cursorPos = e.target.selectionStart ?? newValue.length;
@@ -181,58 +180,38 @@ export function QuickAddApp() {
       triggerStart--;
     }
 
-    // Handle slash command menu selection
-    if (suggestion.type === 'slash') {
-      if (suggestion.value === '/today') {
-        setMetadata((prev) => ({ ...prev, today: !prev.today }));
-        const newTitle = before.slice(0, triggerStart) + after;
-        setTitle(newTitle.trim());
-        setExpanded(true);
-      } else {
-        const newTitle = before.slice(0, triggerStart) + suggestion.value + ' ' + after;
-        setTitle(newTitle);
-        requestAnimationFrame(() => {
-          if (input) {
-            const newPos = triggerStart + suggestion.value.length + 1;
-            input.setSelectionRange(newPos, newPos);
-            input.focus();
-          }
-        });
-      }
-    } else if (suggestion.type === 'tag') {
-      const newTitle = before.slice(0, triggerStart) + '#' + suggestion.value + ' ' + after;
-      setTitle(newTitle);
-      requestAnimationFrame(() => {
-        if (input) {
-          const newPos = triggerStart + 1 + suggestion.value.length + 1;
-          input.setSelectionRange(newPos, newPos);
-          input.focus();
-        }
-      });
-    } else if (suggestion.type === 'status') {
-      const newTitle = before.slice(0, triggerStart) + '@' + suggestion.value + ' ' + after;
-      setTitle(newTitle);
-      requestAnimationFrame(() => {
-        if (input) {
-          const newPos = triggerStart + 1 + suggestion.value.length + 1;
-          input.setSelectionRange(newPos, newPos);
-          input.focus();
-        }
-      });
-    } else if (suggestion.type === 'priority') {
-      const bangVal = suggestion.shorthand ?? `!!${suggestion.value === 'high' ? '1' : suggestion.value === 'medium' ? '2' : '3'}`;
-      const newTitle = before.slice(0, triggerStart) + bangVal + ' ' + after;
-      setTitle(newTitle);
-      requestAnimationFrame(() => {
-        if (input) {
-          const newPos = triggerStart + bangVal.length + 1;
-          input.setSelectionRange(newPos, newPos);
-          input.focus();
-        }
-      });
+    // /today is special — toggles metadata, removes trigger text
+    if (suggestion.type === 'slash' && suggestion.value === '/today') {
+      setMetadata((prev) => ({ ...prev, today: !prev.today }));
+      setTitle((before.slice(0, triggerStart) + after).trim());
+      setExpanded(true);
+      setSuggestions([]);
+      return;
     }
 
+    // Build the insert text based on token type
+    let insert: string;
+    if (suggestion.type === 'slash') {
+      insert = suggestion.value;
+    } else if (suggestion.type === 'tag') {
+      insert = '#' + suggestion.value.replace(/\s+/g, '-');
+    } else if (suggestion.type === 'status') {
+      insert = '@' + suggestion.value;
+    } else {
+      insert = '!!' + suggestion.value;
+    }
+
+    const newTitle = before.slice(0, triggerStart) + insert + ' ' + after;
+    setTitle(newTitle);
     setSuggestions([]);
+
+    requestAnimationFrame(() => {
+      if (input) {
+        const newPos = triggerStart + insert.length + 1;
+        input.setSelectionRange(newPos, newPos);
+        input.focus();
+      }
+    });
   }, [title]);
 
   const handleSubmit = useCallback(async () => {

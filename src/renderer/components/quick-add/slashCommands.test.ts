@@ -37,8 +37,14 @@ describe('detectToken', () => {
   it('detects !! at start', () => {
     expect(detectToken('!!', 2)).toEqual({ type: 'priority', partial: '' });
   });
-  it('detects !!1', () => {
-    expect(detectToken('task !!1', 8)).toEqual({ type: 'priority', partial: '1' });
+  it('returns null for completed !!1 (complete token)', () => {
+    expect(detectToken('task !!1', 8)).toBeNull();
+  });
+  it('returns null for completed !!high (complete token)', () => {
+    expect(detectToken('task !!high', 11)).toBeNull();
+  });
+  it('detects partial !!h', () => {
+    expect(detectToken('task !!h', 8)).toEqual({ type: 'priority', partial: 'h' });
   });
   it('does not detect single !', () => {
     expect(detectToken('task !x', 7)).toBeNull();
@@ -118,6 +124,21 @@ describe('extractTokens', () => {
     expect(r.cleanTitle).toBe('task');
     expect(r.tokens).toContainEqual({ type: 'priority', value: 'low' });
   });
+  it('extracts !!high as priority high', () => {
+    const r = extractTokens('task !!high');
+    expect(r.cleanTitle).toBe('task');
+    expect(r.tokens).toContainEqual({ type: 'priority', value: 'high' });
+  });
+  it('extracts !!medium as priority medium', () => {
+    const r = extractTokens('task !!medium');
+    expect(r.cleanTitle).toBe('task');
+    expect(r.tokens).toContainEqual({ type: 'priority', value: 'medium' });
+  });
+  it('extracts !!low as priority low', () => {
+    const r = extractTokens('task !!low');
+    expect(r.cleanTitle).toBe('task');
+    expect(r.tokens).toContainEqual({ type: 'priority', value: 'low' });
+  });
   it('does not extract !!4 (invalid)', () => {
     const r = extractTokens('task !!4');
     expect(r.cleanTitle).toBe('task !!4');
@@ -173,6 +194,18 @@ describe('highlightRanges', () => {
   });
   it('returns empty array for plain text', () => {
     expect(highlightRanges('just text')).toEqual([]);
+  });
+  it('highlights !!high word form', () => {
+    const ranges = highlightRanges('task !!high');
+    expect(ranges).toContainEqual(
+      expect.objectContaining({ start: 5, end: 11, type: 'priority' })
+    );
+  });
+  it('highlights #hyphenated-tag', () => {
+    const ranges = highlightRanges('task #my-tag');
+    expect(ranges).toContainEqual(
+      expect.objectContaining({ start: 5, end: 12, type: 'tag' })
+    );
   });
 });
 

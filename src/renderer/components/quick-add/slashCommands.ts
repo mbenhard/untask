@@ -121,10 +121,12 @@ export function detectToken(text: string, cursorPos: number): DetectedToken | nu
   }
   const word = before.slice(wordStart);
 
-  // !! priority
+  // !! priority — show popover for partial input, not for completed tokens
   if (word.startsWith('!!')) {
     const partial = word.slice(2);
-    if (partial.length <= 1 && !/\s/.test(partial)) {
+    const COMPLETE = ['1', '2', '3', 'high', 'medium', 'med', 'low'];
+    if (COMPLETE.includes(partial.toLowerCase())) return null;
+    if (partial.length <= 6 && !/\s/.test(partial)) {
       return { type: 'priority', partial };
     }
     return null;
@@ -189,11 +191,11 @@ const TOKEN_REGEXES: { type: TokenType; regex: RegExp; extract: (match: RegExpMa
     regex: /(?<=^|\s)\/status\s+(\S+)(?=\s|$)/gi,
     extract: (m) => ({ type: 'status', value: resolveStatusId(m[1]) }),
   },
-  // #tag
+  // #tag (supports hyphens for multi-word tags like #franko-pizza)
   {
     type: 'tag',
-    regex: /(?<=^|\s)#(\w+)(?=\s|$)/g,
-    extract: (m) => ({ type: 'tag', value: m[1].toLowerCase() }),
+    regex: /(?<=^|\s)#([\w][\w-]*)(?=\s|$)/g,
+    extract: (m) => ({ type: 'tag', value: m[1].replace(/-/g, ' ').toLowerCase() }),
   },
   // @status
   {
@@ -201,12 +203,12 @@ const TOKEN_REGEXES: { type: TokenType; regex: RegExp; extract: (match: RegExpMa
     regex: /(?<=^|\s)@(\w+)(?=\s|$)/g,
     extract: (m) => ({ type: 'status', value: resolveStatusId(m[1]) }),
   },
-  // !!N priority
+  // !!N or !!word priority
   {
     type: 'priority',
-    regex: /(?<=^|\s)!!([1-3])(?=\s|$)/g,
+    regex: /(?<=^|\s)!!([1-3]|high|medium|med|low)(?=\s|$)/gi,
     extract: (m) => {
-      const val = BANG_PRIORITY[m[1]];
+      const val = normalizePriority(m[1]);
       return val ? { type: 'priority', value: val } : null;
     },
   },
@@ -280,9 +282,9 @@ export function highlightRanges(text: string): HighlightRange[] {
     { type: 'due',      regex: /(?<=^|\s)\/due\s+.+?(?=\s*(?:\/|#|@|!!)|$)/gi },
     { type: 'tag',      regex: /(?<=^|\s)\/tag\s+\S+(?=\s|$)/gi },
     { type: 'status',   regex: /(?<=^|\s)\/status\s+\S+(?=\s|$)/gi },
-    { type: 'tag',      regex: /(?<=^|\s)#\w+(?=\s|$)/g },
+    { type: 'tag',      regex: /(?<=^|\s)#[\w][\w-]*(?=\s|$)/g },
     { type: 'status',   regex: /(?<=^|\s)@\w+(?=\s|$)/g },
-    { type: 'priority', regex: /(?<=^|\s)!![1-3](?=\s|$)/g },
+    { type: 'priority', regex: /(?<=^|\s)!!(?:[1-3]|high|medium|med|low)(?=\s|$)/gi },
   ];
 
   for (const pattern of HIGHLIGHT_PATTERNS) {
@@ -368,9 +370,10 @@ export function getSuggestions(
       { label: 'Medium', value: 'medium', shorthand: '!!2' },
       { label: 'Low', value: 'low', shorthand: '!!3' },
     ];
-    if (!partial) return options.map((o) => ({ ...o, type: 'priority' as const }));
+    const lower = partial.toLowerCase();
+    if (!lower) return options.map((o) => ({ ...o, type: 'priority' as const }));
     return options
-      .filter((o) => o.shorthand.endsWith(partial) || o.value.startsWith(partial.toLowerCase()))
+      .filter((o) => o.shorthand.endsWith(lower) || o.value.startsWith(lower))
       .map((o) => ({ ...o, type: 'priority' as const }));
   }
 

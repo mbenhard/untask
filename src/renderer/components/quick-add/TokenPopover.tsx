@@ -48,42 +48,21 @@ export function TokenPopover({ suggestions, selectedIndex, onSelect }: Props) {
                 : 'text-muted-foreground hover:bg-accent/50',
             ].join(' ')}
           >
-            {/* Slash menu: show trigger + label + shorthand */}
-            {s.type === 'slash' || (s.shorthand && !s.isCreate) ? (
-              <>
-                <span className="font-mono text-[11px] text-muted-foreground/70 w-16">
-                  {s.value}
-                </span>
-                <span>{s.label}</span>
-                {s.shorthand && (
-                  <span className="ml-auto font-mono text-[11px] text-muted-foreground/50">
-                    {s.shorthand}
-                  </span>
-                )}
-                {s.detail && !s.shorthand && (
-                  <span className="ml-auto text-[10px] text-muted-foreground/50">
-                    {s.detail}
-                  </span>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Tag/Status/Priority items */}
-                {s.isCreate && (
-                  <span className="text-[11px] text-muted-foreground/50">Create</span>
-                )}
-                <span>{s.label}</span>
-                {s.detail && !s.isCreate && (
-                  <span className="ml-auto text-[10px] text-muted-foreground/50">
-                    {s.detail}
-                  </span>
-                )}
-                {s.shorthand && (
-                  <span className="ml-auto font-mono text-[11px] text-muted-foreground/50">
-                    {s.shorthand}
-                  </span>
-                )}
-              </>
+            <span className="flex-1 truncate">
+              {s.isCreate && (
+                <span className="text-muted-foreground/50 mr-1">Create</span>
+              )}
+              {s.label}
+            </span>
+            {s.shorthand && (
+              <span className="font-mono text-[11px] text-muted-foreground/40 shrink-0">
+                {s.shorthand}
+              </span>
+            )}
+            {s.detail && !s.shorthand && (
+              <span className="text-[11px] text-muted-foreground/40 shrink-0">
+                {s.detail}
+              </span>
             )}
           </li>
         ))}
