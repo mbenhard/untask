@@ -329,7 +329,7 @@ export function getSuggestions(
   if (type === 'tag') {
     const tags = data?.tags ?? [];
     const lower = partial.toLowerCase();
-    const matches = tags
+    const matches: SuggestionItem[] = tags
       .filter((t) => t.tag.startsWith(lower))
       .map((t) => ({
         label: t.tag,
