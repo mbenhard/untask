@@ -24,6 +24,54 @@ import { SETTING_KEY_TASKS_AUTO_CLEAN_DAYS } from '../defaultSettings';
 import { getMainWindow } from '../window/summonController';
 import { IPC_CHANNELS } from '../../types/ipc';
 
+// ─── Tags serialization ─────────────────────────────────────
+// DB stores tags as a JSON-encoded TEXT column (e.g. '["work","acme"]').
+// Runtime code expects string[]. These helpers bridge the gap.
+
+const normalizeTag = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.replace(/,/g, '').trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const normalizeTags = (values: unknown[]): string[] => {
+  const deduped = new Set<string>();
+  for (const value of values) {
+    const normalized = normalizeTag(value);
+    if (normalized) {
+      deduped.add(normalized);
+    }
+  }
+  return [...deduped];
+};
+
+const parseTags = (raw: unknown): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return normalizeTags(raw);
+  if (typeof raw !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? normalizeTags(parsed) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Convert a raw DB task row (tags as JSON string) into the runtime shape (tags as string[]). */
+const hydrateTask = <T extends { tags: unknown }>(row: T): T => ({
+  ...row,
+  tags: parseTags(row.tags as string | null),
+});
+
+const hydrateTasks = <T extends { tags: unknown }>(rows: T[]): T[] => rows.map(hydrateTask);
+
+/** Normalize and serialize tags for DB write. */
+const serializeTags = (tags: string[] | undefined): string | undefined =>
+  tags !== undefined ? JSON.stringify(parseTags(tags)) : undefined;
+
 // ─── Validation schemas ─────────────────────────────────────
 export const createTaskSchema = z.object({
   title: z.string().min(1),
@@ -32,7 +80,7 @@ export const createTaskSchema = z.object({
   status: z.enum(TASK_STATUS_VALUES).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
   today: z.boolean().optional(),
-  client: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
   dueDate: z.string().nullable().optional(),
   dueType: z.enum(['hard', 'soft']).nullable().optional(),
   recurrence: z.string().nullable().optional(),
@@ -399,7 +447,7 @@ export function listTasks(filter?: {
   parentId?: string | null;
   today?: boolean;
   priority?: 'none' | 'low' | 'medium' | 'high';
-  client?: string;
+  tag?: string;
   search?: string;
   limit?: number;
 }): Task[] {
@@ -422,10 +470,12 @@ export function listTasks(filter?: {
   if (filter?.priority) {
     conditions.push(eq(tasks.priority, filter.priority));
   }
-  if (filter?.client) {
-    const normalizedClient = filter.client.trim().toLowerCase();
-    if (normalizedClient.length > 0) {
-      conditions.push(sql`lower(${tasks.client}) LIKE ${`%${normalizedClient}%`}`);
+  if (filter?.tag) {
+    const normalizedTag = filter.tag.trim().toLowerCase();
+    if (normalizedTag.length > 0) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM json_each(${tasks.tags}) WHERE lower(CAST(value AS TEXT)) LIKE ${`%${normalizedTag}%`})`,
+      );
     }
   }
   if (filter?.search) {
@@ -445,7 +495,7 @@ export function listTasks(filter?: {
     ? query.limit(filter.limit)
     : query;
 
-  return limitedQuery.all();
+  return hydrateTasks(limitedQuery.all());
 }
 
 /**
@@ -537,13 +587,13 @@ export function getTaskById(id: string): Task | null {
     .from(tasks)
     .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
     .all();
-  return row ?? null;
+  return row ? hydrateTask(row) : null;
 }
 
 const getTaskByIdIncludeDeleted = (id: string): Task | null => {
   const db = getDb();
   const [row] = db.select().from(tasks).where(eq(tasks.id, id)).all();
-  return row ?? null;
+  return row ? hydrateTask(row) : null;
 };
 
 export function getLastTaskEventForTask(taskId: string): TaskEvent | null {
@@ -916,16 +966,17 @@ export function createTask(
     }
   }
 
+  const dbValues = { ...validated, tags: serializeTags(validated.tags) };
   const [created] = db
     .insert(tasks)
-    .values(validated as NewTask)
+    .values(dbValues as NewTask)
     .returning()
     .all();
 
   logTaskEvent(created.id, 'create', source, null, created);
 
   emitTaskChange({ taskId: created.id, action: 'create' });
-  return created;
+  return hydrateTask(created);
 }
 
 export function updateTask(
@@ -968,16 +1019,17 @@ export function updateTask(
 
   }
 
+  const dbUpdates = { ...updates, tags: serializeTags(updates.tags) };
   const [updated] = db
     .update(tasks)
-    .set(updates)
+    .set(dbUpdates)
     .where(eq(tasks.id, id))
     .returning()
     .all();
 
   logTaskEvent(id, 'update', source, before, updated);
   emitTaskChange({ taskId: id, action: 'update' });
-  return updated;
+  return hydrateTask(updated);
 }
 
 const deleteTaskRecursive = (
@@ -1135,7 +1187,7 @@ export function completeTask(
   const recurredTask = spawnRecurringInstance(completed, source);
 
   emitTaskChange({ taskId: id, action: 'complete' });
-  return { completed, recurredTask };
+  return { completed: hydrateTask(completed), recurredTask };
 }
 
 function spawnRecurringInstance(
@@ -1156,7 +1208,7 @@ function spawnRecurringInstance(
       body: completedTask.body,
       status: 'inbox',
       priority: completedTask.priority ?? undefined,
-      client: completedTask.client,
+      tags: parseTags(completedTask.tags as unknown as string),
       dueDate: next.nextDate,
       recurrence: completedTask.recurrence,
       recurrenceSourceId: sourceId,
@@ -1185,7 +1237,7 @@ export function toggleToday(id: string, source: TaskEventSource = 'user'): Task 
 
   logTaskEvent(id, 'update', source, before, updated);
   emitTaskChange({ taskId: id, action: 'update' });
-  return updated;
+  return hydrateTask(updated);
 }
 
 // ─── Cancel / Reopen ────────────────────────────────────────
@@ -1211,7 +1263,7 @@ export function cancelTask(
 
   logTaskEvent(id, 'cancel', source, before, updated);
   emitTaskChange({ taskId: id, action: 'cancel' });
-  return updated;
+  return hydrateTask(updated);
 }
 
 export function reopenTask(
@@ -1240,7 +1292,7 @@ export function reopenTask(
 
   logTaskEvent(id, 'update', source, before, updated);
   emitTaskChange({ taskId: id, action: 'reopen' });
-  return updated;
+  return hydrateTask(updated);
 }
 
 // ─── Task status config ─────────────────────────────────────
@@ -1334,4 +1386,32 @@ export function reorderTasks(
   if (validatedIds.length > 0) {
     emitTaskChange({ taskId: validatedIds[0], action: 'update' });
   }
+}
+
+// ─── Tag suggestions ────────────────────────────────────────
+
+export type TagWithCount = { tag: string; count: number };
+
+/**
+ * Collect all unique tags across non-deleted tasks, with usage counts.
+ * Returns sorted by count descending, then alphabetically.
+ */
+export function getTagsWithCount(): TagWithCount[] {
+  const db = getDb();
+  const rows = db
+    .select({ tags: tasks.tags })
+    .from(tasks)
+    .where(isNull(tasks.deletedAt))
+    .all();
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    for (const tag of parseTags(row.tags as string | null)) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }

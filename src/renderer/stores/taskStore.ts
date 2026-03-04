@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import type { Task } from '../../types/models';
 import { toErrorMessage } from '../lib/errors';
+import { invalidateTagSuggestionsCache } from '../lib/tagSuggestionsCache';
 import { getUntask } from '../lib/untask';
 import { useToastStore } from './toastStore';
 
@@ -15,7 +16,7 @@ export type TaskCreateInput = {
   status?: Task['status'];
   priority?: Task['priority'];
   today?: boolean;
-  client?: string | null;
+  tags?: string[];
   dueDate?: string | null;
   recurrence?: string | null;
   reminderOffset?: ReminderOffset | null;
@@ -32,7 +33,7 @@ export type TaskUpdateInput = {
   status?: Task['status'];
   priority?: Task['priority'];
   today?: boolean;
-  client?: string | null;
+  tags?: string[];
   dueDate?: string | null;
   recurrence?: string | null;
   reminderOffset?: ReminderOffset | null;
@@ -283,7 +284,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       status: input.status ?? 'inbox',
       priority: input.priority ?? 'none',
       today: input.today ?? false,
-      client: input.client ?? null,
+      tags: input.tags ?? [],
       dueDate: input.dueDate ?? null,
       dueType: input.dueType ?? null,
       recurrence: input.recurrence ?? null,
@@ -308,6 +309,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set((s) => ({
         tasks: replaceTaskAndSort(s.tasks, tempId, created),
       }));
+      invalidateTagSuggestionsCache();
       return created;
     } catch (e) {
       // Rollback: remove temp task
@@ -342,6 +344,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       set((s) => ({
         tasks: replaceTaskAndSort(s.tasks, id, updated),
       }));
+      invalidateTagSuggestionsCache();
       return updated;
     } catch (e) {
       // Rollback to previous state

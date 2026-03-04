@@ -14,6 +14,7 @@ import {
   updateTask,
   updateTaskSchema,
 } from '../../services/taskService';
+import { getAttachmentsByTaskId, getAttachmentCountsByTaskIds } from '../../services/attachmentService';
 import { TERMINAL_STATUSES, type PredefinedStatusId } from '../../../types/models';
 import type { ChatViewIntent } from '../../../types/chat';
 import type { ToolRegistryEntry, ToolExecutionContext, ToolExecutionEnvelope } from './types';
@@ -22,6 +23,19 @@ import { isPostMutationVerifyEnabled } from '../runtimeFlags';
 import { logRuntimeDiagnostic } from '../runtimeDiagnostics';
 
 const summarizeTask = (task: { title: string }): string => task.title;
+
+const normalizeTag = (raw: string): string => raw.replace(/,/g, '').trim().toLowerCase();
+
+const normalizeTags = (tags: string[]): string[] => {
+  const deduped = new Set<string>();
+  for (const tag of tags) {
+    const normalized = normalizeTag(tag);
+    if (normalized.length > 0) {
+      deduped.add(normalized);
+    }
+  }
+  return [...deduped];
+};
 
 const resolveTaskLensViewIntent = (task: {
   today?: boolean | null;
@@ -52,6 +66,11 @@ const verificationError = (toolName: string, reason: string, message: string): T
 
 export const createTaskToolInputSchema = createTaskSchema.strict();
 
+export const updateTaskToolInputSchema = updateTaskSchema.extend({
+  add_tags: z.array(z.string()).optional(),
+  remove_tags: z.array(z.string()).optional(),
+}).strict();
+
 export const completeTaskToolInputSchema = z.object({
   id: z.string().min(1),
   completeChildren: z.boolean().optional(),
@@ -71,7 +90,7 @@ export const listTasksToolInputSchema = z.object({
   status: z.enum(TASK_STATUS_VALUES).optional(),
   includeTerminal: z.boolean().optional(),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
-  client: z.string().optional(),
+  tag: z.string().optional().describe('Filter tasks containing this tag (case-insensitive partial match).'),
   today: z.boolean().optional(),
   search: z.string().optional(),
   limit: z.number().int().min(1).max(50).default(20),
@@ -81,7 +100,7 @@ export const listTasksToolInputSchema = z.object({
 
 export const createTaskTool = {
   name: 'create_task',
-  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Always set priority — don\'t leave it as none. High: due today/tomorrow, money/client commitments, user said urgent/ASAP. Medium: due this week, meaningful but not time-critical. Low: no deadline, nice-to-have. If unsure, default to medium. Optional: dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), client, parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks"). To create subtasks, first create the parent task, then use its returned ID as parentId. Never use placeholder IDs.',
+  description: 'Create a new task. Use when the user asks to add, create, or capture a task, todo, or action item. Title must be concrete and actionable (e.g., "Call Acme about invoice"). If the request is vague, ask for clarification instead. Always set priority — don\'t leave it as none. High: due today/tomorrow, urgent commitments, user said urgent/ASAP. Medium: due this week, meaningful but not time-critical. Low: no deadline, nice-to-have. If unsure, default to medium. Optional: dueDate (date "2026-02-17" or date+time "2026-02-17T14:30"), tags (string array for categorization), parentId, status, recurrence (e.g., "daily", "weekly", "monthly", "every monday", "every 2 weeks"). To create subtasks, first create the parent task, then use its returned ID as parentId. Never use placeholder IDs.',
   schema: createTaskToolInputSchema,
   execute: async (input: z.infer<typeof createTaskToolInputSchema>, context: ToolExecutionContext): Promise<ToolExecutionEnvelope> => {
     const createdTask = createTask(input, 'ai');
@@ -105,9 +124,9 @@ export const createTaskTool = {
 
 export const updateTaskTool = {
   name: 'update_task',
-  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, client, notes, or recurrence. Requires the task id. dueDate supports date "2026-02-17" or date+time "2026-02-17T14:30". recurrence accepts rules like "daily", "weekly", "monthly", "every monday", "every 2 weeks". Set recurrence to null to remove. High-risk changes (rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
-  schema: updateTaskSchema.strict(),
-  execute: async (input: z.infer<ReturnType<typeof updateTaskSchema.strict>>, context: ToolExecutionContext): Promise<ToolExecutionEnvelope> => {
+  description: 'Update an existing task. Use when the user wants to change a task title, priority, due date, status, tags, notes, or recurrence. Requires the task id. dueDate supports date "2026-02-17" or date+time "2026-02-17T14:30". recurrence accepts rules like "daily", "weekly", "monthly", "every monday", "every 2 weeks". Set recurrence to null to remove. tags is a string array — provide the full array to replace all tags. Convenience options: add_tags/remove_tags to mutate tags without replacing the full list. High-risk changes (rewriting completed tasks) trigger confirmation. Provide only the fields that need changing.',
+  schema: updateTaskToolInputSchema,
+  execute: async (input: z.infer<typeof updateTaskToolInputSchema>, context: ToolExecutionContext): Promise<ToolExecutionEnvelope> => {
     const before = getTaskById(input.id);
 
     if (!before) {
@@ -126,7 +145,30 @@ export const updateTaskTool = {
       }
     }
 
-    const updatedTask = updateTask(input, 'ai');
+    const { add_tags, remove_tags, ...updates } = input;
+
+    if (updates.tags) {
+      updates.tags = normalizeTags(updates.tags);
+    }
+
+    if (add_tags || remove_tags) {
+      const next = new Set<string>(updates.tags ?? before.tags ?? []);
+      for (const tag of add_tags ?? []) {
+        const normalized = normalizeTag(tag);
+        if (normalized.length > 0) {
+          next.add(normalized);
+        }
+      }
+      for (const tag of remove_tags ?? []) {
+        const normalized = normalizeTag(tag);
+        if (normalized.length > 0) {
+          next.delete(normalized);
+        }
+      }
+      updates.tags = [...next];
+    }
+
+    const updatedTask = updateTask(updates, 'ai');
     const event = getLastTaskEventForTask(updatedTask.id);
 
     if (postVerifyEnabled() && Object.prototype.hasOwnProperty.call(input, 'parentId')) {
@@ -157,7 +199,7 @@ export const updateTaskTool = {
       },
     );
   },
-} satisfies ToolRegistryEntry<'update_task', ReturnType<typeof updateTaskSchema.strict>>;
+} satisfies ToolRegistryEntry<'update_task', typeof updateTaskToolInputSchema>;
 
 export const completeTaskTool = {
   name: 'complete_task',
@@ -382,7 +424,7 @@ export const undoLastActionTool = {
 
 export const listTasksTool = {
   name: 'list_tasks',
-  description: 'Search and filter the full task list, or retrieve a single task by ID. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Pass id to look up one task. Accepts optional filters: status, includeTerminal, priority, client (case-insensitive partial match), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
+  description: 'Search and filter the full task list, or retrieve a single task by ID. Use when you need to find a task beyond the top-15 visible in context, or when resolving a user\'s natural-language reference to a task ID. Pass id to look up one task. Accepts optional filters: status, includeTerminal, priority, tag (case-insensitive partial match on any tag), today, search (case-insensitive title substring), limit (default 20). Returns array of task summaries with IDs.',
   schema: listTasksToolInputSchema,
   execute: async (input: z.infer<typeof listTasksToolInputSchema>): Promise<ToolExecutionEnvelope> => {
     // Single-task lookup by ID (absorbs get_task)
@@ -393,6 +435,12 @@ export const listTasksTool = {
       }
 
       const children = listTasks({ parentId: task.id });
+      const taskAttachments = getAttachmentsByTaskId(task.id).map((att) => ({
+        id: att.id,
+        originalName: att.originalName,
+        mimeType: att.mimeType,
+        size: att.size,
+      }));
 
       return {
         status: 'success',
@@ -403,13 +451,14 @@ export const listTasksTool = {
             title: task.title,
             status: task.status,
             priority: task.priority,
-            client: task.client,
+            tags: task.tags,
             dueDate: task.dueDate,
             today: task.today,
             parentId: task.parentId,
             body: task.body,
             recurrence: task.recurrence,
             childCount: children.length,
+            attachments: taskAttachments,
           }],
         },
       };
@@ -418,7 +467,7 @@ export const listTasksTool = {
     const results = listTasks({
       status: input.status,
       priority: input.priority,
-      client: input.client,
+      tag: input.tag,
       today: input.today,
       search: input.search,
       limit: input.limit,
@@ -432,15 +481,19 @@ export const listTasksTool = {
       )
       : results;
 
+    const taskIds = filteredResults.map((t) => t.id);
+    const attachmentCounts = getAttachmentCountsByTaskIds(taskIds);
+
     const taskSummaries = filteredResults.map((task) => ({
       id: task.id,
       title: task.title,
       status: task.status,
       priority: task.priority,
-      client: task.client,
+      tags: task.tags,
       dueDate: task.dueDate,
       today: task.today,
       parentId: task.parentId,
+      attachmentCount: attachmentCounts.get(task.id) ?? 0,
     }));
 
     return {

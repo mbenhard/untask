@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { BlockNoteEditor } from '@blocknote/core';
 import { Paperclip } from 'lucide-react';
 
 import type { Task, PredefinedStatusId } from '../../../types/models';
 import { PREDEFINED_STATUSES } from '../../../types/models';
+import type { AttachmentRecord } from '../../../types/ipc';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../lib/utils';
 import { getUntask } from '../../lib/untask';
-import { useAutoSaveBody } from '../../hooks/useAutoSaveBody';
+import {
+  type TagSuggestion,
+  getTagSuggestions,
+  invalidateTagSuggestionsCache,
+} from '../../lib/tagSuggestionsCache';
 import { useFlashHighlight } from '../../hooks/useFlashHighlight';
 import { PRIORITY_DOT as SHARED_PRIORITY_DOT, SEGMENT, SEGMENT_EMPTY } from '../../lib/taskConstants';
 import { useAppStore } from '../../stores/appStore';
@@ -22,7 +26,9 @@ import {
 import { Popover, PopoverContent } from '../ui';
 import { TaskDueDatePicker } from './TaskDueDatePicker';
 import { getNextPriority } from './taskInteraction';
-import { BlockEditor, type BlockEditorSlashMenuItem, type BlockEditorSlashMenuParams } from '../editor/BlockEditor';
+
+import { AttachmentList } from './AttachmentList';
+import { NoteSection } from './NoteSection';
 
 // ─── Types & Constants ──────────────────────────────────────
 
@@ -53,15 +59,6 @@ const PRIORITY_LABEL: Record<NonNullable<Task['priority']>, string> = {
   medium: 'Med',
   high: 'High',
 };
-
-const UNSUPPORTED_MEDIA_ITEMS = new Set(['Video', 'Audio']);
-
-export const getAttachmentSlashMenuItems = (
-  { defaultItems }: BlockEditorSlashMenuParams,
-): BlockEditorSlashMenuItem[] =>
-  defaultItems.filter(
-    (item) => !UNSUPPORTED_MEDIA_ITEMS.has(item.title),
-  );
 
 // ─── Dot Separator ──────────────────────────────────────────
 
@@ -156,76 +153,175 @@ export const DueDateSegment = ({
   );
 };
 
-// ─── Client Segment ─────────────────────────────────────────
+// ─── Tags Segment ──────────────────────────────────────────
 
-export const ClientSegment = ({
+const normalizeTag = (raw: string): string =>
+  raw.replace(/,/g, '').trim().toLowerCase();
+
+export const TagsSegment = ({
   task,
   onUpdate,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(task.client ?? '');
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const tags = task.tags ?? [];
+  const isEmpty = tags.length === 0;
 
   useEffect(() => {
-    setDraft(task.client ?? '');
-  }, [task.client]);
+    if (open) {
+      void getTagSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
+    }
+  }, [open]);
 
-  const isEmpty = !task.client;
+  const filteredSuggestions = draft.trim()
+    ? suggestions
+        .filter((s) => s.tag.includes(draft.trim().toLowerCase()) && !tags.includes(s.tag))
+        .slice(0, 6)
+    : [];
 
-  if (isEditing) {
-    return (
-      <input
-        autoFocus
-        type="text"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            void onUpdate({ id: task.id, client: draft.trim() || null });
-            setIsEditing(false);
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            setDraft(task.client ?? '');
-            setIsEditing(false);
-          }
-        }}
-        onBlur={() => {
-          void onUpdate({ id: task.id, client: draft.trim() || null });
-          setIsEditing(false);
-        }}
-        onClick={(e) => e.stopPropagation()}
-        placeholder="Client"
-        className="min-w-[60px] max-w-[140px] bg-transparent text-[11px] font-mono text-foreground outline-none"
-        style={{
-          width: `${Math.max(60, Math.min(140, draft.length * 7 + 16))}px`,
-        }}
-        aria-label="Client"
-      />
-    );
-  }
+  const addTag = (raw: string) => {
+    const normalized = normalizeTag(raw);
+    if (!normalized || tags.includes(normalized)) {
+      setDraft('');
+      return;
+    }
+    const next = [...tags, normalized];
+    void onUpdate({ id: task.id, tags: next })
+      .then((updated) => {
+        if (updated) {
+          invalidateTagSuggestionsCache();
+        }
+      })
+      .catch(() => {});
+    setDraft('');
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const removeTag = (tag: string) => {
+    const next = tags.filter((t) => t !== tag);
+    void onUpdate({ id: task.id, tags: next })
+      .then((updated) => {
+        if (updated) {
+          invalidateTagSuggestionsCache();
+        }
+      })
+      .catch(() => {});
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (selectedSuggestionIndex >= 0 && filteredSuggestions[selectedSuggestionIndex]) {
+        addTag(filteredSuggestions[selectedSuggestionIndex].tag);
+      } else if (draft.trim()) {
+        addTag(draft);
+      }
+    } else if (e.key === 'Backspace' && !draft && tags.length > 0) {
+      removeTag(tags[tags.length - 1]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex((i) =>
+        i < filteredSuggestions.length - 1 ? i + 1 : i,
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex((i) => (i > 0 ? i - 1 : -1));
+    }
+  };
+
+  const displayLabel = isEmpty
+    ? '+ tag'
+    : tags.length === 1
+      ? tags[0]
+      : `${tags[0]} +${tags.length - 1}`;
 
   return (
-    <button
-      type="button"
-      tabIndex={0}
-      onClick={(e) => {
-        e.stopPropagation();
-        setIsEditing(true);
-      }}
-      className={cn(
-        SEGMENT,
-        isEmpty && SEGMENT_EMPTY,
-        !isEmpty && 'max-w-[140px] truncate',
-      )}
-      aria-label={isEmpty ? 'Add client' : 'Edit client'}
-    >
-      {isEmpty ? '+ client' : task.client}
-    </button>
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          tabIndex={0}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={cn(
+            SEGMENT,
+            isEmpty && SEGMENT_EMPTY,
+            !isEmpty && 'max-w-[140px] truncate',
+          )}
+          aria-label={isEmpty ? 'Add tag' : `Tags: ${tags.join(', ')}`}
+        >
+          {displayLabel}
+        </button>
+      </Popover.Trigger>
+      <PopoverContent
+        className="w-auto min-w-[180px] max-w-[280px] p-2"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        {tags.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-mono text-foreground"
+              >
+                <span className="max-w-[100px] truncate">{tag}</span>
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label={`Remove tag ${tag}`}
+                >
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          autoFocus
+          type="text"
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setSelectedSuggestionIndex(-1);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Add tag..."
+          className="w-full bg-transparent text-[11px] font-mono text-foreground outline-none placeholder:text-muted-foreground/60"
+        />
+        {filteredSuggestions.length > 0 && (
+          <div className="mt-1 border-t border-border/40 pt-1">
+            {filteredSuggestions.map((s, i) => (
+              <button
+                key={s.tag}
+                type="button"
+                onClick={() => addTag(s.tag)}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-sm px-2 py-1 text-[11px] font-mono text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                  i === selectedSuggestionIndex && 'bg-accent text-foreground',
+                )}
+              >
+                <span className="truncate">{s.tag}</span>
+                <span className="ml-2 text-[10px] text-muted-foreground/60">{s.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover.Root>
   );
 };
 
@@ -526,20 +622,6 @@ const SubtasksSegment = ({
   );
 };
 
-// ─── Attachment helpers ─────────────────────────────────────
-
-export function countAttachments(body: string | null): number {
-  if (!body) return 0;
-  try {
-    const blocks = JSON.parse(body) as Array<{ type?: string }>;
-    return blocks.filter(
-      (b) => b.type === 'image' || b.type === 'file',
-    ).length;
-  } catch {
-    return 0;
-  }
-}
-
 // ─── Attachment Segment ─────────────────────────────────────
 
 export const AttachmentSegment = ({
@@ -569,6 +651,30 @@ export const AttachmentSegment = ({
   );
 };
 
+// ─── Note Segment ────────────────────────────────────────────
+
+const NoteSegment = ({
+  hasContent,
+  onClick,
+}: {
+  hasContent: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    tabIndex={0}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    onKeyDown={(e) => e.stopPropagation()}
+    className={cn(SEGMENT, !hasContent && SEGMENT_EMPTY)}
+    aria-label={hasContent ? 'Note — click to scroll to note' : 'Add note'}
+  >
+    {hasContent ? 'note' : '+ note'}
+  </button>
+);
+
 // ─── Metadata Line ──────────────────────────────────────────
 
 const MetadataLine = ({
@@ -578,6 +684,8 @@ const MetadataLine = ({
   onRequestAddSubtask,
   attachmentCount,
   onAttach,
+  noteHasContent,
+  onNoteClick,
 }: {
   task: Task;
   onUpdate: UpdateTaskAction;
@@ -585,6 +693,8 @@ const MetadataLine = ({
   onRequestAddSubtask?: () => void;
   attachmentCount: number;
   onAttach: () => void;
+  noteHasContent: boolean;
+  onNoteClick: () => void;
 }) => {
   const isCompleted = task.status === 'done';
   const isSubtask = task.parentId !== null;
@@ -608,12 +718,14 @@ const MetadataLine = ({
           <MetaDot />
           <StatusSegment task={task} onUpdate={onUpdate} />
           <MetaDot />
-          <ClientSegment task={task} onUpdate={onUpdate} />
+          <TagsSegment task={task} onUpdate={onUpdate} />
           <MetaDot />
           <AttachmentSegment
             count={attachmentCount}
             onAttach={onAttach}
           />
+          <MetaDot />
+          <NoteSegment hasContent={noteHasContent} onClick={onNoteClick} />
           {onRequestAddSubtask && (
             <>
               <MetaDot />
@@ -632,6 +744,8 @@ const MetadataLine = ({
             count={attachmentCount}
             onAttach={onAttach}
           />
+          <MetaDot />
+          <NoteSegment hasContent={noteHasContent} onClick={onNoteClick} />
         </>
       )}
     </div>
@@ -671,7 +785,6 @@ export const TaskBody = ({
   );
   const selectTask = useTaskStore((state) => state.selectTask);
   const setView = useAppStore((state) => state.setView);
-  const editorRef = useRef<BlockNoteEditor | null>(null);
   const devLatencyRef = useRef<DevLatencyApi>(NOOP_DEV_LATENCY);
   const openMetricKeyRef = useRef<string | null>(null);
   const hasRecordedOpenLatencyRef = useRef(false);
@@ -692,45 +805,43 @@ export const TaskBody = ({
     return undefined;
   }, []);
 
-  const [attachmentCount, setAttachmentCount] = useState(() => countAttachments(task.body));
+  // ── Attachments from DB ──
 
-  const handleAttach = useCallback(async () => {
-    const result = await window.untask?.attachments.pickAndSave();
-    if (!result || result.canceled || result.urls.length === 0) return;
+  const [attachments, setAttachments] = useState<AttachmentRecord[]>([]);
 
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const newBlocks = result.urls.map((url) => {
-      const isImage = /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
-      if (isImage) {
-        return { type: 'image' as const, props: { url } };
-      }
-      return { type: 'file' as const, props: { url } };
-    });
-
-    const lastBlock = editor.document[editor.document.length - 1];
-    editor.insertBlocks(newBlocks, lastBlock, 'after');
-  }, []);
-
-  const { handleBodyChange, flushSave } = useAutoSaveBody({
-    taskId: task.id,
-    onContentChange: (json: string) => {
-      const metricKey = openMetricKeyRef.current;
-      if (!hasRecordedOpenLatencyRef.current && metricKey) {
-        hasRecordedOpenLatencyRef.current = true;
-        devLatencyRef.current.end('task-editor-open', metricKey);
-      }
-      const newCount = countAttachments(json);
-      setAttachmentCount((prev) => (prev !== newCount ? newCount : prev));
-    },
-  });
+  const loadAttachments = useCallback(async () => {
+    const result = await window.untask?.attachments.listByTask({ taskId: task.id });
+    setAttachments(result ?? []);
+  }, [task.id]);
 
   useEffect(() => {
-    if (!isExpanded) {
-      flushSave();
+    if (isExpanded) {
+      void loadAttachments();
     }
-  }, [isExpanded, flushSave]);
+  }, [isExpanded, loadAttachments]);
+
+  const handleAttach = useCallback(async () => {
+    const result = await window.untask?.attachments.pickAndSaveForTask({ taskId: task.id });
+    if (!result || result.canceled) return;
+    void loadAttachments();
+  }, [task.id, loadAttachments]);
+
+  // ── Note state ──
+
+  const [noteHasContent, setNoteHasContent] = useState(() => {
+    if (!task.body) return false;
+    try {
+      const blocks = JSON.parse(task.body) as Array<{ type?: string; content?: unknown[] }>;
+      return blocks.some((b) => b.type === 'paragraph' && Array.isArray(b.content) && b.content.length > 0);
+    } catch {
+      return false;
+    }
+  });
+  const [noteForceOpen, setNoteForceOpen] = useState(false);
+
+  const handleNoteClick = useCallback(() => {
+    setNoteForceOpen(true);
+  }, []);
 
   // Dev-only latency probe: expanded task editor -> first content change.
   useEffect(() => {
@@ -758,14 +869,6 @@ export const TaskBody = ({
     };
   }, [isExpanded, task.id]);
 
-  const handleFocus = useCallback(() => {
-    onBodyEditModeChange?.(true);
-  }, [onBodyEditModeChange]);
-
-  const handleBlur = useCallback(() => {
-    onBodyEditModeChange?.(false);
-  }, [onBodyEditModeChange]);
-
   return (
     <div className="overflow-hidden">
       {/* Part-of reference — subtask context */}
@@ -789,32 +892,42 @@ export const TaskBody = ({
         </div>
       )}
 
-      {/* Zone 1 — Body Editor (hero) */}
-      <div className={cn(
-        'px-3 py-3',
-        !parentTask && 'border-t border-border/30',
-      )}>
-        <BlockEditor
-          content={task.body ?? ''}
-          onChange={handleBodyChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          className="untask-task-editor"
-          preset="task"
-          contextMenuMode="off"
-          editorRef={editorRef}
-          getSlashMenuItems={getAttachmentSlashMenuItems}
-        />
-      </div>
-
-      {/* Zone 2 — Metadata Line */}
+      {/* Zone 1 — Metadata Line */}
       <MetadataLine
         task={task}
         onUpdate={updateTask}
         subtaskCount={subtaskCount}
         onRequestAddSubtask={onRequestAddSubtask}
-        attachmentCount={attachmentCount}
+        attachmentCount={attachments.length}
         onAttach={handleAttach}
+        noteHasContent={noteHasContent}
+        onNoteClick={handleNoteClick}
+      />
+
+      {/* Zone 2 — Attachments (only when present) */}
+      <AttachmentList
+        taskId={task.id}
+        attachments={attachments}
+        onAttachmentsChange={loadAttachments}
+      />
+
+      {/* Zone 3 — Note section (collapsible text-only editor) */}
+      <NoteSection
+        taskId={task.id}
+        body={task.body}
+        forceOpen={noteForceOpen}
+        onBodyChange={(hasContent) => {
+          setNoteHasContent(hasContent);
+          const metricKey = openMetricKeyRef.current;
+          if (!hasRecordedOpenLatencyRef.current && metricKey) {
+            hasRecordedOpenLatencyRef.current = true;
+            devLatencyRef.current.end('task-editor-open', metricKey);
+          }
+        }}
+        onOpenStateChange={(isOpen) => {
+          if (!isOpen) setNoteForceOpen(false);
+        }}
+        onEditModeChange={onBodyEditModeChange}
       />
     </div>
   );

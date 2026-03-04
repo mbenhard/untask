@@ -128,15 +128,18 @@ const buildTodaySection = (
   });
 
   const todayLines = todayTasks.slice(0, taskLimit).map((task) => {
-    const tags = [
+    const annotations = [
       task.priority && task.priority !== 'none' ? task.priority : null,
       task.dueDate ? `due:${task.dueDate}` : null,
       overdueTasks.some((o) => o.id === task.id) ? 'OVERDUE' : null,
+      Array.isArray(task.tags) && task.tags.length > 0
+        ? `tags:${task.tags.join('|')}`
+        : null,
     ]
       .filter(Boolean)
       .join(', ');
 
-    return `- [${task.id}] ${task.title}${tags ? ` (${tags})` : ''}`;
+    return `- [${task.id}] ${task.title}${annotations ? ` (${annotations})` : ''}`;
   });
 
   return [

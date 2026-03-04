@@ -27,7 +27,7 @@ vi.mock('../services/taskService', () => {
     status: z.enum(['inbox', 'active', 'in_progress', 'waiting', 'done']).optional(),
     priority: z.enum(['none', 'low', 'medium', 'high']).optional(),
     today: z.boolean().optional(),
-    client: z.string().nullable().optional(),
+    tags: z.array(z.string()).optional(),
     dueDate: z.string().nullable().optional(),
     dueType: z.enum(['hard', 'soft']).nullable().optional(),
     order: z.number().optional(),
@@ -49,6 +49,11 @@ vi.mock('../services/taskService', () => {
     }),
   };
 });
+
+vi.mock('../services/attachmentService', () => ({
+  getAttachmentsByTaskId: vi.fn(() => []),
+  getAttachmentCountsByTaskIds: vi.fn(() => new Map<string, number>()),
+}));
 
 vi.mock('../services/notesService', () => ({
   getNote: vi.fn((id: string) => ({
@@ -89,6 +94,7 @@ vi.mock('./memory', () => ({
 }));
 
 import * as taskService from '../services/taskService';
+import * as attachmentService from '../services/attachmentService';
 import * as notesService from '../services/notesService';
 import * as autonomy from './autonomy';
 import * as runtimeFlags from './runtimeFlags';
@@ -101,6 +107,8 @@ const deleteTaskMock = vi.mocked(taskService.deleteTask);
 const getLastTaskEventForTaskMock = vi.mocked(taskService.getLastTaskEventForTask);
 const getTaskByIdMock = vi.mocked(taskService.getTaskById);
 const listTasksMock = vi.mocked(taskService.listTasks);
+const getAttachmentsByTaskIdMock = vi.mocked(attachmentService.getAttachmentsByTaskId);
+const getAttachmentCountsByTaskIdsMock = vi.mocked(attachmentService.getAttachmentCountsByTaskIds);
 const getNoteMock = vi.mocked(notesService.getNote);
 const saveNoteMock = vi.mocked(notesService.saveNote);
 const listNotesMock = vi.mocked(notesService.listNotes);
@@ -117,6 +125,8 @@ beforeEach(() => {
   getLastTaskEventForTaskMock.mockReset();
   getTaskByIdMock.mockReset();
   listTasksMock.mockReset();
+  getAttachmentsByTaskIdMock.mockReset();
+  getAttachmentCountsByTaskIdsMock.mockReset();
   getNoteMock.mockReset();
   saveNoteMock.mockReset();
   listNotesMock.mockReset();
@@ -143,6 +153,8 @@ beforeEach(() => {
     active: [{ id: 'note-1', title: 'Test note', content: '', status: 'active', createdAt: '2026-02-16T00:00:00.000Z', updatedAt: '2026-02-16T00:00:00.000Z' }],
     archived: [],
   } as never);
+  getAttachmentsByTaskIdMock.mockReturnValue([] as never);
+  getAttachmentCountsByTaskIdsMock.mockReturnValue(new Map() as never);
   evaluateGateMock.mockReturnValue({ action: 'execute', reason: 'allowed' } as never);
   isMutationToolMock.mockReturnValue(false);
   isPostMutationVerifyEnabledMock.mockReturnValue(false);
@@ -176,7 +188,7 @@ describe('create_task tool', () => {
       today: true,
       priority: 'none',
       dueDate: null,
-      client: null,
+      tags: [],
     } as never);
     getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-1' } as never);
 
@@ -205,7 +217,7 @@ describe('create_task tool', () => {
       today: false,
       priority: 'medium',
       dueDate: null,
-      client: null,
+      tags: [],
     } as never);
     getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-dup-1' } as never);
 
@@ -337,7 +349,7 @@ describe('view intent mapping', () => {
       today: false,
       priority: 'none',
       dueDate: null,
-      client: null,
+      tags: [],
     } as never);
     getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-upd-1' } as never);
 
@@ -363,7 +375,7 @@ describe('view intent mapping', () => {
       today: false,
       priority: 'none',
       dueDate: null,
-      client: null,
+      tags: [],
     } as never);
     listTasksMock.mockReturnValue([] as never);
     completeTaskMock.mockReturnValue({
@@ -374,7 +386,7 @@ describe('view intent mapping', () => {
         today: false,
         priority: 'none',
         dueDate: null,
-        client: null,
+        tags: [],
       },
       recurredTask: null,
     } as never);
@@ -388,6 +400,47 @@ describe('view intent mapping', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.output.actionCard?.viewIntent).toBe('tasks');
+    }
+  });
+
+  it('supports add_tags/remove_tags convenience updates', async () => {
+    getTaskByIdMock.mockReturnValue({
+      id: 'task-tags-1',
+      title: 'Follow up',
+      status: 'active',
+      today: false,
+      tags: ['acme', 'urgent'],
+    } as never);
+    updateTaskMock.mockReturnValue({
+      id: 'task-tags-1',
+      title: 'Follow up',
+      status: 'active',
+      today: false,
+      priority: 'medium',
+      dueDate: null,
+      tags: ['acme', 'backend'],
+    } as never);
+    getLastTaskEventForTaskMock.mockReturnValue({ id: 'event-tags-1' } as never);
+
+    const result = await executeToolCall({
+      name: 'update_task',
+      input: {
+        id: 'task-tags-1',
+        add_tags: ['Backend', 'acme,'],
+        remove_tags: ['URGENT'],
+      },
+    });
+
+    expect(updateTaskMock).toHaveBeenCalledWith(
+      {
+        id: 'task-tags-1',
+        tags: ['acme', 'backend'],
+      },
+      'ai',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.output.status).toBe('success');
     }
   });
 
@@ -473,7 +526,7 @@ describe('post-mutation verification', () => {
       parentId: null,
       priority: 'medium',
       dueDate: null,
-      client: null,
+      tags: [],
     } as never);
 
     const result = await executeToolCall({
@@ -494,13 +547,17 @@ describe('post-mutation verification', () => {
 
 describe('list_tasks tool', () => {
   it('returns filtered task summaries with ids', async () => {
+    getAttachmentCountsByTaskIdsMock.mockReturnValue(new Map([
+      ['task-11', 2],
+    ]) as never);
+
     listTasksMock.mockReturnValue([
       {
         id: 'task-11',
         title: 'Acme invoice follow-up',
         status: 'active',
         priority: 'high',
-        client: 'Acme',
+        tags: ['acme'],
         dueDate: '2026-02-20',
         today: true,
         parentId: null,
@@ -509,17 +566,18 @@ describe('list_tasks tool', () => {
 
     const result = await executeToolCall({
       name: 'list_tasks',
-      input: { client: 'acme', limit: 5 },
+      input: { tag: 'acme', limit: 5 },
     });
 
     expect(listTasksMock).toHaveBeenCalledWith({
       status: undefined,
       priority: undefined,
-      client: 'acme',
+      tag: 'acme',
       today: undefined,
       search: undefined,
       limit: 5,
     });
+    expect(getAttachmentCountsByTaskIdsMock).toHaveBeenCalledWith(['task-11']);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.output.status).toBe('success');
@@ -530,10 +588,11 @@ describe('list_tasks tool', () => {
             title: 'Acme invoice follow-up',
             status: 'active',
             priority: 'high',
-            client: 'Acme',
+            tags: ['acme'],
             dueDate: '2026-02-20',
             today: true,
             parentId: null,
+            attachmentCount: 2,
           },
         ],
       });
@@ -547,7 +606,7 @@ describe('list_tasks tool', () => {
         title: 'La Diosa',
         status: 'active',
         priority: 'high',
-        client: null,
+        tags: [],
         dueDate: null,
         today: true,
         parentId: null,
@@ -557,7 +616,7 @@ describe('list_tasks tool', () => {
         title: 'Old completed task',
         status: 'done',
         priority: 'high',
-        client: null,
+        tags: [],
         dueDate: null,
         today: false,
         parentId: null,
@@ -590,7 +649,7 @@ describe('list_tasks tool', () => {
         title: 'La Diosa',
         status: 'active',
         priority: 'high',
-        client: null,
+        tags: [],
         dueDate: null,
         today: true,
         parentId: null,
@@ -600,7 +659,7 @@ describe('list_tasks tool', () => {
         title: 'Old completed task',
         status: 'done',
         priority: 'high',
-        client: null,
+        tags: [],
         dueDate: null,
         today: false,
         parentId: null,
@@ -627,7 +686,7 @@ describe('list_tasks tool', () => {
         title: 'Archive invoices',
         status: 'done',
         priority: 'medium',
-        client: null,
+        tags: [],
         dueDate: null,
         today: false,
         parentId: null,
@@ -642,7 +701,7 @@ describe('list_tasks tool', () => {
     expect(listTasksMock).toHaveBeenCalledWith({
       status: 'done',
       priority: undefined,
-      client: undefined,
+      tag: undefined,
       today: undefined,
       search: undefined,
       limit: 10,
