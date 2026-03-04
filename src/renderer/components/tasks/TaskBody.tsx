@@ -116,44 +116,6 @@ export const PrioritySegment = ({
   );
 };
 
-// ─── Due Date Segment (legacy — used by quick-add) ──────────
-
-export const DueDateSegment = ({
-  task,
-  onUpdate,
-}: {
-  task: Task;
-  onUpdate: UpdateTaskAction;
-}) => {
-  const ref = useRef<HTMLSpanElement>(null);
-  const flash = useFlashHighlight(ref);
-  const prevDueDate = useRef(task.dueDate);
-
-  useEffect(() => {
-    if (task.dueDate !== prevDueDate.current) {
-      prevDueDate.current = task.dueDate;
-      flash();
-    }
-  }, [task.dueDate, flash]);
-
-  return (
-    <span ref={ref}>
-      <TaskDueDatePicker
-        dueDate={task.dueDate}
-        emptyLabel="+ due date"
-        variant="segment"
-        reminderOffset={(task.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined}
-        onChange={(nextDueDate) => {
-          void onUpdate({ id: task.id, dueDate: nextDueDate });
-        }}
-        onReminderOffsetChange={(offset) => {
-          void onUpdate({ id: task.id, reminderOffset: offset });
-        }}
-      />
-    </span>
-  );
-};
-
 // ─── Merged Date + Recurrence Segment ───────────────────────
 
 export const DateSegment = ({
@@ -473,171 +435,6 @@ export const StatusSegment = ({
   );
 };
 
-// ─── Recurrence Segment ────────────────────────────────────
-
-const RECURRENCE_PRESETS = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'every 2 weeks', label: 'Every 2 weeks' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'every weekday', label: 'Every weekday' },
-];
-
-export const RecurrenceSegment = ({
-  task,
-  onUpdate,
-}: {
-  task: Task;
-  onUpdate: UpdateTaskAction;
-}) => {
-  const [open, setOpen] = useState(false);
-  const [customN, setCustomN] = useState(2);
-  const [customUnit, setCustomUnit] = useState<'days' | 'weeks' | 'months'>('days');
-  const customTouched = useRef(false);
-  const presetApplied = useRef(false);
-  const isEmpty = !task.recurrence;
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const flash = useFlashHighlight(triggerRef);
-  const prevRecurrence = useRef(task.recurrence);
-
-  useEffect(() => {
-    if (task.recurrence !== prevRecurrence.current) {
-      prevRecurrence.current = task.recurrence;
-      flash();
-    }
-  }, [task.recurrence, flash]);
-
-  const handleOpenChange = (next: boolean) => {
-    if (!next && customTouched.current && !presetApplied.current) {
-      void onUpdate({ id: task.id, recurrence: `every ${customN} ${customUnit}` });
-    }
-    if (next) {
-      customTouched.current = false;
-      presetApplied.current = false;
-    }
-    setOpen(next);
-  };
-
-  return (
-    <Popover.Root open={open} onOpenChange={handleOpenChange}>
-      <Popover.Trigger asChild>
-        <button
-          ref={triggerRef}
-          type="button"
-          tabIndex={0}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className={cn(SEGMENT, isEmpty && SEGMENT_EMPTY)}
-          aria-label={isEmpty ? 'Recurrence: none' : `Recurrence: ${task.recurrence}`}
-        >
-          {isEmpty ? '+ repeat' : task.recurrence}
-        </button>
-      </Popover.Trigger>
-      <PopoverContent
-        className="w-auto min-w-[140px] p-1"
-        align="start"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        {RECURRENCE_PRESETS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => {
-              presetApplied.current = true;
-              void onUpdate({ id: task.id, recurrence: opt.value });
-              setOpen(false);
-            }}
-            className={cn(
-              'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-              task.recurrence === opt.value && 'text-foreground',
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-        <div className="flex items-center gap-1.5 border-t border-border/40 px-2 py-1.5">
-          <span className="text-xs text-muted-foreground">Every</span>
-          <div className="flex items-center rounded border border-border/40">
-            <button
-              type="button"
-              onClick={() => { customTouched.current = true; setCustomN((n) => Math.max(1, n - 1)); }}
-              className="px-1 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Decrease"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M3 5L5 7L7 5" />
-              </svg>
-            </button>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={customN}
-              onChange={(e) => {
-                customTouched.current = true;
-                const v = parseInt(e.target.value, 10);
-                if (!isNaN(v) && v >= 1 && v <= 365) setCustomN(v);
-                if (e.target.value === '') setCustomN(1);
-              }}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === 'Enter') {
-                  void onUpdate({ id: task.id, recurrence: `every ${customN} ${customUnit}` });
-                  setOpen(false);
-                }
-                if (e.key === 'ArrowUp') { e.preventDefault(); setCustomN((n) => Math.min(365, n + 1)); }
-                if (e.key === 'ArrowDown') { e.preventDefault(); setCustomN((n) => Math.max(1, n - 1)); }
-              }}
-              className="w-6 bg-transparent py-0.5 text-center text-xs text-foreground outline-none [appearance:textfield]"
-            />
-            <button
-              type="button"
-              onClick={() => { customTouched.current = true; setCustomN((n) => Math.min(365, n + 1)); }}
-              className="px-1 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Increase"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M7 5L5 3L3 5" />
-              </svg>
-            </button>
-          </div>
-          <select
-            value={customUnit}
-            onChange={(e) => { customTouched.current = true; setCustomUnit(e.target.value as 'days' | 'weeks' | 'months'); }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') {
-                void onUpdate({ id: task.id, recurrence: `every ${customN} ${customUnit}` });
-                setOpen(false);
-              }
-            }}
-            className="rounded border border-border/40 bg-transparent px-1 py-0.5 text-xs text-foreground outline-none"
-          >
-            <option value="days">day(s)</option>
-            <option value="weeks">week(s)</option>
-            <option value="months">month(s)</option>
-          </select>
-        </div>
-        {!isEmpty && (
-          <button
-            type="button"
-            onClick={() => {
-              presetApplied.current = true;
-              void onUpdate({ id: task.id, recurrence: null });
-              setOpen(false);
-            }}
-            className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
-          >
-            Remove
-          </button>
-        )}
-      </PopoverContent>
-    </Popover.Root>
-  );
-};
-
 // ─── Subtasks Segment ───────────────────────────────────────
 
 const SubtasksSegment = ({
@@ -739,7 +536,9 @@ export const OverflowMenu = ({
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const tagInputRef = useRef<HTMLInputElement>(null);
-  const [, setFocusIndex] = useState(-1);
+  const overflowBtnRef = useRef<HTMLButtonElement>(null);
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const priority = task.priority ?? 'none';
   const hasPriority = priority !== 'none';
@@ -780,7 +579,7 @@ export const OverflowMenu = ({
     : [];
 
   const addTag = (raw: string) => {
-    const normalized = raw.replace(/,/g, '').trim().toLowerCase();
+    const normalized = normalizeTag(raw);
     if (!normalized || tags.includes(normalized)) {
       setTagDraft('');
       return;
@@ -813,23 +612,27 @@ export const OverflowMenu = ({
     }
   };
 
-  // Build menu items
+  // Build menu items — focusable items get refs for arrow-key navigation
   const menuItems: { key: string; node: React.ReactNode }[] = [];
+  let refIdx = 0;
 
   if (!hasPriority) {
+    const iLow = refIdx++;
+    const iMed = refIdx++;
+    const iHigh = refIdx++;
     menuItems.push(
       { key: 'low', node: (
-        <button type="button" onClick={() => handleSetPriority('low')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <button ref={(el) => { itemRefs.current[iLow] = el; }} type="button" onClick={() => handleSetPriority('low')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <span className={cn('inline-block size-1.5 rounded-full', PRIORITY_DOT.low)} />Low
         </button>
       )},
       { key: 'med', node: (
-        <button type="button" onClick={() => handleSetPriority('medium')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <button ref={(el) => { itemRefs.current[iMed] = el; }} type="button" onClick={() => handleSetPriority('medium')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <span className={cn('inline-block size-1.5 rounded-full', PRIORITY_DOT.medium)} />Med
         </button>
       )},
       { key: 'high', node: (
-        <button type="button" onClick={() => handleSetPriority('high')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <button ref={(el) => { itemRefs.current[iHigh] = el; }} type="button" onClick={() => handleSetPriority('high')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <span className={cn('inline-block size-1.5 rounded-full', PRIORITY_DOT.high)} />High
         </button>
       )},
@@ -843,20 +646,30 @@ export const OverflowMenu = ({
       menuItems.push({ key: 'div', node: <div className="my-1 h-px bg-border/40" /> });
     }
     if (!hasTags) {
+      const iTag = refIdx++;
       menuItems.push({ key: 'tag', node: (
-        <button type="button" onClick={handleOpenTagPopover} className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <button ref={(el) => { itemRefs.current[iTag] = el; }} type="button" onClick={handleOpenTagPopover} className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           + tag
         </button>
       )});
     }
     if (!hasAttachments) {
+      const iAttach = refIdx++;
       menuItems.push({ key: 'attach', node: (
-        <button type="button" onClick={handleAttach} className="flex w-full items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <button ref={(el) => { itemRefs.current[iAttach] = el; }} type="button" onClick={handleAttach} className="flex w-full items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <Paperclip aria-hidden="true" className="size-3" /> attach
         </button>
       )});
     }
   }
+
+  // Trim stale refs
+  itemRefs.current.length = refIdx;
+
+  // Imperatively move focus when focusIndex changes
+  useEffect(() => {
+    if (focusIndex >= 0) itemRefs.current[focusIndex]?.focus();
+  }, [focusIndex]);
 
   const handleMenuKeyDown = (e: React.KeyboardEvent) => {
     e.stopPropagation();
@@ -875,36 +688,38 @@ export const OverflowMenu = ({
 
   return (
     <>
-      <Popover.Root open={open} onOpenChange={(next) => { setOpen(next); if (next) setFocusIndex(-1); }}>
-        <Popover.Trigger asChild>
-          <button
-            type="button"
-            tabIndex={0}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-            className={cn(SEGMENT, 'text-muted-foreground/70')}
-            aria-label="More options"
-          >
-            ···
-          </button>
-        </Popover.Trigger>
-        <PopoverContent
-          className="w-auto min-w-[120px] p-1"
-          align="start"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={handleMenuKeyDown}
-        >
-          {menuItems.map((item) => (
-            <div key={item.key}>{item.node}</div>
-          ))}
-        </PopoverContent>
-      </Popover.Root>
-
-      {/* Tag popover (triggered from overflow) */}
+      {/* Tag popover wraps the overflow button as its anchor */}
       <Popover.Root open={tagOpen} onOpenChange={setTagOpen}>
-        <Popover.Trigger asChild>
-          <span className="hidden" />
-        </Popover.Trigger>
+        <Popover.Anchor asChild>
+          {/* Overflow menu popover — nested inside tag anchor so the tag popover positions correctly */}
+          <span className="inline-flex">
+            <Popover.Root open={open} onOpenChange={(next) => { setOpen(next); if (next) setFocusIndex(-1); }}>
+              <Popover.Trigger asChild>
+                <button
+                  ref={overflowBtnRef}
+                  type="button"
+                  tabIndex={0}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  className={cn(SEGMENT, 'text-muted-foreground/70')}
+                  aria-label="More options"
+                >
+                  ···
+                </button>
+              </Popover.Trigger>
+              <PopoverContent
+                className="w-auto min-w-[120px] p-1"
+                align="start"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={handleMenuKeyDown}
+              >
+                {menuItems.map((item) => (
+                  <div key={item.key}>{item.node}</div>
+                ))}
+              </PopoverContent>
+            </Popover.Root>
+          </span>
+        </Popover.Anchor>
         <PopoverContent
           className="w-auto min-w-[180px] max-w-[280px] p-2"
           align="start"

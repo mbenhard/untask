@@ -60,6 +60,10 @@ export const TaskDueDatePicker = ({
   const [notifBlocked, setNotifBlocked] = useState(false);
   const [customN, setCustomN] = useState(2);
   const [customUnit, setCustomUnit] = useState<'days' | 'weeks' | 'months'>('days');
+  const customNRef = useRef(customN);
+  const customUnitRef = useRef(customUnit);
+  customNRef.current = customN;
+  customUnitRef.current = customUnit;
   const customTouched = useRef(false);
   const presetApplied = useRef(false);
 
@@ -84,7 +88,7 @@ export const TaskDueDatePicker = ({
   const handleOpenChange = useCallback(
     (next: boolean) => {
       if (!next && onRecurrenceChange && customTouched.current && !presetApplied.current) {
-        onRecurrenceChange(`every ${customN} ${customUnit}`);
+        onRecurrenceChange(`every ${customNRef.current} ${customUnitRef.current}`);
       }
       if (next) {
         customTouched.current = false;
@@ -92,7 +96,7 @@ export const TaskDueDatePicker = ({
       }
       setOpen(next);
     },
-    [onRecurrenceChange, customN, customUnit],
+    [onRecurrenceChange],
   );
 
   const today = useMemo(() => {
