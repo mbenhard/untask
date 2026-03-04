@@ -21,6 +21,7 @@ import {
 } from '@dnd-kit/sortable';
 
 import { AnimatePresence, motion } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import { isTerminalStatus, PREDEFINED_STATUSES, type PredefinedStatusId, type Task } from '../../../types/models';
 import { useShallow } from 'zustand/react/shallow';
 import { fadeVariants } from '../../lib/animation';
@@ -655,6 +656,7 @@ export const TaskList = ({
           const subtasks = canOwnSubtasks
             ? allTasks.filter((candidate) => candidate.parentId === task.id)
             : [];
+          const completedSubtaskCount = subtasks.filter((subtask) => subtask.status === 'done').length;
 
           return (
             <TaskItem
@@ -666,7 +668,7 @@ export const TaskList = ({
               isNavigatedTo={task.id === navigatedTaskId}
               hasChildren={subtasks.length > 0}
               childrenCount={subtasks.length}
-              childrenDoneCount={subtasks.filter((s) => s.status === 'done').length}
+              childrenDoneCount={completedSubtaskCount}
               onStartTitleEdit={setEditingTitleTaskId}
               onEndTitleEdit={() => setEditingTitleTaskId(null)}
               onToggleExpand={handleToggleExpand}
@@ -698,6 +700,22 @@ export const TaskList = ({
                 canOwnSubtasks &&
                 (subtasks.length > 0 || addingSubtaskForId === task.id) && (
                   <div className="px-3 pb-1">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <h3 className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">
+                        Subtasks ({completedSubtaskCount}/{subtasks.length})
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddingSubtaskForId(task.id);
+                        }}
+                        className="rounded-sm p-0.5 text-muted-foreground/70 transition-colors hover:bg-accent/40 hover:text-foreground"
+                        aria-label={`Add subtask for ${task.title}`}
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </div>
                     {subtasks.length > 0 && (
                       <TaskList
                         tasks={subtasks}

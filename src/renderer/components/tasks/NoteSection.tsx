@@ -24,8 +24,8 @@ const getTextOnlySlashMenuItems = (
 export type NoteSectionProps = {
   taskId: string;
   body: string | null;
-  /** When true, expand the editor and focus it (e.g. user clicked "+ note"). */
-  forceOpen?: boolean;
+  /** Increment to request opening and focusing the editor (e.g. user clicked "+ note"). */
+  focusRequestId?: number;
   /** Called when body content changes (used for metadata indicator updates). */
   onBodyChange?: (hasContent: boolean) => void;
   /** Called when the note is explicitly added (first focus) or emptied (last blur). */
@@ -39,7 +39,7 @@ export type NoteSectionProps = {
 export const NoteSection = ({
   taskId,
   body,
-  forceOpen = false,
+  focusRequestId,
   onBodyChange,
   onOpenStateChange,
   onEditModeChange,
@@ -49,27 +49,73 @@ export const NoteSection = ({
   const [isOpen, setIsOpen] = useState(hasContent);
   const editorRef = useRef<BlockNoteEditor | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isBlurCollapseRef = useRef(false);
+  const isOpenRef = useRef(isOpen);
+  const lastFocusRequestIdRef = useRef<number | null>(focusRequestId ?? null);
 
-  // Sync forceOpen from parent
   useEffect(() => {
-    if (forceOpen && !isOpen) {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  const focusEditor = useCallback(() => {
+    const tryFocus = (attempt: number) => {
+      requestAnimationFrame(() => {
+        if (editorRef.current) {
+          editorRef.current.focus();
+          return;
+        }
+        if (attempt < 4) {
+          tryFocus(attempt + 1);
+        }
+      });
+    };
+
+    tryFocus(0);
+  }, []);
+
+  const collapseIfEmpty = useCallback((): boolean => {
+    if (!isOpenRef.current || !editorRef.current) {
+      return false;
+    }
+
+    const content = JSON.stringify(editorRef.current.document);
+    if (hasNoteContent(content)) {
+      return false;
+    }
+
+    isOpenRef.current = false;
+    setIsOpen(false);
+    onOpenStateChange?.(false);
+    onBodyChange?.(false);
+    onEditModeChange?.(false);
+    return true;
+  }, [onBodyChange, onEditModeChange, onOpenStateChange]);
+
+  // Sync focus requests from parent.
+  useEffect(() => {
+    if (focusRequestId === undefined || focusRequestId === null) {
+      return;
+    }
+    if (focusRequestId === lastFocusRequestIdRef.current) {
+      return;
+    }
+
+    lastFocusRequestIdRef.current = focusRequestId;
+    if (!isOpenRef.current) {
+      isOpenRef.current = true;
       setIsOpen(true);
       onOpenStateChange?.(true);
-      // Focus editor after it mounts
-      requestAnimationFrame(() => {
-        editorRef.current?.focus();
-      });
     }
-  }, [forceOpen, isOpen, onOpenStateChange]);
+    focusEditor();
+  }, [focusRequestId, focusEditor, onOpenStateChange]);
 
   // Auto-expand when body gets content externally (e.g. from store refresh)
   useEffect(() => {
-    if (hasContent && !isOpen) {
+    if (hasContent && !isOpenRef.current) {
+      isOpenRef.current = true;
       setIsOpen(true);
       onOpenStateChange?.(true);
     }
-  }, [hasContent, isOpen, onOpenStateChange]);
+  }, [hasContent, onOpenStateChange]);
 
   const { handleBodyChange, flushSave } = useAutoSaveBody({
     taskId,
@@ -92,18 +138,36 @@ export const NoteSection = ({
 
   const handleBlur = useCallback(() => {
     onEditModeChange?.(false);
-
-    // Auto-collapse if editor is empty
-    if (editorRef.current) {
-      const content = JSON.stringify(editorRef.current.document);
-      if (!hasNoteContent(content)) {
-        isBlurCollapseRef.current = true;
-        setIsOpen(false);
-        onOpenStateChange?.(false);
-        onBodyChange?.(false);
+    requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof Node && containerRef.current?.contains(activeElement)) {
+        return;
       }
+      collapseIfEmpty();
+    });
+  }, [collapseIfEmpty, onEditModeChange]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
     }
-  }, [onOpenStateChange, onBodyChange, onEditModeChange]);
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (containerRef.current?.contains(target)) {
+        return;
+      }
+      collapseIfEmpty();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [collapseIfEmpty, isOpen]);
 
   const handleEditorReady = useCallback(
     (editor: BlockNoteEditor) => {

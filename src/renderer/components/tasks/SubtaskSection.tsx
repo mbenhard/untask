@@ -54,98 +54,93 @@ export const SubtaskSection = ({
     <div>
       {/* Section header */}
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[12px] font-medium text-foreground">
-          Subtasks
-          {subtasks.length > 0 && (
-            <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
-              {doneCount}/{subtasks.length}
-            </span>
-          )}
+        <h2 className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">
+          Subtasks ({doneCount}/{subtasks.length})
         </h2>
         <button
           type="button"
           onClick={handleAddSubtask}
-          className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="rounded-sm p-0.5 text-muted-foreground/70 transition-colors hover:bg-accent/40 hover:text-foreground"
+          aria-label="Add subtask"
         >
-          <Plus className="size-3" />
-          Add
+          <Plus className="size-3.5" />
         </button>
       </div>
 
       {/* Subtask list or empty state */}
       <div className="-mx-2">
-      {subtasks.length === 0 && !isAdding ? (
-        <motion.div
-          variants={fadeVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={{ duration: 0.1 }}
-          className="grid min-h-28 place-items-center rounded-lg border border-dashed border-border/40 px-1 text-center"
-        >
-          <div className="space-y-1">
-            <p className="text-[13px] text-muted-foreground">No subtasks yet</p>
-            <p className="text-[11px] text-muted-foreground">Click + Add to create one</p>
-          </div>
-        </motion.div>
-      ) : (
-        <div className="rounded-md border border-border/60">
-          {subtasks.length > 0 && (
-            <TaskList
-              tasks={subtasks}
-              allTasks={allTasks}
-              emptyMessage=""
-              ariaLabel={`Subtasks for ${parentTask.title}`}
-              scopeId={`detail-subtasks:${parentTask.id}`}
-              hideParentRef
-            />
-          )}
-
-          {/* Inline add input */}
-          {isAdding && (
-            <div className="flex min-h-9 items-center gap-2 border-t border-border/40 px-1.5">
-              <span className="inline-flex size-6 items-center justify-center">
-                <span className="inline-flex size-3.5 rounded-full border border-dashed border-border" />
-              </span>
-              <input
-                ref={newInputRef}
-                autoFocus
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter' && newTitle.trim()) {
-                    e.preventDefault();
-                    handleCreateSubtask(newTitle);
-                    setNewTitle('');
-                    // Keep adding mode open for rapid entry
-                  }
-                  if (e.key === 'Enter' && !newTitle.trim()) {
-                    e.preventDefault();
-                    setIsAdding(false);
-                    setNewTitle('');
-                  }
-                  if (e.key === 'Escape') {
-                    e.preventDefault();
-                    setIsAdding(false);
-                    setNewTitle('');
-                  }
-                }}
-                onBlur={() => {
-                  if (newTitle.trim()) {
-                    handleCreateSubtask(newTitle);
-                  }
-                  setIsAdding(false);
-                  setNewTitle('');
-                }}
-                placeholder="New subtask..."
-                className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
-              />
+        {subtasks.length === 0 && !isAdding ? (
+          <motion.div
+            variants={fadeVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.1 }}
+            className="grid min-h-28 place-items-center rounded-lg border border-dashed border-border/40 px-1 text-center"
+          >
+            <div className="space-y-1">
+              <p className="text-[13px] text-muted-foreground">No subtasks yet</p>
+              <p className="text-[11px] text-muted-foreground">Click + to create one</p>
             </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        ) : (
+          <div className="rounded-md border border-border/60">
+            {subtasks.length > 0 && (
+              <TaskList
+                tasks={subtasks}
+                allTasks={allTasks}
+                emptyMessage=""
+                ariaLabel={`Subtasks for ${parentTask.title}`}
+                scopeId={`detail-subtasks:${parentTask.id}`}
+                hideParentRef
+              />
+            )}
+
+            {/* Inline add input */}
+            {isAdding && (
+              <div className="flex min-h-9 items-center gap-2 border-t border-border/40 px-1.5">
+                <span className="inline-flex size-6 items-center justify-center">
+                  <span className="inline-flex size-3.5 rounded-full border border-dashed border-border" />
+                </span>
+                <input
+                  ref={newInputRef}
+                  autoFocus
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter' && newTitle.trim()) {
+                      e.preventDefault();
+                      handleCreateSubtask(newTitle);
+                      setNewTitle('');
+                      // Keep adding mode open for rapid entry
+                    }
+                    if (e.key === 'Enter' && !newTitle.trim()) {
+                      e.preventDefault();
+                      setIsAdding(false);
+                      setNewTitle('');
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setIsAdding(false);
+                      setNewTitle('');
+                    }
+                  }}
+                  onBlur={() => {
+                    if (newTitle.trim()) {
+                      handleCreateSubtask(newTitle);
+                    }
+                    setIsAdding(false);
+                    setNewTitle('');
+                  }}
+                  placeholder="New subtask..."
+                  className="flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

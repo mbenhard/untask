@@ -831,10 +831,10 @@ export const TaskBody = ({
   // ── Note state ──
 
   const [noteHasContent, setNoteHasContent] = useState(() => hasNoteContent(task.body));
-  const [noteForceOpen, setNoteForceOpen] = useState(false);
+  const [noteFocusRequestId, setNoteFocusRequestId] = useState(0);
 
   const handleNoteClick = useCallback(() => {
-    setNoteForceOpen(true);
+    setNoteFocusRequestId((current) => current + 1);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const noteSection = containerRef.current?.querySelector<HTMLElement>('[data-note-section="true"]');
@@ -999,7 +999,7 @@ export const TaskBody = ({
       <NoteSection
         taskId={task.id}
         body={task.body}
-        forceOpen={noteForceOpen}
+        focusRequestId={noteFocusRequestId}
         onPasteImages={handlePasteImages}
         onBodyChange={(hasContent) => {
           setNoteHasContent(hasContent);
@@ -1008,9 +1008,6 @@ export const TaskBody = ({
             hasRecordedOpenLatencyRef.current = true;
             devLatencyRef.current.end('task-editor-open', metricKey);
           }
-        }}
-        onOpenStateChange={(isOpen) => {
-          if (!isOpen) setNoteForceOpen(false);
         }}
         onEditModeChange={onBodyEditModeChange}
       />

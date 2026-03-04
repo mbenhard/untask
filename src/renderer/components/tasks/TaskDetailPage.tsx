@@ -256,10 +256,10 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
   // ── Note state ──
 
   const [noteHasContent, setNoteHasContent] = useState(() => hasNoteContent(task?.body));
-  const [noteForceOpen, setNoteForceOpen] = useState(false);
+  const [noteFocusRequestId, setNoteFocusRequestId] = useState(0);
 
   const handleNoteClick = useCallback(() => {
-    setNoteForceOpen(true);
+    setNoteFocusRequestId((current) => current + 1);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const noteSection = containerRef.current?.querySelector<HTMLElement>('[data-note-section="true"]');
@@ -592,12 +592,9 @@ export const TaskDetailPage = ({ taskId, navigatedSubtaskId = null }: TaskDetail
           <NoteSection
             taskId={taskId}
             body={task.body}
-            forceOpen={noteForceOpen}
+            focusRequestId={noteFocusRequestId}
             onPasteImages={handlePasteImages}
             onBodyChange={(hasContent) => setNoteHasContent(hasContent)}
-            onOpenStateChange={(isOpen) => {
-              if (!isOpen) setNoteForceOpen(false);
-            }}
           />
 
           {/* Divider before subtasks */}
