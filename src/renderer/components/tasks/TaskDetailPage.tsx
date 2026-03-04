@@ -38,11 +38,11 @@ import { Popover } from '../ui';
 import {
   StatusSegment,
   PrioritySegment,
-  DueDateSegment,
+  DateSegment,
   TagsSegment,
-  RecurrenceSegment,
   AttachmentSegment,
   MetaDot,
+  OverflowMenu,
   type UpdateTaskAction,
 } from './TaskBody';
 import { AttachmentList } from './AttachmentList';
@@ -149,27 +149,55 @@ const DetailMetadataLine = ({
   noteHasContent: boolean;
   onNoteClick: () => void;
 }) => {
+  const priority = task.priority ?? 'none';
+  const hasPriority = priority !== 'none';
+  const hasTags = (task.tags ?? []).length > 0;
+  const hasAttachments = attachmentCount > 0;
+
+  // Build segments: status · date · today · [priority] · [tags] · [attach] · note
+  const segments: [string, React.ReactNode][] = [];
+
+  segments.push(['status', <StatusSegment key="status" task={task} onUpdate={onUpdate} />]);
+  segments.push(['date', <DateSegment key="date" task={task} onUpdate={onUpdate} />]);
+  segments.push(['today', <TodaySegment key="today" task={task} onToggle={onToggleToday} />]);
+
+  if (hasPriority) {
+    segments.push(['priority', <PrioritySegment key="priority" task={task} onUpdate={onUpdate} />]);
+  }
+  if (hasTags) {
+    segments.push(['tags', <TagsSegment key="tags" task={task} onUpdate={onUpdate} />]);
+  }
+  if (hasAttachments) {
+    segments.push(['attach', <AttachmentSegment key="attach" count={attachmentCount} onAttach={onAttach} />]);
+  }
+
+  segments.push(['note', <NoteSegmentDetail key="note" hasContent={noteHasContent} onClick={onNoteClick} />]);
+
+  const showOverflow = !hasPriority || !hasTags || !hasAttachments;
+
   return (
     <div
       role="toolbar"
       aria-label="Task metadata"
       className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-muted-foreground"
     >
-      <DueDateSegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <PrioritySegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <TodaySegment task={task} onToggle={onToggleToday} />
-      <MetaDot />
-      <RecurrenceSegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <StatusSegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <TagsSegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <AttachmentSegment count={attachmentCount} onAttach={onAttach} />
-      <MetaDot />
-      <NoteSegmentDetail hasContent={noteHasContent} onClick={onNoteClick} />
+      {segments.map(([key, node], i) => (
+        <span key={key} className="inline-flex items-center gap-1.5">
+          {i > 0 && <MetaDot />}
+          {node}
+        </span>
+      ))}
+      {showOverflow && (
+        <span className="inline-flex items-center gap-1.5">
+          <MetaDot />
+          <OverflowMenu
+            task={task}
+            onUpdate={onUpdate}
+            attachmentCount={attachmentCount}
+            onAttach={onAttach}
+          />
+        </span>
+      )}
     </div>
   );
 };

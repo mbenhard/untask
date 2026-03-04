@@ -116,7 +116,7 @@ export const PrioritySegment = ({
   );
 };
 
-// ─── Due Date Segment ───────────────────────────────────────
+// ─── Due Date Segment (legacy — used by quick-add) ──────────
 
 export const DueDateSegment = ({
   task,
@@ -148,6 +148,50 @@ export const DueDateSegment = ({
         }}
         onReminderOffsetChange={(offset) => {
           void onUpdate({ id: task.id, reminderOffset: offset });
+        }}
+      />
+    </span>
+  );
+};
+
+// ─── Merged Date + Recurrence Segment ───────────────────────
+
+export const DateSegment = ({
+  task,
+  onUpdate,
+}: {
+  task: Task;
+  onUpdate: UpdateTaskAction;
+}) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const flash = useFlashHighlight(ref);
+  const prevDueDate = useRef(task.dueDate);
+  const prevRecurrence = useRef(task.recurrence);
+
+  useEffect(() => {
+    if (task.dueDate !== prevDueDate.current || task.recurrence !== prevRecurrence.current) {
+      prevDueDate.current = task.dueDate;
+      prevRecurrence.current = task.recurrence;
+      flash();
+    }
+  }, [task.dueDate, task.recurrence, flash]);
+
+  return (
+    <span ref={ref}>
+      <TaskDueDatePicker
+        dueDate={task.dueDate}
+        emptyLabel="+ date"
+        variant="segment"
+        reminderOffset={(task.reminderOffset as 'at_due' | '15m' | '1h' | '1d') ?? undefined}
+        onChange={(nextDueDate) => {
+          void onUpdate({ id: task.id, dueDate: nextDueDate });
+        }}
+        onReminderOffsetChange={(offset) => {
+          void onUpdate({ id: task.id, reminderOffset: offset });
+        }}
+        recurrence={task.recurrence}
+        onRecurrenceChange={(next) => {
+          void onUpdate({ id: task.id, recurrence: next });
         }}
       />
     </span>
@@ -676,6 +720,256 @@ const NoteSegment = ({
   </button>
 );
 
+// ─── Overflow Menu (···) ─────────────────────────────────────
+
+export const OverflowMenu = ({
+  task,
+  onUpdate,
+  attachmentCount,
+  onAttach,
+}: {
+  task: Task;
+  onUpdate: UpdateTaskAction;
+  attachmentCount: number;
+  onAttach: () => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [tagOpen, setTagOpen] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const [, setFocusIndex] = useState(-1);
+
+  const priority = task.priority ?? 'none';
+  const hasPriority = priority !== 'none';
+  const hasTags = (task.tags ?? []).length > 0;
+  const hasAttachments = attachmentCount > 0;
+
+  // All three set → hide overflow entirely
+  if (hasPriority && hasTags && hasAttachments) return null;
+
+  const handleSetPriority = (p: 'low' | 'medium' | 'high') => {
+    void onUpdate({ id: task.id, priority: p });
+    setOpen(false);
+  };
+
+  const handleOpenTagPopover = () => {
+    setOpen(false);
+    setTagOpen(true);
+  };
+
+  const handleAttach = () => {
+    setOpen(false);
+    onAttach();
+  };
+
+  // Tag popover logic (reuses TagsSegment patterns)
+  const tags = task.tags ?? [];
+
+  useEffect(() => {
+    if (tagOpen) {
+      void getTagSuggestions().then(setTagSuggestions).catch(() => setTagSuggestions([]));
+    }
+  }, [tagOpen]);
+
+  const filteredTagSuggestions = tagDraft.trim()
+    ? tagSuggestions
+        .filter((s) => s.tag.includes(tagDraft.trim().toLowerCase()) && !tags.includes(s.tag))
+        .slice(0, 6)
+    : [];
+
+  const addTag = (raw: string) => {
+    const normalized = raw.replace(/,/g, '').trim().toLowerCase();
+    if (!normalized || tags.includes(normalized)) {
+      setTagDraft('');
+      return;
+    }
+    void onUpdate({ id: task.id, tags: [...tags, normalized] })
+      .then((updated) => { if (updated) invalidateTagSuggestionsCache(); })
+      .catch(() => undefined);
+    setTagDraft('');
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (selectedSuggestionIndex >= 0 && filteredTagSuggestions[selectedSuggestionIndex]) {
+        addTag(filteredTagSuggestions[selectedSuggestionIndex].tag);
+      } else if (tagDraft.trim()) {
+        addTag(tagDraft);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setTagOpen(false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex((i) => i < filteredTagSuggestions.length - 1 ? i + 1 : i);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex((i) => (i > 0 ? i - 1 : -1));
+    }
+  };
+
+  // Build menu items
+  const menuItems: { key: string; node: React.ReactNode }[] = [];
+
+  if (!hasPriority) {
+    menuItems.push(
+      { key: 'low', node: (
+        <button type="button" onClick={() => handleSetPriority('low')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <span className={cn('inline-block size-1.5 rounded-full', PRIORITY_DOT.low)} />Low
+        </button>
+      )},
+      { key: 'med', node: (
+        <button type="button" onClick={() => handleSetPriority('medium')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <span className={cn('inline-block size-1.5 rounded-full', PRIORITY_DOT.medium)} />Med
+        </button>
+      )},
+      { key: 'high', node: (
+        <button type="button" onClick={() => handleSetPriority('high')} className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <span className={cn('inline-block size-1.5 rounded-full', PRIORITY_DOT.high)} />High
+        </button>
+      )},
+    );
+  }
+
+  const needsDivider = !hasPriority && (!hasTags || !hasAttachments);
+
+  if (!hasTags || !hasAttachments) {
+    if (needsDivider) {
+      menuItems.push({ key: 'div', node: <div className="my-1 h-px bg-border/40" /> });
+    }
+    if (!hasTags) {
+      menuItems.push({ key: 'tag', node: (
+        <button type="button" onClick={handleOpenTagPopover} className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          + tag
+        </button>
+      )});
+    }
+    if (!hasAttachments) {
+      menuItems.push({ key: 'attach', node: (
+        <button type="button" onClick={handleAttach} className="flex w-full items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <Paperclip aria-hidden="true" className="size-3" /> attach
+        </button>
+      )});
+    }
+  }
+
+  const handleMenuKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    const focusable = menuItems.filter((m) => m.key !== 'div');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusIndex((i) => Math.min(i + 1, focusable.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <Popover.Root open={open} onOpenChange={(next) => { setOpen(next); if (next) setFocusIndex(-1); }}>
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            tabIndex={0}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            className={cn(SEGMENT, 'text-muted-foreground/70')}
+            aria-label="More options"
+          >
+            ···
+          </button>
+        </Popover.Trigger>
+        <PopoverContent
+          className="w-auto min-w-[120px] p-1"
+          align="start"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={handleMenuKeyDown}
+        >
+          {menuItems.map((item) => (
+            <div key={item.key}>{item.node}</div>
+          ))}
+        </PopoverContent>
+      </Popover.Root>
+
+      {/* Tag popover (triggered from overflow) */}
+      <Popover.Root open={tagOpen} onOpenChange={setTagOpen}>
+        <Popover.Trigger asChild>
+          <span className="hidden" />
+        </Popover.Trigger>
+        <PopoverContent
+          className="w-auto min-w-[180px] max-w-[280px] p-2"
+          align="start"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {tags.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-mono text-foreground"
+                >
+                  <span className="max-w-[100px] truncate">{tag}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = tags.filter((t) => t !== tag);
+                      void onUpdate({ id: task.id, tags: next })
+                        .then((u) => { if (u) invalidateTagSuggestionsCache(); })
+                        .catch(() => undefined);
+                    }}
+                    className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label={`Remove tag ${tag}`}
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <input
+            ref={tagInputRef}
+            autoFocus
+            type="text"
+            value={tagDraft}
+            onChange={(e) => { setTagDraft(e.target.value); setSelectedSuggestionIndex(-1); }}
+            onKeyDown={handleTagKeyDown}
+            placeholder="Add tag..."
+            className="w-full bg-transparent text-[11px] font-mono text-foreground outline-none placeholder:text-muted-foreground/60"
+          />
+          {filteredTagSuggestions.length > 0 && (
+            <div className="mt-1 border-t border-border/40 pt-1">
+              {filteredTagSuggestions.map((s, i) => (
+                <button
+                  key={s.tag}
+                  type="button"
+                  onClick={() => addTag(s.tag)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-sm px-2 py-1 text-[11px] font-mono text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                    i === selectedSuggestionIndex && 'bg-accent text-foreground',
+                  )}
+                >
+                  <span className="truncate">{s.tag}</span>
+                  <span className="ml-2 text-[10px] text-muted-foreground/60">{s.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </PopoverContent>
+      </Popover.Root>
+    </>
+  );
+};
+
 // ─── Metadata Line ──────────────────────────────────────────
 
 const MetadataLine = ({
@@ -700,6 +994,48 @@ const MetadataLine = ({
   const isCompleted = task.status === 'done';
   const isSubtask = task.parentId !== null;
 
+  const priority = task.priority ?? 'none';
+  const hasPriority = priority !== 'none';
+  const hasTags = (task.tags ?? []).length > 0;
+  const hasAttachments = attachmentCount > 0;
+
+  // Build segments array: [key, element] pairs for visible segments
+  const segments: [string, React.ReactNode][] = [];
+
+  // status — always visible (not for subtasks since they inherit parent status context)
+  if (!isSubtask) {
+    segments.push(['status', <StatusSegment key="status" task={task} onUpdate={onUpdate} />]);
+  }
+
+  // date (merged due date + recurrence) — always visible
+  segments.push(['date', <DateSegment key="date" task={task} onUpdate={onUpdate} />]);
+
+  // priority — only when set (surfaced from overflow)
+  if (hasPriority) {
+    segments.push(['priority', <PrioritySegment key="priority" task={task} onUpdate={onUpdate} />]);
+  }
+
+  // tags — only when set (surfaced from overflow)
+  if (hasTags) {
+    segments.push(['tags', <TagsSegment key="tags" task={task} onUpdate={onUpdate} />]);
+  }
+
+  // attachments — only when set (surfaced from overflow)
+  if (hasAttachments) {
+    segments.push(['attach', <AttachmentSegment key="attach" count={attachmentCount} onAttach={onAttach} />]);
+  }
+
+  // note — always visible
+  segments.push(['note', <NoteSegment key="note" hasContent={noteHasContent} onClick={onNoteClick} />]);
+
+  // subtasks — always visible in expanded view (not subtask)
+  if (!isSubtask && onRequestAddSubtask) {
+    segments.push(['subtasks', <SubtasksSegment key="subtasks" count={subtaskCount} onAdd={onRequestAddSubtask} />]);
+  }
+
+  // overflow menu — only when there are unset optional segments
+  const showOverflow = !hasPriority || !hasTags || !hasAttachments;
+
   return (
     <div
       role="toolbar"
@@ -709,45 +1045,22 @@ const MetadataLine = ({
         isCompleted && 'opacity-60',
       )}
     >
-      <DueDateSegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <PrioritySegment task={task} onUpdate={onUpdate} />
-      <MetaDot />
-      <RecurrenceSegment task={task} onUpdate={onUpdate} />
-      {!isSubtask && (
-        <>
+      {segments.map(([key, node], i) => (
+        <span key={key} className="inline-flex items-center gap-1.5">
+          {i > 0 && <MetaDot />}
+          {node}
+        </span>
+      ))}
+      {showOverflow && (
+        <span className="inline-flex items-center gap-1.5">
           <MetaDot />
-          <StatusSegment task={task} onUpdate={onUpdate} />
-          <MetaDot />
-          <TagsSegment task={task} onUpdate={onUpdate} />
-          <MetaDot />
-          <AttachmentSegment
-            count={attachmentCount}
+          <OverflowMenu
+            task={task}
+            onUpdate={onUpdate}
+            attachmentCount={attachmentCount}
             onAttach={onAttach}
           />
-          <MetaDot />
-          <NoteSegment hasContent={noteHasContent} onClick={onNoteClick} />
-          {onRequestAddSubtask && (
-            <>
-              <MetaDot />
-              <SubtasksSegment
-                count={subtaskCount}
-                onAdd={onRequestAddSubtask}
-              />
-            </>
-          )}
-        </>
-      )}
-      {isSubtask && (
-        <>
-          <MetaDot />
-          <AttachmentSegment
-            count={attachmentCount}
-            onAttach={onAttach}
-          />
-          <MetaDot />
-          <NoteSegment hasContent={noteHasContent} onClick={onNoteClick} />
-        </>
+        </span>
       )}
     </div>
   );

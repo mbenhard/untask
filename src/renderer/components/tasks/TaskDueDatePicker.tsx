@@ -15,6 +15,8 @@ export interface TaskDueDatePickerProps {
   variant: 'row' | 'meta' | 'segment';
   reminderOffset?: ReminderOffset | null;
   onReminderOffsetChange?: (offset: ReminderOffset) => void;
+  recurrence?: string | null;
+  onRecurrenceChange?: (next: string | null) => void;
 }
 
 const ROW_TRIGGER_BASE =
@@ -34,6 +36,16 @@ const REMINDER_OFFSET_LABELS: Record<ReminderOffset, string> = {
   '1d': '1 day before',
 };
 
+const RECURRENCE_PRESETS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'every 2 weeks', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'every weekday', label: 'Every weekday' },
+];
+
 export const TaskDueDatePicker = ({
   dueDate,
   onChange,
@@ -41,9 +53,15 @@ export const TaskDueDatePicker = ({
   variant,
   reminderOffset,
   onReminderOffsetChange,
+  recurrence,
+  onRecurrenceChange,
 }: TaskDueDatePickerProps) => {
   const [open, setOpen] = useState(false);
   const [notifBlocked, setNotifBlocked] = useState(false);
+  const [customN, setCustomN] = useState(2);
+  const [customUnit, setCustomUnit] = useState<'days' | 'weeks' | 'months'>('days');
+  const customTouched = useRef(false);
+  const presetApplied = useRef(false);
 
   // Probe notification permission once on mount
   useEffect(() => {
@@ -60,7 +78,22 @@ export const TaskDueDatePicker = ({
   const selected = useMemo(() => parseDueDate(dueDate), [dueDate]);
   const currentTime = useMemo(() => parseDueTime(dueDate), [dueDate]);
   const timeInputRef = useRef<HTMLInputElement | null>(null);
-  const displayLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
+  const dateLabel = dueDate ? formatDueDateDisplay(dueDate) : emptyLabel;
+  const displayLabel = dueDate && recurrence ? `${dateLabel} · ${recurrence}` : dateLabel;
+
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next && onRecurrenceChange && customTouched.current && !presetApplied.current) {
+        onRecurrenceChange(`every ${customN} ${customUnit}`);
+      }
+      if (next) {
+        customTouched.current = false;
+        presetApplied.current = false;
+      }
+      setOpen(next);
+    },
+    [onRecurrenceChange, customN, customUnit],
+  );
 
   const today = useMemo(() => {
     const d = new Date();
@@ -199,7 +232,7 @@ export const TaskDueDatePicker = ({
   };
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root open={open} onOpenChange={onRecurrenceChange ? handleOpenChange : setOpen}>
       <Popover.Trigger asChild>
         <button
           type="button"
@@ -286,6 +319,105 @@ export const TaskDueDatePicker = ({
           </div>
         )}
 
+        {/* Recurrence — only when onRecurrenceChange is provided and date is set */}
+        {onRecurrenceChange && dueDate && (
+          <div className="border-t border-border/40 p-1">
+            <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+              Repeat
+            </div>
+            {RECURRENCE_PRESETS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  presetApplied.current = true;
+                  onRecurrenceChange(opt.value);
+                }}
+                className={cn(
+                  'flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                  recurrence === opt.value && 'text-foreground',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+            <div className="flex items-center gap-1.5 border-t border-border/40 px-2 py-1.5">
+              <span className="text-xs text-muted-foreground">Every</span>
+              <div className="flex items-center rounded border border-border/40">
+                <button
+                  type="button"
+                  onClick={() => { customTouched.current = true; setCustomN((n) => Math.max(1, n - 1)); }}
+                  className="px-1 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Decrease"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M3 5L5 7L7 5" />
+                  </svg>
+                </button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={customN}
+                  onChange={(e) => {
+                    customTouched.current = true;
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v) && v >= 1 && v <= 365) setCustomN(v);
+                    if (e.target.value === '') setCustomN(1);
+                  }}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                      onRecurrenceChange(`every ${customN} ${customUnit}`);
+                      setOpen(false);
+                    }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); setCustomN((n) => Math.min(365, n + 1)); }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setCustomN((n) => Math.max(1, n - 1)); }
+                  }}
+                  className="w-6 bg-transparent py-0.5 text-center text-xs text-foreground outline-none [appearance:textfield]"
+                />
+                <button
+                  type="button"
+                  onClick={() => { customTouched.current = true; setCustomN((n) => Math.min(365, n + 1)); }}
+                  className="px-1 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Increase"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M7 5L5 3L3 5" />
+                  </svg>
+                </button>
+              </div>
+              <select
+                value={customUnit}
+                onChange={(e) => { customTouched.current = true; setCustomUnit(e.target.value as 'days' | 'weeks' | 'months'); }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    onRecurrenceChange(`every ${customN} ${customUnit}`);
+                    setOpen(false);
+                  }
+                }}
+                className="rounded border border-border/40 bg-transparent px-1 py-0.5 text-xs text-foreground outline-none"
+              >
+                <option value="days">day(s)</option>
+                <option value="weeks">week(s)</option>
+                <option value="months">month(s)</option>
+              </select>
+            </div>
+            {recurrence && (
+              <button
+                type="button"
+                onClick={() => {
+                  presetApplied.current = true;
+                  onRecurrenceChange(null);
+                }}
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
+                Remove repeat
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Clear button — always visible, disabled when no date */}
         <div className="border-t border-border px-3 py-2">
           <Button
@@ -299,10 +431,11 @@ export const TaskDueDatePicker = ({
             onClick={(event) => {
               event.stopPropagation();
               void onChange(null);
+              onRecurrenceChange?.(null);
               setOpen(false);
             }}
           >
-            Clear due date
+            Clear date{recurrence ? ' & repeat' : ''}
           </Button>
         </div>
       </PopoverContent>
