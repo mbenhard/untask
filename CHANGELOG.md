@@ -2,6 +2,27 @@
 
 All notable changes to Untask will be documented in this file.
 
+## [0.2.1] - 2026-03-04
+
+Quick Add token shortcuts, redesigned task toolbar, and notes/attachments split.
+
+### Changes
+
+**Added**
+- **Quick Add token shortcuts** — Type `#tag`, `@status`, or `!!priority` directly in the Quick Add input to set task metadata inline; autocomplete popover suggests matching values as you type
+- **Token highlighting** — Recognized tokens display as monochrome badges in the input so you can see what will be applied before submitting
+- **Attachments system** — Attachments are now stored independently with a dedicated list showing file type icons, sizes, and per-file actions (Open, Show in Finder, Delete)
+- **Tags field** — Replaced the single-value `client` field with a multi-tag system; tags are shown as removable pills with autocomplete suggestions
+
+**Improved**
+- **Toolbar overflow menu** — Priority, tags, and attachments move into a `···` overflow button when unset, surfacing as visible segments once populated
+- **Unified date popover** — Due date and recurrence controls merged into a single date segment with collapsible repeat presets
+- **Note and tag focus reliability** — Hardened focus handling with retry loops and DOM fallbacks so "add note" and "add tag" actions reliably open and focus their inputs
+
+**Fixed**
+- Legacy FTS triggers referencing removed `client` column no longer block database migration on upgrade
+- Tag popover from overflow menu now anchors correctly instead of floating off-position
+
 ## [0.2.0] - 2026-03-03
 
 Task detail workflow, smarter AI task execution, and smoother update flow.
@@ -430,6 +451,7 @@ Initial open-source release — local-first task management with an optional AI 
 - Structured AI memory system (profile, patterns, observations)
 - All AI mutations logged and undoable
 
+[0.2.1]: https://github.com/mbenhard/untask/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mbenhard/untask/compare/v0.1.17...v0.2.0
 [0.1.17]: https://github.com/mbenhard/untask/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/mbenhard/untask/compare/v0.1.15...v0.1.16
