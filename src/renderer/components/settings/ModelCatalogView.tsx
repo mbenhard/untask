@@ -128,6 +128,14 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     isRecommended: true,
   },
   {
+    id: 'inception/mercury-2',
+    name: 'Mercury 2',
+    provider: 'openrouter',
+    costTier: 'cheap',
+    capabilities: ['tools', 'reasoning'],
+    isRecommended: true,
+  },
+  {
     id: 'mercury-2',
     name: 'Mercury 2',
     provider: 'inception',
