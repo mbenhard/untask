@@ -19,6 +19,26 @@ fn write_task(dir: &Path, filename: &str, content: &str) {
     std::fs::write(tasks_dir.join(filename), content).unwrap();
 }
 
+fn git(dir: &Path, args: &[&str]) {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git command failed: git {}\nstderr: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn init_git_repo(dir: &Path) {
+    git(dir, &["init"]);
+    git(dir, &["config", "user.email", "test@test.com"]);
+    git(dir, &["config", "user.name", "Test"]);
+}
+
 // ── Git summary ──────────────────────────────────────────────────────
 
 #[test]
@@ -33,33 +53,10 @@ fn git_summary_returns_commits_when_available() {
     let tmp = tempfile::TempDir::new().unwrap();
     let dir = tmp.path();
 
-    // Init a git repo and create a commit
-    std::process::Command::new("git")
-        .args(["init"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    std::process::Command::new("git")
-        .args(["config", "user.email", "test@test.com"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    std::process::Command::new("git")
-        .args(["config", "user.name", "Test"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    init_git_repo(dir);
     std::fs::write(dir.join("file.txt"), "hello").unwrap();
-    std::process::Command::new("git")
-        .args(["add", "."])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    std::process::Command::new("git")
-        .args(["commit", "-m", "initial commit"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    git(dir, &["add", "."]);
+    git(dir, &["commit", "-m", "initial commit"]);
 
     let summary = git::get_summary(dir, 5).unwrap();
     assert!(!summary.branch.is_empty());
@@ -73,32 +70,10 @@ fn git_summary_detects_uncommitted_changes() {
     let tmp = tempfile::TempDir::new().unwrap();
     let dir = tmp.path();
 
-    std::process::Command::new("git")
-        .args(["init"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    std::process::Command::new("git")
-        .args(["config", "user.email", "test@test.com"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    std::process::Command::new("git")
-        .args(["config", "user.name", "Test"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    init_git_repo(dir);
     std::fs::write(dir.join("file.txt"), "hello").unwrap();
-    std::process::Command::new("git")
-        .args(["add", "."])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    std::process::Command::new("git")
-        .args(["commit", "-m", "initial"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    git(dir, &["add", "."]);
+    git(dir, &["commit", "-m", "initial"]);
 
     // Create uncommitted change
     std::fs::write(dir.join("dirty.txt"), "uncommitted").unwrap();
@@ -112,11 +87,7 @@ fn git_summary_handles_empty_history() {
     let tmp = tempfile::TempDir::new().unwrap();
     let dir = tmp.path();
 
-    std::process::Command::new("git")
-        .args(["init"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    git(dir, &["init"]);
 
     // git log fails on empty repo, but get_summary should still return Some
     let summary = git::get_summary(dir, 5);
@@ -184,6 +155,30 @@ fn next_includes_recently_completed_tasks() {
 }
 
 #[test]
+fn next_treats_done_aliases_as_completed_instead_of_open() {
+    let (tmp, _store) = setup();
+    write_task(
+        tmp.path(),
+        "001-finished.md",
+        &format!(
+            "---\nid: 1\ntitle: Finished via alias\nstatus: finished\ncompleted: \"{}\"\n---\n",
+            Utc::now().to_rfc3339()
+        ),
+    );
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary.open_tasks.is_empty());
+    assert_eq!(summary.recently_completed.len(), 1);
+    assert_eq!(summary.recently_completed[0].title, "Finished via alias");
+    assert!(
+        summary
+            .cleanup_hints
+            .iter()
+            .any(|hint| hint.kind == CleanupKind::NoncanonicalStatus)
+    );
+}
+
+#[test]
 fn next_excludes_old_completed_tasks() {
     let (tmp, _store) = setup();
     // Write a task with a completed timestamp > 7 days ago
@@ -235,10 +230,12 @@ fn next_includes_cleanup_hints_for_unknown_statuses() {
     );
 
     let summary = next::generate_next(tmp.path()).unwrap();
-    assert!(summary
-        .cleanup_hints
-        .iter()
-        .any(|h| h.kind == CleanupKind::UnknownStatus));
+    assert!(
+        summary
+            .cleanup_hints
+            .iter()
+            .any(|h| h.kind == CleanupKind::UnknownStatus)
+    );
 }
 
 #[test]

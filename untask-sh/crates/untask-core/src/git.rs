@@ -27,7 +27,11 @@ pub fn get_summary(project_root: &Path, limit: usize) -> Option<GitSummary> {
 
     let recent_commits = run_git(
         project_root,
-        &["log", &format!("-n{limit}"), "--format=%H%x00%s%x00%aN%x00%aI"],
+        &[
+            "log",
+            &format!("-n{limit}"),
+            "--format=%H%x00%s%x00%aN%x00%aI",
+        ],
     )
     .map(|output| {
         output

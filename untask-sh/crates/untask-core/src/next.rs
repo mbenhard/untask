@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{Duration, Utc};
 
+use crate::config::Config;
 use crate::error::Result;
 use crate::git::{self, GitSummary};
 use crate::repair;
@@ -35,10 +36,11 @@ pub fn generate_next(project_root: &Path) -> Result<NextSummary> {
 
     let store = TaskStore::new(project_root.to_path_buf())?;
     let all_tasks = store.list(None)?;
+    let config = store.config();
 
     let mut open_tasks: Vec<Task> = all_tasks
         .iter()
-        .filter(|t| t.status != "done")
+        .filter(|task| !task_is_done(config, task))
         .cloned()
         .collect();
     // Sort by priority descending, then updated descending
@@ -51,7 +53,7 @@ pub fn generate_next(project_root: &Path) -> Result<NextSummary> {
     let cutoff = Utc::now() - Duration::days(7);
     let mut recently_completed: Vec<Task> = all_tasks
         .into_iter()
-        .filter(|t| t.status == "done" && t.completed.is_some_and(|c| c > cutoff))
+        .filter(|task| task_is_done(config, task) && task.completed.is_some_and(|c| c >= cutoff))
         .collect();
     recently_completed.sort_by(|a, b| b.completed.cmp(&a.completed));
 
@@ -63,6 +65,10 @@ pub fn generate_next(project_root: &Path) -> Result<NextSummary> {
         recently_completed,
         cleanup_hints,
     })
+}
+
+fn task_is_done(config: &Config, task: &Task) -> bool {
+    config.normalize_status(&task.status).as_deref() == Some("done")
 }
 
 fn build_cleanup_hints(project_root: &Path) -> Vec<CleanupHint> {
