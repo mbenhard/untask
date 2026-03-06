@@ -20,6 +20,9 @@ pub enum UntaskError {
     #[error("Task not found: {0}")]
     TaskNotFound(String),
 
+    #[error("Doc not found: {0}")]
+    DocNotFound(String),
+
     #[error("Ambiguous reference '{0}': matches {1}")]
     Ambiguous(String, String),
 

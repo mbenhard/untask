@@ -1,10 +1,12 @@
 pub mod config;
+pub mod docs;
 pub mod error;
 pub mod fs;
 pub mod init;
 pub mod lock;
 pub mod project;
 pub mod repair;
+pub mod search;
 pub mod slug;
 pub mod store;
 pub mod task;

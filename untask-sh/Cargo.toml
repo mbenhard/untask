@@ -9,3 +9,4 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2.0"
 tempfile = "3.0"
+glob = "0.3"

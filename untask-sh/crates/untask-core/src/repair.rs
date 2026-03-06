@@ -98,14 +98,14 @@ fn scan(dir: &Path, config: &Config) -> Result<RepairReport> {
             });
         }
 
-        if let (Some(fid), Some(tid)) = (filename_id, task.id) {
-            if fid != tid {
-                report.mismatched_ids.push(MismatchedId {
-                    path: path.clone(),
-                    filename_id: fid,
-                    frontmatter_id: tid,
-                });
-            }
+        if let (Some(fid), Some(tid)) = (filename_id, task.id)
+            && fid != tid
+        {
+            report.mismatched_ids.push(MismatchedId {
+                path: path.clone(),
+                filename_id: fid,
+                frontmatter_id: tid,
+            });
         }
 
         if !task.status.is_empty() {

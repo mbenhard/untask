@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Result, UntaskError};
 use crate::types::Theme;
 
+pub const DEFAULT_DOC_GLOB: &str = ".untask/docs/**/*.md";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Column {
     pub id: String,
@@ -53,7 +55,7 @@ fn default_columns() -> Vec<Column> {
 }
 
 fn default_docs() -> Vec<String> {
-    vec![".untask/docs/**/*.md".into()]
+    vec![DEFAULT_DOC_GLOB.into()]
 }
 
 impl Default for Config {

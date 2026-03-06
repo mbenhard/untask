@@ -65,11 +65,10 @@ impl TaskStore {
                 let content = std::fs::read_to_string(&path)?;
                 let mut task = parse_task(&content);
                 task.file_path = Some(path);
-                // Use filename ID if available and frontmatter id is missing
-                if task.id.is_none() {
-                    if let Some(ref fp) = task.file_path {
-                        task.id = parse_filename_id(fp);
-                    }
+                if task.id.is_none()
+                    && let Some(ref fp) = task.file_path
+                {
+                    task.id = parse_filename_id(fp);
                 }
                 tasks.push(task);
             }

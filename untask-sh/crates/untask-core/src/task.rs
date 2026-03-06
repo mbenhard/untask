@@ -75,10 +75,10 @@ impl From<TaskFrontmatter> for Task {
 impl Task {
     /// Classify a task based on its file path and frontmatter id.
     pub fn kind(&self) -> TaskKind {
-        if let Some(ref path) = self.file_path {
-            if parse_filename_id(path).is_some() {
-                return TaskKind::Managed;
-            }
+        if let Some(ref path) = self.file_path
+            && parse_filename_id(path).is_some()
+        {
+            return TaskKind::Managed;
         }
         if self.id.is_some() {
             TaskKind::UnindexedWithId
