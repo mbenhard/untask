@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/*
+ * Untask design tokens
+ * See docs/untask-design-language.md
+ */
+
+@theme {
+  /* Light palette */
+  --color-background: #F7F7F7;
+  --color-foreground: #171717;
+  --color-card: #FFFFFF;
+  --color-popover: #F7F7F7;
+  --color-accent: #F1F1F1;
+  --color-border: #E3E3E3;
+  --color-muted-foreground: #6B6B6B;
+  --color-primary: #262626;
+  --color-primary-foreground: #F7F7F7;
+  --color-ring: #737373;
+  --color-destructive: #DC2626;
+
+  /* Priority dots */
+  --color-priority-low: #10B981;
+  --color-priority-medium: #F59E0B;
+  --color-priority-high: #F43F5E;
+
+  /* Radius system */
+  --radius-control: 4px;
+  --radius-surface: 6px;
+  --radius-window: 10px;
+
+  /* Typography */
+  --font-sans: "Geist", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Variable", ui-monospace, monospace;
+}
+
+/* Dark palette (default for desktop app) */
+.dark {
+  --color-background: #161616;
+  --color-foreground: #F5F5F5;
+  --color-card: #1A1A1A;
+  --color-popover: #161616;
+  --color-accent: #1E1E1E;
+  --color-border: #2A2A2A;
+  --color-muted-foreground: #9E9E9E;
+  --color-primary: #E5E5E5;
+  --color-primary-foreground: #161616;
+  --color-ring: #8A8A8A;
+  --color-destructive: #7F1D1D;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  color: var(--color-foreground);
+  background: var(--color-background);
+}

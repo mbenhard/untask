@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/untask-core", "crates/untask-cli"]
+members = ["crates/untask-core", "crates/untask-cli", "apps/desktop/src-tauri"]
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }

@@ -1,0 +1,20 @@
+[package]
+name = "untask-desktop"
+version = "0.1.0"
+description = "Untask desktop app"
+authors = ["mbenhard"]
+edition = "2024"
+default-run = "untask-desktop"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+untask-core = { path = "../../../crates/untask-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
