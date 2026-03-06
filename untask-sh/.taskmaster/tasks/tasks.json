@@ -1093,7 +1093,7 @@
         "dependencies": [
           "17"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1101,9 +1101,10 @@
             "description": "Create the core Svelte 5 stores for reactive state management including currentProject, tasks, selectedTask, docs, and view stores.",
             "dependencies": [],
             "details": "Create `apps/desktop/src/lib/stores.ts` with writable stores for currentProject (string | null), tasks (Task[]), selectedTask (Task | null), docs (Doc[]), and view ('kanban' | 'list' | 'docs'). Ensure type safety and proper Svelte 5 store patterns. Add helper functions for store updates if needed. The frontend stores should hydrate from backend recent-project / last-project commands rather than persisting project selection in localStorage or a frontend-only store plugin.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Verify stores initialize with correct default values, (2) Test store updates propagate to subscribers, (3) Verify last project state hydrates from backend metadata across app restarts, (4) Check type safety with TypeScript compiler",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:20:46.406Z"
           },
           {
             "id": 2,
@@ -1113,9 +1114,10 @@
               1
             ],
             "details": "Create `ProjectPicker.svelte` component that uses Tauri's dialog API to open folder selection dialog. On folder selection, call backend open_project and update currentProject store. If the selected repository is missing `.untask/`, surface an explicit inline initialization action instead of silently creating it. Show recent projects list if available. Handle error cases (invalid folder, permission denied). Style with shadcn-svelte components and Tailwind CSS in a way that matches `docs/untask-design-language.md`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Test first-run flow shows project picker, (2) Verify folder selection dialog opens correctly, (3) Test inline `.untask/` initialization flow for new projects, (4) Verify currentProject store updates on selection, (5) Test error handling for invalid paths",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:20:48.353Z"
           },
           {
             "id": 3,
@@ -1125,9 +1127,10 @@
               1
             ],
             "details": "Create `Sidebar.svelte` with project name display, view switcher (kanban/list/docs buttons), and navigation elements. Subscribe to currentProject and view stores. Implement view toggle logic that updates the view store. Include project settings/info section. Style the shell with dense spacing, monochrome surfaces, border-led structure, and restrained chroma that match `docs/untask-design-language.md`. Ensure responsive layout and proper state synchronization.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Verify sidebar displays current project name, (2) Test view switching updates view store and triggers re-render, (3) Check sidebar responsiveness and styling, (4) Verify sidebar state persists during navigation",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:20:50.353Z"
           },
           {
             "id": 4,
@@ -1138,9 +1141,10 @@
               2
             ],
             "details": "Create `Kanban.svelte` that subscribes to tasks store and renders columns in config order using the canonical status IDs from project config, plus non-destructive Unmatched and Unindexed groups when needed. Implement drag-and-drop using svelte-dnd-action or native HTML5 drag API, or provide move buttons as fallback. On status change, call backend update_task command and update local tasks store. Handle task click to update selectedTask store and show detail view. Style columns with Tailwind CSS and shadcn-svelte primitives adapted to `docs/untask-design-language.md`, including dense spacing, border-led cards, and tiny priority-dot treatment instead of heavy priority badges.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Verify tasks appear in the correct config-defined columns by status, (2) Verify Unmatched and Unindexed groups appear when relevant, (3) Test drag-drop or move button changes task status, (4) Verify backend update_task is called on status change, (5) Test clicking task opens detail view, (6) Check visual feedback during drag operations, (7) Verify cards follow the design-language density and priority-dot treatment",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:26:09.229Z"
           },
           {
             "id": 5,
@@ -1151,9 +1155,10 @@
               2
             ],
             "details": "Create `TaskList.svelte` with table controls that support filtering by status, tag, and priority plus stable sort modes for priority, updated, created, and title. Create `TaskDetail.svelte` showing task metadata and Milkdown editor for body. Implement the Milkdown integration via a Svelte `use:` action using @milkdown/kit/core plus CommonMark and GFM presets, and reference Otterly as the integration precedent from the implementation plan. Strip YAML frontmatter before passing content to Milkdown, store it separately, and re-prepend on save preserving exact format. Handle editor initialization, content updates, and cleanup. Call backend update_task command on save. Style the list/detail views with the restrained monochrome system from `docs/untask-design-language.md`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Verify task list displays all tasks, (2) Test filter controls for status, tag, and priority, (3) Test stable sort modes for priority, updated, created, and title, (4) Test Milkdown editor loads task body correctly, (5) Verify frontmatter is stripped before editing, (6) Test frontmatter is re-prepended exactly on save, (7) Check markdown round-trip fidelity, (8) Verify editor updates trigger backend save, (9) Test clicking task in list opens detail view",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:26:11.210Z"
           },
           {
             "id": 6,
@@ -1164,14 +1169,16 @@
               5
             ],
             "details": "Create `DocsViewer.svelte` that subscribes to docs store and displays list of available docs with preview pane. Create `DocsEditor.svelte` using Milkdown integration (reuse approach from TaskDetail). Ensure markdown content round-trips perfectly without formatting loss. Handle frontmatter if present in docs. Implement save functionality calling backend commands. Add search/filter for doc list. Style with a split-pane layout that matches `docs/untask-design-language.md` through compact spacing, thin borders, muted surfaces, and restrained motion.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Verify docs list loads correctly, (2) Test doc preview displays markdown properly, (3) Test Milkdown editor loads doc content, (4) Verify markdown round-trip preserves all formatting, (5) Test save updates backend, (6) Check search/filter functionality if implemented, (7) Verify frontmatter handling if present",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:26:13.265Z"
           }
         ],
         "complexity": 8,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: (1) Svelte stores setup and state management, (2) Project picker component with Tauri dialog integration, (3) Sidebar and navigation shell, (4) Kanban view with drag-drop or move buttons, (5) Task list and task detail with Milkdown editor integration and frontmatter handling, (6) Docs viewer and editor with markdown round-trip fidelity."
+        "expansionPrompt": "Break down into: (1) Svelte stores setup and state management, (2) Project picker component with Tauri dialog integration, (3) Sidebar and navigation shell, (4) Kanban view with drag-drop or move buttons, (5) Task list and task detail with Milkdown editor integration and frontmatter handling, (6) Docs viewer and editor with markdown round-trip fidelity.",
+        "updatedAt": "2026-03-06T23:26:13.265Z"
       },
       {
         "id": "19",
@@ -1238,9 +1245,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-06T23:15:48.056Z",
+      "lastModified": "2026-03-06T23:26:13.265Z",
       "taskCount": 19,
-      "completedCount": 12,
+      "completedCount": 13,
       "tags": [
         "master"
       ]

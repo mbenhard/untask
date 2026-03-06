@@ -119,6 +119,35 @@ fn require_project(state: &State<'_, AppState>) -> Result<PathBuf, String> {
         .ok_or_else(|| "no project open".to_string())
 }
 
+#[derive(Serialize)]
+pub struct ColumnDto {
+    pub id: String,
+    pub aliases: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct ConfigDto {
+    pub columns: Vec<ColumnDto>,
+}
+
+// ── Config ──────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_config(state: State<'_, AppState>) -> Result<ConfigDto, String> {
+    let root = require_project(&state)?;
+    let config = untask_core::config::Config::load(&root);
+    Ok(ConfigDto {
+        columns: config
+            .columns
+            .into_iter()
+            .map(|c| ColumnDto {
+                id: c.id,
+                aliases: c.aliases,
+            })
+            .collect(),
+    })
+}
+
 // ── Project lifecycle ───────────────────────────────────────────────
 
 #[tauri::command]

@@ -1,7 +1,22 @@
 import { writable } from "svelte/store";
 
+import type { ColumnDto, DocInfo, TaskDto } from "$lib/api";
+
 export type ShellView = "board" | "list" | "docs" | "next";
 
 export const theme = writable<"light" | "dark">("dark");
 export const activeView = writable<ShellView>("board");
-export const selectedProjectPath = writable<string | null>(null);
+
+// Project
+export const projectPath = writable<string | null>(null);
+export const projectName = writable<string | null>(null);
+
+// Config
+export const columns = writable<ColumnDto[]>([]);
+
+// Tasks
+export const tasks = writable<TaskDto[]>([]);
+export const selectedTask = writable<TaskDto | null>(null);
+
+// Docs
+export const docs = writable<DocInfo[]>([]);

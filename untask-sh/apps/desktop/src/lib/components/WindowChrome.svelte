@@ -1,3 +1,7 @@
+<script lang="ts">
+  let { title = "Untask" }: { title?: string } = $props();
+</script>
+
 <header
   data-tauri-drag-region
   class="flex h-8 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-3 backdrop-blur"
@@ -9,10 +13,8 @@
   </div>
 
   <div class="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-    Untask Desktop Foundation
+    {title}
   </div>
 
-  <div class="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-    Tauri 2 · Svelte 5
-  </div>
+  <div class="w-[52px]"></div>
 </header>
