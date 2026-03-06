@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(name = "untask", version, about = "Local-first project companion")]
 pub struct Cli {
     #[command(subcommand)]
@@ -15,7 +15,7 @@ pub struct Cli {
     pub no_color: bool,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Initialize a new untask project
     Init,
@@ -114,7 +114,7 @@ pub enum Commands {
     Open,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum DocsCommands {
     /// List all docs
     List,
@@ -126,8 +126,47 @@ pub enum DocsCommands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum SkillCommands {
     /// Install the untask skill for an AI agent
     Install,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_global_flags() {
+        let cli = Cli::try_parse_from(["untask", "--json", "--no-color", "list"]).unwrap();
+
+        assert!(cli.json);
+        assert!(cli.no_color);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::List {
+                status: None,
+                tag: None
+            })
+        ));
+    }
+
+    #[test]
+    fn parses_nested_subcommands() {
+        let docs = Cli::try_parse_from(["untask", "docs", "show", "plan"]).unwrap();
+        assert!(matches!(
+            docs.command,
+            Some(Commands::Docs {
+                cmd: Some(DocsCommands::Show { name })
+            }) if name == "plan"
+        ));
+
+        let skill = Cli::try_parse_from(["untask", "skill", "install"]).unwrap();
+        assert!(matches!(
+            skill.command,
+            Some(Commands::Skill {
+                cmd: SkillCommands::Install
+            })
+        ));
+    }
 }

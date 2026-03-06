@@ -46,6 +46,17 @@ fn add_normalizes_status_alias() {
 }
 
 #[test]
+fn add_rejects_unknown_status() {
+    let (_tmp, store) = setup();
+    let err = store.add("Mystery task", Some("mystery")).unwrap_err();
+    assert!(matches!(
+        err,
+        untask_core::error::UntaskError::InvalidConfig(message)
+            if message.contains("unknown status: mystery")
+    ));
+}
+
+#[test]
 fn add_increments_ids() {
     let (_tmp, store) = setup();
     let t1 = store.add("First", None).unwrap();
@@ -68,6 +79,37 @@ fn add_is_gap_tolerant() {
     store.delete(1).unwrap();
     let t3 = store.add("Third", None).unwrap();
     assert_eq!(t3.id, Some(3));
+}
+
+#[test]
+fn add_uses_frontmatter_ids_when_allocating_next_id() {
+    let (tmp, store) = setup();
+    let legacy_path = tmp.path().join(".untask/tasks/legacy-task.md");
+    std::fs::write(
+        &legacy_path,
+        "---\nid: 7\ntitle: Legacy task\nstatus: todo\n---\n",
+    )
+    .unwrap();
+
+    let task = store.add("Fresh task", None).unwrap();
+
+    assert_eq!(task.id, Some(8));
+    assert_eq!(
+        task.file_path
+            .as_ref()
+            .and_then(|path| path.file_name())
+            .and_then(|name| name.to_str()),
+        Some("008-fresh-task.md")
+    );
+}
+
+#[test]
+fn add_done_sets_completed() {
+    let (_tmp, store) = setup();
+    let task = store.add("Ship it", Some("done")).unwrap();
+
+    assert_eq!(task.status, "done");
+    assert!(task.completed.is_some());
 }
 
 // ── List ───────────────────────────────────────────────────────────
@@ -114,6 +156,22 @@ fn list_does_not_modify_files() {
         unindexed_path.file_name().unwrap().to_str().unwrap(),
         original_name
     );
+}
+
+#[test]
+fn list_orders_managed_tasks_before_unindexed_files() {
+    let (tmp, store) = setup();
+    store.add("Managed task", None).unwrap();
+    std::fs::write(
+        tmp.path().join(".untask/tasks/notes.md"),
+        "---\ntitle: Loose note\nstatus: todo\n---\n",
+    )
+    .unwrap();
+
+    let tasks = store.list(None).unwrap();
+    let titles: Vec<_> = tasks.iter().map(|task| task.title.as_str()).collect();
+
+    assert_eq!(titles, vec!["Managed task", "Loose note"]);
 }
 
 #[test]
@@ -334,4 +392,33 @@ fn concurrent_status_changes() {
     for t in &tasks {
         assert_eq!(t.status, "in-progress");
     }
+}
+
+#[test]
+fn concurrent_deletes_remove_all_targets() {
+    let (tmp, store) = setup();
+    for i in 0..5 {
+        store.add(&format!("Task {i}"), None).unwrap();
+    }
+
+    let root = tmp.path().to_path_buf();
+    let barrier = Arc::new(Barrier::new(5));
+    let mut handles = vec![];
+
+    for id in 1..=5 {
+        let root = root.clone();
+        let barrier = Arc::clone(&barrier);
+        handles.push(std::thread::spawn(move || {
+            let store = TaskStore::new(root).unwrap();
+            barrier.wait();
+            store.delete(id).unwrap();
+        }));
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+    assert!(store.list(None).unwrap().is_empty());
 }

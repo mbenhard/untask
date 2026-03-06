@@ -1,5 +1,7 @@
 mod cli;
 
+use std::ffi::OsString;
+
 use clap::Parser;
 use cli::{Cli, Commands};
 use colored::control::set_override;
@@ -8,7 +10,7 @@ fn main() {
     let cli = Cli::parse();
 
     // Respect --no-color flag or NO_COLOR environment variable
-    if cli.no_color || std::env::var_os("NO_COLOR").is_some() {
+    if should_disable_color(cli.no_color, std::env::var_os("NO_COLOR")) {
         set_override(false);
     }
 
@@ -25,6 +27,10 @@ fn main() {
         }
     };
     std::process::exit(code);
+}
+
+fn should_disable_color(no_color_flag: bool, no_color_env: Option<OsString>) -> bool {
+    no_color_flag || no_color_env.is_some()
 }
 
 fn run(cli: &Cli) -> untask_core::error::Result<()> {
@@ -54,5 +60,25 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_disable_color;
+
+    #[test]
+    fn disables_color_when_flag_is_set() {
+        assert!(should_disable_color(true, None));
+    }
+
+    #[test]
+    fn disables_color_when_env_is_present() {
+        assert!(should_disable_color(false, Some("1".into())));
+    }
+
+    #[test]
+    fn keeps_color_enabled_when_flag_and_env_are_absent() {
+        assert!(!should_disable_color(false, None));
     }
 }

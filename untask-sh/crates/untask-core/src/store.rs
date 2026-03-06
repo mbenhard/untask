@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::cmp::Ordering;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 
@@ -7,7 +8,7 @@ use crate::error::{Result, UntaskError};
 use crate::fs::atomic_write;
 use crate::lock::ProjectLock;
 use crate::slug::generate_slug;
-use crate::task::{Task, parse_filename_id, parse_task, serialize_task};
+use crate::task::{Task, TaskKind, parse_filename_id, parse_task, serialize_task};
 
 pub struct TaskStore {
     project_root: PathBuf,
@@ -75,7 +76,7 @@ impl TaskStore {
         }
 
         // Sort by ID (managed first), then unindexed
-        tasks.sort_by(|a, b| a.id.cmp(&b.id));
+        tasks.sort_by(task_order);
 
         if let Some(filter) = filter {
             if let Some(ref status) = filter.status {
@@ -156,7 +157,7 @@ impl TaskStore {
         for entry in std::fs::read_dir(&tasks_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if let Some(id) = parse_filename_id(&path) {
+            if let Some(id) = self.read_known_id(&path)? {
                 max_id = max_id.max(id);
             }
         }
@@ -176,14 +177,13 @@ impl TaskStore {
 
         let id = self.next_id()?;
         let slug = generate_slug(title);
-        let canonical_status = status
-            .and_then(|s| self.config.normalize_status(s))
-            .unwrap_or_else(|| self.config.default_status());
+        let canonical_status = self.resolve_status(status)?;
 
         let now = Utc::now();
         let task = Task {
             id: Some(id),
             title: title.to_string(),
+            completed: (canonical_status == "done").then_some(now),
             status: canonical_status,
             created: Some(now.date_naive()),
             updated: Some(now),
@@ -268,10 +268,7 @@ impl TaskStore {
 
     /// Apply a status change, handling done/undone transitions for `completed`.
     fn apply_status_change(&self, task: &mut Task, new_status: &str) -> Result<()> {
-        let canonical = self
-            .config
-            .normalize_status(new_status)
-            .ok_or_else(|| UntaskError::InvalidConfig(format!("unknown status: {new_status}")))?;
+        let canonical = self.normalize_status(new_status)?;
 
         let was_done = self.config.normalize_status(&task.status).as_deref() == Some("done");
         let is_done = canonical == "done";
@@ -285,5 +282,51 @@ impl TaskStore {
         }
 
         Ok(())
+    }
+
+    fn normalize_status(&self, raw: &str) -> Result<String> {
+        self.config
+            .normalize_status(raw)
+            .ok_or_else(|| UntaskError::InvalidConfig(format!("unknown status: {raw}")))
+    }
+
+    fn resolve_status(&self, requested: Option<&str>) -> Result<String> {
+        requested
+            .map(|status| self.normalize_status(status))
+            .transpose()?
+            .map(Ok)
+            .unwrap_or_else(|| Ok(self.config.default_status()))
+    }
+
+    fn read_known_id(&self, path: &Path) -> Result<Option<u32>> {
+        if path.extension().is_none_or(|ext| ext != "md") {
+            return Ok(None);
+        }
+
+        if let Some(id) = parse_filename_id(path) {
+            return Ok(Some(id));
+        }
+
+        let content = std::fs::read_to_string(path)?;
+        Ok(parse_task(&content).id)
+    }
+}
+
+fn task_order(left: &Task, right: &Task) -> Ordering {
+    task_kind_rank(left.kind())
+        .cmp(&task_kind_rank(right.kind()))
+        .then_with(|| {
+            left.id
+                .unwrap_or(u32::MAX)
+                .cmp(&right.id.unwrap_or(u32::MAX))
+        })
+        .then_with(|| left.title.to_lowercase().cmp(&right.title.to_lowercase()))
+}
+
+fn task_kind_rank(kind: TaskKind) -> u8 {
+    match kind {
+        TaskKind::Managed => 0,
+        TaskKind::UnindexedWithId => 1,
+        TaskKind::UnindexedWithoutId => 2,
     }
 }
