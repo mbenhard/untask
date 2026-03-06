@@ -393,7 +393,7 @@
         "dependencies": [
           "5"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -401,7 +401,7 @@
             "description": "Create the DocsStore struct and implement doc discovery that resolves globs from config.docs relative to project root, deduplicates by canonical path, and includes .untask/docs/**/*.md by default.",
             "dependencies": [],
             "details": "Create `crates/untask-core/src/docs.rs` with Doc and DocsStore structs. Implement DocsStore::list() that: (1) reads config.docs globs, (2) resolves globs relative to project_root using the glob crate, (3) includes `.untask/docs/**/*.md` as default pattern, (4) canonicalizes all paths to deduplicate symlinks and relative paths, (5) reads file content and extracts basename, (6) returns Vec<Doc> with path, basename, and content. Handle errors gracefully for inaccessible files.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create `crates/untask-core/tests/docs_test.rs` with tests: (1) doc list discovers files from config.docs globs, (2) doc list deduplicates by canonical path when same file accessed via different paths, (3) doc list includes default .untask/docs/**/*.md pattern, (4) doc list handles missing directories gracefully, (5) doc list reads file content correctly.",
             "parentId": "undefined"
           },
@@ -413,7 +413,7 @@
               1
             ],
             "details": "Implement DocsStore::get(reference: &str) that: (1) calls list() to get all docs, (2) filters docs where basename matches reference (case-sensitive exact match), (3) if exactly one match, return Ok(doc), (4) if zero matches, return NotFound error, (5) if multiple matches, return Ambiguous error variant containing all matching PathBuf entries. The Ambiguous error should include helpful context like 'Multiple docs found with basename \"example.md\": path/to/first.md, path/to/second.md'.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Add tests to docs_test.rs: (1) get by unique basename succeeds and returns correct doc, (2) get by ambiguous basename returns Ambiguous error with all matching paths listed, (3) get by non-existent basename returns NotFound error, (4) get is case-sensitive for basename matching.",
             "parentId": "undefined"
           },
@@ -425,7 +425,7 @@
               1
             ],
             "details": "Create `crates/untask-core/src/search.rs` with SearchResult struct (kind: SearchResultKind enum, path, title, snippet, line_number). Implement search(project_root, query, tasks_only) that: (1) loads all tasks from TaskStore, (2) loads all docs from DocsStore unless tasks_only=true, (3) performs case-insensitive substring search in task titles/bodies/tags and doc content, (4) generates contextual snippets (50 chars before/after match) with match highlighting using markers like **match**, (5) captures line_number where match occurs, (6) returns Vec<SearchResult> sorted by relevance (title matches first, then content matches).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create `crates/untask-core/tests/search_test.rs` with tests: (1) search finds matches in task titles case-insensitively, (2) search finds matches in task bodies, (3) search finds matches in doc content, (4) search respects tasks_only flag and excludes docs, (5) search generates snippets with context around matches, (6) search returns empty Vec when no matches, (7) search handles special regex characters in query safely.",
             "parentId": "undefined"
           }

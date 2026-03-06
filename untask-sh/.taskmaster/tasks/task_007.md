@@ -2,7 +2,7 @@
 
 **Title:** Docs Discovery and Search Implementation
 
-**Status:** pending
+**Status:** done
 
 **Dependencies:** 5
 
