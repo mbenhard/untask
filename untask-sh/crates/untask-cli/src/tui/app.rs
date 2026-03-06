@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{Block, List, ListItem, ListState, Paragraph, Tabs};
-use ratatui::Frame;
 
 use untask_core::store::TaskStore;
 use untask_core::task::Task;
@@ -39,6 +39,14 @@ impl App {
 
     pub fn refresh(&mut self) -> untask_core::error::Result<()> {
         self.tasks = self.store.list(None)?;
+        self.clamp_selection();
+
+        if let View::TaskDetail(id) = self.view
+            && !self.tasks.iter().any(|task| task.id == Some(id))
+        {
+            self.view = View::List;
+        }
+
         Ok(())
     }
 
@@ -74,12 +82,7 @@ impl App {
                 return;
             }
             KeyCode::Tab => {
-                self.view = match self.view {
-                    View::Kanban => View::List,
-                    View::List => View::Docs,
-                    View::Docs => View::Kanban,
-                    View::TaskDetail(_) => View::List,
-                };
+                self.cycle_view();
                 return;
             }
             _ => {}
@@ -89,6 +92,29 @@ impl App {
         match self.view {
             View::List | View::Kanban => self.handle_list_nav(key),
             View::Docs | View::TaskDetail(_) => {}
+        }
+    }
+
+    fn cycle_view(&mut self) {
+        self.view = match self.view {
+            View::Kanban => View::List,
+            View::List => View::Docs,
+            View::Docs => View::Kanban,
+            View::TaskDetail(_) => View::List,
+        };
+    }
+
+    fn clamp_selection(&mut self) {
+        self.selected = self.selected.min(self.tasks.len().saturating_sub(1));
+    }
+
+    fn selected_task(&self) -> Option<&Task> {
+        self.tasks.get(self.selected)
+    }
+
+    fn open_selected_task(&mut self) {
+        if let Some(id) = self.selected_task().and_then(|task| task.id) {
+            self.view = View::TaskDetail(id);
         }
     }
 
@@ -112,11 +138,7 @@ impl App {
                 self.selected = count - 1;
             }
             KeyCode::Enter => {
-                if let Some(task) = self.tasks.get(self.selected) {
-                    if let Some(id) = task.id {
-                        self.view = View::TaskDetail(id);
-                    }
-                }
+                self.open_selected_task();
             }
             _ => {}
         }
@@ -164,7 +186,11 @@ impl App {
             .iter()
             .map(|task| {
                 let id_str = task.id.map(|id| format!("#{id}")).unwrap_or_default();
-                ListItem::new(format!("{id_str} {title} [{status}]", title = task.title, status = task.status))
+                ListItem::new(format!(
+                    "{id_str} {title} [{status}]",
+                    title = task.title,
+                    status = task.status
+                ))
             })
             .collect();
 
@@ -190,37 +216,37 @@ impl App {
             .collect();
 
         if columns.is_empty() {
-            let placeholder = Paragraph::new("No columns configured")
-                .block(Block::bordered().title("Kanban"));
+            let placeholder =
+                Paragraph::new("No columns configured").block(Block::bordered().title("Kanban"));
             frame.render_widget(placeholder, area);
             return;
         }
 
-        let constraints: Vec<Constraint> = columns
-            .iter()
-            .map(|_| Constraint::Fill(1))
-            .collect();
+        let constraints: Vec<Constraint> = columns.iter().map(|_| Constraint::Fill(1)).collect();
 
         let col_areas = Layout::horizontal(constraints).split(area);
+        let selected_task = self.selected_task().map(|task| task as *const Task);
 
         for (i, col_id) in columns.iter().enumerate() {
             let col_tasks: Vec<&Task> = self
                 .tasks
                 .iter()
                 .filter(|t| {
-                    self.store
-                        .config()
-                        .normalize_status(&t.status)
-                        .as_deref()
-                        == Some(col_id)
+                    self.store.config().normalize_status(&t.status).as_deref() == Some(col_id)
                 })
                 .collect();
 
             let items: Vec<ListItem> = col_tasks
                 .iter()
                 .map(|t| {
+                    let is_selected = selected_task == Some(*t as *const Task);
+                    let marker = if is_selected { "> " } else { "  " };
                     let id_str = t.id.map(|id| format!("#{id} ")).unwrap_or_default();
-                    ListItem::new(format!("{id_str}{}", t.title))
+                    ListItem::new(format!("{marker}{id_str}{}", t.title)).style(if is_selected {
+                        Style::default().add_modifier(Modifier::REVERSED)
+                    } else {
+                        Style::default()
+                    })
                 })
                 .collect();
 
@@ -272,10 +298,113 @@ impl App {
     fn draw_footer(&self, frame: &mut Frame, area: Rect) {
         let help = match self.view {
             View::TaskDetail(_) => "esc:back  q:quit",
+            View::Docs => "tab:next view  1-3:switch view  q:quit",
             _ => "\u{2191}\u{2193}/jk:navigate  enter:open  tab:next view  q:quit",
         };
 
         let footer = Paragraph::new(help).style(Style::default().add_modifier(Modifier::DIM));
         frame.render_widget(footer, area);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use tempfile::TempDir;
+
+    use super::{App, View};
+    use untask_core::{init, store::TaskStore};
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn make_app() -> (TempDir, App) {
+        let tmp = TempDir::new().unwrap();
+        init::init(tmp.path()).unwrap();
+
+        let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+        store.add("Alpha task", None).unwrap();
+        store.add("Bravo task", Some("done")).unwrap();
+
+        let app = App::new(TaskStore::new(tmp.path().to_path_buf()).unwrap()).unwrap();
+        (tmp, app)
+    }
+
+    #[test]
+    fn quits_on_q_and_ctrl_c() {
+        let (_tmp, mut app) = make_app();
+        app.handle_key(key(KeyCode::Char('q')));
+        assert!(app.should_quit);
+
+        let (_tmp, mut app) = make_app();
+        app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        assert!(app.should_quit);
+    }
+
+    #[test]
+    fn tab_and_number_keys_switch_views() {
+        let (_tmp, mut app) = make_app();
+
+        assert_eq!(app.view, View::List);
+
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.view, View::Docs);
+
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.view, View::Kanban);
+
+        app.handle_key(key(KeyCode::Char('2')));
+        assert_eq!(app.view, View::List);
+
+        app.handle_key(key(KeyCode::Char('1')));
+        assert_eq!(app.view, View::Kanban);
+
+        app.handle_key(key(KeyCode::Char('3')));
+        assert_eq!(app.view, View::Docs);
+    }
+
+    #[test]
+    fn enter_opens_selected_task_and_escape_returns_to_list() {
+        let (_tmp, mut app) = make_app();
+        app.selected = 1;
+
+        app.handle_key(key(KeyCode::Enter));
+        assert_eq!(app.view, View::TaskDetail(2));
+
+        app.handle_key(key(KeyCode::Esc));
+        assert_eq!(app.view, View::List);
+    }
+
+    #[test]
+    fn refresh_clamps_selection_after_task_removal() {
+        let (_tmp, mut app) = make_app();
+        app.selected = 1;
+
+        let task_path = app.tasks[1].file_path.clone().unwrap();
+        fs::remove_file(task_path).unwrap();
+
+        app.refresh().unwrap();
+
+        assert_eq!(app.selected, 0);
+        assert_eq!(app.tasks.len(), 1);
+    }
+
+    #[test]
+    fn refresh_exits_detail_when_selected_task_disappears() {
+        let (_tmp, mut app) = make_app();
+        app.selected = 1;
+        app.handle_key(key(KeyCode::Enter));
+        assert_eq!(app.view, View::TaskDetail(2));
+
+        let task_path = app.tasks[1].file_path.clone().unwrap();
+        fs::remove_file(task_path).unwrap();
+
+        app.refresh().unwrap();
+
+        assert_eq!(app.view, View::List);
+        assert_eq!(app.selected, 0);
     }
 }
