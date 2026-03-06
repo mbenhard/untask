@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+mod tui;
 
 use std::ffi::OsString;
 
@@ -38,9 +39,17 @@ fn should_disable_color(no_color_flag: bool, no_color_env: Option<OsString>) -> 
 fn run(cli: &Cli) -> untask_core::error::Result<()> {
     match &cli.command {
         None => {
-            // No subcommand → TUI placeholder
-            println!("untask: TUI coming soon. Use --help for available commands.");
-            Ok(())
+            let cwd = std::env::current_dir()?;
+            match untask_core::project::find_project_root(&cwd) {
+                Ok(root) => {
+                    let store = TaskStore::new(root)?;
+                    tui::run(store)
+                }
+                Err(_) => {
+                    eprintln!("No untask project found. Run 'untask init' first.");
+                    std::process::exit(1);
+                }
+            }
         }
         Some(Commands::Init) => {
             let root = std::env::current_dir()?;
