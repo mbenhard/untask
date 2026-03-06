@@ -1,5 +1,5 @@
 {
-  "name": "desktop",
+  "name": "untask-desktop",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -23,7 +23,10 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/geist-mono": "^5.2.7",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
     "bits-ui": "^2.16.3",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.5.0",

@@ -84,6 +84,22 @@ fn check_detects_unknown_statuses() {
     assert_eq!(report.unknown_statuses[0].title, "Mystery status");
 }
 
+#[test]
+fn check_detects_status_aliases_that_need_canonicalization() {
+    let (tmp, _store) = setup();
+    write_task(
+        tmp.path(),
+        "001-task.md",
+        "---\nid: 1\ntitle: Alias status\nstatus: to-do\n---\n",
+    );
+
+    let report = check(tmp.path()).unwrap();
+    assert_eq!(report.noncanonical_statuses.len(), 1);
+    assert_eq!(report.noncanonical_statuses[0].status, "to-do");
+    assert_eq!(report.noncanonical_statuses[0].canonical_status, "todo");
+    assert_eq!(report.noncanonical_statuses[0].title, "Alias status");
+}
+
 // ── 5. Repair assigns IDs to unindexed tasks ────────────────────
 
 #[test]
@@ -148,6 +164,26 @@ fn repair_normalizes_unknown_statuses() {
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
     let task = store.get(1).unwrap();
     assert_eq!(task.status, "backlog");
+}
+
+#[test]
+fn repair_normalizes_status_aliases_to_canonical_ids() {
+    let (tmp, _store) = setup();
+    write_task(
+        tmp.path(),
+        "001-task.md",
+        "---\nid: 1\ntitle: Alias status\nstatus: to-do\n---\n",
+    );
+
+    let report = repair(tmp.path()).unwrap();
+    assert_eq!(report.noncanonical_statuses.len(), 1);
+    assert!(!report.actions_taken.is_empty());
+
+    let task = TaskStore::new(tmp.path().to_path_buf())
+        .unwrap()
+        .get(1)
+        .unwrap();
+    assert_eq!(task.status, "todo");
 }
 
 // ── 8. Repair aligns frontmatter ID with filename ───────────────
@@ -246,7 +282,9 @@ fn repair_disambiguates_duplicate_slugs() {
     );
     // Both should have numeric prefixes now
     assert!(
-        files.iter().all(|f| f.chars().next().unwrap().is_ascii_digit()),
+        files
+            .iter()
+            .all(|f| f.chars().next().unwrap().is_ascii_digit()),
         "all files should have numeric prefixes: {files:?}"
     );
 }

@@ -15,6 +15,7 @@ pub struct RepairReport {
     pub unindexed_tasks: Vec<UnindexedTask>,
     pub mismatched_ids: Vec<MismatchedId>,
     pub unknown_statuses: Vec<UnknownStatus>,
+    pub noncanonical_statuses: Vec<NoncanonicalStatus>,
     pub actions_taken: Vec<RepairAction>,
 }
 
@@ -23,6 +24,7 @@ impl RepairReport {
         self.unindexed_tasks.is_empty()
             && self.mismatched_ids.is_empty()
             && self.unknown_statuses.is_empty()
+            && self.noncanonical_statuses.is_empty()
     }
 }
 
@@ -44,6 +46,14 @@ pub struct MismatchedId {
 pub struct UnknownStatus {
     pub path: PathBuf,
     pub status: String,
+    pub title: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NoncanonicalStatus {
+    pub path: PathBuf,
+    pub status: String,
+    pub canonical_status: String,
     pub title: String,
 }
 
@@ -98,12 +108,25 @@ fn scan(dir: &Path, config: &Config) -> Result<RepairReport> {
             }
         }
 
-        if !task.status.is_empty() && config.normalize_status(&task.status).is_none() {
-            report.unknown_statuses.push(UnknownStatus {
-                path: path.clone(),
-                status: task.status.clone(),
-                title: task.title.clone(),
-            });
+        if !task.status.is_empty() {
+            match config.normalize_status(&task.status) {
+                Some(canonical) if task.status.trim() != canonical => {
+                    report.noncanonical_statuses.push(NoncanonicalStatus {
+                        path: path.clone(),
+                        status: task.status.clone(),
+                        canonical_status: canonical,
+                        title: task.title.clone(),
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    report.unknown_statuses.push(UnknownStatus {
+                        path: path.clone(),
+                        status: task.status.clone(),
+                        title: task.title.clone(),
+                    });
+                }
+            }
         }
     }
 
@@ -127,9 +150,26 @@ fn max_id(dir: &Path) -> Result<u32> {
 
 /// Apply repairs to all detected issues in a single pass per file.
 fn apply_fixes(dir: &Path, config: &Config, report: &mut RepairReport) -> Result<()> {
-    let unindexed: HashSet<PathBuf> = report.unindexed_tasks.iter().map(|u| u.path.clone()).collect();
-    let mismatched: HashSet<PathBuf> = report.mismatched_ids.iter().map(|m| m.path.clone()).collect();
-    let bad_status: HashSet<PathBuf> = report.unknown_statuses.iter().map(|u| u.path.clone()).collect();
+    let unindexed: HashSet<PathBuf> = report
+        .unindexed_tasks
+        .iter()
+        .map(|u| u.path.clone())
+        .collect();
+    let mismatched: HashSet<PathBuf> = report
+        .mismatched_ids
+        .iter()
+        .map(|m| m.path.clone())
+        .collect();
+    let bad_status: HashSet<PathBuf> = report
+        .unknown_statuses
+        .iter()
+        .map(|u| u.path.clone())
+        .collect();
+    let canonical_statuses: std::collections::HashMap<PathBuf, String> = report
+        .noncanonical_statuses
+        .iter()
+        .map(|status| (status.path.clone(), status.canonical_status.clone()))
+        .collect();
 
     let mut next_id = max_id(dir)?;
     let mut used_filenames: HashSet<String> = HashSet::new();
@@ -143,8 +183,9 @@ fn apply_fixes(dir: &Path, config: &Config, report: &mut RepairReport) -> Result
         let is_unindexed = unindexed.contains(&path);
         let is_mismatched = mismatched.contains(&path);
         let has_bad_status = bad_status.contains(&path);
+        let canonical_status = canonical_statuses.get(&path);
 
-        if !is_unindexed && !is_mismatched && !has_bad_status {
+        if !is_unindexed && !is_mismatched && !has_bad_status && canonical_status.is_none() {
             continue;
         }
 
@@ -188,7 +229,19 @@ fn apply_fixes(dir: &Path, config: &Config, report: &mut RepairReport) -> Result
         }
 
         // Fix unknown status: normalize to default
-        if has_bad_status {
+        if let Some(canonical_status) = canonical_status {
+            let old_status = task.status.clone();
+            task.status = canonical_status.clone();
+
+            report.actions_taken.push(RepairAction {
+                description: format!(
+                    "Canonicalized status '{}' → '{}' in {}",
+                    old_status,
+                    canonical_status,
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                ),
+            });
+        } else if has_bad_status {
             let old_status = task.status.clone();
             let default = config.default_status();
             task.status = default.clone();
@@ -221,9 +274,7 @@ fn apply_fixes(dir: &Path, config: &Config, report: &mut RepairReport) -> Result
 
             if path != new_path {
                 std::fs::remove_file(&path)?;
-                used_filenames.remove(
-                    path.file_name().unwrap_or_default().to_str().unwrap_or(""),
-                );
+                used_filenames.remove(path.file_name().unwrap_or_default().to_str().unwrap_or(""));
             }
             used_filenames.insert(filename.clone());
 
