@@ -7,8 +7,8 @@ const PROVIDER_OPTIONS: { value: ProviderType; label: string }[] = [
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
-  { value: 'ollama', label: 'Ollama (local) experimental' },
-  { value: 'inception', label: 'Inception Labs experimental' },
+  { value: 'ollama', label: 'Ollama (local) (experimental)' },
+  { value: 'inception', label: 'Inception Labs (experimental)' },
 ];
 
 type ProviderSelectorProps = {

@@ -15,6 +15,7 @@ export const SUPPORTED_MODEL_IDS = [
   'minimax/minimax-m2.5',
   'z-ai/glm-5',
   'moonshotai/kimi-k2.5',
+  'inception/mercury-2',
   // OpenAI direct models
   'gpt-4o-mini',
   'gpt-4o',
@@ -204,6 +205,16 @@ const CURATED_MODELS: readonly CuratedModel[] = [
     capabilities: ['tools', 'vision', 'reasoning'],
     isRecommended: true,
   },
+  // Mercury 2 — OpenRouter
+  {
+    id: 'inception/mercury-2',
+    name: 'Mercury 2',
+    provider: 'openrouter',
+    contextWindow: 128_000,
+    costTier: 'cheap',
+    capabilities: ['tools', 'reasoning'],
+    isRecommended: true,
+  },
   // Mercury 2 — Inception Labs
   {
     id: 'mercury-2',
@@ -320,6 +331,16 @@ const MODEL_CATALOG: readonly ModelCatalogEntry[] = [
     supportsWebSearch: true,
     supportsVision: true,
     webSearchMethod: 'kimi_builtin',
+  },
+  {
+    id: 'inception/mercury-2',
+    label: 'Mercury 2 (OpenRouter)',
+    inputCostPerMillion: 0.25,
+    outputCostPerMillion: 0.75,
+    defaultSelected: false,
+    supportsReasoning: true,
+    supportsWebSearch: false,
+    supportsVision: false,
   },
   {
     id: 'gpt-4o-mini',
