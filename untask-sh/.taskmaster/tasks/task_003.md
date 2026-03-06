@@ -2,7 +2,7 @@
 
 **Title:** Task Parsing, Serialization, and Metadata Rules
 
-**Status:** pending
+**Status:** done
 
 **Dependencies:** 2
 

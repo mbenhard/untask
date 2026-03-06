@@ -9,7 +9,7 @@
         "testStrategy": "1. Run `cargo build --workspace` - should compile successfully with no errors.\n2. Run `cargo test --workspace` - should pass (no tests yet, but no failures).\n3. Verify no nested `.git/` directory exists.\n4. Verify directory structure matches the repository layout spec:\n   - `crates/untask-core/`\n   - `crates/untask-cli/`\n   - `apps/desktop/` (empty placeholder)\n   - `.github/workflows/` (empty placeholder)",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -17,7 +17,7 @@
             "description": "Initialize the root Cargo.toml file with workspace resolver, member crates, and shared workspace dependencies including serde, chrono, thiserror, and tempfile.",
             "dependencies": [],
             "details": "Create `Cargo.toml` at repository root with:\n- `[workspace]` section with `resolver = \"2\"`\n- `members = [\"crates/untask-core\", \"crates/untask-cli\"]`\n- `[workspace.dependencies]` block containing:\n  - serde 1.0 with derive feature\n  - serde_yaml 0.9\n  - serde_json 1.0\n  - chrono 0.4 with serde feature\n  - thiserror 2.0\n  - tempfile 3.0\n\nThis establishes the workspace foundation that other crates will reference.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `cargo metadata --format-version=1` to verify workspace structure is valid and members are correctly recognized."
           },
           {
@@ -28,7 +28,7 @@
               1
             ],
             "details": "Create directory `crates/untask-core/` with:\n1. `Cargo.toml` containing:\n   - Package metadata (name=\"untask-core\", version=\"0.1.0\", edition=\"2024\")\n   - Dependencies section referencing workspace deps via `.workspace = true`\n   - Dev-dependencies section with tempfile\n2. `src/lib.rs` with module declarations for future implementation\n\nThis crate will contain shared domain logic, types, and business rules.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `cargo check -p untask-core` to verify the crate compiles successfully and workspace dependency resolution works correctly."
           },
           {
@@ -39,7 +39,7 @@
               1
             ],
             "details": "Create directory `crates/untask-cli/` with:\n1. `Cargo.toml` containing:\n   - Package metadata (name=\"untask-cli\", version=\"0.1.0\", edition=\"2024\")\n   - Dependencies including clap for command-line parsing\n   - Reference to untask-core crate\n2. `src/main.rs` with:\n   - Placeholder main() function\n   - Basic structure for future CLI command handling\n\nThis will be the user-facing terminal interface binary.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `cargo build -p untask-cli` to verify binary compilation succeeds and can execute with `cargo run -p untask-cli`."
           },
           {
@@ -48,7 +48,7 @@
             "description": "Add or update the root .gitignore file to exclude Rust build artifacts, optional Cargo.lock, and untask runtime files like cache and lock files.",
             "dependencies": [],
             "details": "Update `.gitignore` in repository root to include:\n- `/target/` - Rust build output directory\n- `Cargo.lock` - Optional for libraries (can be committed for binaries)\n- `.untask/cache/` - Runtime cache directory\n- `.untask/.lock` - Project lock file for concurrent access control\n\nEnsure entries don't conflict with existing gitignore patterns if file already exists.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `git status` to verify /target/ and .untask/ directories are properly ignored. Create test files in these directories and confirm they don't appear in git status output."
           },
           {
@@ -57,7 +57,7 @@
             "description": "Create placeholder directories for the desktop app and GitHub workflows to establish the complete repository structure.",
             "dependencies": [],
             "details": "Create the following empty directories:\n1. `apps/desktop/` - Future location for Tauri desktop application\n2. `.github/workflows/` - Future location for CI/CD workflow definitions\n\nThese directories establish the full monorepo structure even though they won't contain files yet. This prevents confusion about repository layout and makes future tasks clearer.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify directories exist with `ls -la apps/` and `ls -la .github/`. Run `cargo build --workspace` as final validation that entire workspace structure compiles successfully."
           }
         ]
@@ -72,7 +72,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -80,7 +80,7 @@
             "description": "Define the UntaskError enum with all error variants using thiserror, establish the Result type alias, and create the error.rs module with comprehensive error cases for IO, parsing, validation, and domain errors.",
             "dependencies": [],
             "details": "Create `crates/untask-core/src/error.rs` with the complete UntaskError enum including variants for: Io (with #[from] std::io::Error), YamlParse (with #[from] serde_yaml::Error), JsonParse (with #[from] serde_json::Error), InvalidConfig(String), NotInitialized, TaskNotFound(String), Ambiguous(String, String), RepairFailed(String), and LockFailed(String). Each variant should have appropriate #[error(...)] attributes with formatted display messages. Define the Result<T> type alias as std::result::Result<T, UntaskError> for use throughout the codebase. This establishes the error handling foundation that all other modules will depend on.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Write unit tests in error.rs to verify: (1) Error variant Display implementations produce expected messages, (2) #[from] conversions work correctly for std::io::Error, serde_yaml::Error, and serde_json::Error, (3) Custom error variants (InvalidConfig, TaskNotFound, Ambiguous) properly store and display their string payloads. Test error propagation using the Result<T> alias."
           },
           {
@@ -91,7 +91,7 @@
               1
             ],
             "details": "Create `crates/untask-core/src/config.rs` with: (1) Column struct containing id: String and aliases: Vec<String>, (2) Config struct with columns: Vec<Column>, docs: Vec<String>, theme: Theme fields and serde derives, (3) Config::default() implementation returning 5 columns (backlog, todo, in-progress, review, done) with their standard aliases from the design doc, (4) Config::load(project_root: &Path) -> Result<Config> that reads .untask/config.yml, parses YAML with serde_yaml, validates doc globs for security (reject paths starting with '/', reject paths containing '../'), and falls back to Config::default() on missing or invalid files rather than erroring. The validation logic is security-critical to prevent path traversal attacks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create `crates/untask-core/tests/config_test.rs` with tests for: (1) Config::default() returns exactly 5 columns with correct ids and aliases, (2) Loading valid config.yml with custom columns succeeds and parses correctly, (3) Missing config.yml returns default config without error, (4) Invalid YAML syntax falls back to defaults gracefully, (5) Absolute path doc globs (e.g., '/etc/passwd') are rejected, (6) Parent traversal doc globs (e.g., '../secrets') are rejected, (7) Valid relative doc globs (e.g., 'docs/**/*.md') are accepted."
           },
           {
@@ -102,7 +102,7 @@
               1
             ],
             "details": "Create `crates/untask-core/src/types.rs` containing: (1) Theme enum matching the design doc values `mono`, `color`, and `none`, (2) Priority enum with variants (High, Medium, Low, or similar), (3) Any additional shared DTOs or value objects needed by Config and Task types. All types must derive Debug, Clone, Serialize, and Deserialize from serde. Implement appropriate Default traits where sensible. Update `crates/untask-core/src/lib.rs` to export the error, config, and types modules using pub mod statements. These types establish the shared vocabulary used throughout the application.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Write tests in types.rs or a dedicated test module verifying: (1) Theme enum serializes/deserializes as `mono`, `color`, and `none`, (2) Priority enum serializes to expected JSON/YAML representations, (3) Deserialization from strings works correctly, (4) Default implementations return sensible values, (5) All types can be cloned and debugged properly. Test round-trip serialization/deserialization for each type to ensure serde derives work correctly."
           }
         ]
@@ -117,7 +117,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -125,7 +125,7 @@
             "description": "Create the slug generation module that converts task titles into URL-safe slugs with proper handling of Unicode, special characters, and edge cases. Ensure slugs remain stable and are never regenerated for existing tasks.",
             "dependencies": [],
             "details": "Create `crates/untask-core/src/slug.rs` with `generate_slug(title: &str) -> String` function. Implementation requirements: (1) Convert to lowercase, (2) Replace spaces and special characters with hyphens, (3) Remove consecutive hyphens, (4) Trim leading/trailing hyphens, (5) Handle Unicode characters appropriately, (6) Handle empty strings and edge cases like all-special-characters. Document stability guarantees: slugs are generated once and never changed for existing tasks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests in `crates/untask-core/tests/slug_test.rs`: (1) Basic title conversion, (2) Unicode handling, (3) Special character replacement, (4) Consecutive hyphen removal, (5) Edge cases (empty, all-special-chars, very long titles), (6) Stability verification (same input produces same output)"
           },
           {
@@ -136,7 +136,7 @@
               1
             ],
             "details": "Implement in `crates/untask-core/src/task.rs`: (1) Define Task struct with all fields (id, title, status, priority, tags, created, updated, completed, body, file_path, subtask_progress), (2) Define TaskKind enum (Managed, UnindexedWithId, UnindexedWithoutId), (3) Parse YAML frontmatter between --- markers using serde_yaml, (4) Extract filename prefix for task ID (e.g., '001-fix-login-bug.md' → id=1), (5) Gracefully handle malformed frontmatter by preserving body and using default values, (6) Parse datetime fields using chrono (created as NaiveDate, updated/completed as DateTime<Utc>)",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Tests in `crates/untask-core/tests/task_test.rs`: (1) Parse minimal task with only title and status, (2) Parse rich task with all fields populated, (3) Malformed frontmatter falls back to body-only with defaults, (4) Filename ID extraction from various formats, (5) DateTime parsing and timezone handling"
           },
           {
@@ -147,7 +147,7 @@
               2
             ],
             "details": "Extend task.rs parsing logic: (1) Extract body content after frontmatter (everything after second ---), (2) Implement regex-based checklist counting for `- [ ]` (incomplete) and `- [x]` or `- [X]` (complete) patterns, (3) Calculate subtask_progress tuple as (completed_count, total_count), (4) Count only top-level standard checkbox syntax for progress math and ignore nested subtasks in v1, (5) Preserve exact body content including whitespace and formatting, (6) Handle edge cases like checkboxes in code blocks (should not count)",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Tests in `crates/untask-core/tests/task_test.rs`: (1) Count mixed completed/incomplete checkboxes, (2) Handle uppercase X in [X], (3) Ignore checkboxes in code blocks, (4) Ignore nested subtasks for progress math, (5) Zero subtasks when no checkboxes present, (6) Body content preservation verification"
           },
           {
@@ -158,7 +158,7 @@
               3
             ],
             "details": "Implement serialization in task.rs: (1) Serialize Task to YAML frontmatter using serde_yaml, (2) Format frontmatter between --- markers, (3) Append body content exactly as parsed, (4) Manage timestamp fields: set updated on modification, set completed when status changes to done/completed, preserve created timestamp, (5) Ensure round-trip property: parse(serialize(task)) == task (excluding timestamp updates), (6) Handle optional fields gracefully (omit from frontmatter if None), (7) Format dates consistently (ISO 8601)",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Tests in `crates/untask-core/tests/task_test.rs`: (1) Round-trip test: parse then serialize produces identical content, (2) Timestamp management: updated auto-updates, completed set on status change, (3) Optional fields omitted when None, (4) Body content preserved exactly including special characters, (5) Date format consistency verification, (6) Whitespace and formatting preservation"
           }
         ]
@@ -173,7 +173,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -181,7 +181,7 @@
             "description": "Create lock.rs module with ProjectLock struct that provides exclusive file-based locking using the fs2 crate for concurrent safety across threads and processes.",
             "dependencies": [],
             "details": "Create `crates/untask-core/src/lock.rs` implementing ProjectLock with acquire() method. Add fs2 dependency to Cargo.toml. Use FileExt::lock_exclusive() for blocking lock acquisition on `.untask/.lock` file. Implement RAII pattern where lock is released on drop. Handle lock file creation with proper permissions. Ensure cross-platform compatibility (Unix and Windows). Add proper error handling for lock acquisition failures.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create multi-threaded test spawning 10 threads that attempt to acquire lock simultaneously. Verify only one thread holds lock at a time. Test lock release on drop by verifying subsequent acquisition succeeds. Test lock file creation in non-existent directory fails gracefully. Verify lock blocks until released by concurrent holder."
           },
           {
@@ -192,7 +192,7 @@
               1
             ],
             "details": "Create `crates/untask-core/src/fs.rs` implementing atomic_write(path: &Path, content: &[u8]) -> Result<()>. Generate temp file in same directory as target (ensures same filesystem for atomic rename). Write content to temp file first. Use fs::rename() for atomic operation. Implement cleanup on failure: remove temp file in error paths. Handle edge cases: parent directory doesn't exist, insufficient permissions, disk full during write. Use proper error types from error.rs module.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test successful atomic write creates file with correct content. Test partial write failure leaves no corrupted state (no temp files left behind). Test write to non-existent directory fails with proper error. Test concurrent writes to same file don't interfere (uses locking). Simulate disk full scenario and verify cleanup. Verify rename operation is atomic (no partial reads possible)."
           },
           {
@@ -204,7 +204,7 @@
               2
             ],
             "details": "Create `crates/untask-core/src/init.rs` implementing init(project_root: &Path) -> Result<()>. Create directory structure: `.untask/tasks/`, `.untask/docs/`, `.untask/attachments/`, `.untask/cache/`. Write `.untask/.gitignore` with entries: `.lock` and `cache/` using atomic_write(). Make fully idempotent: use fs::create_dir_all() which succeeds if directories exist. Don't fail if .gitignore already exists with correct content. Acquire ProjectLock before initialization to prevent concurrent init races. Don't create config.yml (allows defaults until user customizes).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test init creates all required directories in fresh location. Test init succeeds when run twice on same location (idempotency). Verify .gitignore contains exact entries: `.lock` and `cache/`. Test init with existing partial structure completes successfully. Test concurrent init calls from multiple threads don't corrupt state. Verify no config.yml is created. Test init in read-only directory fails with proper error."
           }
         ]

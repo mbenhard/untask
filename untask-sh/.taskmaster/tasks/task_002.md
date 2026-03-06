@@ -2,7 +2,7 @@
 
 **Title:** Config, Errors, and Shared Domain Types
 
-**Status:** pending
+**Status:** done
 
 **Dependencies:** 1
 
