@@ -1,10 +1,12 @@
 mod cli;
+mod commands;
 
 use std::ffi::OsString;
 
 use clap::Parser;
 use cli::{Cli, Commands};
 use colored::control::set_override;
+use untask_core::store::TaskStore;
 
 fn main() {
     let cli = Cli::parse();
@@ -49,12 +51,37 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
         Some(cmd) => {
             // All other commands require an initialized project
             let cwd = std::env::current_dir()?;
-            let _root = untask_core::project::find_project_root(&cwd)?;
+            let root = untask_core::project::find_project_root(&cwd)?;
+            let store = TaskStore::new(root)?;
 
             match cmd {
                 Commands::Init => unreachable!(),
+                Commands::Add { title, status } => {
+                    commands::add(&store, title, status.as_deref(), cli.json)
+                }
+                Commands::List {
+                    status,
+                    tag,
+                    priority,
+                    sort,
+                } => commands::list(
+                    &store,
+                    status.as_deref(),
+                    tag.as_deref(),
+                    priority.as_deref(),
+                    sort,
+                    cli.json,
+                ),
+                Commands::Show { reference } => commands::show(&store, reference, cli.json),
+                Commands::Edit { reference } => commands::edit(&store, reference),
+                Commands::Status { reference, status } => {
+                    commands::status(&store, reference, status, cli.json)
+                }
+                Commands::Done { reference } => commands::done(&store, reference, cli.json),
+                Commands::Delete { reference, force } => {
+                    commands::delete(&store, reference, *force, cli.json)
+                }
                 _ => {
-                    // Placeholder — commands will be wired in Task 10
                     println!("Command not yet implemented.");
                     Ok(())
                 }

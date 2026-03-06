@@ -3941,7 +3941,10 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "colored",
+ "serde",
  "serde_json",
+ "shlex",
+ "tempfile",
  "untask-core",
 ]
 

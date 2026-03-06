@@ -323,7 +323,7 @@
         "dependencies": [
           "5"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -331,9 +331,10 @@
             "description": "Implement the scanning and detection logic that identifies three types of issues: files without numeric prefixes (unindexed), files where filename ID doesn't match frontmatter ID (mismatched), and tasks with statuses not matching any column ID or alias (unknown).",
             "dependencies": [],
             "details": "Create `crates/untask-core/src/repair.rs` with detection functions. Implement filesystem scanning to find all task files. For each file: (1) Check if filename has numeric prefix pattern `{id}-{slug}.md`, (2) Parse frontmatter to extract `id` and `status` fields, (3) Compare filename ID with frontmatter ID to detect mismatches, (4) Validate status against project board columns and aliases, (5) Collect all issues into categorized vectors. Handle edge cases like malformed frontmatter, missing fields, and filesystem errors gracefully.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test detection with various malformed states: (1) Files without numeric prefix, (2) Files with prefix but no frontmatter ID, (3) Files where filename ID=5 but frontmatter ID=10, (4) Tasks with status='invalid-status', (5) Mixed scenarios with multiple issues. Verify correct categorization in RepairReport.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:43:32.280Z"
           },
           {
             "id": 2,
@@ -343,9 +344,10 @@
               1
             ],
             "details": "Define Rust structs with proper Serialize derives: RepairReport containing vectors of issues and actions, UnindexedTask with path/has_frontmatter_id/title fields, MismatchedId with path/filename_id/frontmatter_id fields, UnknownStatus with path/current_status/title fields, RepairAction enum variants for each type of fix (AssignedId, RenamedFile, UpdatedFrontmatter, NormalizedStatus). Implement display methods for human-readable output. Ensure report clearly distinguishes between check mode (issues only) and write mode (issues + actions).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test report serialization: (1) Verify JSON output is valid and complete, (2) Test human-readable display format, (3) Verify empty reports serialize correctly, (4) Test reports with all issue types populated, (5) Ensure actions_taken is empty for check mode.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:43:34.469Z"
           },
           {
             "id": 3,
@@ -356,9 +358,10 @@
               2
             ],
             "details": "Implement `repair(project_root: &Path)` function: (1) Acquire write lock before any modifications, (2) Find highest existing ID to determine next available ID, (3) For unindexed tasks: assign next sequential ID, generate slug from title, rename file to `{id}-{slug}.md`, (4) For mismatched IDs: update frontmatter ID to match filename ID, (5) For unknown statuses: map to canonical column ID using board configuration, update frontmatter, (6) Track all actions in RepairAction vector, (7) Ensure atomic operations - if any step fails, report error and don't continue, (8) Write updated frontmatter using safe file operations (write to temp, then rename).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test repair operations: (1) Test ID assignment starts from max+1, (2) Test file renaming creates correct format, (3) Test frontmatter updates are persisted, (4) Test status normalization uses canonical IDs, (5) Test lock acquisition prevents concurrent modifications, (6) Test partial failure scenarios don't leave inconsistent state, (7) Verify all actions are recorded in report.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:43:36.711Z"
           },
           {
             "id": 4,
@@ -369,14 +372,16 @@
               3
             ],
             "details": "Implement slug conflict detection: (1) Track all generated slugs in a HashMap during repair, (2) When slug collision detected, append `-{id}` to make unique, (3) Report ambiguities clearly in RepairAction with both original and disambiguated names, (4) For each action type, create detailed RepairAction variants with before/after values, (5) Implement check() function as read-only version that populates issues but leaves actions_taken empty, (6) Add comprehensive error messages for edge cases (e.g., filesystem permissions, invalid UTF-8 in filenames), (7) Ensure repair report includes summary counts of each issue type and action type.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test ambiguity scenarios: (1) Test multiple unindexed tasks with same title get different slugs, (2) Test slug with ID suffix when base slug exists, (3) Test check mode produces no actions_taken, (4) Test repair mode produces detailed action descriptions, (5) Test report summary counts match actual issues/actions, (6) Test error handling for permission denied and other filesystem errors.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:43:38.982Z"
           }
         ],
         "complexity": 6,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: (1) Detection logic scanning for unindexed tasks, mismatched IDs, and unknown statuses, (2) Report structure with detailed issue categorization, (3) Repair logic with ID assignment, file renaming, and status normalization, (4) Ambiguity handling for duplicate slugs and explicit action reporting."
+        "expansionPrompt": "Break down into: (1) Detection logic scanning for unindexed tasks, mismatched IDs, and unknown statuses, (2) Report structure with detailed issue categorization, (3) Repair logic with ID assignment, file renaming, and status normalization, (4) Ambiguity handling for duplicate slugs and explicit action reporting.",
+        "updatedAt": "2026-03-06T21:43:38.982Z"
       },
       {
         "id": "7",
@@ -570,7 +575,7 @@
           "5",
           "9"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -578,9 +583,10 @@
             "description": "Implement the init command to create .untask/ directory structure and the add command with TaskStore integration, supporting both human-readable and --json output formats.",
             "dependencies": [],
             "details": "Create `crates/untask-cli/src/commands/mod.rs` and submodules for init.rs and add.rs. The init command should create the .untask/ directory structure and print a success message. The add command should call `TaskStore::add()`, handle the result, and format output in two modes: (1) human-readable showing 'Created task #N: title', (2) JSON mode using serde_json::to_string_pretty. Both commands must handle errors gracefully and return proper Result types.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration tests: (1) Test init creates .untask/ directory structure, (2) Test add creates file in .untask/tasks/ with correct frontmatter, (3) Test add with --json outputs valid JSON, (4) Test add without json shows human-readable format, (5) Test init → add workflow succeeds.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T22:10:28.872Z"
           },
           {
             "id": 2,
@@ -590,9 +596,10 @@
               1
             ],
             "details": "Create list.rs and show.rs command modules. List command should: (1) Call TaskStore to get all tasks, (2) Apply --status, --tag, and --priority filters if provided, (3) Support stable sort options for priority, updated, created, or title, (4) Format as table with proper column alignment for ID, title, status, tags, and priority, (5) Support --json output mode. Show command should: (1) Accept task reference (ID or slug), (2) Display full task details including all metadata fields, (3) Render the markdown body content, (4) Support --json for structured output. Both must respect color settings (--no-color, NO_COLOR env).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration tests: (1) Test list displays all tasks in table format, (2) Test list --status filters correctly, (3) Test list --tag filters correctly, (4) Test list --priority filters correctly, (5) Test list sort options are stable for priority, updated, created, and title, (6) Test list --json outputs valid JSON array, (7) Test show displays task with full details, (8) Test show with --json outputs task object, (9) Test list/show respect --no-color flag.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T22:10:31.073Z"
           },
           {
             "id": 3,
@@ -602,9 +609,10 @@
               1
             ],
             "details": "Create status.rs, done.rs, and edit.rs modules. Status command should: (1) Accept task reference and new status, (2) Normalize status to canonical ID using config, (3) Call `TaskStore::set_status()`, (4) Output confirmation message or JSON. Done command is a thin wrapper calling status with 'done'. Edit command should: (1) Resolve task reference to file path, (2) Check $EDITOR env var, fallback to vim then nano, (3) Spawn editor process with std::process::Command, (4) Wait for editor to close, (5) Handle missing editor gracefully with clear error message.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration tests: (1) Test status changes task status correctly, (2) Test status normalizes aliases to canonical IDs, (3) Test done sets status to 'done', (4) Test edit opens file in configured $EDITOR, (5) Test edit fallback chain (vim → nano), (6) Test status/done --json output, (7) Test full workflow: add → status → done.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T22:10:33.256Z"
           },
           {
             "id": 4,
@@ -614,14 +622,16 @@
               1
             ],
             "details": "Create delete.rs module. Delete command should: (1) Accept task reference, (2) Resolve to task ID and verify existence, (3) If --force not provided, prompt user for confirmation with task details (Y/n prompt), (4) Call `TaskStore::delete()` to remove the task file, (5) Output confirmation message 'Deleted task #N: title' or JSON with deleted task info, (6) Respect --no-color and NO_COLOR for output, (7) Handle errors (task not found, IO errors) with actionable messages. Confirmation prompt should show task title for user to verify deletion target.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration tests: (1) Test delete with confirmation prompt (mock stdin), (2) Test delete --force skips confirmation, (3) Test delete removes the task file, (4) Test delete --json outputs deleted task, (5) Test delete non-existent task shows error, (6) Test end-to-end: add → delete workflow, (7) Test confirmation 'n' response cancels deletion.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T22:10:35.459Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: (1) Init and add commands with output formatting, (2) List and show commands with filtering and detail rendering, (3) Status, done, and edit commands with $EDITOR integration, (4) Delete command with confirmation logic and output format handling (--json, --no-color)."
+        "expansionPrompt": "Break down into: (1) Init and add commands with output formatting, (2) List and show commands with filtering and detail rendering, (3) Status, done, and edit commands with $EDITOR integration, (4) Delete command with confirmation logic and output format handling (--json, --no-color).",
+        "updatedAt": "2026-03-06T22:10:35.459Z"
       },
       {
         "id": "11",
@@ -941,7 +951,7 @@
         "dependencies": [
           "5"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -949,9 +959,10 @@
             "description": "Initialize the Tauri project using the official scaffolding command with Svelte 5 TypeScript template at apps/desktop location.",
             "dependencies": [],
             "details": "Execute `npm create tauri-app@latest apps/desktop -- --template svelte-ts` to scaffold the base Tauri project. This creates the initial project structure with src-tauri directory containing Rust backend code and src directory for Svelte 5 frontend code. Verify the scaffold completes successfully and all files are generated correctly including package.json, tauri.conf.json, and the basic Svelte 5 app structure with TypeScript support.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `cd apps/desktop && npm install` to verify dependencies install successfully. Confirm directory structure includes src-tauri/, src/, and standard Tauri configuration files.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:53:23.039Z"
           },
           {
             "id": 2,
@@ -961,9 +972,10 @@
               1
             ],
             "details": "Modify root `Cargo.toml` to add \"apps/desktop/src-tauri\" to the workspace members array alongside existing crates. Then update `apps/desktop/src-tauri/Cargo.toml` to add untask-core dependency using path reference: `untask-core = { path = \"../../../crates/untask-core\" }`. Also add required Tauri dependencies including tauri version 2.0 with dialog feature, tauri-plugin-dialog 2.0, serde with derive feature, and serde_json. Register the dialog plugin in `src-tauri/src/lib.rs` by adding `.plugin(tauri_plugin_dialog::init())` to the Tauri builder chain.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `cargo build --workspace` from root to verify workspace integration is correct and all crates compile together. Verify untask-core can be imported in desktop Rust code.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:53:25.233Z"
           },
           {
             "id": 3,
@@ -973,14 +985,16 @@
               2
             ],
             "details": "Navigate to apps/desktop and execute: (1) `npx sv add tailwindcss` to integrate Tailwind CSS with Svelte, (2) `npx shadcn-svelte@latest init` to initialize shadcn-svelte component library, (3) `npm run tauri add dialog` to add dialog plugin capability. Read `docs/untask-design-language.md` before defining the base shell, then create the initial Svelte 5 structure: `src/App.svelte` for main app shell, `src/lib/stores.ts` for Svelte stores managing state (currentProject, tasks, selectedTask, docs, view), `src/lib/components/` for future components, and shared CSS variables/tokens that reflect the monochrome-first, dense, border-led visual system. Ensure all tooling configurations are committed including Tailwind config, shadcn-svelte config, and component structure.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `npm run check` to verify TypeScript type checking passes. Run `npm run tauri dev` to launch the app window and confirm it displays without errors. Verify Tailwind classes work and shadcn-svelte is properly configured. Verify the shared CSS variables and typography choices line up with `docs/untask-design-language.md`.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T21:53:27.390Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: (1) Tauri project scaffolding with Svelte 5 TypeScript template, (2) Workspace integration adding desktop to Cargo workspace and linking untask-core, (3) Frontend tooling setup with Tailwind CSS, shadcn-svelte, and Tauri dialog plugin registration."
+        "expansionPrompt": "Break down into: (1) Tauri project scaffolding with Svelte 5 TypeScript template, (2) Workspace integration adding desktop to Cargo workspace and linking untask-core, (3) Frontend tooling setup with Tailwind CSS, shadcn-svelte, and Tauri dialog plugin registration.",
+        "updatedAt": "2026-03-06T21:53:27.390Z"
       },
       {
         "id": "17",
@@ -1213,9 +1227,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-06T21:27:57.597Z",
+      "lastModified": "2026-03-06T22:10:35.460Z",
       "taskCount": 19,
-      "completedCount": 6,
+      "completedCount": 9,
       "tags": [
         "master"
       ]

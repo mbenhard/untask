@@ -1,0 +1,165 @@
+{
+	"meta": {
+		"generatedAt": "2026-03-06T20:27:11.151Z",
+		"tasksAnalyzed": 19,
+		"totalTasks": 19,
+		"analysisCount": 19,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Root Workspace Scaffold",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "This task is straightforward file creation with well-defined structure. No expansion needed.",
+			"reasoning": "This is primarily file creation following a standard Rust workspace pattern. The task involves creating 2-3 Cargo.toml files, directory structure, and a .gitignore. All dependencies are explicitly specified. There are no complex decisions or integrations. The only potential complication is ensuring the workspace resolver and member paths are correct, but these follow standard Cargo conventions. The test strategy is simple: cargo build and verify file existence."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Config, Errors, and Shared Domain Types",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Error types and Result aliases with thiserror, (2) Config struct with YAML loading and validation including doc glob security checks, (3) Shared domain types (Priority, Theme, Column) with serde derives and default implementations.",
+			"reasoning": "This task involves multiple interrelated type definitions and introduces important validation logic. Complexity stems from: (1) Defining a comprehensive error taxonomy that will be used throughout the codebase, (2) Implementing config loading with fallback-to-defaults behavior, (3) Path traversal validation for doc globs (security-sensitive), (4) Setting up 5 default columns with aliases correctly. The validation rules around absolute paths and '../' traversal require careful implementation. Testing requires multiple cases for graceful degradation. Medium complexity due to security validation and error handling patterns that will ripple through the codebase."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Task Parsing, Serialization, and Metadata Rules",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Slug generation with stability guarantees and edge case handling, (2) YAML frontmatter parsing with graceful error handling, (3) Markdown body parsing and subtask checkbox counting using regex, (4) Task serialization maintaining round-trip fidelity including timestamp management.",
+			"reasoning": "This is a core domain model task with significant complexity: (1) Parsing YAML frontmatter between --- markers with malformed input handling, (2) Implementing stable slug generation that handles Unicode, special characters, and edge cases, (3) Counting checklist items using pattern matching (- [ ] vs - [x]), (4) Managing three different TaskKind variants based on filename and frontmatter state, (5) Handling datetime serialization/deserialization for created/updated/completed, (6) Ensuring round-trip fidelity when parsing and re-serializing. The test strategy shows 9 distinct test cases, indicating multiple independent behaviors to implement correctly. This is foundational code that all CRUD operations depend on."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Project Initialization, Locking, and Atomic File IO",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) File locking implementation using fs2 with proper RAII and error handling, (2) Atomic write helper using temp file + rename with cleanup on failure, (3) Project initialization creating directory structure and .gitignore with idempotency guarantees.",
+			"reasoning": "This task involves critical concurrent-safety primitives and file system operations: (1) Cross-platform file locking using fs2 with blocking semantics and proper lock release on drop, (2) Atomic write pattern requiring temp file creation, write, and rename with cleanup on failure paths, (3) Idempotent directory creation, (4) Multi-threaded testing to verify exclusive lock behavior. The atomic write implementation must handle partial failures and ensure no corrupted state. The locking mechanism is foundational for all write operations in the system. Testing includes concurrency testing which is inherently more complex. Moderate-high complexity due to concurrency primitives and failure handling."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Store Layer CRUD Operations",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Store initialization and config loading, (2) Read operations (list with filtering, get by ID, get by reference/slug) ensuring no side effects, (3) ID allocation with gap-tolerance by scanning existing files, (4) Write operations (add, update, delete) with lock acquisition and atomic writes, (5) Status transition logic handling timestamp management for completed/updated fields.",
+			"reasoning": "This is the central storage layer with significant complexity: (1) ID allocation requires scanning filesystem and finding max ID without gaps, (2) Status normalization from aliases to canonical IDs using config, (3) Managing three timestamp fields with different update rules (created is set once, updated refreshes on changes, completed sets/clears on done transitions), (4) Lock acquisition for all mutations, (5) Atomic file writes integration, (6) Reference resolution supporting both numeric IDs and slug strings, (7) Filtering logic for list operations, (8) Strict requirement that reads never rename files (critical constraint that conflicts with natural 'fix on read' patterns). The test strategy shows 10 distinct behaviors. This is the most critical module that all other features depend on. High complexity due to multiple interacting concerns and strict side-effect constraints."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Repair Command Implementation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Detection logic scanning for unindexed tasks, mismatched IDs, and unknown statuses, (2) Report structure with detailed issue categorization, (3) Repair logic with ID assignment, file renaming, and status normalization, (4) Ambiguity handling for duplicate slugs and explicit action reporting.",
+			"reasoning": "This task involves complex file system operations and decision logic: (1) Three distinct detection patterns (unindexed, mismatched, unknown statuses), (2) Conditional write behavior based on --check vs --write flag, (3) Sequential ID assignment algorithm that must avoid conflicts, (4) File renaming with slug disambiguation when conflicts occur, (5) Frontmatter updates to align with filename, (6) Comprehensive reporting of all actions taken, (7) Lock acquisition only for write mode. The repair operation must be atomic and not leave the system in an inconsistent state if it fails midway. Testing requires complex setup with various malformed states. High complexity due to multi-step atomic operations and detailed reporting requirements."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Docs Discovery and Search Implementation",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Doc discovery with glob resolution, deduplication, and default includes, (2) Doc retrieval with basename ambiguity detection returning helpful errors, (3) Search implementation with case-insensitive matching, snippet generation, and task/doc filtering.",
+			"reasoning": "This task has moderate complexity across two subsystems: (1) Glob pattern resolution relative to project root using a glob library, (2) Canonical path deduplication, (3) Duplicate basename detection requiring tracking of all seen basenames and their paths, (4) Ambiguous error construction with all matching paths, (5) Full-text search across both task and doc content, (6) Contextual snippet generation with match highlighting, (7) Case-insensitive substring matching. The ambiguity handling is the most complex part, requiring careful tracking and helpful error messages. Search requires reading potentially many files and formatting results. The test strategy shows 11 distinct test cases across two modules, indicating multiple independent behaviors."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Git Summary and Next Command Implementation",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Git integration with graceful fallback using command execution and parsing, (2) Next summary aggregation combining git, tasks, and cleanup hints, (3) Recently completed task filtering using completed timestamp and time window logic.",
+			"reasoning": "This task involves external process execution and data aggregation: (1) Executing multiple git commands (log, branch, status) and parsing output, (2) Graceful fallback when git is unavailable or not in a repo (return None), (3) Aggregating data from multiple sources (git, tasks, repair), (4) Filtering recently completed tasks using a 7-day time window on completed timestamp, (5) Sorting open tasks by priority and updated date, (6) Omitting empty sections in output. The git integration has inherent complexity due to external process handling and parsing, but the fallback approach simplifies error handling. The data aggregation logic is straightforward but involves multiple components. Moderate complexity due to external process handling and multi-source aggregation."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "CLI Scaffold and Project Root Resolution",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "This task is straightforward CLI structure setup with Clap. No expansion needed.",
+			"reasoning": "This task is mostly boilerplate CLI setup: (1) Defining a Clap parser with subcommands (well-documented pattern), (2) Implementing upward directory traversal to find .untask/ (simple loop), (3) Setting up global flags (--json, --no-color), (4) Handling NO_COLOR environment variable. The project root discovery is ~10 lines of logic. The Clap derive macros handle most of the heavy lifting. The main complexity is ensuring all subcommands are properly defined with their arguments, but this is straightforward declaration. Testing is simple: verify help output and project root discovery in various directory scenarios. Low-moderate complexity due to boilerplate nature."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Core Task CLI Commands",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Init and add commands with output formatting, (2) List and show commands with filtering and detail rendering, (3) Status, done, and edit commands with $EDITOR integration, (4) Delete command with confirmation logic and output format handling (--json, --no-color).",
+			"reasoning": "This task involves implementing 8 distinct commands with various complexity levels: (1) Init is simple directory creation, (2) Add requires store interaction and output formatting, (3) List needs table formatting with column alignment and filtering, (4) Show requires full detail rendering possibly including markdown formatting, (5) Edit involves $EDITOR environment variable handling and fallback chain (vim, nano), (6) Status and done involve store mutations, (7) Delete requires confirmation prompts (unless --force), (8) All commands need dual output modes (human-readable vs --json), (9) Color handling respecting --no-color and NO_COLOR. The test strategy shows 11 distinct test cases including end-to-end workflow testing. Moderate complexity due to number of commands and dual output formatting requirements."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Docs, Search, Next, Repair, and Skill CLI Commands",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Docs list/show commands with ambiguity error handling, (2) Search command with JSON output formatting, (3) Next command with markdown section rendering, (4) Repair command with --check/--write flags and report output, (5) Skill install with config path detection and open command for macOS app.",
+			"reasoning": "This task implements 5 secondary commands with varying complexity: (1) Docs commands are straightforward wrappers around DocsStore with ambiguity handling, (2) Search requires result formatting with snippets, (3) Next command requires rendering complex structured output as markdown sections, (4) Repair command has dual modes (check/write) and detailed report output, (5) Skill install requires detecting Claude Code config directory (~/.config/claude-code/) with fallback instructions, (6) Open command uses macOS-specific 'open -a' with graceful failure. The test strategy shows 12 distinct test cases. The complexity is primarily in output formatting and path detection rather than business logic, as the core functionality is implemented in earlier tasks. Moderate complexity due to diverse command behaviors and platform-specific handling."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "CLI Output Formatting and Contract Tests",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Output mode detection (Color/Monochrome/Plain) based on TTY, NO_COLOR, and flags, (2) Formatter implementation with consistent formatting methods for different content types, (3) Snapshot testing setup with insta crate covering all JSON output formats.",
+			"reasoning": "This task involves creating a robust output formatting system: (1) TTY detection using atty crate, (2) NO_COLOR environment variable handling, (3) Three distinct output modes with different rendering logic, (4) Consistent formatters for task_row, task_detail, success/error/warning messages, (5) Table formatting with column alignment for list view, (6) Markdown rendering for next command output, (7) Setting up insta for snapshot testing, (8) Creating snapshots for 5 different JSON output shapes (list, show, next, search, repair). The complexity is moderate because output formatting can have subtle edge cases (Unicode width calculation for table alignment, ANSI escape code handling). The snapshot testing adds structure but is relatively straightforward to set up. Moderate complexity due to multiple output modes and comprehensive testing requirements."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "TUI Scaffold with Ratatui",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Terminal setup and teardown with proper cleanup on panic, (2) App state structure with view enum and stores, (3) Event loop with keyboard input handling and view switching, (4) Navigation framework with hjkl/arrow keys and view transitions.",
+			"reasoning": "This task introduces TUI programming which has inherent complexity: (1) Terminal state management with proper setup and restoration (critical for not leaving user terminal broken), (2) Event loop with crossterm for keyboard input, (3) View state machine with transitions, (4) Keyboard shortcut handling for multiple contexts (global vs view-specific), (5) Ensuring clean terminal restoration even on panic (requires catch_unwind), (6) Integrating with TaskStore and DocsStore, (7) Implementing refresh logic. TUI programming has a learning curve and debugging is harder than CLI. The task is foundational for all TUI views but the scaffolding itself is well-documented in Ratatui examples. Moderate complexity due to TUI state management and error handling requirements."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "TUI Views: Kanban, List, Docs, and Detail",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Kanban view with column rendering, card layout, and selection state, (2) List view with table formatting and filtering UI, (3) Docs view with file tree/list rendering, (4) Detail view with metadata display and markdown body rendering, (5) View-specific keyboard actions and $EDITOR integration.",
+			"reasoning": "This task implements 4 distinct TUI views with significant complexity: (1) Kanban requires multi-column layout with dynamic task distribution, highlight rendering for selected column/task, badge rendering for priority, subtask progress display, and special sections for Unmatched/Unindexed, (2) List requires table rendering with proper column alignment, selection highlighting, and filter bar UI, (3) Docs requires tree or list rendering with selection, (4) Detail requires full metadata display, markdown rendering in terminal (plain text with formatting hints), subtask progress bar, and action hints footer, (5) Each view has specific keyboard actions (d for done, e for edit, Enter for detail), (6) Editor integration requires launching $EDITOR and reloading on return. The test strategy shows 8 manual test cases indicating multiple complex behaviors. High complexity due to multiple sophisticated views and layout management in terminal constraints."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "TUI File Watching and Real-time Updates",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) File watcher setup using notify crate with path configuration, (2) Event debouncing and filtering logic ignoring temp files and lock files, (3) Integration with app main loop for refresh triggering and immediate UI updates on status changes.",
+			"reasoning": "This task adds real-time synchronization to the TUI: (1) Setting up notify file watcher for .untask/ and configured doc paths with recursive watching, (2) Implementing debouncing to coalesce events within 100-200ms window (prevents UI flicker), (3) Filtering out noise (.lock files, temp files from atomic writes), (4) Channel-based communication between watcher thread and main loop, (5) Refresh triggering without blocking UI, (6) Handling watcher cleanup on project switch, (7) Quick status updates from TUI (d/s keys) that trigger immediate local update plus file write. The test strategy shows 7 cases including event storm handling. File watching adds concurrency complexity and requires careful event filtering. Moderate complexity due to concurrency and event filtering logic."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Desktop App Scaffold with Tauri 2 and Svelte 5",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Tauri project scaffolding with Svelte 5 TypeScript template, (2) Workspace integration adding desktop to Cargo workspace and linking untask-core, (3) Frontend tooling setup with Tailwind CSS, shadcn-svelte, and Tauri dialog plugin registration.",
+			"reasoning": "This task involves project scaffolding with multiple tools: (1) Running npm create tauri-app with specific template, (2) Setting up Tailwind CSS using sv command, (3) Initializing shadcn-svelte, (4) Adding Tauri dialog plugin, (5) Modifying workspace Cargo.toml to include apps/desktop/src-tauri, (6) Configuring untask-core dependency in desktop's Cargo.toml, (7) Registering dialog plugin in Tauri builder, (8) Setting up basic Svelte 5 structure with stores and component directory. Most of these are well-documented setup steps following official guides. The complexity comes from ensuring workspace integration is correct and all tools work together. The test strategy shows 7 verification steps. Moderate complexity due to multiple tool integrations but following established patterns."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "Desktop Backend Commands and App State",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) App state structure with project and store management using Mutex, (2) Project lifecycle commands (open_project, init_project, get_recent_projects, get_last_project), (3) Task CRUD commands (list, get, add, update, delete) with proper state management, (4) Docs and search commands, (5) Recent project persistence to Application Support directory with JSON serialization.",
+			"reasoning": "This task implements a comprehensive Tauri command layer with significant complexity: (1) Designing AppState with Mutex<Option<...>> for thread-safe shared state, (2) Implementing 15 distinct #[tauri::command] functions, (3) State management coordinating between current project path and TaskStore instance, (4) Recent projects tracking with last_opened timestamp and name extraction, (5) Persistence to ~/Library/Application Support/Untask/ with JSON serialization, (6) Graceful handling of missing/moved project directories, (7) Error propagation from Rust Result to JavaScript-friendly String errors, (8) Proper store lifecycle when opening/closing projects. The test strategy shows 9 test cases plus manual end-to-end testing. High complexity due to state management, 15 commands, persistence logic, and error handling across Rust/JS boundary."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Desktop Frontend: Shell, Project Lifecycle, and Core Views",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Svelte stores setup and state management, (2) Project picker component with Tauri dialog integration, (3) Sidebar and navigation shell, (4) Kanban view with drag-drop or move buttons, (5) Task list and task detail with Milkdown editor integration and frontmatter handling, (6) Docs viewer and editor with markdown round-trip fidelity.",
+			"reasoning": "This task builds the complete desktop UI with significant complexity: (1) Setting up Svelte 5 stores for reactive state (currentProject, tasks, selectedTask, docs, view), (2) Implementing 7 distinct components (ProjectPicker, Sidebar, Kanban, TaskList, TaskDetail, DocsViewer, DocsEditor), (3) Integrating Milkdown editor in Svelte using actions, (4) YAML frontmatter stripping before editing and re-prepending on save (must preserve exact format), (5) Kanban view with drag-drop or move buttons between columns, (6) Task detail with Milkdown for body editing and metadata display, (7) Last project restore on app launch, (8) Ensuring markdown round-trip fidelity. The test strategy shows 11 manual test cases including complex round-trip testing. Milkdown integration in Svelte is non-trivial, and frontmatter handling requires careful parsing. High complexity due to sophisticated UI components, Milkdown integration, and data persistence requirements."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Desktop File Watching, CI Workflows, and Release Automation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) File watcher in desktop backend with Tauri event emission, (2) Frontend subscription to watcher events with store refresh, (3) CI workflow for Rust (fmt, clippy, test) and desktop (npm check, build) on multiple platforms, (4) Release workflow with CLI binary builds for 3 platforms and unsigned desktop preview builds with proper labeling.",
+			"reasoning": "This task completes the project with three distinct subsystems: (1) File watching in Tauri backend using notify crate, emitting events via app.emit(), (2) Frontend event subscription and store refresh with debouncing, (3) Watcher cleanup on project switch, (4) CI workflow with matrix strategy for Ubuntu/macOS/Windows, (5) Running fmt, clippy, test for Rust and check, build for desktop, (6) Release workflow building CLI binaries for 3 platforms with proper archive creation, (7) Building unsigned macOS .dmg with preview labeling, (8) GitHub Release asset upload. The test strategy shows 8 test cases including event storm handling and CI verification. High-moderate complexity due to multiple distinct systems (file watching + CI + release) and multi-platform considerations."
+		}
+	]
+}

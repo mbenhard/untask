@@ -7,4 +7,10 @@ edition = "2024"
 untask-core = { path = "../untask-core" }
 clap = { version = "4.5", features = ["derive"] }
 colored = "2.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+shlex = "1.3"
+
+[dev-dependencies]
+tempfile = { workspace = true }
 serde_json = { workspace = true }

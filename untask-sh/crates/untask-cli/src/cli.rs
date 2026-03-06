@@ -39,6 +39,14 @@ pub enum Commands {
         /// Filter by tag
         #[arg(short, long)]
         tag: Option<String>,
+
+        /// Filter by priority (low, medium, high, urgent)
+        #[arg(short, long)]
+        priority: Option<String>,
+
+        /// Sort by field (priority, updated, created, title)
+        #[arg(long, default_value = "id")]
+        sort: String,
     },
 
     /// Show a task by ID or slug
@@ -72,6 +80,10 @@ pub enum Commands {
     Delete {
         /// Task ID or slug
         reference: String,
+
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
     },
 
     /// Show next actions summary
@@ -146,7 +158,9 @@ mod tests {
             cli.command,
             Some(Commands::List {
                 status: None,
-                tag: None
+                tag: None,
+                priority: None,
+                ..
             })
         ));
     }
