@@ -1,0 +1,266 @@
+use std::path::Path;
+
+use chrono::{Duration, Utc};
+use untask_core::git;
+use untask_core::init::init;
+use untask_core::next::{self, CleanupKind};
+use untask_core::store::TaskStore;
+use untask_core::types::Priority;
+
+fn setup() -> (tempfile::TempDir, TaskStore) {
+    let tmp = tempfile::TempDir::new().unwrap();
+    init(tmp.path()).unwrap();
+    let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+    (tmp, store)
+}
+
+fn write_task(dir: &Path, filename: &str, content: &str) {
+    let tasks_dir = dir.join(".untask/tasks");
+    std::fs::write(tasks_dir.join(filename), content).unwrap();
+}
+
+// ── Git summary ──────────────────────────────────────────────────────
+
+#[test]
+fn git_summary_returns_none_when_not_in_git_repo() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let result = git::get_summary(tmp.path(), 5);
+    assert!(result.is_none());
+}
+
+#[test]
+fn git_summary_returns_commits_when_available() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // Init a git repo and create a commit
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::fs::write(dir.join("file.txt"), "hello").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "initial commit"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let summary = git::get_summary(dir, 5).unwrap();
+    assert!(!summary.branch.is_empty());
+    assert_eq!(summary.recent_commits.len(), 1);
+    assert_eq!(summary.recent_commits[0].message, "initial commit");
+    assert!(!summary.has_uncommitted_changes);
+}
+
+#[test]
+fn git_summary_detects_uncommitted_changes() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::fs::write(dir.join("file.txt"), "hello").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-m", "initial"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    // Create uncommitted change
+    std::fs::write(dir.join("dirty.txt"), "uncommitted").unwrap();
+
+    let summary = git::get_summary(dir, 5).unwrap();
+    assert!(summary.has_uncommitted_changes);
+}
+
+#[test]
+fn git_summary_handles_empty_history() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    std::process::Command::new("git")
+        .args(["init"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    // git log fails on empty repo, but get_summary should still return Some
+    let summary = git::get_summary(dir, 5);
+    // branch --show-current succeeds on a fresh repo
+    if let Some(s) = summary {
+        assert!(s.recent_commits.is_empty());
+    }
+}
+
+// ── Next summary ─────────────────────────────────────────────────────
+
+#[test]
+fn next_includes_open_tasks_sorted_by_priority() {
+    let (tmp, store) = setup();
+    store.add("Low priority", None).unwrap();
+    store.add("High priority", None).unwrap();
+    store.add("Urgent task", None).unwrap();
+
+    store
+        .update(
+            1,
+            untask_core::store::TaskUpdate {
+                priority: Some(Priority::Low),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    store
+        .update(
+            2,
+            untask_core::store::TaskUpdate {
+                priority: Some(Priority::High),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    store
+        .update(
+            3,
+            untask_core::store::TaskUpdate {
+                priority: Some(Priority::Urgent),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert_eq!(summary.open_tasks.len(), 3);
+    assert_eq!(summary.open_tasks[0].title, "Urgent task");
+    assert_eq!(summary.open_tasks[1].title, "High priority");
+    assert_eq!(summary.open_tasks[2].title, "Low priority");
+}
+
+#[test]
+fn next_includes_recently_completed_tasks() {
+    let (tmp, store) = setup();
+    store.add("Done task", Some("done")).unwrap();
+    store.add("Open task", None).unwrap();
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert_eq!(summary.recently_completed.len(), 1);
+    assert_eq!(summary.recently_completed[0].title, "Done task");
+    assert_eq!(summary.open_tasks.len(), 1);
+    assert_eq!(summary.open_tasks[0].title, "Open task");
+}
+
+#[test]
+fn next_excludes_old_completed_tasks() {
+    let (tmp, _store) = setup();
+    // Write a task with a completed timestamp > 7 days ago
+    let old_timestamp = (Utc::now() - Duration::days(10)).to_rfc3339();
+    write_task(
+        tmp.path(),
+        "001-old-done.md",
+        &format!(
+            "---\nid: 1\ntitle: Old done\nstatus: done\ncompleted: \"{}\"\n---\n",
+            old_timestamp
+        ),
+    );
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary.recently_completed.is_empty());
+}
+
+#[test]
+fn next_omits_empty_sections() {
+    let (tmp, _store) = setup();
+    // No tasks at all
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary.open_tasks.is_empty());
+    assert!(summary.recently_completed.is_empty());
+    assert!(summary.cleanup_hints.is_empty());
+}
+
+#[test]
+fn next_includes_cleanup_hints_for_unindexed_tasks() {
+    let (tmp, _store) = setup();
+    write_task(
+        tmp.path(),
+        "loose-note.md",
+        "---\ntitle: Loose note\nstatus: todo\n---\n",
+    );
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert_eq!(summary.cleanup_hints.len(), 1);
+    assert_eq!(summary.cleanup_hints[0].kind, CleanupKind::Unindexed);
+}
+
+#[test]
+fn next_includes_cleanup_hints_for_unknown_statuses() {
+    let (tmp, _store) = setup();
+    write_task(
+        tmp.path(),
+        "001-bad.md",
+        "---\nid: 1\ntitle: Bad status\nstatus: yolo\n---\n",
+    );
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary
+        .cleanup_hints
+        .iter()
+        .any(|h| h.kind == CleanupKind::UnknownStatus));
+}
+
+#[test]
+fn next_works_in_non_git_directory() {
+    let (tmp, store) = setup();
+    store.add("Task in non-git dir", None).unwrap();
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary.git.is_none());
+    assert_eq!(summary.open_tasks.len(), 1);
+}
+
+#[test]
+fn recently_completed_filter_handles_missing_completed_timestamp() {
+    let (tmp, _store) = setup();
+    // A done task without a completed timestamp should not appear in recently_completed
+    write_task(
+        tmp.path(),
+        "001-no-timestamp.md",
+        "---\nid: 1\ntitle: No timestamp\nstatus: done\n---\n",
+    );
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary.recently_completed.is_empty());
+}
