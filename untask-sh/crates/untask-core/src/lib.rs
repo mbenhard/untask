@@ -3,6 +3,8 @@ pub mod error;
 pub mod fs;
 pub mod init;
 pub mod lock;
+pub mod project;
 pub mod slug;
+pub mod store;
 pub mod task;
 pub mod types;
