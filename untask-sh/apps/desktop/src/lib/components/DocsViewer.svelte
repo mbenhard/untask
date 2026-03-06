@@ -40,7 +40,7 @@
       <div class="flex flex-col items-center justify-center gap-2 py-12">
         <span class="font-mono text-[11px] text-muted-foreground/50">No documents</span>
         <span class="text-[12px] text-muted-foreground/40">
-          Add markdown files to .untask/docs/
+          Add markdown files matching your configured docs globs
         </span>
       </div>
     {/if}

@@ -64,6 +64,10 @@ export function openProject(path: string): Promise<void> {
   return invoke("open_project", { path });
 }
 
+export function closeProject(): Promise<void> {
+  return invoke("close_project");
+}
+
 export function initProject(path: string): Promise<void> {
   return invoke("init_project", { path });
 }

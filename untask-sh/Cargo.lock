@@ -4631,11 +4631,13 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dirs",
+ "glob",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "tempfile",
  "untask-core",
 ]
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { readDoc, saveDoc, type DocInfo } from "$lib/api";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
+  import { splitFrontmatter } from "$lib/frontmatter";
 
   let {
     doc,
@@ -12,7 +13,7 @@
 
   let content = $state<string | null>(null);
   let loading = $state(true);
-  let frontmatter = $state("");
+  let frontmatterPrefix = $state("");
 
   $effect(() => {
     loadDoc(doc.path);
@@ -22,8 +23,8 @@
     loading = true;
     try {
       const detail = await readDoc(path);
-      const { fm, body } = splitFrontmatter(detail.content);
-      frontmatter = fm;
+      const { prefix, body } = splitFrontmatter(detail.content);
+      frontmatterPrefix = prefix;
       content = body;
     } catch (e) {
       console.error("Failed to load doc:", e);
@@ -32,26 +33,8 @@
     loading = false;
   }
 
-  function splitFrontmatter(raw: string): { fm: string; body: string } {
-    const trimmed = raw.trimStart();
-    if (!trimmed.startsWith("---")) return { fm: "", body: raw };
-
-    const afterOpen = trimmed.indexOf("\n", 3);
-    if (afterOpen === -1) return { fm: "", body: raw };
-
-    const closeIdx = trimmed.indexOf("\n---", afterOpen + 1);
-    if (closeIdx === -1) return { fm: "", body: raw };
-
-    const fmEnd = closeIdx + 4;
-    const restOfLine = trimmed.indexOf("\n", fmEnd);
-    const fm = trimmed.slice(0, restOfLine === -1 ? fmEnd : restOfLine + 1);
-    const body = restOfLine === -1 ? "" : trimmed.slice(restOfLine + 1);
-
-    return { fm, body };
-  }
-
   async function handleSave(markdown: string) {
-    const fullContent = frontmatter ? frontmatter + "\n" + markdown : markdown;
+    const fullContent = frontmatterPrefix + markdown;
     try {
       await saveDoc(doc.path, fullContent);
     } catch (e) {

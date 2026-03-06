@@ -1,8 +1,8 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   import {
-    getLastProject,
     getRecentProjects,
     initProject,
     openProject,
@@ -13,7 +13,7 @@
   let {
     onProjectOpened,
   }: {
-    onProjectOpened: (path: string, name: string) => void;
+    onProjectOpened: (path: string, name: string) => Promise<void>;
   } = $props();
 
   let recentProjects = $state<RecentProject[]>([]);
@@ -21,8 +21,8 @@
   let error = $state<string | null>(null);
   let loading = $state(false);
 
-  $effect(() => {
-    loadRecents();
+  onMount(() => {
+    void loadRecents();
   });
 
   async function loadRecents() {
@@ -49,7 +49,7 @@
       await openProject(selection);
       const name =
         selection.split("/").filter(Boolean).pop() ?? selection;
-      onProjectOpened(selection, name);
+      await onProjectOpened(selection, name);
     } catch (e) {
       const msg = String(e);
       if (msg.includes("not an untask project")) {
@@ -71,7 +71,7 @@
       await openProject(initPrompt);
       const name =
         initPrompt.split("/").filter(Boolean).pop() ?? initPrompt;
-      onProjectOpened(initPrompt, name);
+      await onProjectOpened(initPrompt, name);
     } catch (e) {
       error = String(e);
     } finally {
@@ -89,7 +89,7 @@
     try {
       loading = true;
       await openProject(project.path);
-      onProjectOpened(project.path, project.name);
+      await onProjectOpened(project.path, project.name);
     } catch (e) {
       error = String(e);
     } finally {

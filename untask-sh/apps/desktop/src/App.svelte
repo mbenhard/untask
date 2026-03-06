@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { listen } from "@tauri-apps/api/event";
+  import { onMount } from "svelte";
   import {
+    closeProject,
     getConfig,
     getLastProject,
     listDocs,
@@ -27,13 +30,43 @@
     type ShellView,
   } from "$lib/stores";
 
+  type ProjectRefreshEvent = {
+    project_path: string;
+  };
+
+  type TaskHealth = {
+    unmatchedCount: number;
+    unindexedCount: number;
+  };
+
   let restoring = $state(true);
   let selectedTask = $state<TaskDto | null>(null);
   let selectedDoc = $state<DocInfo | null>(null);
+  let refreshRevision = $state(0);
+  let openProjectPath = $state<string | null>(null);
+  let taskHealth = $state<TaskHealth>({ unmatchedCount: 0, unindexedCount: 0 });
 
-  // Auto-restore last project on launch
-  $effect(() => {
-    restoreLastProject();
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
+
+    void (async () => {
+      unlisten = await listen<ProjectRefreshEvent>(
+        "untask://project-refresh",
+        async (event) => {
+          if (!openProjectPath || event.payload.project_path !== openProjectPath) {
+            return;
+          }
+
+          await refreshData();
+        },
+      );
+
+      await restoreLastProject();
+    })();
+
+    return () => {
+      unlisten?.();
+    };
   });
 
   async function restoreLastProject() {
@@ -51,6 +84,7 @@
   }
 
   async function onProjectOpened(path: string, name: string) {
+    openProjectPath = path;
     projectPath.set(path);
     projectName.set(name);
     selectedTask = null;
@@ -61,6 +95,8 @@
   }
 
   async function refreshData() {
+    const selectedTaskId = selectedTask?.id ?? null;
+    const selectedDocPath = selectedDoc?.path ?? null;
     const [config, taskList, docList] = await Promise.all([
       getConfig().catch(() => ({ columns: [] })),
       listTasks().catch(() => []),
@@ -70,11 +106,20 @@
     columns.set(config.columns);
     tasks.set(taskList);
     docs.set(docList);
+    taskHealth = summarizeTaskHealth(taskList, config.columns);
+    refreshRevision += 1;
+
+    if (selectedTaskId != null) {
+      selectedTask = taskList.find((entry) => entry.id === selectedTaskId) ?? null;
+    }
+
+    if (selectedDocPath) {
+      selectedDoc = docList.find((entry) => entry.path === selectedDocPath) ?? null;
+    }
   }
 
   async function refreshTasks() {
-    const taskList = await listTasks().catch(() => []);
-    tasks.set(taskList);
+    await refreshData();
   }
 
   function selectView(view: ShellView) {
@@ -83,7 +128,14 @@
     selectedDoc = null;
   }
 
-  function switchProject() {
+  async function switchProject() {
+    try {
+      await closeProject();
+    } catch {
+      // best-effort teardown; clearing local state still returns picker control to the user
+    }
+
+    openProjectPath = null;
     projectPath.set(null);
     projectName.set(null);
     tasks.set([]);
@@ -91,6 +143,7 @@
     columns.set([]);
     selectedTask = null;
     selectedDoc = null;
+    taskHealth = { unmatchedCount: 0, unindexedCount: 0 };
   }
 
   function onTaskClick(task: TaskDto) {
@@ -107,6 +160,35 @@
 
   function onDocClose() {
     selectedDoc = null;
+  }
+
+  function summarizeTaskHealth(
+    taskList: TaskDto[],
+    configuredColumns: { id: string; aliases: string[] }[],
+  ): TaskHealth {
+    const columnIds = new Set(configuredColumns.map((column) => column.id));
+    const aliases = new Map<string, string>();
+    for (const column of configuredColumns) {
+      for (const alias of column.aliases) {
+        aliases.set(alias.toLowerCase(), column.id);
+      }
+    }
+
+    let unmatchedCount = 0;
+    let unindexedCount = 0;
+
+    for (const task of taskList) {
+      if (task.id == null) {
+        unindexedCount += 1;
+      }
+
+      const normalizedStatus = task.status.toLowerCase();
+      if (!columnIds.has(normalizedStatus) && !aliases.has(normalizedStatus)) {
+        unmatchedCount += 1;
+      }
+    }
+
+    return { unmatchedCount, unindexedCount };
   }
 
   $effect(() => {
@@ -134,10 +216,30 @@
         onSwitchProject={switchProject}
       />
       <main class="flex min-w-0 flex-1 flex-col bg-background/80">
+        {#if taskHealth.unindexedCount > 0 || taskHealth.unmatchedCount > 0}
+          <div class="border-b border-border/80 px-4 py-2">
+            <div class="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+              {#if taskHealth.unindexedCount > 0}
+                <span class="rounded-[4px] border border-border/70 px-1.5 py-0.5">
+                  {taskHealth.unindexedCount} unindexed
+                </span>
+              {/if}
+              {#if taskHealth.unmatchedCount > 0}
+                <span class="rounded-[4px] border border-border/70 px-1.5 py-0.5">
+                  {taskHealth.unmatchedCount} unmatched
+                </span>
+              {/if}
+              <span class="text-[11px] normal-case tracking-normal text-muted-foreground">
+                Visible for review only until you normalize or repair them.
+              </span>
+            </div>
+          </div>
+        {/if}
         {#if selectedTask}
           <TaskDetail
             task={selectedTask}
             columns={$columns}
+            {refreshRevision}
             onClose={onTaskClose}
             onTaskUpdated={refreshTasks}
           />

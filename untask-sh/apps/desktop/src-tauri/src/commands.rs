@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -119,6 +119,32 @@ fn require_project(state: &State<'_, AppState>) -> Result<PathBuf, String> {
         .ok_or_else(|| "no project open".to_string())
 }
 
+fn ensure_project_dir(path: &Path) -> Result<(), String> {
+    if path.join(".untask").is_dir() {
+        Ok(())
+    } else {
+        Err(format!("not an untask project: {}", path.display()))
+    }
+}
+
+fn relative_project_path(project_root: &Path, path: &Path) -> String {
+    path.strip_prefix(project_root)
+        .unwrap_or(path)
+        .display()
+        .to_string()
+}
+
+fn resolve_doc_path(project_root: &Path, reference: &str) -> Result<PathBuf, String> {
+    let docs_store = DocsStore::new(project_root.to_path_buf());
+    let doc = docs_store.get(reference).map_err(|e| e.to_string())?;
+    Ok(doc.path)
+}
+
+fn write_doc(project_root: &Path, reference: &str, content: &str) -> Result<(), String> {
+    let full_path = resolve_doc_path(project_root, reference)?;
+    std::fs::write(full_path, content).map_err(|e| e.to_string())
+}
+
 #[derive(Serialize)]
 pub struct ColumnDto {
     pub id: String,
@@ -151,16 +177,17 @@ pub fn get_config(state: State<'_, AppState>) -> Result<ConfigDto, String> {
 // ── Project lifecycle ───────────────────────────────────────────────
 
 #[tauri::command]
-pub fn open_project(path: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn open_project(
+    path: String,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let path = PathBuf::from(&path);
-    if !path.join(".untask").is_dir() {
-        return Err(format!("not an untask project: {}", path.display()));
-    }
+    ensure_project_dir(&path)?;
 
-    *state
-        .current_project
-        .lock()
-        .map_err(|e| e.to_string())? = Some(path.clone());
+    *state.current_project.lock().map_err(|e| e.to_string())? = Some(path.clone());
+
+    state::replace_project_watcher(&app, state.inner(), &path)?;
 
     let name = path
         .file_name()
@@ -176,6 +203,12 @@ pub fn open_project(path: String, state: State<'_, AppState>) -> Result<(), Stri
     state::add_to_recent(project)?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn close_project(state: State<'_, AppState>) -> Result<(), String> {
+    *state.current_project.lock().map_err(|e| e.to_string())? = None;
+    state::clear_project_watcher(state.inner())
 }
 
 #[tauri::command]
@@ -272,12 +305,12 @@ pub fn delete_task(id: u32, state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 pub fn list_docs(state: State<'_, AppState>) -> Result<Vec<DocInfo>, String> {
     let root = require_project(&state)?;
-    let docs_store = DocsStore::new(root);
+    let docs_store = DocsStore::new(root.clone());
     let docs = docs_store.list().map_err(|e| e.to_string())?;
     Ok(docs
         .into_iter()
         .map(|d| DocInfo {
-            path: d.path.display().to_string(),
+            path: relative_project_path(&root, &d.path),
             basename: d.basename,
         })
         .collect())
@@ -286,10 +319,10 @@ pub fn list_docs(state: State<'_, AppState>) -> Result<Vec<DocInfo>, String> {
 #[tauri::command]
 pub fn read_doc(path: String, state: State<'_, AppState>) -> Result<DocDetail, String> {
     let root = require_project(&state)?;
-    let docs_store = DocsStore::new(root);
+    let docs_store = DocsStore::new(root.clone());
     let doc = docs_store.get(&path).map_err(|e| e.to_string())?;
     Ok(DocDetail {
-        path: doc.path.display().to_string(),
+        path: relative_project_path(&root, &doc.path),
         basename: doc.basename,
         content: doc.content,
     })
@@ -297,12 +330,8 @@ pub fn read_doc(path: String, state: State<'_, AppState>) -> Result<DocDetail, S
 
 #[tauri::command]
 pub fn save_doc(path: String, content: String, state: State<'_, AppState>) -> Result<(), String> {
-    if path.contains("..") {
-        return Err("path must not contain '..'".to_string());
-    }
     let root = require_project(&state)?;
-    let full_path = root.join(&path);
-    std::fs::write(&full_path, &content).map_err(|e| e.to_string())
+    write_doc(&root, &path, &content)
 }
 
 // ── Search, Next, Repair ────────────────────────────────────────────
@@ -310,8 +339,7 @@ pub fn save_doc(path: String, content: String, state: State<'_, AppState>) -> Re
 #[tauri::command]
 pub fn search(query: String, state: State<'_, AppState>) -> Result<Vec<SearchHit>, String> {
     let root = require_project(&state)?;
-    let results =
-        untask_core::search::search(&root, &query, false).map_err(|e| e.to_string())?;
+    let results = untask_core::search::search(&root, &query, false).map_err(|e| e.to_string())?;
     Ok(results
         .into_iter()
         .map(|r| SearchHit {
@@ -346,11 +374,7 @@ pub fn get_next(state: State<'_, AppState>) -> Result<NextDto, String> {
                 })
                 .collect(),
         }),
-        open_tasks: summary
-            .open_tasks
-            .into_iter()
-            .map(TaskDto::from)
-            .collect(),
+        open_tasks: summary.open_tasks.into_iter().map(TaskDto::from).collect(),
         recently_completed: summary
             .recently_completed
             .into_iter()
@@ -374,4 +398,55 @@ pub fn get_repair_summary(
 ) -> Result<untask_core::repair::RepairReport, String> {
     let root = require_project(&state)?;
     untask_core::repair::check(&root).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup_project() -> tempfile::TempDir {
+        let tmp = tempfile::TempDir::new().unwrap();
+        untask_core::init::init(tmp.path()).unwrap();
+        tmp
+    }
+
+    #[test]
+    fn resolve_doc_path_supports_configured_globs_outside_default_docs_dir() {
+        let tmp = setup_project();
+        let doc_path = tmp.path().join("docs/architecture.md");
+        std::fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            tmp.path().join(".untask/config.yml"),
+            "docs:\n  - \"docs/**/*.md\"\n",
+        )
+        .unwrap();
+        std::fs::write(&doc_path, "# Architecture").unwrap();
+
+        let resolved = resolve_doc_path(tmp.path(), "docs/architecture.md").unwrap();
+
+        assert_eq!(resolved, doc_path);
+    }
+
+    #[test]
+    fn write_doc_rejects_paths_outside_discovered_docs() {
+        let tmp = setup_project();
+        let outside = tmp.path().join("README.md");
+        std::fs::write(&outside, "before").unwrap();
+
+        let error = write_doc(tmp.path(), &outside.display().to_string(), "after").unwrap_err();
+
+        assert!(error.contains("document not found") || error.contains("Doc not found"));
+        assert_eq!(std::fs::read_to_string(outside).unwrap(), "before");
+    }
+
+    #[test]
+    fn relative_project_path_prefers_project_relative_doc_references() {
+        let root = Path::new("/tmp/project");
+        let doc = root.join(".untask/docs/guide.md");
+
+        assert_eq!(
+            relative_project_path(root, &doc),
+            ".untask/docs/guide.md".to_string()
+        );
+    }
 }

@@ -155,6 +155,11 @@
         <span class="min-w-0 flex-1 truncate text-[13px] text-foreground">
           {task.title}
         </span>
+        {#if task.id == null}
+          <span class="mr-2 rounded-[4px] border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            unindexed
+          </span>
+        {/if}
         <span class="w-[100px] shrink-0 font-mono text-[10px] text-muted-foreground">
           {task.status}
         </span>

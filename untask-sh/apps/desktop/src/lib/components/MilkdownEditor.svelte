@@ -19,12 +19,13 @@
   let editorEl: HTMLDivElement | undefined = $state();
   let editorInstance: Editor | undefined = $state();
   let dirty = $state(false);
-  let initialContent = $state(content);
+  let initialContent = $state("");
 
   $effect(() => {
     if (!editorEl) return;
 
     const startContent = content;
+    initialContent = startContent;
     let mounted = true;
 
     Editor.make()
@@ -69,6 +70,7 @@
     if (onSave && editorInstance) {
       const md = editorInstance.action(getMarkdown());
       onSave(md);
+      initialContent = md;
       dirty = false;
     }
   }

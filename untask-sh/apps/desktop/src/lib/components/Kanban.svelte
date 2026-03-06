@@ -78,11 +78,13 @@
   }
 
   function canMoveLeft(task: TaskDto): boolean {
+    if (task.id == null) return false;
     const idx = columnIndex(task);
     return idx > 0;
   }
 
   function canMoveRight(task: TaskDto): boolean {
+    if (task.id == null) return false;
     const idx = columnIndex(task);
     return idx >= 0 && idx < columns.length - 1;
   }
@@ -139,6 +141,11 @@
             <span class="min-w-0 flex-1 truncate text-[13px] text-foreground">
               {task.title}
             </span>
+            {#if task.id == null}
+              <span class="shrink-0 rounded-[4px] border border-border/60 px-1 py-0.5 font-mono text-[9px] text-muted-foreground">
+                unindexed
+              </span>
+            {/if}
 
             <span
               class="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
