@@ -54,6 +54,10 @@ body {
   box-sizing: border-box;
 }
 
+[data-tauri-drag-region] {
+  app-region: drag;
+}
+
 button,
 input,
 textarea,
