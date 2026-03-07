@@ -5,14 +5,12 @@
     closeProject,
     getConfig,
     getLastProject,
-    listDocs,
+    listDocsTree,
     listTasks,
     openProject,
-    type DocInfo,
     type TaskDto,
   } from "$lib/api";
   import { hasKnownStatus } from "$lib/utils";
-  import DocsEditor from "$lib/components/DocsEditor.svelte";
   import DocsViewer from "$lib/components/DocsViewer.svelte";
   import Kanban from "$lib/components/Kanban.svelte";
   import ProjectPicker from "$lib/components/ProjectPicker.svelte";
@@ -33,6 +31,7 @@
 
   type ProjectRefreshEvent = {
     project_path: string;
+    changed_paths: string[];
   };
 
   type TaskHealth = {
@@ -42,11 +41,13 @@
 
   let restoring = $state(true);
   let selectedTask = $state<TaskDto | null>(null);
-  let selectedDoc = $state<DocInfo | null>(null);
   let refreshRevision = $state(0);
+  let docsExternalRevision = $state(0);
+  let docsExternalPaths = $state<string[]>([]);
   let openProjectPath = $state<string | null>(null);
   let taskHealth = $state<TaskHealth>({ unmatchedCount: 0, unindexedCount: 0 });
   let refreshTimeout: number | null = null;
+  let pendingRefreshPaths = $state<Set<string>>(new Set());
 
   onMount(() => {
     let unlisten: (() => void) | undefined;
@@ -59,7 +60,7 @@
             return;
           }
 
-          scheduleRefresh();
+          scheduleRefresh(event.payload.changed_paths);
         },
       );
 
@@ -93,18 +94,16 @@
     projectPath.set(path);
     projectName.set(name);
     selectedTask = null;
-    selectedDoc = null;
 
     await refreshData();
     restoring = false;
   }
 
-  async function refreshData() {
-    const selectedDocPath = selectedDoc?.path ?? null;
+  async function refreshData(options?: { externalPaths?: string[] }) {
     const [config, taskList, docList] = await Promise.all([
       getConfig().catch(() => ({ columns: [] })),
       listTasks().catch(() => []),
-      listDocs().catch(() => []),
+      listDocsTree().catch(() => []),
     ]);
 
     columns.set(config.columns);
@@ -113,30 +112,44 @@
     taskHealth = summarizeTaskHealth(taskList, config.columns);
     refreshRevision += 1;
 
-    if (selectedDocPath) {
-      selectedDoc = docList.find((entry) => entry.path === selectedDocPath) ?? null;
+    if (options?.externalPaths && affectsDocsExternally(options.externalPaths)) {
+      docsExternalPaths = options.externalPaths;
+      docsExternalRevision += 1;
     }
+  }
+
+  async function refreshDocs() {
+    const docList = await listDocsTree().catch(() => []);
+    docs.set(docList);
+    refreshRevision += 1;
   }
 
   async function refreshTasks() {
     await refreshData();
   }
 
-  function scheduleRefresh() {
+  function scheduleRefresh(changedPaths: string[]) {
     if (refreshTimeout !== null) {
       window.clearTimeout(refreshTimeout);
     }
 
+    const nextPaths = new Set(pendingRefreshPaths);
+    for (const path of changedPaths) {
+      nextPaths.add(path);
+    }
+    pendingRefreshPaths = nextPaths;
+
     refreshTimeout = window.setTimeout(() => {
       refreshTimeout = null;
-      void refreshData();
+      const externalPaths = [...pendingRefreshPaths];
+      pendingRefreshPaths = new Set();
+      void refreshData(externalPaths.length ? { externalPaths } : undefined);
     }, 120);
   }
 
   function selectView(view: ShellView) {
     activeView.set(view);
     selectedTask = null;
-    selectedDoc = null;
   }
 
   async function switchProject() {
@@ -153,8 +166,14 @@
     docs.set([]);
     columns.set([]);
     selectedTask = null;
-    selectedDoc = null;
+    docsExternalRevision = 0;
+    docsExternalPaths = [];
+    pendingRefreshPaths = new Set();
     taskHealth = { unmatchedCount: 0, unindexedCount: 0 };
+  }
+
+  function affectsDocsExternally(paths: string[]) {
+    return paths.some((path) => path === ".untask/config.yml" || !path.startsWith(".untask/tasks/"));
   }
 
   function onTaskClick(task: TaskDto) {
@@ -163,14 +182,6 @@
 
   function onTaskClose() {
     selectedTask = null;
-  }
-
-  function onDocSelect(doc: DocInfo) {
-    selectedDoc = doc;
-  }
-
-  function onDocClose() {
-    selectedDoc = null;
   }
 
   function summarizeTaskHealth(
@@ -232,9 +243,7 @@
             </div>
           </div>
         {/if}
-        {#if selectedDoc}
-          <DocsEditor doc={selectedDoc} onClose={onDocClose} />
-        {:else if $activeView === "board"}
+        {#if $activeView === "board"}
           <Kanban
             tasks={$tasks}
             columns={$columns}
@@ -249,7 +258,13 @@
             onTasksChanged={refreshTasks}
           />
         {:else if $activeView === "docs"}
-          <DocsViewer docs={$docs} onDocSelect={onDocSelect} />
+          <DocsViewer
+            docs={$docs}
+            refreshRevision={refreshRevision}
+            externalRevision={docsExternalRevision}
+            externalPaths={docsExternalPaths}
+            onDocsChanged={refreshDocs}
+          />
         {:else if $activeView === "next"}
           <div class="flex flex-1 items-center justify-center">
             <p class="font-mono text-[11px] text-muted-foreground">Next view — coming soon</p>

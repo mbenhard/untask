@@ -4,7 +4,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use untask_core::docs::DocsStore;
+use untask_core::docs::{DocNode, DocsStore};
 use untask_core::search::SearchResultKind;
 use untask_core::store::{ListFilter, TaskStore, TaskUpdate};
 use untask_core::task::Task;
@@ -146,6 +146,13 @@ fn resolve_doc_path(project_root: &Path, reference: &str) -> Result<PathBuf, Str
 fn write_doc(project_root: &Path, reference: &str, content: &str) -> Result<(), String> {
     let full_path = resolve_doc_path(project_root, reference)?;
     std::fs::write(full_path, content).map_err(|e| e.to_string())
+}
+
+fn doc_info_from_ref(project_root: &Path, doc: untask_core::docs::DocRef) -> DocInfo {
+    DocInfo {
+        path: relative_project_path(project_root, &doc.path),
+        basename: doc.basename,
+    }
 }
 
 #[derive(Serialize)]
@@ -408,14 +415,18 @@ pub fn delete_task(id: u32, state: State<'_, AppState>) -> Result<(), String> {
 pub fn list_docs(state: State<'_, AppState>) -> Result<Vec<DocInfo>, String> {
     let root = require_project(&state)?;
     let docs_store = DocsStore::new(root.clone());
-    let docs = docs_store.list().map_err(|e| e.to_string())?;
+    let docs = docs_store.list_refs().map_err(|e| e.to_string())?;
     Ok(docs
         .into_iter()
-        .map(|d| DocInfo {
-            path: relative_project_path(&root, &d.path),
-            basename: d.basename,
-        })
+        .map(|doc| doc_info_from_ref(&root, doc))
         .collect())
+}
+
+#[tauri::command]
+pub fn list_docs_tree(state: State<'_, AppState>) -> Result<Vec<DocNode>, String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root);
+    docs_store.list_tree().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -434,6 +445,77 @@ pub fn read_doc(path: String, state: State<'_, AppState>) -> Result<DocDetail, S
 pub fn save_doc(path: String, content: String, state: State<'_, AppState>) -> Result<(), String> {
     let root = require_project(&state)?;
     write_doc(&root, &path, &content)
+}
+
+#[tauri::command]
+pub fn create_doc(
+    parent_path: String,
+    name: String,
+    content: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<DocInfo, String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root.clone());
+    let doc = docs_store
+        .create_doc(&parent_path, &name, content.as_deref().unwrap_or(""))
+        .map_err(|e| e.to_string())?;
+    Ok(doc_info_from_ref(&root, doc))
+}
+
+#[tauri::command]
+pub fn create_doc_folder(
+    parent_path: String,
+    name: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root);
+    let path = docs_store
+        .create_folder(&parent_path, &name)
+        .map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+#[tauri::command]
+pub fn rename_doc_path(
+    path: String,
+    new_name: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root);
+    let path = docs_store
+        .rename_path(&path, &new_name)
+        .map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+#[tauri::command]
+pub fn move_doc_path(
+    path: String,
+    destination_parent: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root);
+    let path = docs_store
+        .move_path(&path, &destination_parent)
+        .map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+#[tauri::command]
+pub fn delete_doc_path(path: String, state: State<'_, AppState>) -> Result<(), String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root);
+    docs_store.delete_doc(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_doc_folder(path: String, state: State<'_, AppState>) -> Result<(), String> {
+    let root = require_project(&state)?;
+    let docs_store = DocsStore::new(root);
+    docs_store.delete_folder(&path).map_err(|e| e.to_string())
 }
 
 // ── Search, Next, Repair ────────────────────────────────────────────

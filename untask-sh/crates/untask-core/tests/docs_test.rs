@@ -1,4 +1,4 @@
-use untask_core::docs::DocsStore;
+use untask_core::docs::{DocNode, DocNodeKind, DocsStore, infer_writable_doc_root};
 use untask_core::init::init;
 
 fn setup() -> tempfile::TempDir {
@@ -13,6 +13,22 @@ fn write_doc(tmp: &tempfile::TempDir, rel_path: &str, content: &str) {
         std::fs::create_dir_all(parent).unwrap();
     }
     std::fs::write(&path, content).unwrap();
+}
+
+fn write_config(tmp: &tempfile::TempDir, content: &str) {
+    std::fs::write(tmp.path().join(".untask/config.yml"), content).unwrap();
+}
+
+fn find_node<'a>(nodes: &'a [DocNode], path: &str) -> Option<&'a DocNode> {
+    for node in nodes {
+        if node.relative_path == path || node.node_path == path {
+            return Some(node);
+        }
+        if let Some(child) = find_node(&node.children, path) {
+            return Some(child);
+        }
+    }
+    None
 }
 
 // ── List ────────────────────────────────────────────────────────────
@@ -180,4 +196,101 @@ fn get_is_case_sensitive() {
         err,
         untask_core::error::UntaskError::DocNotFound(_)
     ));
+}
+
+// ── Tree / File Management ──────────────────────────────────────────
+
+#[test]
+fn infer_writable_doc_root_only_accepts_literal_directory_prefixes() {
+    assert_eq!(
+        infer_writable_doc_root("docs/**/*.md").unwrap(),
+        std::path::PathBuf::from("docs")
+    );
+    assert_eq!(
+        infer_writable_doc_root(".untask/docs/*.md").unwrap(),
+        std::path::PathBuf::from(".untask/docs")
+    );
+    assert!(infer_writable_doc_root("**/notes/*.md").is_none());
+    assert!(infer_writable_doc_root("docs/*/drafts/*.md").is_none());
+}
+
+#[test]
+fn list_tree_includes_empty_writable_folders() {
+    let tmp = setup();
+    write_doc(&tmp, "docs/readme.md", "# Readme");
+    std::fs::create_dir_all(tmp.path().join("docs/plans/empty")).unwrap();
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let tree = store.list_tree().unwrap();
+
+    let docs_root = find_node(&tree, "docs").unwrap();
+    assert_eq!(docs_root.kind, DocNodeKind::Root);
+    assert!(!docs_root.read_only);
+    assert!(find_node(&tree, "docs/readme.md").is_some());
+    assert!(find_node(&tree, "docs/plans").is_some());
+    assert!(find_node(&tree, "docs/plans/empty").is_some());
+}
+
+#[test]
+fn list_tree_downgrades_unsupported_patterns_to_browse_only() {
+    let tmp = setup();
+    write_config(&tmp, "docs:\n  - \"**/notes/*.md\"\n");
+    write_doc(&tmp, "guides/notes/idea.md", "# Idea");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let tree = store.list_tree().unwrap();
+
+    assert_eq!(tree.len(), 1);
+    assert!(tree[0].read_only);
+    assert_eq!(tree[0].kind, DocNodeKind::Root);
+    assert_eq!(tree[0].relative_path, "**/notes/*.md");
+    assert!(find_node(&tree, "guides/notes").is_some());
+    assert!(find_node(&tree, "guides/notes/idea.md").is_some());
+}
+
+#[test]
+fn create_doc_creates_missing_writable_root_and_appends_md() {
+    let tmp = setup();
+    write_config(&tmp, "docs:\n  - \"specs/**/*.md\"\n");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let created = store.create_doc("specs", "overview", "# Overview\n").unwrap();
+
+    assert_eq!(created.basename, "overview.md");
+    assert!(tmp.path().join("specs/overview.md").is_file());
+    assert!(find_node(&store.list_tree().unwrap(), "specs/overview.md").is_some());
+}
+
+#[test]
+fn move_path_rejects_cross_root_moves() {
+    let tmp = setup();
+    write_config(&tmp, "docs:\n  - \"docs/**/*.md\"\n  - \"specs/**/*.md\"\n");
+    write_doc(&tmp, "docs/readme.md", "# Readme");
+    std::fs::create_dir_all(tmp.path().join("specs")).unwrap();
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let err = store.move_path("docs/readme.md", "specs").unwrap_err();
+
+    assert!(err.to_string().contains("cross-root"));
+}
+
+#[test]
+fn delete_folder_rejects_non_empty_folder() {
+    let tmp = setup();
+    write_doc(&tmp, "docs/plans/roadmap.md", "# Roadmap");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let err = store.delete_folder("docs/plans").unwrap_err();
+
+    assert!(err.to_string().contains("not empty"));
+}
+
+#[test]
+fn rename_path_rejects_docs_root() {
+    let tmp = setup();
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let err = store.rename_path("docs", "notes").unwrap_err();
+
+    assert!(err.to_string().contains("docs root"));
 }

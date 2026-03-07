@@ -12,6 +12,7 @@
     saveOnBlur = false,
     onSave,
     onDirtyChange,
+    onContentChange,
     onFocusChange,
   }: {
     content?: string;
@@ -19,6 +20,7 @@
     saveOnBlur?: boolean;
     onSave?: (markdown: string) => void;
     onDirtyChange?: (dirty: boolean) => void;
+    onContentChange?: (markdown: string) => void;
     onFocusChange?: (focused: boolean) => void;
   } = $props();
 
@@ -41,6 +43,7 @@
         ctx.get(listenerCtx).markdownUpdated((_ctx, md) => {
           if (!mounted) return;
           dirty = md !== initialContent;
+          onContentChange?.(md);
           onDirtyChange?.(dirty);
         });
       })
@@ -70,6 +73,7 @@
       initialContent = content;
       editorInstance.action(replaceAll(content));
       dirty = false;
+      onContentChange?.(content);
       onDirtyChange?.(false);
     }
   });
@@ -80,6 +84,7 @@
       onSave(md);
       initialContent = md;
       dirty = false;
+      onContentChange?.(md);
       onDirtyChange?.(false);
     }
   }

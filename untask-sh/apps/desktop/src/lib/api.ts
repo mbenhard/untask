@@ -34,6 +34,21 @@ export interface DocInfo {
   basename: string;
 }
 
+export type DocNodeKind = "root" | "folder" | "doc";
+
+export interface DocNode {
+  node_path: string;
+  relative_path: string;
+  name: string;
+  kind: DocNodeKind;
+  children: DocNode[];
+  can_create: boolean;
+  can_rename: boolean;
+  can_move: boolean;
+  can_delete: boolean;
+  read_only: boolean;
+}
+
 export interface DocDetail {
   path: string;
   basename: string;
@@ -151,10 +166,42 @@ export function listDocs(): Promise<DocInfo[]> {
   return invoke("list_docs");
 }
 
+export function listDocsTree(): Promise<DocNode[]> {
+  return invoke("list_docs_tree");
+}
+
 export function readDoc(path: string): Promise<DocDetail> {
   return invoke("read_doc", { path });
 }
 
 export function saveDoc(path: string, content: string): Promise<void> {
   return invoke("save_doc", { path, content });
+}
+
+export function createDoc(
+  parentPath: string,
+  name: string,
+  content?: string,
+): Promise<DocInfo> {
+  return invoke("create_doc", { parentPath, name, content: content ?? null });
+}
+
+export function createDocFolder(parentPath: string, name: string): Promise<string> {
+  return invoke("create_doc_folder", { parentPath, name });
+}
+
+export function renameDocPath(path: string, newName: string): Promise<string> {
+  return invoke("rename_doc_path", { path, newName });
+}
+
+export function moveDocPath(path: string, destinationParent: string): Promise<string> {
+  return invoke("move_doc_path", { path, destinationParent });
+}
+
+export function deleteDocPath(path: string): Promise<void> {
+  return invoke("delete_doc_path", { path });
+}
+
+export function deleteDocFolder(path: string): Promise<void> {
+  return invoke("delete_doc_folder", { path });
 }

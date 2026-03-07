@@ -1,6 +1,6 @@
 import { writable } from "svelte/store";
 
-import type { ColumnDto, DocInfo, TaskDto } from "$lib/api";
+import type { ColumnDto, DocNode, TaskDto } from "$lib/api";
 
 export type ShellView = "board" | "list" | "docs" | "next";
 
@@ -19,4 +19,4 @@ export const tasks = writable<TaskDto[]>([]);
 export const selectedTask = writable<TaskDto | null>(null);
 
 // Docs
-export const docs = writable<DocInfo[]>([]);
+export const docs = writable<DocNode[]>([]);

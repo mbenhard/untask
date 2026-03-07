@@ -11,6 +11,7 @@ use notify::{Event, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime};
 use untask_core::config::Config;
+use untask_core::docs::{infer_writable_doc_root, matches_doc_pattern};
 
 pub const PROJECT_REFRESH_EVENT: &str = "untask://project-refresh";
 
@@ -20,6 +21,7 @@ const STOP_POLL: Duration = Duration::from_millis(50);
 #[derive(Debug, Clone, Serialize)]
 pub struct ProjectRefreshEvent {
     pub project_path: String,
+    pub changed_paths: Vec<String>,
 }
 
 pub struct ProjectWatcher {
@@ -33,10 +35,11 @@ impl ProjectWatcher {
         let callback_root = project_root.clone();
         let project_path = project_root.display().to_string();
         let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-            if let Ok(event) = res
-                && is_relevant_event(&callback_root, &event)
-            {
-                let _ = tx.send(());
+            if let Ok(event) = res {
+                let changed_paths = relevant_event_paths(&callback_root, &event);
+                if !changed_paths.is_empty() {
+                    let _ = tx.send(changed_paths);
+                }
             }
         })
         .map_err(|e| e.to_string())?;
@@ -53,20 +56,21 @@ impl ProjectWatcher {
 
             while !thread_stop.load(Ordering::Relaxed) {
                 match rx.recv_timeout(STOP_POLL) {
-                    Ok(()) => debounce.note_event(),
+                    Ok(paths) => debounce.note_event(paths),
                     Err(mpsc::RecvTimeoutError::Timeout) => {}
                     Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 }
 
-                while rx.try_recv().is_ok() {
-                    debounce.note_event();
+                while let Ok(paths) = rx.try_recv() {
+                    debounce.note_event(paths);
                 }
 
-                if debounce.should_emit() {
+                if let Some(changed_paths) = debounce.should_emit() {
                     let _ = app.emit(
                         PROJECT_REFRESH_EVENT,
                         ProjectRefreshEvent {
                             project_path: project_path.clone(),
+                            changed_paths,
                         },
                     );
                 }
@@ -96,35 +100,50 @@ impl Drop for ProjectWatcher {
 #[derive(Default)]
 struct DebounceState {
     last_event: Option<Instant>,
+    changed_paths: std::collections::BTreeSet<String>,
 }
 
 impl DebounceState {
-    fn note_event(&mut self) {
+    fn note_event(&mut self, changed_paths: Vec<String>) {
         self.last_event = Some(Instant::now());
+        self.changed_paths.extend(changed_paths);
     }
 
-    fn should_emit(&mut self) -> bool {
+    fn should_emit(&mut self) -> Option<Vec<String>> {
         if let Some(last) = self.last_event
             && last.elapsed() >= DEBOUNCE
         {
             self.last_event = None;
-            return true;
+            let changed_paths = self.changed_paths.iter().cloned().collect::<Vec<_>>();
+            self.changed_paths.clear();
+            return Some(changed_paths);
         }
 
-        false
+        None
     }
 }
 
+#[cfg(test)]
 fn is_relevant_event(project_root: &Path, event: &Event) -> bool {
+    !relevant_event_paths(project_root, event).is_empty()
+}
+
+fn relevant_event_paths(project_root: &Path, event: &Event) -> Vec<String> {
     event
         .paths
         .iter()
-        .any(|path| is_relevant_path(project_root, path))
+        .filter_map(|path| relative_relevant_path(project_root, path))
+        .collect()
 }
 
+#[cfg(test)]
 fn is_relevant_path(project_root: &Path, path: &Path) -> bool {
+    relative_relevant_path(project_root, path).is_some()
+}
+
+fn relative_relevant_path(project_root: &Path, path: &Path) -> Option<String> {
     let Some(relative_path) = path.strip_prefix(project_root).ok() else {
-        return false;
+        return None;
     };
 
     let file_name = path
@@ -132,28 +151,34 @@ fn is_relevant_path(project_root: &Path, path: &Path) -> bool {
         .and_then(|name| name.to_str())
         .unwrap_or("");
     if file_name == ".lock" {
-        return false;
+        return None;
     }
 
     let extension = path.extension().and_then(|ext| ext.to_str());
     if relative_path.starts_with(".untask") {
-        return matches!(extension, Some("md") | Some("yml"));
-    }
-
-    if !matches!(extension, Some("md")) {
-        return false;
+        return matches!(extension, Some("md") | Some("yml"))
+            .then(|| relative_path.display().to_string());
     }
 
     let config = Config::load(project_root);
+    if extension.is_none()
+        && config
+            .docs
+            .iter()
+            .filter_map(|pattern| infer_writable_doc_root(pattern))
+            .any(|root| relative_path.starts_with(root))
+    {
+        return Some(relative_path.display().to_string());
+    }
+
+    if !matches!(extension, Some("md")) {
+        return None;
+    }
+
     config.docs
         .iter()
         .any(|pattern| matches_doc_pattern(relative_path, pattern))
-}
-
-fn matches_doc_pattern(relative_path: &Path, pattern: &str) -> bool {
-    glob::Pattern::new(pattern)
-        .map(|pattern| pattern.matches_path(relative_path))
-        .unwrap_or(false)
+        .then(|| relative_path.display().to_string())
 }
 
 #[cfg(test)]
@@ -229,6 +254,22 @@ mod tests {
     }
 
     #[test]
+    fn relevant_for_directory_inside_writable_docs_root() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("docs/plans");
+
+        assert!(is_relevant_path(tmp.path(), &path));
+    }
+
+    #[test]
+    fn ignores_directory_outside_writable_docs_root() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("notes/plans");
+
+        assert!(!is_relevant_path(tmp.path(), &path));
+    }
+
+    #[test]
     fn config_changes_take_effect_without_restarting_watcher_logic() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::create_dir_all(tmp.path().join(".untask")).unwrap();
@@ -261,7 +302,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let mut debounce = DebounceTestHelper::new(rx);
 
-        tx.send(()).unwrap();
+        tx.send(vec!["docs/guide.md".into()]).unwrap();
 
         assert!(!debounce.check());
 
@@ -274,11 +315,11 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let mut debounce = DebounceTestHelper::new(rx);
 
-        tx.send(()).unwrap();
+        tx.send(vec!["docs/guide.md".into()]).unwrap();
         debounce.check();
 
         std::thread::sleep(Duration::from_millis(80));
-        tx.send(()).unwrap();
+        tx.send(vec!["docs/roadmap.md".into()]).unwrap();
         assert!(!debounce.check());
 
         std::thread::sleep(Duration::from_millis(180));
@@ -286,12 +327,12 @@ mod tests {
     }
 
     struct DebounceTestHelper {
-        receiver: mpsc::Receiver<()>,
+        receiver: mpsc::Receiver<Vec<String>>,
         debounce: DebounceState,
     }
 
     impl DebounceTestHelper {
-        fn new(receiver: mpsc::Receiver<()>) -> Self {
+        fn new(receiver: mpsc::Receiver<Vec<String>>) -> Self {
             Self {
                 receiver,
                 debounce: DebounceState::default(),
@@ -299,11 +340,11 @@ mod tests {
         }
 
         fn check(&mut self) -> bool {
-            while self.receiver.try_recv().is_ok() {
-                self.debounce.note_event();
+            while let Ok(paths) = self.receiver.try_recv() {
+                self.debounce.note_event(paths);
             }
 
-            self.debounce.should_emit()
+            self.debounce.should_emit().is_some()
         }
     }
 }
