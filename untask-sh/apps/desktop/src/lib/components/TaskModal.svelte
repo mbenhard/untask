@@ -527,10 +527,11 @@
             {:else}
               <button
                 type="button"
-                class="flex items-center rounded-full border border-dashed border-border/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
+                class="flex items-center gap-1 rounded-full border border-dashed border-border/50 px-1.5 py-0.5 transition-colors duration-[120ms] hover:border-border"
                 onclick={() => { addingTag = true; }}
               >
-                + tag
+                <PriorityDot tone="neutral" />
+                <span class="font-mono text-[10px] text-muted-foreground/60">+ tag</span>
               </button>
             {/if}
           {/if}
