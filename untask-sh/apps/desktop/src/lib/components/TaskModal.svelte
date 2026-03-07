@@ -50,6 +50,10 @@
 
   const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
+  function focusOnMount(el: HTMLElement) {
+    requestAnimationFrame(() => el.focus());
+  }
+
   onMount(() => {
     triggerEl = document.activeElement;
     modalEl?.focus();
@@ -444,11 +448,8 @@
                 onkeydown={handleTitleKeydown}
                 rows="2"
                 class="w-full resize-none bg-transparent text-[16px] font-medium text-foreground/80 outline-none"
-                autofocus
+                use:focusOnMount
               ></textarea>
-              <span class="absolute right-0 bottom-0 font-mono text-[10px] text-muted-foreground/40">
-                Esc to cancel
-              </span>
             </div>
           {:else}
             {#if isUnindexed}
@@ -497,17 +498,18 @@
 
           <!-- Tags -->
           {#each task.tags as tag}
-            <span class="flex h-[20px] items-center gap-0.5 rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] text-muted-foreground">
+            <button
+              type="button"
+              class="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border"
+              disabled={isUnindexed}
+              onclick={() => removeTag(tag)}
+              title={isUnindexed ? tag : "Click to remove"}
+            >
               {tag}
               {#if !isUnindexed}
-                <button
-                  type="button"
-                  class="ml-0.5 text-muted-foreground/60 transition-colors duration-[120ms] hover:text-foreground"
-                  onclick={() => removeTag(tag)}
-                  title="Remove tag"
-                >&times;</button>
+                <span class="text-muted-foreground/40">&times;</span>
               {/if}
-            </span>
+            </button>
           {/each}
 
           <!-- Add tag -->
@@ -519,13 +521,13 @@
                 onblur={() => { if (!tagDraft.trim()) addingTag = false; else addTag(); }}
                 onkeydown={handleTagKeydown}
                 placeholder="tag..."
-                class="h-[20px] w-[80px] rounded-[4px] border border-dashed border-border bg-transparent px-1.5 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"
-                autofocus
+                class="w-[80px] rounded-full border border-dashed border-border bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"
+                use:focusOnMount
               />
             {:else}
               <button
                 type="button"
-                class="flex h-[20px] items-center rounded-[4px] border border-dashed border-border/50 px-1.5 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
+                class="flex items-center rounded-full border border-dashed border-border/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
                 onclick={() => { addingTag = true; }}
               >
                 + tag

@@ -1,8 +1,9 @@
 ---
 id: 25
 title: In the pop-up model I would like to match the tag badges to look the same or similar or maybe reuse the component we have in the priority.
-status: todo
+status: done
 created: 2026-03-07
-updated: 2026-03-07T14:51:17.298993Z
+updated: 2026-03-07T14:54:30.213120Z
+completed: 2026-03-07T14:54:30.213119Z
 position: 4.0
 ---

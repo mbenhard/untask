@@ -58,6 +58,11 @@
           return;
         }
         editorInstance = editor;
+        // Auto-focus the ProseMirror editable area
+        requestAnimationFrame(() => {
+          const pm = editorEl?.querySelector<HTMLElement>('.ProseMirror');
+          pm?.focus();
+        });
       });
 
     return () => {
