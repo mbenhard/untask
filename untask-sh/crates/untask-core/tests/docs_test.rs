@@ -294,3 +294,44 @@ fn rename_path_rejects_docs_root() {
 
     assert!(err.to_string().contains("docs root"));
 }
+
+// ── DocType / frontmatter parsing ───────────────────────────────────
+
+#[test]
+fn list_parses_doc_type_from_frontmatter() {
+    let tmp = setup();
+    write_doc(&tmp, ".untask/docs/spec.md", "---\ntype: prd\n---\n# My PRD\nBuild this.");
+    write_doc(&tmp, ".untask/docs/notes.md", "# Just notes\nNo frontmatter.");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let docs = store.list().unwrap();
+
+    assert_eq!(docs.len(), 2);
+    let spec = docs.iter().find(|d| d.basename == "spec.md").unwrap();
+    let notes = docs.iter().find(|d| d.basename == "notes.md").unwrap();
+
+    assert_eq!(spec.doc_type, untask_core::docs::DocType::Prd);
+    assert_eq!(notes.doc_type, untask_core::docs::DocType::Doc);
+}
+
+#[test]
+fn list_parses_doc_type_defaults_to_doc() {
+    let tmp = setup();
+    write_doc(&tmp, ".untask/docs/guide.md", "---\ntitle: Guide\n---\n# Guide");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let docs = store.list().unwrap();
+
+    assert_eq!(docs[0].doc_type, untask_core::docs::DocType::Doc);
+}
+
+#[test]
+fn list_parses_explicit_doc_type() {
+    let tmp = setup();
+    write_doc(&tmp, ".untask/docs/notes.md", "---\ntype: doc\n---\n# Notes");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let docs = store.list().unwrap();
+
+    assert_eq!(docs[0].doc_type, untask_core::docs::DocType::Doc);
+}

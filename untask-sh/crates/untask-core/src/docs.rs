@@ -1,16 +1,53 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::error::{Result, UntaskError};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DocType {
+    #[default]
+    Doc,
+    Prd,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct DocFrontmatter {
+    #[serde(default, rename = "type")]
+    doc_type: DocType,
+}
+
+/// Parse doc type from file content by reading YAML frontmatter.
+pub fn parse_doc_type(content: &str) -> DocType {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return DocType::Doc;
+    }
+
+    let after_open = match trimmed[3..].find('\n') {
+        Some(i) => 3 + i + 1,
+        None => return DocType::Doc,
+    };
+
+    if let Some(close_pos) = trimmed[after_open..].find("\n---") {
+        let fm_str = &trimmed[after_open..after_open + close_pos];
+        serde_yaml::from_str::<DocFrontmatter>(fm_str)
+            .map(|fm| fm.doc_type)
+            .unwrap_or_default()
+    } else {
+        DocType::Doc
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Doc {
     pub path: PathBuf,
     pub basename: String,
     pub content: String,
+    pub doc_type: DocType,
 }
 
 #[derive(Debug, Clone)]
@@ -60,10 +97,12 @@ impl DocsStore {
             .into_iter()
             .map(|doc| {
                 let content = std::fs::read_to_string(&doc.path)?;
+                let doc_type = parse_doc_type(&content);
                 Ok(Doc {
                     path: doc.path,
                     basename: doc.basename,
                     content,
+                    doc_type,
                 })
             })
             .collect()
@@ -136,10 +175,13 @@ impl DocsStore {
         if let Some(doc) = docs.iter().find(|doc| {
             doc.path == reference_path || self.relative_path(&doc.path) == reference_path
         }) {
+            let content = std::fs::read_to_string(&doc.path)?;
+            let doc_type = parse_doc_type(&content);
             return Ok(Doc {
                 path: doc.path.clone(),
                 basename: doc.basename.clone(),
-                content: std::fs::read_to_string(&doc.path)?,
+                content,
+                doc_type,
             });
         }
 
@@ -152,10 +194,13 @@ impl DocsStore {
             0 => Err(UntaskError::DocNotFound(reference.to_string())),
             1 => {
                 let doc = matches.into_iter().next().unwrap();
+                let content = std::fs::read_to_string(&doc.path)?;
+                let doc_type = parse_doc_type(&content);
                 Ok(Doc {
                     path: doc.path.clone(),
                     basename: doc.basename,
-                    content: std::fs::read_to_string(doc.path)?,
+                    content,
+                    doc_type,
                 })
             }
             _ => {
