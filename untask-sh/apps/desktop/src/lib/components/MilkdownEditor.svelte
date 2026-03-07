@@ -11,11 +11,15 @@
     readonly = false,
     saveOnBlur = false,
     onSave,
+    onDirtyChange,
+    onFocusChange,
   }: {
     content?: string;
     readonly?: boolean;
     saveOnBlur?: boolean;
     onSave?: (markdown: string) => void;
+    onDirtyChange?: (dirty: boolean) => void;
+    onFocusChange?: (focused: boolean) => void;
   } = $props();
 
   let editorEl: HTMLDivElement | undefined = $state();
@@ -37,6 +41,7 @@
         ctx.get(listenerCtx).markdownUpdated((_ctx, md) => {
           if (!mounted) return;
           dirty = md !== initialContent;
+          onDirtyChange?.(dirty);
         });
       })
       .use(commonmark)
@@ -65,6 +70,7 @@
       initialContent = content;
       editorInstance.action(replaceAll(content));
       dirty = false;
+      onDirtyChange?.(false);
     }
   });
 
@@ -74,6 +80,7 @@
       onSave(md);
       initialContent = md;
       dirty = false;
+      onDirtyChange?.(false);
     }
   }
 
@@ -86,11 +93,20 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="milkdown-wrap" onkeydown={handleKeydown} onfocusout={(e) => {
-  if (saveOnBlur && dirty && !e.currentTarget.contains(e.relatedTarget as Node)) {
-    save();
-  }
-}}>
+<div
+  class="milkdown-wrap"
+  onkeydown={handleKeydown}
+  onfocusin={() => onFocusChange?.(true)}
+  onfocusout={(e) => {
+    const leavingEditor = !e.currentTarget.contains(e.relatedTarget as Node);
+    if (saveOnBlur && dirty && leavingEditor) {
+      save();
+    }
+    if (leavingEditor) {
+      onFocusChange?.(false);
+    }
+  }}
+>
   {#if dirty && onSave}
     <div class="flex items-center justify-between border-b border-border/80 px-3 py-1.5">
       <span class="font-mono text-[10px] text-muted-foreground">Unsaved changes</span>

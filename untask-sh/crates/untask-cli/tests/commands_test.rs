@@ -650,7 +650,7 @@ fn docs_remove_path_errors_on_unknown_pattern() {
 #[test]
 fn docs_list_discovers_docs_folder_without_config() {
     let tmp = TempDir::new().unwrap();
-    init_project(tmp.path());
+    fs::create_dir(tmp.path().join(".untask")).unwrap();
     write_doc(tmp.path(), "docs/guide.md", "# Guide\n");
 
     let (stdout, _, ok) = run_in(tmp.path(), &["docs"]);

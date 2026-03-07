@@ -100,7 +100,7 @@ fn list_uses_config_as_authoritative_source() {
 
 #[test]
 fn list_discovers_docs_folder_with_no_config() {
-    let tmp = setup();
+    let tmp = tempfile::TempDir::new().unwrap();
     write_doc(&tmp, "docs/readme.md", "# Readme");
     write_doc(&tmp, "docs/plans/roadmap.md", "# Roadmap");
 

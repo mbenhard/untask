@@ -1,11 +1,11 @@
 # Current Run
 
 - stage: implementation_reviewed
-- topic: desktop-cli-consolidation
-- design_path:
-- execution_plan_path: docs/plans/2026-03-07-desktop-cli-consolidation-execution-plan.md
+- topic: docs-discovery
+- design_path: docs/plans/2026-03-07-docs-discovery-design.md
+- execution_plan_path: docs/plans/2026-03-07-docs-discovery-implementation.md
 - plan_review_path:
-- implementation_checkpoints_path: docs/plans/2026-03-07-desktop-cli-consolidation-execution-checkpoints.md
-- implementation_review_path: docs/plans/2026-03-07-desktop-cli-consolidation-implementation-review.md
+- implementation_checkpoints_path:
+- implementation_review_path: docs/plans/2026-03-07-docs-discovery-implementation-review.md
 - next_skill: none
-- updated_at: 2026-03-07T11:55:00+0100
+- updated_at: 2026-03-07T12:05:31+0100

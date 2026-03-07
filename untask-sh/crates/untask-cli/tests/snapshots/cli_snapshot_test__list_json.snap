@@ -7,6 +7,7 @@ expression: redacted
   {
     "created": "[timestamp]",
     "id": 1,
+    "position": 1.0,
     "priority": "high",
     "status": "backlog",
     "tags": [
@@ -19,6 +20,7 @@ expression: redacted
   {
     "created": "[timestamp]",
     "id": 2,
+    "position": 1.0,
     "priority": "medium",
     "status": "in-progress",
     "title": "Write tests",
@@ -28,6 +30,7 @@ expression: redacted
     "completed": "[timestamp]",
     "created": "[timestamp]",
     "id": 3,
+    "position": 1.0,
     "status": "done",
     "title": "Deploy app",
     "updated": "[timestamp]"

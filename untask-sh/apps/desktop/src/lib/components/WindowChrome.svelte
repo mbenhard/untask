@@ -15,6 +15,7 @@
 <header
   data-tauri-drag-region
   role="toolbar"
+  tabindex="-1"
   onmousedown={onmousedown}
   class="flex h-8 shrink-0 select-none items-center justify-between border-b border-border/80 bg-background/90 px-3 backdrop-blur"
 >
