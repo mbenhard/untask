@@ -4,6 +4,7 @@
     createDocFolder,
     deleteDocFolder,
     deleteDocPath,
+    getPrdTaskCounts,
     moveDocPath,
     renameDocPath,
     type DocInfo,
@@ -43,6 +44,8 @@
   let moveDestination = $state("");
   let actionError = $state<string | null>(null);
   let actionPending = $state(false);
+  let prdTaskCounts = $state<[number, number] | null>(null);
+  let newDocType = $state<"doc" | "prd">("doc");
 
   const totalDocs = $derived(countDocs(docs));
   const flatNodes = $derived(flattenNodes(docs, expandedPaths));
@@ -94,6 +97,7 @@
       openDoc = {
         path: currentNode.relative_path,
         basename: currentNode.name,
+        doc_type: currentNode.doc_type ?? "doc",
       };
       openDocMissing = false;
     }
@@ -114,6 +118,18 @@
     }
   });
 
+  $effect(() => {
+    if (selectedDoc && selectedNode?.doc_type === "prd") {
+      getPrdTaskCounts(selectedDoc.path).then((counts) => {
+        prdTaskCounts = counts;
+      }).catch(() => {
+        prdTaskCounts = null;
+      });
+    } else {
+      prdTaskCounts = null;
+    }
+  });
+
   function onNodeSelect(node: DocNode) {
     selectedPath = node.node_path;
     actionMode = null;
@@ -123,6 +139,7 @@
       openDoc = {
         path: node.relative_path,
         basename: node.name,
+        doc_type: node.doc_type ?? "doc",
       };
       openDocMissing = false;
       editorKey = node.node_path;
@@ -210,6 +227,7 @@
   function startNewDoc() {
     actionMode = "new-doc";
     draftName = "untitled.md";
+    newDocType = "doc";
     actionError = null;
   }
 
@@ -274,7 +292,10 @@
 
     try {
       if (actionMode === "new-doc") {
-        const created = await createDoc(selectedNode.relative_path, draftName, "");
+        const initialContent = newDocType === "prd"
+          ? `---\ntype: prd\n---\n`
+          : "";
+        const created = await createDoc(selectedNode.relative_path, draftName, initialContent);
         selectedPath = created.path;
         openDoc = created;
         openDocMissing = false;
@@ -293,6 +314,7 @@
           openDoc = {
             path: nextPath,
             basename: basenameFromPath(nextPath),
+            doc_type: selectedNode.doc_type ?? "doc",
           };
           openDocMissing = false;
         }
@@ -304,6 +326,7 @@
           openDoc = {
             path: nextPath,
             basename: basenameFromPath(nextPath),
+            doc_type: selectedNode.doc_type ?? "doc",
           };
           openDocMissing = false;
         }
@@ -562,6 +585,12 @@
 
             <span class="min-w-0 flex-1 truncate text-left text-[12px] text-foreground">{item.node.name}</span>
 
+            {#if item.node.doc_type === "prd"}
+              <span class="ml-1 shrink-0 rounded-[3px] border border-border/60 px-1 font-mono text-[9px] leading-[14px] text-muted-foreground">
+                PRD
+              </span>
+            {/if}
+
             {#if item.node.read_only}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="ml-1 shrink-0 text-muted-foreground/30">
                 <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
@@ -583,6 +612,12 @@
               {selectedNode.relative_path}
             </p>
           </div>
+
+          {#if prdTaskCounts && prdTaskCounts[1] > 0}
+            <span class="font-mono text-[10px] text-muted-foreground">
+              {prdTaskCounts[1]} tasks · {prdTaskCounts[0]} done
+            </span>
+          {/if}
 
           <div class="flex shrink-0 items-center gap-1">
             {#if canCreateInSelectedNode(selectedNode)}
@@ -651,11 +686,24 @@
                   ? `Delete ${selectedNode.name}?`
                   : `Delete empty folder ${selectedNode.name}?`}
               </span>
+            {:else if actionMode === "new-doc"}
+              <select
+                bind:value={newDocType}
+                class="rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-ring"
+              >
+                <option value="doc">Doc</option>
+                <option value="prd">PRD</option>
+              </select>
+              <input
+                bind:value={draftName}
+                class="min-w-[220px] rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"
+                placeholder="untitled.md"
+              />
             {:else}
               <input
                 bind:value={draftName}
                 class="min-w-[220px] rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"
-                placeholder={actionMode === "new-doc" ? "untitled.md" : "name"}
+                placeholder="name"
               />
             {/if}
 
@@ -741,6 +789,11 @@
                   </svg>
                 {/if}
                 <span class="min-w-0 flex-1 truncate text-[12px] text-foreground">{child.name}</span>
+                {#if child.doc_type === "prd"}
+                  <span class="ml-1 shrink-0 rounded-[3px] border border-border/60 px-1 font-mono text-[9px] leading-[14px] text-muted-foreground">
+                    PRD
+                  </span>
+                {/if}
               </button>
             {/each}
           {/if}
