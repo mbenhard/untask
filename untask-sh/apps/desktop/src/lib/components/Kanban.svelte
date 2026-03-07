@@ -308,35 +308,6 @@
           ondragleave={handleDragLeave}
           ondrop={(e) => handleDrop(e, col.id, col.tasks.length)}
         >
-        <!-- Quick-add at top for non-empty columns -->
-        {#if !isUnmatchedColumn(col.id)}
-          {#if addingInColumn === col.id}
-            <div class="rounded-[6px] border border-border/60 bg-card px-2.5 py-2">
-              <input
-                type="text"
-                bind:value={quickAddTitle}
-                onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
-                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
-                placeholder="Task title..."
-                class="w-full bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
-                class:border-destructive={quickAddErrorFlash}
-                autofocus
-              />
-              {#if quickAddError}
-                <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
-              {/if}
-            </div>
-          {:else}
-            <button
-              type="button"
-              class="w-full rounded-[6px] border border-dashed border-border/40 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground/40 transition-colors duration-[120ms] hover:border-border/60 hover:text-muted-foreground"
-              onclick={() => startQuickAdd(col.id)}
-            >
-              + Add task
-            </button>
-          {/if}
-        {/if}
-
         <!-- Task cards -->
         {#each col.tasks as task, i}
           <!-- Drop indicator line -->
@@ -363,7 +334,7 @@
             <!-- Row 1: priority dot + title -->
             <div class="flex items-center gap-1.5">
               <PriorityDot tone={priorityTone(task.priority)} />
-              <span class="min-w-0 flex-1 truncate text-[13px] leading-snug text-foreground">
+              <span class="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
                 {task.title}
               </span>
               {#if task.id == null}
@@ -421,6 +392,35 @@
               <span class="font-mono text-[10px] text-muted-foreground/40">Drop here</span>
             {/if}
           </div>
+        {/if}
+
+        <!-- Quick-add at bottom -->
+        {#if !isUnmatchedColumn(col.id)}
+          {#if addingInColumn === col.id}
+            <div class="rounded-[6px] border border-border/60 bg-card px-2.5 py-2">
+              <textarea
+                bind:value={quickAddTitle}
+                onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
+                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
+                placeholder="Task title..."
+                rows="2"
+                class="w-full resize-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
+                class:border-destructive={quickAddErrorFlash}
+                autofocus
+              ></textarea>
+              {#if quickAddError}
+                <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
+              {/if}
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="w-full rounded-[6px] border border-dashed border-border/40 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground/40 transition-colors duration-[120ms] hover:border-border/60 hover:text-muted-foreground"
+              onclick={() => startQuickAdd(col.id)}
+            >
+              + Add task
+            </button>
+          {/if}
         {/if}
         </div>
         <div class="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background/80 to-transparent"></div>

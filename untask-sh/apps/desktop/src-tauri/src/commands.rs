@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tauri::State;
 
 use untask_core::docs::{DocNode, DocsStore};
@@ -11,6 +11,16 @@ use untask_core::task::Task;
 use untask_core::types::Priority;
 
 use crate::state::{self, AppState, RecentProject};
+
+/// Deserialize a double-option so that a missing field → None (don't update)
+/// and an explicit null → Some(None) (clear the value).
+fn deserialize_double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::deserialize(deserializer)?))
+}
 
 // ── DTOs ────────────────────────────────────────────────────────────
 
@@ -105,6 +115,7 @@ pub struct NextDto {
 pub struct TaskUpdateDto {
     pub title: Option<String>,
     pub status: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
     pub priority: Option<Option<Priority>>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,

@@ -112,18 +112,6 @@
     }
   }}
 >
-  {#if dirty && onSave}
-    <div class="flex items-center justify-between border-b border-border/80 px-3 py-1.5">
-      <span class="font-mono text-[10px] text-muted-foreground">Unsaved changes</span>
-      <button
-        type="button"
-        class="rounded-[4px] border border-border px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors hover:bg-accent"
-        onclick={save}
-      >
-        Save
-      </button>
-    </div>
-  {/if}
   <div
     bind:this={editorEl}
     class="milkdown-editor prose prose-invert min-h-[120px] px-3 py-2 text-[14px] leading-[1.5] text-foreground outline-none"

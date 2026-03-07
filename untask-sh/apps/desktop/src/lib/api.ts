@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 // ── Types ───────────────────────────────────────────────────────────
 
-export type Priority = "low" | "medium" | "high" | "urgent";
+export type Priority = "low" | "medium" | "high";
 
 export interface TaskDto {
   id: number | null;

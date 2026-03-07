@@ -1,8 +1,9 @@
 ---
 id: 9
-title: in Desktop app, the “Add task” displays at bottom, but in case we dont have tasks it displays at the full bottom of column - can you review the UI/UX of this implementation
-status: todo
+title: in Desktop app, the “Add task” displays at the top, i want it to display at the bottomm and in case we dont have any tasks just display normally like in the beginning?
+status: done
 created: 2026-03-07
-updated: 2026-03-07T10:36:04.630146Z
-position: 2.0
+updated: 2026-03-07T14:18:35.478865Z
+completed: 2026-03-07T14:18:35.478864Z
+position: 1.0
 ---

@@ -28,7 +28,7 @@
   let statusPopoverTaskId = $state<number | null>(null);
   let popoverIndex = $state(0);
 
-  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high", "urgent"];
+  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
   let defaultStatus = $derived(columns.length > 0 ? columns[0].id : "backlog");
   let statuses = $derived([...new Set(tasks.map((t) => t.status))].sort());
@@ -66,7 +66,7 @@
           cmp = a.status.localeCompare(b.status);
           break;
         case "priority": {
-          const order = { urgent: 0, high: 1, medium: 2, low: 3 };
+          const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
           const ap = a.priority ? order[a.priority] ?? 4 : 4;
           const bp = b.priority ? order[b.priority] ?? 4 : 4;
           cmp = ap - bp;

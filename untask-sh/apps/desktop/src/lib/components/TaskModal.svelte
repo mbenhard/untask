@@ -48,7 +48,7 @@
   let modalEl: HTMLDivElement | undefined = $state();
   let triggerEl: Element | null = null;
 
-  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high", "urgent"];
+  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
   onMount(() => {
     triggerEl = document.activeElement;
@@ -94,7 +94,7 @@
   });
 
   async function loadTask(id: number, preserveDrafts: boolean) {
-    loading = true;
+    if (!preserveDrafts) loading = true;
     try {
       const loaded = await getTask(id);
       const preserveBodyDraft = preserveDrafts && (bodyFocused || bodyDirty);
@@ -200,10 +200,11 @@
 
   // Priority cycling
   function cyclePriority() {
-    if (isUnindexed) return;
-    const current = task?.priority ?? null;
+    if (isUnindexed || !task) return;
+    const current = task.priority ?? null;
     const idx = priorityCycle.indexOf(current);
     const next = priorityCycle[(idx + 1) % priorityCycle.length];
+    task = { ...task, priority: next };
     saveField({ priority: next });
   }
 
@@ -437,27 +438,27 @@
 
           {#if editingTitle}
             <div class="relative">
-              <input
-                type="text"
+              <textarea
                 bind:value={titleDraft}
                 onblur={confirmTitle}
                 onkeydown={handleTitleKeydown}
-                class="w-full bg-transparent text-[16px] font-medium text-foreground/80 outline-none"
+                rows="2"
+                class="w-full resize-none bg-transparent text-[16px] font-medium text-foreground/80 outline-none"
                 autofocus
-              />
-              <span class="absolute right-0 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground/40">
+              ></textarea>
+              <span class="absolute right-0 bottom-0 font-mono text-[10px] text-muted-foreground/40">
                 Esc to cancel
               </span>
             </div>
           {:else}
             {#if isUnindexed}
-              <h2 class="text-[16px] font-medium text-foreground">
+              <h2 class="break-words text-[16px] font-medium text-foreground">
                 {task.title}
               </h2>
             {:else}
               <button
                 type="button"
-                class="w-full text-left text-[16px] font-medium text-foreground transition-colors duration-[120ms] hover:text-foreground/80"
+                class="w-full break-words text-left text-[16px] font-medium text-foreground transition-colors duration-[120ms] hover:text-foreground/80"
                 onclick={startEditTitle}
               >
                 {task.title}

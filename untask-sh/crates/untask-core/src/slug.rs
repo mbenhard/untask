@@ -22,5 +22,15 @@ pub fn generate_slug(title: &str) -> String {
         }
     }
 
-    result.trim_matches('-').to_string()
+    let trimmed = result.trim_matches('-');
+
+    // Truncate to avoid exceeding filesystem filename limits (255 bytes).
+    // Reserve space for id prefix (e.g. "001-") and ".md" suffix.
+    const MAX_SLUG_LEN: usize = 200;
+    if trimmed.len() <= MAX_SLUG_LEN {
+        return trimmed.to_string();
+    }
+    // Truncate at a hyphen boundary to avoid cutting mid-word
+    let truncated = &trimmed[..MAX_SLUG_LEN];
+    truncated.trim_end_matches('-').to_string()
 }
