@@ -181,7 +181,7 @@ impl App {
         self.view = View::TaskDetail(id);
     }
 
-    fn refresh_or_message(&mut self) {
+    pub(super) fn refresh_or_message(&mut self) {
         if let Err(err) = self.refresh() {
             self.message = Some(format!("Refresh failed: {err}"));
         }

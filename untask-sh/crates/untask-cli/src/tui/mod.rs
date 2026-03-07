@@ -13,17 +13,21 @@ use ratatui::crossterm::event::{self, Event, KeyEventKind};
 
 use app::App;
 use untask_core::store::TaskStore;
+use watcher::FileWatcher;
 
 pub fn run(store: TaskStore, project_root: PathBuf) -> untask_core::error::Result<()> {
+    let mut watcher = FileWatcher::new(&project_root, store.config());
+
     with_terminal(ratatui::init, ratatui::restore, |terminal| {
         let mut app = App::new(store, project_root)?;
-        run_loop(terminal, &mut app)
+        run_loop(terminal, &mut app, &mut watcher)
     })
 }
 
 fn run_loop(
     terminal: &mut ratatui::DefaultTerminal,
     app: &mut App,
+    watcher: &mut Option<FileWatcher>,
 ) -> untask_core::error::Result<()> {
     while !app.should_quit {
         terminal.draw(|frame| app.draw(frame))?;
@@ -33,6 +37,13 @@ fn run_loop(
             && key.kind == KeyEventKind::Press
         {
             app.handle_key(key);
+        }
+
+        // Check for filesystem changes (debounced)
+        if let Some(w) = watcher {
+            if w.should_refresh() {
+                app.refresh_or_message();
+            }
         }
     }
 
