@@ -105,7 +105,7 @@ pub struct NextDto {
 pub struct TaskUpdateDto {
     pub title: Option<String>,
     pub status: Option<String>,
-    pub priority: Option<Priority>,
+    pub priority: Option<Option<Priority>>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
     pub position: Option<f64>,
@@ -152,6 +152,7 @@ fn write_doc(project_root: &Path, reference: &str, content: &str) -> Result<(), 
 pub struct ColumnDto {
     pub id: String,
     pub aliases: Vec<String>,
+    pub done: bool,
 }
 
 #[derive(Serialize)]
@@ -172,9 +173,112 @@ pub fn get_config(state: State<'_, AppState>) -> Result<ConfigDto, String> {
             .map(|c| ColumnDto {
                 id: c.id,
                 aliases: c.aliases,
+                done: c.done,
             })
             .collect(),
     })
+}
+
+// ── Column management ────────────────────────────────────────────────
+
+fn columns_to_dto(config: &untask_core::config::Config) -> Vec<ColumnDto> {
+    config
+        .columns
+        .iter()
+        .map(|c| ColumnDto {
+            id: c.id.clone(),
+            aliases: c.aliases.clone(),
+            done: c.done,
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn column_add(
+    name: String,
+    after: Option<String>,
+    done: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ColumnDto>, String> {
+    let root = require_project(&state)?;
+    let mut config = untask_core::config::Config::load(&root);
+    config
+        .column_add(&name, after.as_deref(), done.unwrap_or(false))
+        .map_err(|e| e.to_string())?;
+    config.save(&root).map_err(|e| e.to_string())?;
+    Ok(columns_to_dto(&config))
+}
+
+#[tauri::command]
+pub fn column_rename(
+    old: String,
+    new: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ColumnDto>, String> {
+    let root = require_project(&state)?;
+    let mut config = untask_core::config::Config::load(&root);
+    let old_id = config.column_rename(&old, &new).map_err(|e| e.to_string())?;
+    config.save(&root).map_err(|e| e.to_string())?;
+
+    let mut store = TaskStore::new(root.clone()).map_err(|e| e.to_string())?;
+    store.reload_config();
+    store
+        .migrate_tasks_status(&old_id, &new.trim().to_lowercase())
+        .map_err(|e| e.to_string())?;
+    Ok(columns_to_dto(&config))
+}
+
+#[tauri::command]
+pub fn column_move(
+    name: String,
+    after: Option<String>,
+    before: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ColumnDto>, String> {
+    let root = require_project(&state)?;
+    let mut config = untask_core::config::Config::load(&root);
+    config
+        .column_move(&name, after.as_deref(), before.as_deref())
+        .map_err(|e| e.to_string())?;
+    config.save(&root).map_err(|e| e.to_string())?;
+    Ok(columns_to_dto(&config))
+}
+
+#[tauri::command]
+pub fn column_delete(
+    name: String,
+    move_to: Option<String>,
+    delete_tasks: bool,
+    state: State<'_, AppState>,
+) -> Result<Vec<ColumnDto>, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root.clone()).map_err(|e| e.to_string())?;
+    let col_id = name.trim().to_lowercase();
+
+    let task_count = store.count_tasks_in_column(&col_id).map_err(|e| e.to_string())?;
+
+    if task_count > 0 && move_to.is_none() && !delete_tasks {
+        return Err(format!(
+            "column '{}' has {} task(s). Specify move_to or delete_tasks",
+            col_id, task_count
+        ));
+    }
+
+    if let Some(ref target) = move_to {
+        store
+            .migrate_tasks_status(&col_id, target)
+            .map_err(|e| e.to_string())?;
+    } else if delete_tasks {
+        store
+            .delete_tasks_by_status(&col_id)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let mut config = untask_core::config::Config::load(&root);
+    config.column_delete(&col_id).map_err(|e| e.to_string())?;
+    config.save(&root).map_err(|e| e.to_string())?;
+
+    Ok(columns_to_dto(&config))
 }
 
 // ── Project lifecycle ───────────────────────────────────────────────
@@ -216,7 +320,7 @@ pub fn close_project(state: State<'_, AppState>) -> Result<(), String> {
 
 #[tauri::command]
 pub fn init_project(path: String) -> Result<(), String> {
-    untask_core::init::init(std::path::Path::new(&path)).map_err(|e| e.to_string())
+    untask_core::init::init(std::path::Path::new(&path), None).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -410,7 +514,7 @@ mod tests {
 
     fn setup_project() -> tempfile::TempDir {
         let tmp = tempfile::TempDir::new().unwrap();
-        untask_core::init::init(tmp.path()).unwrap();
+        untask_core::init::init(tmp.path(), None).unwrap();
         tmp
     }
 

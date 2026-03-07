@@ -22,6 +22,7 @@ export interface TaskDto {
 export interface ColumnDto {
   id: string;
   aliases: string[];
+  done: boolean;
 }
 
 export interface ConfigDto {
@@ -48,7 +49,7 @@ export interface RecentProject {
 export interface TaskUpdateDto {
   title?: string;
   status?: string;
-  priority?: Priority;
+  priority?: Priority | null;
   tags?: string[];
   body?: string;
   position?: number;
@@ -58,6 +59,40 @@ export interface TaskUpdateDto {
 
 export function getConfig(): Promise<ConfigDto> {
   return invoke("get_config");
+}
+
+// ── Columns ────────────────────────────────────────────────────────
+
+export function columnAdd(
+  name: string,
+  after?: string,
+  done?: boolean,
+): Promise<ColumnDto[]> {
+  return invoke("column_add", { name, after: after ?? null, done: done ?? null });
+}
+
+export function columnRename(old: string, newName: string): Promise<ColumnDto[]> {
+  return invoke("column_rename", { old, new: newName });
+}
+
+export function columnMove(
+  name: string,
+  after?: string,
+  before?: string,
+): Promise<ColumnDto[]> {
+  return invoke("column_move", { name, after: after ?? null, before: before ?? null });
+}
+
+export function columnDelete(
+  name: string,
+  moveTo?: string,
+  deleteTasks?: boolean,
+): Promise<ColumnDto[]> {
+  return invoke("column_delete", {
+    name,
+    moveTo: moveTo ?? null,
+    deleteTasks: deleteTasks ?? false,
+  });
 }
 
 // ── Project lifecycle ───────────────────────────────────────────────

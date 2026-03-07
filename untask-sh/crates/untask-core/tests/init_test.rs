@@ -8,7 +8,7 @@ use untask_core::lock::ProjectLock;
 #[test]
 fn init_creates_all_directories() {
     let dir = TempDir::new().unwrap();
-    init(dir.path()).unwrap();
+    init(dir.path(), None).unwrap();
 
     assert!(dir.path().join(".untask/tasks").is_dir());
     assert!(dir.path().join(".untask/docs").is_dir());
@@ -19,15 +19,15 @@ fn init_creates_all_directories() {
 #[test]
 fn init_is_idempotent() {
     let dir = TempDir::new().unwrap();
-    init(dir.path()).unwrap();
-    init(dir.path()).unwrap();
+    init(dir.path(), None).unwrap();
+    init(dir.path(), None).unwrap();
     assert!(dir.path().join(".untask/tasks").is_dir());
 }
 
 #[test]
 fn init_creates_gitignore() {
     let dir = TempDir::new().unwrap();
-    init(dir.path()).unwrap();
+    init(dir.path(), None).unwrap();
 
     let content = std::fs::read_to_string(dir.path().join(".untask/.gitignore")).unwrap();
     assert!(content.contains(".lock"));
@@ -37,7 +37,7 @@ fn init_creates_gitignore() {
 #[test]
 fn lock_acquisition_succeeds() {
     let dir = TempDir::new().unwrap();
-    init(dir.path()).unwrap();
+    init(dir.path(), None).unwrap();
     let _lock = ProjectLock::acquire(dir.path()).unwrap();
 }
 
@@ -58,7 +58,7 @@ fn lock_serializes_access() {
     use std::thread;
 
     let dir = TempDir::new().unwrap();
-    init(dir.path()).unwrap();
+    init(dir.path(), None).unwrap();
 
     let counter = Arc::new(AtomicU32::new(0));
     let barrier = Arc::new(Barrier::new(2));

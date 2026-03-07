@@ -27,6 +27,10 @@ pub fn run() {
             commands::search,
             commands::get_next,
             commands::get_repair_summary,
+            commands::column_add,
+            commands::column_rename,
+            commands::column_move,
+            commands::column_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

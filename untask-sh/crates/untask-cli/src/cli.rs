@@ -122,6 +122,12 @@ pub enum Commands {
         cmd: SkillCommands,
     },
 
+    /// Manage board columns
+    Column {
+        #[command(subcommand)]
+        cmd: ColumnCommands,
+    },
+
     /// Open the desktop app for this project
     Open,
 }
@@ -135,6 +141,63 @@ pub enum DocsCommands {
     Show {
         /// Doc name or path
         name: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ColumnCommands {
+    /// List all columns
+    List,
+
+    /// Add a new column
+    Add {
+        /// Column name (will be kebab-cased)
+        name: String,
+
+        /// Insert after this column
+        #[arg(long)]
+        after: Option<String>,
+
+        /// Mark as a terminal/done column
+        #[arg(long)]
+        done: bool,
+    },
+
+    /// Rename a column
+    Rename {
+        /// Current column name
+        old: String,
+
+        /// New column name
+        new: String,
+    },
+
+    /// Move a column to a new position
+    Move {
+        /// Column to move
+        name: String,
+
+        /// Place after this column
+        #[arg(long, conflicts_with = "before")]
+        after: Option<String>,
+
+        /// Place before this column
+        #[arg(long, conflicts_with = "after")]
+        before: Option<String>,
+    },
+
+    /// Delete a column
+    Delete {
+        /// Column to delete
+        name: String,
+
+        /// Move tasks to this column instead of deleting them
+        #[arg(long, conflicts_with = "delete_tasks")]
+        move_to: Option<String>,
+
+        /// Delete all tasks in the column
+        #[arg(long, conflicts_with = "move_to")]
+        delete_tasks: bool,
     },
 }
 

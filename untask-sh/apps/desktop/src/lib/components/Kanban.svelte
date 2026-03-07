@@ -130,6 +130,7 @@
   function handleDragOver(e: DragEvent, columnId: string, index: number) {
     if (!draggedTask || isUnmatchedColumn(columnId)) return;
     e.preventDefault();
+    e.stopPropagation();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
     dropTarget = { columnId, index };
   }
@@ -156,44 +157,53 @@
       return;
     }
 
+    // Capture reference before async work — handleDragEnd fires during await and nulls draggedTask
+    const task = draggedTask;
+    draggedTask = null;
+    dropTarget = null;
+
+    const sourceColId = resolveColumnId(task);
     const col = kanbanColumns.find((c) => c.id === columnId);
-    if (!col) return;
+    const sourceCol = kanbanColumns.find((c) => c.id === sourceColId);
+    if (!col || !sourceCol) return;
 
-    // Filter out the dragged task from the target column's task list
-    const colTasks = col.tasks.filter((t) => t.id !== draggedTask!.id);
-
-    // Check if this is a same-position no-op
-    const sourceColId = resolveColumnId(draggedTask);
+    // Adjust index for same-column downward drags: the dragged task inflates
+    // the hover index but is removed before insertion, causing an off-by-one.
+    let adjustedIndex = index;
     if (sourceColId === columnId) {
-      const currentIndex = col.tasks.findIndex((t) => t.id === draggedTask!.id);
-      if (currentIndex === index || currentIndex === index - 1) {
-        draggedTask = null;
-        dropTarget = null;
+      const sourceIndex = col.tasks.findIndex((t) => t.id === task.id);
+      if (sourceIndex !== -1 && sourceIndex < index) {
+        adjustedIndex = index - 1;
+      }
+    }
+
+    const targetTasks = col.tasks.filter((t) => t.id !== task.id);
+    const nextTargetOrder = insertTaskAtIndex(targetTasks, task, adjustedIndex);
+
+    if (sourceColId === columnId) {
+      const currentManagedIds = col.tasks
+        .filter((t) => t.id != null)
+        .map((t) => t.id);
+      const nextManagedIds = nextTargetOrder
+        .filter((t) => t.id != null)
+        .map((t) => t.id);
+
+      if (JSON.stringify(currentManagedIds) === JSON.stringify(nextManagedIds)) {
         return;
       }
     }
 
-    // Ensure all tasks in the target column have positions
-    const positioned = ensurePositions(colTasks);
-
-    // Calculate new position
-    const newPosition = calculatePosition(positioned, index);
-
-    // Build update
-    const updates: Parameters<typeof updateTask>[1] = { position: newPosition };
-    if (sourceColId !== columnId) {
-      updates.status = columnId;
-    }
-
     try {
-      await updateTask(draggedTask.id, updates);
+      if (sourceColId !== columnId) {
+        await persistColumnOrder(
+          sourceCol.tasks.filter((t) => t.id !== task.id),
+        );
+      }
+      await persistColumnOrder(nextTargetOrder, columnId, task.id);
       onTasksChanged();
     } catch (err) {
       console.error("Failed to move task:", err);
     }
-
-    draggedTask = null;
-    dropTarget = null;
   }
 
   function resolveColumnId(task: TaskDto): string | undefined {
@@ -208,26 +218,35 @@
     return "__unmatched";
   }
 
-  function ensurePositions(tasks: TaskDto[]): TaskDto[] {
-    const allHavePositions = tasks.every((t) => t.position != null);
-    if (allHavePositions) return tasks;
-    return tasks.map((t, i) => ({ ...t, position: t.position ?? i + 1 }));
+  async function persistColumnOrder(
+    orderedTasks: TaskDto[],
+    movedStatus?: string,
+    movedTaskId?: number,
+  ) {
+    const managedTasks = orderedTasks.filter(
+      (task): task is TaskDto & { id: number } => task.id != null,
+    );
+
+    for (const [index, task] of managedTasks.entries()) {
+      const nextPosition = index + 1;
+      const updates: Parameters<typeof updateTask>[1] = {};
+      if (task.position !== nextPosition) {
+        updates.position = nextPosition;
+      }
+      if (movedStatus && movedTaskId === task.id && task.status !== movedStatus) {
+        updates.status = movedStatus;
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateTask(task.id, updates);
+      }
+    }
   }
 
-  function calculatePosition(sortedTasks: TaskDto[], dropIndex: number): number {
-    if (sortedTasks.length === 0) return 1;
-    if (dropIndex === 0) return (sortedTasks[0].position ?? 1) - 1;
-    if (dropIndex >= sortedTasks.length) {
-      return (sortedTasks[sortedTasks.length - 1].position ?? sortedTasks.length) + 1;
-    }
-    const before = sortedTasks[dropIndex - 1].position ?? dropIndex;
-    const after = sortedTasks[dropIndex].position ?? dropIndex + 1;
-    const mid = (before + after) / 2;
-    // Rebalance check: if gap too small, use integer (will be corrected on next render)
-    if (Math.abs(after - before) < 0.001) {
-      return before + 0.5;
-    }
-    return mid;
+  function insertTaskAtIndex(tasks: TaskDto[], task: TaskDto, index: number): TaskDto[] {
+    const clampedIndex = Math.max(0, Math.min(index, tasks.length));
+    const next = [...tasks];
+    next.splice(clampedIndex, 0, task);
+    return next;
   }
 
   // ── Display helpers ──────────────────────────────────────────────
@@ -297,7 +316,7 @@
             <!-- Row 1: priority dot + title -->
             <div class="flex items-center gap-2">
               <PriorityDot tone={priorityTone(task.priority)} />
-              <span class="min-w-0 flex-1 truncate text-[13px] text-foreground">
+              <span class="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
                 {task.title}
               </span>
               {#if task.id == null}

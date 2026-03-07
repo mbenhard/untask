@@ -5,7 +5,7 @@ use untask_core::store::{ListFilter, TaskStore, TaskUpdate};
 
 fn setup() -> (tempfile::TempDir, TaskStore) {
     let tmp = tempfile::TempDir::new().unwrap();
-    init(tmp.path()).unwrap();
+    init(tmp.path(), None).unwrap();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
     (tmp, store)
 }
@@ -110,6 +110,18 @@ fn add_done_sets_completed() {
 
     assert_eq!(task.status, "done");
     assert!(task.completed.is_some());
+}
+
+#[test]
+fn add_assigns_position_within_status_column() {
+    let (_tmp, store) = setup();
+    let backlog_one = store.add("Backlog one", None).unwrap();
+    let in_progress = store.add("Doing", Some("in-progress")).unwrap();
+    let backlog_two = store.add("Backlog two", None).unwrap();
+
+    assert_eq!(backlog_one.position, Some(1.0));
+    assert_eq!(in_progress.position, Some(1.0));
+    assert_eq!(backlog_two.position, Some(2.0));
 }
 
 // ── List ───────────────────────────────────────────────────────────
@@ -274,6 +286,37 @@ fn update_modifies_fields_and_refreshes_updated() {
 
     assert_eq!(updated.title, "Modified");
     assert!(updated.updated > original_updated);
+}
+
+#[test]
+fn update_can_clear_priority() {
+    let (_tmp, store) = setup();
+    store.add("Priority test", None).unwrap();
+
+    let with_priority = store
+        .update(
+            1,
+            TaskUpdate {
+                priority: Some(Some(untask_core::types::Priority::High)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        with_priority.priority,
+        Some(untask_core::types::Priority::High)
+    );
+
+    let cleared = store
+        .update(
+            1,
+            TaskUpdate {
+                priority: Some(None),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(cleared.priority, None);
 }
 
 // ── Delete ─────────────────────────────────────────────────────────

@@ -5,11 +5,14 @@ mod tui;
 
 use std::ffi::OsString;
 
-use clap::Parser;
-use cli::{Cli, Commands, DocsCommands};
+use clap::{CommandFactory, Parser};
+use cli::{Cli, ColumnCommands, Commands, DocsCommands};
 use colored::control::set_override;
 use output::{Formatter, OutputMode};
 use untask_core::store::TaskStore;
+
+const NO_COMMAND_MESSAGE: &str =
+    "Use a CLI subcommand or `untask open` to launch the desktop app.";
 
 fn main() {
     let cli = Cli::parse();
@@ -21,19 +24,42 @@ fn main() {
 
     let fmt = Formatter::new(OutputMode::detect(cli.no_color));
 
-    let code = match run(&cli, &fmt) {
-        Ok(()) => 0,
-        Err(e) => {
-            if cli.json {
-                let msg = serde_json::json!({ "error": e.to_string() });
-                eprintln!("{msg}");
-            } else {
-                eprintln!("{}", fmt.error(&format!("error: {e}")));
+    let code = if cli.command.is_none() {
+        handle_no_command(&cli, &fmt)
+    } else {
+        match run(&cli, &fmt) {
+            Ok(()) => 0,
+            Err(e) => {
+                if cli.json {
+                    let msg = serde_json::json!({ "error": e.to_string() });
+                    eprintln!("{msg}");
+                } else {
+                    eprintln!("{}", fmt.error(&format!("error: {e}")));
+                }
+                1
             }
-            1
         }
     };
     std::process::exit(code);
+}
+
+fn handle_no_command(cli: &Cli, fmt: &Formatter) -> i32 {
+    if cli.json {
+        let msg = serde_json::json!({ "error": NO_COMMAND_MESSAGE });
+        eprintln!("{msg}");
+        return 1;
+    }
+
+    let mut command = Cli::command();
+    if let Err(error) = command.print_help() {
+        eprintln!("{}", fmt.error(&format!("error: failed to print help: {error}")));
+        return 1;
+    }
+
+    println!();
+    println!();
+    println!("{}", fmt.warning(NO_COMMAND_MESSAGE));
+    1
 }
 
 fn should_disable_color(no_color_flag: bool, no_color_env: Option<OsString>) -> bool {
@@ -42,22 +68,10 @@ fn should_disable_color(no_color_flag: bool, no_color_env: Option<OsString>) -> 
 
 fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
     match &cli.command {
-        None => {
-            let cwd = std::env::current_dir()?;
-            match untask_core::project::find_project_root(&cwd) {
-                Ok(root) => {
-                    let store = TaskStore::new(root.clone())?;
-                    tui::run(store, root)
-                }
-                Err(_) => {
-                    eprintln!("No untask project found. Run 'untask init' first.");
-                    std::process::exit(1);
-                }
-            }
-        }
+        None => unreachable!(),
         Some(Commands::Init) => {
             let root = std::env::current_dir()?;
-            untask_core::init::init(&root)?;
+            untask_core::init::init(&root, None)?;
             println!("Initialized untask project in {}", root.display());
             Ok(())
         }
@@ -65,7 +79,7 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
             // All other commands require an initialized project
             let cwd = std::env::current_dir()?;
             let root = untask_core::project::find_project_root(&cwd)?;
-            let store = TaskStore::new(root.clone())?;
+            let mut store = TaskStore::new(root.clone())?;
 
             match cmd {
                 Commands::Init => unreachable!(),
@@ -108,6 +122,21 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                 Commands::Repair { check, write } => {
                     commands::repair(&root, *check, *write, cli.json, fmt)
                 }
+                Commands::Column { cmd: subcmd } => match subcmd {
+                    ColumnCommands::List => commands::column::list(&root, cli.json),
+                    ColumnCommands::Add { name, after, done } => {
+                        commands::column::add(&root, name, after.as_deref(), *done, cli.json)
+                    }
+                    ColumnCommands::Rename { old, new } => {
+                        commands::column::rename(&mut store, &root, old, new, cli.json)
+                    }
+                    ColumnCommands::Move { name, after, before } => {
+                        commands::column::move_column(&root, name, after.as_deref(), before.as_deref(), cli.json)
+                    }
+                    ColumnCommands::Delete { name, move_to, delete_tasks } => {
+                        commands::column::delete(&mut store, &root, name, move_to.as_deref(), *delete_tasks, cli.json)
+                    }
+                },
                 Commands::Skill { cmd: _ } => commands::skill_install(cli.json),
                 Commands::Open => commands::open(&root),
             }

@@ -1,3 +1,24 @@
+## Dev Mode
+
+We are developing untask using untask itself (dev mode). Do NOT install or build release binaries.
+
+When the `/untask` skill or any untask command is needed, run via cargo:
+
+```
+cargo run -p untask -- <command> [args]
+```
+
+Examples:
+- `cargo run -p untask -- next --json`
+- `cargo run -p untask -- list`
+- `cargo run -p untask -- show <id>`
+- `cargo run -p untask -- status <id> in-progress`
+- `cargo run -p untask -- done <id>`
+
+For the desktop app, use `pnpm tauri dev`.
+
+Note: The project will be renamed from "untask" to something else (TBD).
+
 ## UI / Design Rules
 
 For any desktop or visual work, follow `docs/untask-design-language.md`:

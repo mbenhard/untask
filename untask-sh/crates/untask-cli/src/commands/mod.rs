@@ -1,4 +1,5 @@
 mod add;
+pub mod column;
 mod delete;
 pub mod docs;
 mod done;

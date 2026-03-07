@@ -20,7 +20,7 @@ pub struct TaskStore {
 pub struct TaskUpdate {
     pub title: Option<String>,
     pub status: Option<String>,
-    pub priority: Option<crate::types::Priority>,
+    pub priority: Option<Option<crate::types::Priority>>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
     pub position: Option<f64>,
@@ -178,15 +178,17 @@ impl TaskStore {
         let id = self.next_id()?;
         let slug = generate_slug(title);
         let canonical_status = self.resolve_status(status)?;
+        let position = self.next_position_for_status(&canonical_status)?;
 
         let now = Utc::now();
         let task = Task {
             id: Some(id),
             title: title.to_string(),
-            completed: (canonical_status == "done").then_some(now),
+            completed: self.config.is_done_status(&canonical_status).then_some(now),
             status: canonical_status,
             created: Some(now.date_naive()),
             updated: Some(now),
+            position: Some(position),
             ..Task::default()
         };
 
@@ -217,7 +219,7 @@ impl TaskStore {
             self.apply_status_change(&mut task, &status)?;
         }
         if let Some(priority) = updates.priority {
-            task.priority = Some(priority);
+            task.priority = priority;
         }
         if let Some(tags) = updates.tags {
             task.tags = tags;
@@ -270,8 +272,8 @@ impl TaskStore {
     fn apply_status_change(&self, task: &mut Task, new_status: &str) -> Result<()> {
         let canonical = self.normalize_status(new_status)?;
 
-        let was_done = self.config.normalize_status(&task.status).as_deref() == Some("done");
-        let is_done = canonical == "done";
+        let was_done = self.config.is_done_status(&task.status);
+        let is_done = self.config.is_done_status(&canonical);
 
         task.status = canonical;
 
@@ -296,6 +298,83 @@ impl TaskStore {
             .transpose()?
             .map(Ok)
             .unwrap_or_else(|| Ok(self.config.default_status()))
+    }
+
+    fn next_position_for_status(&self, status: &str) -> Result<f64> {
+        let tasks = self.list(None)?;
+        let mut matching_count = 0usize;
+        let mut max_position = 0.0f64;
+
+        for task in tasks {
+            if self.config.normalize_status(&task.status).as_deref() != Some(status) {
+                continue;
+            }
+            matching_count += 1;
+            if let Some(position) = task.position {
+                max_position = max_position.max(position);
+            }
+        }
+
+        Ok(max_position.max(matching_count as f64) + 1.0)
+    }
+
+    // ── Batch operations (for column rename/delete) ─────────────
+
+    /// Batch-update status on all tasks matching `old_status` to `new_status`.
+    /// Used when renaming a column. Acquires project lock.
+    pub fn migrate_tasks_status(&self, old_status: &str, new_status: &str) -> Result<u32> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
+        let tasks = self.list(None)?;
+        let mut count = 0u32;
+
+        for task in tasks {
+            let canonical = self.config.normalize_status(&task.status);
+            if canonical.as_deref() == Some(old_status) {
+                if let Some(ref path) = task.file_path {
+                    let mut updated = task.clone();
+                    updated.status = new_status.to_string();
+                    updated.updated = Some(Utc::now());
+                    let content = serialize_task(&updated);
+                    atomic_write(path, content.as_bytes())?;
+                    count += 1;
+                }
+            }
+        }
+        Ok(count)
+    }
+
+    /// Delete all tasks matching a status. Used when deleting a column with --delete-tasks.
+    /// Acquires project lock.
+    pub fn delete_tasks_by_status(&self, status: &str) -> Result<u32> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
+        let tasks = self.list(None)?;
+        let mut count = 0u32;
+
+        for task in tasks {
+            let canonical = self.config.normalize_status(&task.status);
+            if canonical.as_deref() == Some(status) {
+                if let Some(ref path) = task.file_path {
+                    std::fs::remove_file(path)?;
+                    count += 1;
+                }
+            }
+        }
+        Ok(count)
+    }
+
+    /// Count tasks in a given column status.
+    pub fn count_tasks_in_column(&self, status: &str) -> Result<u32> {
+        let tasks = self.list(None)?;
+        let count = tasks
+            .iter()
+            .filter(|t| self.config.normalize_status(&t.status).as_deref() == Some(status))
+            .count();
+        Ok(count as u32)
+    }
+
+    /// Reload config from disk (useful after column operations modify config).
+    pub fn reload_config(&mut self) {
+        self.config = Config::load(&self.project_root);
     }
 
     fn read_known_id(&self, path: &Path) -> Result<Option<u32>> {

@@ -3,6 +3,7 @@ use std::path::{Component, Path};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, UntaskError};
+use crate::fs::atomic_write;
 use crate::types::Theme;
 
 pub const DEFAULT_DOC_GLOB: &str = ".untask/docs/**/*.md";
@@ -12,6 +13,8 @@ pub struct Column {
     pub id: String,
     #[serde(default)]
     pub aliases: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub done: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,32 +28,51 @@ pub struct Config {
 }
 
 fn default_columns() -> Vec<Column> {
+    preset_kanban()
+}
+
+/// Built-in column presets.
+pub enum Preset {
+    Simple,
+    Kanban,
+    BugTracking,
+}
+
+impl Preset {
+    pub fn columns(&self) -> Vec<Column> {
+        match self {
+            Self::Simple => preset_simple(),
+            Self::Kanban => preset_kanban(),
+            Self::BugTracking => preset_bug_tracking(),
+        }
+    }
+}
+
+fn preset_simple() -> Vec<Column> {
     vec![
-        Column {
-            id: "backlog".into(),
-            aliases: vec![],
-        },
-        Column {
-            id: "todo".into(),
-            aliases: vec!["to-do".into(), "to do".into(), "pending".into()],
-        },
-        Column {
-            id: "in-progress".into(),
-            aliases: vec![
-                "wip".into(),
-                "in progress".into(),
-                "doing".into(),
-                "working".into(),
-            ],
-        },
-        Column {
-            id: "review".into(),
-            aliases: vec!["reviewing".into(), "in review".into()],
-        },
-        Column {
-            id: "done".into(),
-            aliases: vec!["complete".into(), "finished".into(), "closed".into()],
-        },
+        Column { id: "todo".into(), aliases: vec!["to-do".into(), "pending".into()], done: false },
+        Column { id: "in-progress".into(), aliases: vec!["wip".into(), "doing".into()], done: false },
+        Column { id: "done".into(), aliases: vec!["complete".into(), "finished".into()], done: true },
+    ]
+}
+
+fn preset_kanban() -> Vec<Column> {
+    vec![
+        Column { id: "backlog".into(), aliases: vec![], done: false },
+        Column { id: "todo".into(), aliases: vec!["to-do".into(), "to do".into(), "pending".into()], done: false },
+        Column { id: "in-progress".into(), aliases: vec!["wip".into(), "in progress".into(), "doing".into(), "working".into()], done: false },
+        Column { id: "review".into(), aliases: vec!["reviewing".into(), "in review".into()], done: false },
+        Column { id: "done".into(), aliases: vec!["complete".into(), "finished".into(), "closed".into()], done: true },
+    ]
+}
+
+fn preset_bug_tracking() -> Vec<Column> {
+    vec![
+        Column { id: "reported".into(), aliases: vec!["new".into()], done: false },
+        Column { id: "confirmed".into(), aliases: vec!["triaged".into()], done: false },
+        Column { id: "fixing".into(), aliases: vec!["in-progress".into(), "wip".into()], done: false },
+        Column { id: "testing".into(), aliases: vec!["qa".into(), "verifying".into()], done: false },
+        Column { id: "resolved".into(), aliases: vec!["fixed".into(), "done".into(), "closed".into()], done: true },
     ]
 }
 
@@ -69,6 +91,14 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Create a config with specific columns (and default docs/theme).
+    pub fn with_columns(columns: Vec<Column>) -> Self {
+        Self {
+            columns,
+            ..Self::default()
+        }
+    }
+
     /// Load config from `.untask/config.yml`. Falls back to defaults on missing or invalid file.
     pub fn load(project_root: &Path) -> Self {
         let config_path = project_root.join(".untask/config.yml");
@@ -128,6 +158,145 @@ impl Config {
             .map(|c| c.id.clone())
             .unwrap_or_else(|| "backlog".into())
     }
+
+    /// Check if a status resolves to a terminal (done) column.
+    pub fn is_done_status(&self, raw: &str) -> bool {
+        let normalized = raw.trim().to_lowercase();
+        for col in &self.columns {
+            if col.id == normalized || col.aliases.iter().any(|a| a.to_lowercase() == normalized) {
+                return col.done;
+            }
+        }
+        false
+    }
+
+    /// Save config to `.untask/config.yml`.
+    pub fn save(&self, project_root: &Path) -> Result<()> {
+        let config_path = project_root.join(".untask/config.yml");
+        let content = serde_yaml::to_string(self)
+            .map_err(|e| UntaskError::InvalidConfig(format!("failed to serialize config: {e}")))?;
+        atomic_write(&config_path, content.as_bytes())?;
+        Ok(())
+    }
+
+    // ── Column operations ────────────────────────────────────────
+
+    /// Add a new column. Inserts after `after` if given, otherwise appends.
+    pub fn column_add(&mut self, name: &str, after: Option<&str>, done: bool) -> Result<()> {
+        let id = validate_column_id(name)?;
+        self.check_id_available(&id)?;
+
+        let col = Column { id, aliases: vec![], done };
+
+        if let Some(after_id) = after {
+            let pos = self.find_column_index(after_id)?;
+            self.columns.insert(pos + 1, col);
+        } else {
+            self.columns.push(col);
+        }
+        Ok(())
+    }
+
+    /// Rename a column. Old name becomes an alias.
+    /// Returns the old ID so callers can migrate tasks.
+    pub fn column_rename(&mut self, old: &str, new: &str) -> Result<String> {
+        let new_id = validate_column_id(new)?;
+        self.check_id_available(&new_id)?;
+        let idx = self.find_column_index(old)?;
+
+        let old_id = self.columns[idx].id.clone();
+        self.columns[idx].aliases.push(old_id.clone());
+        self.columns[idx].id = new_id;
+        Ok(old_id)
+    }
+
+    /// Move a column before or after another column.
+    pub fn column_move(&mut self, name: &str, after: Option<&str>, before: Option<&str>) -> Result<()> {
+        let idx = self.find_column_index(name)?;
+        let col = self.columns.remove(idx);
+
+        if let Some(after_id) = after {
+            let target = self.find_column_index(after_id)?;
+            self.columns.insert(target + 1, col);
+        } else if let Some(before_id) = before {
+            let target = self.find_column_index(before_id)?;
+            self.columns.insert(target, col);
+        } else {
+            return Err(UntaskError::InvalidConfig(
+                "column move requires --after or --before".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Delete a column. Returns the list of task statuses that need migration.
+    /// Caller must handle task migration/deletion before calling this.
+    pub fn column_delete(&mut self, name: &str) -> Result<()> {
+        if self.columns.len() <= 1 {
+            return Err(UntaskError::InvalidConfig(
+                "cannot delete the last column".into(),
+            ));
+        }
+        let idx = self.find_column_index(name)?;
+        self.columns.remove(idx);
+        Ok(())
+    }
+
+    /// Find column index by ID (case-insensitive).
+    fn find_column_index(&self, name: &str) -> Result<usize> {
+        let lower = name.trim().to_lowercase();
+        self.columns
+            .iter()
+            .position(|c| c.id == lower)
+            .ok_or_else(|| UntaskError::InvalidConfig(format!("column not found: {name}")))
+    }
+
+    /// Check that a column ID doesn't collide with existing IDs or aliases.
+    fn check_id_available(&self, id: &str) -> Result<()> {
+        for col in &self.columns {
+            if col.id == *id {
+                return Err(UntaskError::InvalidConfig(format!(
+                    "column already exists: {id}"
+                )));
+            }
+            for alias in &col.aliases {
+                if alias.to_lowercase() == *id {
+                    return Err(UntaskError::InvalidConfig(format!(
+                        "'{id}' conflicts with alias of column '{}'",
+                        col.id
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Validate and normalize a column ID to lowercase kebab-case.
+fn validate_column_id(name: &str) -> Result<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(UntaskError::InvalidConfig(
+            "column name cannot be empty".into(),
+        ));
+    }
+    let id: String = trimmed
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .collect();
+    // Collapse multiple hyphens and trim leading/trailing hyphens
+    let id = id
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if id.is_empty() {
+        return Err(UntaskError::InvalidConfig(
+            "column name must contain alphanumeric characters".into(),
+        ));
+    }
+    Ok(id)
 }
 
 fn looks_like_windows_absolute(path: &str) -> bool {

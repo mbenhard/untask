@@ -9,7 +9,7 @@ use untask_core::types::Priority;
 
 fn setup() -> (tempfile::TempDir, TaskStore) {
     let tmp = tempfile::TempDir::new().unwrap();
-    init(tmp.path()).unwrap();
+    init(tmp.path(), None).unwrap();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
     (tmp, store)
 }
@@ -110,7 +110,7 @@ fn next_includes_open_tasks_sorted_by_priority() {
         .update(
             1,
             untask_core::store::TaskUpdate {
-                priority: Some(Priority::Low),
+                priority: Some(Some(Priority::Low)),
                 ..Default::default()
             },
         )
@@ -119,7 +119,7 @@ fn next_includes_open_tasks_sorted_by_priority() {
         .update(
             2,
             untask_core::store::TaskUpdate {
-                priority: Some(Priority::High),
+                priority: Some(Some(Priority::High)),
                 ..Default::default()
             },
         )
@@ -128,7 +128,7 @@ fn next_includes_open_tasks_sorted_by_priority() {
         .update(
             3,
             untask_core::store::TaskUpdate {
-                priority: Some(Priority::Urgent),
+                priority: Some(Some(Priority::Urgent)),
                 ..Default::default()
             },
         )

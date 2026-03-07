@@ -6,7 +6,7 @@ use untask_core::store::TaskStore;
 
 fn setup() -> (tempfile::TempDir, TaskStore) {
     let tmp = tempfile::TempDir::new().unwrap();
-    init(tmp.path()).unwrap();
+    init(tmp.path(), None).unwrap();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
     (tmp, store)
 }

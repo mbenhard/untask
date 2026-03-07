@@ -3,7 +3,7 @@ use untask_core::init::init;
 
 fn setup() -> tempfile::TempDir {
     let tmp = tempfile::TempDir::new().unwrap();
-    init(tmp.path()).unwrap();
+    init(tmp.path(), None).unwrap();
     tmp
 }
 

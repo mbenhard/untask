@@ -576,7 +576,7 @@ mod tests {
 
     fn make_app() -> (TempDir, App) {
         let tmp = TempDir::new().unwrap();
-        init::init(tmp.path()).unwrap();
+        init::init(tmp.path(), None).unwrap();
 
         let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
         store.add("Alpha task", None).unwrap();
@@ -780,7 +780,7 @@ mod tests {
     #[test]
     fn enter_on_unindexed_task_without_id_shows_guidance() {
         let tmp = TempDir::new().unwrap();
-        init::init(tmp.path()).unwrap();
+        init::init(tmp.path(), None).unwrap();
 
         fs::write(
             tmp.path().join(".untask/tasks/loose-note.md"),
@@ -807,7 +807,7 @@ mod tests {
     #[test]
     fn refresh_reloads_config_and_docs_after_external_changes() {
         let tmp = TempDir::new().unwrap();
-        init::init(tmp.path()).unwrap();
+        init::init(tmp.path(), None).unwrap();
 
         let mut app = App::new(
             TaskStore::new(tmp.path().to_path_buf()).unwrap(),
