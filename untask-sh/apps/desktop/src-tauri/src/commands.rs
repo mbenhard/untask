@@ -4,7 +4,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use tauri::State;
 
-use untask_core::docs::{DocNode, DocsStore};
+use untask_core::docs::{DocNode, DocType, DocsStore};
 use untask_core::search::SearchResultKind;
 use untask_core::store::{ListFilter, TaskStore, TaskUpdate};
 use untask_core::task::Task;
@@ -65,6 +65,7 @@ impl From<Task> for TaskDto {
 pub struct DocInfo {
     pub path: String,
     pub basename: String,
+    pub doc_type: DocType,
 }
 
 #[derive(Serialize)]
@@ -72,6 +73,7 @@ pub struct DocDetail {
     pub path: String,
     pub basename: String,
     pub content: String,
+    pub doc_type: DocType,
 }
 
 #[derive(Serialize)]
@@ -161,13 +163,6 @@ fn resolve_doc_path(project_root: &Path, reference: &str) -> Result<PathBuf, Str
 fn write_doc(project_root: &Path, reference: &str, content: &str) -> Result<(), String> {
     let full_path = resolve_doc_path(project_root, reference)?;
     std::fs::write(full_path, content).map_err(|e| e.to_string())
-}
-
-fn doc_info_from_ref(project_root: &Path, doc: untask_core::docs::DocRef) -> DocInfo {
-    DocInfo {
-        path: relative_project_path(project_root, &doc.path),
-        basename: doc.basename,
-    }
 }
 
 #[derive(Serialize)]
@@ -431,10 +426,14 @@ pub fn delete_task(id: u32, state: State<'_, AppState>) -> Result<(), String> {
 pub fn list_docs(state: State<'_, AppState>) -> Result<Vec<DocInfo>, String> {
     let root = require_project(&state)?;
     let docs_store = DocsStore::new(root.clone());
-    let docs = docs_store.list_refs().map_err(|e| e.to_string())?;
+    let docs = docs_store.list().map_err(|e| e.to_string())?;
     Ok(docs
         .into_iter()
-        .map(|doc| doc_info_from_ref(&root, doc))
+        .map(|doc| DocInfo {
+            path: relative_project_path(&root, &doc.path),
+            basename: doc.basename,
+            doc_type: doc.doc_type,
+        })
         .collect())
 }
 
@@ -454,6 +453,7 @@ pub fn read_doc(path: String, state: State<'_, AppState>) -> Result<DocDetail, S
         path: relative_project_path(&root, &doc.path),
         basename: doc.basename,
         content: doc.content,
+        doc_type: doc.doc_type,
     })
 }
 
@@ -472,10 +472,16 @@ pub fn create_doc(
 ) -> Result<DocInfo, String> {
     let root = require_project(&state)?;
     let docs_store = DocsStore::new(root.clone());
+    let content_str = content.as_deref().unwrap_or("");
     let doc = docs_store
-        .create_doc(&parent_path, &name, content.as_deref().unwrap_or(""))
+        .create_doc(&parent_path, &name, content_str)
         .map_err(|e| e.to_string())?;
-    Ok(doc_info_from_ref(&root, doc))
+    let doc_type = untask_core::docs::parse_doc_type(content_str);
+    Ok(DocInfo {
+        path: relative_project_path(&root, &doc.path),
+        basename: doc.basename,
+        doc_type,
+    })
 }
 
 #[tauri::command]
@@ -590,6 +596,16 @@ pub fn get_next(state: State<'_, AppState>) -> Result<NextDto, String> {
             })
             .collect(),
     })
+}
+
+#[tauri::command]
+pub fn get_prd_task_counts(
+    prd_path: String,
+    state: State<'_, AppState>,
+) -> Result<(u32, u32), String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    store.count_by_prd(&prd_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -38,6 +38,7 @@ pub fn run() {
             commands::column_rename,
             commands::column_move,
             commands::column_delete,
+            commands::get_prd_task_counts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

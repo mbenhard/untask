@@ -33,6 +33,7 @@ export interface ConfigDto {
 export interface DocInfo {
   path: string;
   basename: string;
+  doc_type: DocType;
 }
 
 export type DocNodeKind = "root" | "folder" | "doc";
@@ -57,6 +58,7 @@ export interface DocDetail {
   path: string;
   basename: string;
   content: string;
+  doc_type: DocType;
 }
 
 export interface RecentProject {
@@ -209,4 +211,12 @@ export function deleteDocPath(path: string): Promise<void> {
 
 export function deleteDocFolder(path: string): Promise<void> {
   return invoke("delete_doc_folder", { path });
+}
+
+// ── PRD ─────────────────────────────────────────────────────────────
+
+export function getPrdTaskCounts(
+  prdPath: string,
+): Promise<[number, number]> {
+  return invoke("get_prd_task_counts", { prdPath });
 }
