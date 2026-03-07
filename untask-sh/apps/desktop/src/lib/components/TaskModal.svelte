@@ -544,11 +544,11 @@
           {#if dateEntries.length > 0}
             <button
               type="button"
-              class="font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+              class="font-mono text-[8px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
               onclick={cycleDate}
               title="Click to cycle dates"
             >
-              {dateEntries[dateIndex % dateEntries.length].label} {dateEntries[dateIndex % dateEntries.length].value}
+              <span class="text-muted-foreground/40">{dateEntries[dateIndex % dateEntries.length].label}</span> {dateEntries[dateIndex % dateEntries.length].value}
             </button>
           {/if}
         </div>

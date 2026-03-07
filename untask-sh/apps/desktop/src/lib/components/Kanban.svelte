@@ -332,8 +332,8 @@
             title={task.title}
           >
             <!-- Row 1: priority dot + title -->
-            <div class="flex items-center gap-1.5">
-              <PriorityDot tone={priorityTone(task.priority)} />
+            <div class="flex items-start gap-1.5">
+              <span class="mt-[6px] shrink-0"><PriorityDot tone={priorityTone(task.priority)} /></span>
               <span class="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
                 {task.title}
               </span>
