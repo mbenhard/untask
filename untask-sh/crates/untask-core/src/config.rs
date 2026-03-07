@@ -6,7 +6,6 @@ use crate::error::{Result, UntaskError};
 use crate::fs::atomic_write;
 use crate::types::Theme;
 
-pub const DEFAULT_DOC_GLOB: &str = ".untask/docs/**/*.md";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Column {
@@ -77,7 +76,10 @@ fn preset_bug_tracking() -> Vec<Column> {
 }
 
 fn default_docs() -> Vec<String> {
-    vec![DEFAULT_DOC_GLOB.into()]
+    vec![
+        ".untask/docs/**/*.md".into(),
+        "docs/**/*.md".into(),
+    ]
 }
 
 impl Default for Config {

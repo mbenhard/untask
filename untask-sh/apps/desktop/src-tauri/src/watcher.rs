@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use notify::{Event, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime};
-use untask_core::config::{Config, DEFAULT_DOC_GLOB};
+use untask_core::config::Config;
 
 pub const PROJECT_REFRESH_EVENT: &str = "untask://project-refresh";
 
@@ -145,8 +145,8 @@ fn is_relevant_path(project_root: &Path, path: &Path) -> bool {
     }
 
     let config = Config::load(project_root);
-    unique_doc_patterns(&config)
-        .into_iter()
+    config.docs
+        .iter()
         .any(|pattern| matches_doc_pattern(relative_path, pattern))
 }
 
@@ -154,18 +154,6 @@ fn matches_doc_pattern(relative_path: &Path, pattern: &str) -> bool {
     glob::Pattern::new(pattern)
         .map(|pattern| pattern.matches_path(relative_path))
         .unwrap_or(false)
-}
-
-fn unique_doc_patterns(config: &Config) -> Vec<&str> {
-    let mut patterns = vec![DEFAULT_DOC_GLOB];
-
-    for pattern in &config.docs {
-        if !patterns.contains(&pattern.as_str()) {
-            patterns.push(pattern);
-        }
-    }
-
-    patterns
 }
 
 #[cfg(test)]

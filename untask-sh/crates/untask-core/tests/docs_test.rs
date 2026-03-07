@@ -82,24 +82,20 @@ fn list_discovers_configured_globs_outside_default() {
 }
 
 #[test]
-fn list_always_includes_default_docs_glob() {
+fn list_uses_config_as_authoritative_source() {
     let tmp = setup();
     write_doc(&tmp, ".untask/docs/guide.md", "# Guide");
     write_doc(&tmp, "docs/architecture.md", "# Architecture");
 
+    // Config only specifies docs/**/*.md — .untask/docs/ should NOT be searched
     let config_content = "docs:\n  - \"docs/**/*.md\"\n";
     std::fs::write(tmp.path().join(".untask/config.yml"), config_content).unwrap();
 
     let store = DocsStore::new(tmp.path().to_path_buf());
     let docs = store.list().unwrap();
 
-    assert_eq!(docs.len(), 2);
-    assert_eq!(
-        docs.iter()
-            .map(|doc| doc.basename.as_str())
-            .collect::<Vec<_>>(),
-        vec!["guide.md", "architecture.md"]
-    );
+    assert_eq!(docs.len(), 1);
+    assert_eq!(docs[0].basename, "architecture.md");
 }
 
 // ── Get ─────────────────────────────────────────────────────────────

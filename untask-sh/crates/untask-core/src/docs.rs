@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::config::{Config, DEFAULT_DOC_GLOB};
+use crate::config::Config;
 use crate::error::{Result, UntaskError};
 
 #[derive(Debug, Clone)]
@@ -103,16 +103,8 @@ impl DocsStore {
         }
     }
 
-    fn doc_patterns(&self) -> Vec<&str> {
-        let mut patterns = vec![DEFAULT_DOC_GLOB];
-
-        for pattern in &self.config.docs {
-            if !patterns.contains(&pattern.as_str()) {
-                patterns.push(pattern);
-            }
-        }
-
-        patterns
+    fn doc_patterns(&self) -> &[String] {
+        &self.config.docs
     }
 
     fn relative_path<'a>(&self, path: &'a Path) -> &'a Path {

@@ -79,7 +79,7 @@ docs:
 
     let config = Config::load(dir.path());
     assert_eq!(config.columns.len(), 5);
-    assert_eq!(config.docs, vec![".untask/docs/**/*.md"]);
+    assert_eq!(config.docs, vec![".untask/docs/**/*.md", "docs/**/*.md"]);
 }
 
 #[test]
