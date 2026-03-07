@@ -9,10 +9,12 @@
   let {
     content = "",
     readonly = false,
+    saveOnBlur = false,
     onSave,
   }: {
     content?: string;
     readonly?: boolean;
+    saveOnBlur?: boolean;
     onSave?: (markdown: string) => void;
   } = $props();
 
@@ -84,7 +86,11 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="milkdown-wrap" onkeydown={handleKeydown}>
+<div class="milkdown-wrap" onkeydown={handleKeydown} onfocusout={(e) => {
+  if (saveOnBlur && dirty && !e.currentTarget.contains(e.relatedTarget as Node)) {
+    save();
+  }
+}}>
   {#if dirty && onSave}
     <div class="flex items-center justify-between border-b border-border/80 px-3 py-1.5">
       <span class="font-mono text-[10px] text-muted-foreground">Unsaved changes</span>

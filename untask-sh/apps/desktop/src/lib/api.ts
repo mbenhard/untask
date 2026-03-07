@@ -16,6 +16,7 @@ export interface TaskDto {
   body: string;
   subtask_done: number;
   subtask_total: number;
+  position: number | null;
 }
 
 export interface ColumnDto {
@@ -50,6 +51,7 @@ export interface TaskUpdateDto {
   priority?: Priority;
   tags?: string[];
   body?: string;
+  position?: number;
 }
 
 // ── Config ──────────────────────────────────────────────────────────

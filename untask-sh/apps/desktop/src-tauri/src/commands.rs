@@ -27,6 +27,7 @@ pub struct TaskDto {
     pub body: String,
     pub subtask_done: u32,
     pub subtask_total: u32,
+    pub position: Option<f64>,
 }
 
 impl From<Task> for TaskDto {
@@ -43,6 +44,7 @@ impl From<Task> for TaskDto {
             body: task.body,
             subtask_done: task.subtask_progress.0,
             subtask_total: task.subtask_progress.1,
+            position: task.position,
         }
     }
 }
@@ -106,6 +108,7 @@ pub struct TaskUpdateDto {
     pub priority: Option<Priority>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
+    pub position: Option<f64>,
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -287,6 +290,7 @@ pub fn update_task(
                 priority: updates.priority,
                 tags: updates.tags,
                 body: updates.body,
+                position: updates.position,
             },
         )
         .map_err(|e| e.to_string())?;

@@ -23,6 +23,7 @@ pub struct TaskUpdate {
     pub priority: Option<crate::types::Priority>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
+    pub position: Option<f64>,
 }
 
 /// Filter for listing tasks.
@@ -224,6 +225,9 @@ impl TaskStore {
         if let Some(body) = updates.body {
             task.body = body;
         }
+        if let Some(position) = updates.position {
+            task.position = Some(position);
+        }
 
         task.updated = Some(Utc::now());
         let content = serialize_task(&task);
@@ -250,10 +254,7 @@ impl TaskStore {
             id,
             TaskUpdate {
                 status: Some(status.to_string()),
-                title: None,
-                priority: None,
-                tags: None,
-                body: None,
+                ..TaskUpdate::default()
             },
         )
     }

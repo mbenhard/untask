@@ -16,8 +16,8 @@
   import Kanban from "$lib/components/Kanban.svelte";
   import ProjectPicker from "$lib/components/ProjectPicker.svelte";
   import SidebarNav from "$lib/components/SidebarNav.svelte";
-  import TaskDetail from "$lib/components/TaskDetail.svelte";
   import TaskList from "$lib/components/TaskList.svelte";
+  import TaskModal from "$lib/components/TaskModal.svelte";
   import WindowChrome from "$lib/components/WindowChrome.svelte";
   import {
     activeView,
@@ -40,7 +40,7 @@
   };
 
   let restoring = $state(true);
-  let selectedTask = $state<TaskDto | null>(null);
+  let selectedTaskId = $state<number | null>(null);
   let selectedDoc = $state<DocInfo | null>(null);
   let refreshRevision = $state(0);
   let openProjectPath = $state<string | null>(null);
@@ -91,7 +91,7 @@
     openProjectPath = path;
     projectPath.set(path);
     projectName.set(name);
-    selectedTask = null;
+    selectedTaskId = null;
     selectedDoc = null;
 
     await refreshData();
@@ -99,7 +99,6 @@
   }
 
   async function refreshData() {
-    const selectedTaskId = selectedTask?.id ?? null;
     const selectedDocPath = selectedDoc?.path ?? null;
     const [config, taskList, docList] = await Promise.all([
       getConfig().catch(() => ({ columns: [] })),
@@ -112,10 +111,6 @@
     docs.set(docList);
     taskHealth = summarizeTaskHealth(taskList, config.columns);
     refreshRevision += 1;
-
-    if (selectedTaskId != null) {
-      selectedTask = taskList.find((entry) => entry.id === selectedTaskId) ?? null;
-    }
 
     if (selectedDocPath) {
       selectedDoc = docList.find((entry) => entry.path === selectedDocPath) ?? null;
@@ -139,7 +134,7 @@
 
   function selectView(view: ShellView) {
     activeView.set(view);
-    selectedTask = null;
+    selectedTaskId = null;
     selectedDoc = null;
   }
 
@@ -156,17 +151,17 @@
     tasks.set([]);
     docs.set([]);
     columns.set([]);
-    selectedTask = null;
+    selectedTaskId = null;
     selectedDoc = null;
     taskHealth = { unmatchedCount: 0, unindexedCount: 0 };
   }
 
   function onTaskClick(task: TaskDto) {
-    selectedTask = task;
+    selectedTaskId = task.id;
   }
 
   function onTaskClose() {
-    selectedTask = null;
+    selectedTaskId = null;
   }
 
   function onDocSelect(doc: DocInfo) {
@@ -250,15 +245,7 @@
             </div>
           </div>
         {/if}
-        {#if selectedTask}
-          <TaskDetail
-            task={selectedTask}
-            columns={$columns}
-            {refreshRevision}
-            onClose={onTaskClose}
-            onTaskUpdated={refreshTasks}
-          />
-        {:else if selectedDoc}
+        {#if selectedDoc}
           <DocsEditor doc={selectedDoc} onClose={onDocClose} />
         {:else if $activeView === "board"}
           <Kanban
@@ -268,7 +255,12 @@
             onTasksChanged={refreshTasks}
           />
         {:else if $activeView === "list"}
-          <TaskList tasks={$tasks} onTaskClick={onTaskClick} />
+          <TaskList
+            tasks={$tasks}
+            columns={$columns}
+            onTaskClick={onTaskClick}
+            onTasksChanged={refreshTasks}
+          />
         {:else if $activeView === "docs"}
           <DocsViewer docs={$docs} onDocSelect={onDocSelect} />
         {:else if $activeView === "next"}
@@ -278,5 +270,15 @@
         {/if}
       </main>
     </div>
+
+    {#if selectedTaskId != null}
+      <TaskModal
+        taskId={selectedTaskId}
+        columns={$columns}
+        {refreshRevision}
+        onClose={onTaskClose}
+        onTaskUpdated={refreshTasks}
+      />
+    {/if}
   {/if}
 </div>
