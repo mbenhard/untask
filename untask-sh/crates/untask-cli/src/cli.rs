@@ -263,6 +263,27 @@ mod tests {
     }
 
     #[test]
+    fn parses_docs_path_subcommands() {
+        let paths = Cli::try_parse_from(["untask", "docs", "paths"]).unwrap();
+        assert!(matches!(
+            paths.command,
+            Some(Commands::Docs { cmd: Some(DocsCommands::Paths) })
+        ));
+
+        let add = Cli::try_parse_from(["untask", "docs", "add-path", "specs/**/*.md"]).unwrap();
+        assert!(matches!(
+            add.command,
+            Some(Commands::Docs { cmd: Some(DocsCommands::AddPath { pattern }) }) if pattern == "specs/**/*.md"
+        ));
+
+        let remove = Cli::try_parse_from(["untask", "docs", "remove-path", "docs/**/*.md"]).unwrap();
+        assert!(matches!(
+            remove.command,
+            Some(Commands::Docs { cmd: Some(DocsCommands::RemovePath { pattern }) }) if pattern == "docs/**/*.md"
+        ));
+    }
+
+    #[test]
     fn rejects_conflicting_repair_flags() {
         let err = Cli::try_parse_from(["untask", "repair", "--check", "--write"]).unwrap_err();
         let rendered = err.to_string();

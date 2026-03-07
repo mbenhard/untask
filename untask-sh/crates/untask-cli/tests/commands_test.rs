@@ -574,6 +574,91 @@ fn docs_show_with_ambiguous_name_returns_helpful_error() {
 }
 
 #[test]
+fn docs_paths_shows_default_globs() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "paths"]);
+    assert!(ok);
+    assert!(stdout.contains(".untask/docs/**/*.md"));
+    assert!(stdout.contains("docs/**/*.md"));
+}
+
+#[test]
+fn docs_paths_json() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "docs", "paths"]);
+    assert!(ok);
+    let parsed: Vec<String> = serde_json::from_str(&stdout).unwrap();
+    assert!(parsed.contains(&".untask/docs/**/*.md".to_string()));
+    assert!(parsed.contains(&"docs/**/*.md".to_string()));
+}
+
+#[test]
+fn docs_add_path_and_remove_path() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    // Add a new path
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "add-path", "specs/**/*.md"]);
+    assert!(ok);
+    assert!(stdout.contains("Added: specs/**/*.md"));
+
+    // Verify it shows up in paths
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "paths"]);
+    assert!(ok);
+    assert!(stdout.contains("specs/**/*.md"));
+
+    // Adding again is a no-op
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "add-path", "specs/**/*.md"]);
+    assert!(ok);
+    assert!(stdout.contains("already configured"));
+
+    // Remove it
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "remove-path", "specs/**/*.md"]);
+    assert!(ok);
+    assert!(stdout.contains("Removed: specs/**/*.md"));
+
+    // Verify it's gone
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "paths"]);
+    assert!(ok);
+    assert!(!stdout.contains("specs/**/*.md"));
+}
+
+#[test]
+fn docs_add_path_rejects_absolute_path() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let (_, stderr, ok) = run_in(tmp.path(), &["docs", "add-path", "/tmp/docs/**/*.md"]);
+    assert!(!ok);
+    assert!(stderr.contains("absolute"));
+}
+
+#[test]
+fn docs_remove_path_errors_on_unknown_pattern() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let (_, stderr, ok) = run_in(tmp.path(), &["docs", "remove-path", "nonexistent/**/*.md"]);
+    assert!(!ok);
+    assert!(stderr.contains("not found"));
+}
+
+#[test]
+fn docs_list_discovers_docs_folder_without_config() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    write_doc(tmp.path(), "docs/guide.md", "# Guide\n");
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs"]);
+    assert!(ok);
+    assert!(stdout.contains("docs/guide.md"));
+}
+
+#[test]
 fn search_returns_matches_and_json_output() {
     let tmp = TempDir::new().unwrap();
     init_project(tmp.path());

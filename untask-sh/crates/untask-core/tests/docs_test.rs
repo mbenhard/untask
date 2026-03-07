@@ -98,6 +98,21 @@ fn list_uses_config_as_authoritative_source() {
     assert_eq!(docs[0].basename, "architecture.md");
 }
 
+#[test]
+fn list_discovers_docs_folder_with_no_config() {
+    let tmp = setup();
+    write_doc(&tmp, "docs/readme.md", "# Readme");
+    write_doc(&tmp, "docs/plans/roadmap.md", "# Roadmap");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let docs = store.list().unwrap();
+
+    assert_eq!(docs.len(), 2);
+    let basenames: Vec<&str> = docs.iter().map(|d| d.basename.as_str()).collect();
+    assert!(basenames.contains(&"readme.md"));
+    assert!(basenames.contains(&"roadmap.md"));
+}
+
 // ── Get ─────────────────────────────────────────────────────────────
 
 #[test]
