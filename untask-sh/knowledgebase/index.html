@@ -39,15 +39,6 @@
         <a href="#task-references" class="nav-link">Task references</a>
       </div>
       <div class="nav-group">
-        <div class="nav-group-label">TUI</div>
-        <a href="#tui-overview" class="nav-link">Overview</a>
-        <a href="#tui-list" class="nav-link">List view</a>
-        <a href="#tui-kanban" class="nav-link">Kanban view</a>
-        <a href="#tui-docs" class="nav-link">Docs view</a>
-        <a href="#tui-detail" class="nav-link">Detail view</a>
-        <a href="#tui-file-watching" class="nav-link">File watching</a>
-      </div>
-      <div class="nav-group">
         <div class="nav-group-label">Configuration</div>
         <a href="#project-structure" class="nav-link">Project structure</a>
         <a href="#config-file" class="nav-link">config.yml</a>
@@ -75,9 +66,9 @@
     <!-- Introduction -->
     <section id="introduction">
       <h1>Untask</h1>
-      <p class="section-lead">Local-first, keyboard-first task management for the terminal. No cloud. No tracking. Your data stays on your machine.</p>
+      <p class="section-lead">Local-first task management for your terminal and desktop. No cloud. No tracking. Your data stays on your machine.</p>
 
-      <p>Untask is a CLI and TUI application that manages tasks as plain markdown files inside your project. It gives you a kanban board, list view, and docs browser — all from the terminal.</p>
+      <p>Untask is a CLI and desktop application that manages tasks as plain markdown files inside your project. Use the CLI for scripting and fast edits, or the desktop app for a richer project view backed by the same local files.</p>
 
       <ul>
         <li>Tasks are markdown files with YAML frontmatter</li>
@@ -108,7 +99,7 @@ cargo build --release</code></pre>
     <section id="quick-start">
       <h2>Quick start</h2>
 
-      <p>Initialize a project, add some tasks, and launch the TUI.</p>
+      <p>Initialize a project, add some tasks, and open the desktop app when you want a graphical view.</p>
 
       <pre><code><span class="fm-comment"># Initialize untask in your project</span>
 cd my-project
@@ -128,12 +119,12 @@ untask done 1
 <span class="fm-comment"># See what's next</span>
 untask next
 
-<span class="fm-comment"># Launch the TUI</span>
-untask</code></pre>
+<span class="fm-comment"># Open the desktop app</span>
+untask open</code></pre>
 
       <div class="callout">
         <span class="callout-label">Tip</span>
-        Running <code>untask</code> with no subcommand launches the interactive TUI.
+        Running <code>untask</code> with no subcommand shows command help. Use <code>untask open</code> to launch the desktop app.
       </div>
     </section>
 
@@ -233,207 +224,6 @@ untask</code></pre>
       <p>If a slug matches multiple tasks, you'll get an error listing the ambiguous matches.</p>
     </section>
 
-    <!-- TUI Overview -->
-    <section id="tui-overview">
-      <h2>TUI overview</h2>
-      <p>Launch the TUI by running <code>untask</code> with no subcommand inside an initialized project. The TUI has three main views accessible via tabs.</p>
-
-      <div class="key-grid">
-        <div class="key-grid-header">
-          <span>Key</span>
-          <span>Action</span>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">1</div>
-          <div class="key-action">Switch to Kanban view</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">2</div>
-          <div class="key-action">Switch to List view</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">3</div>
-          <div class="key-action">Switch to Docs view</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Tab</div>
-          <div class="key-action">Cycle to next view</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">q / Ctrl+C</div>
-          <div class="key-action">Quit</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Esc</div>
-          <div class="key-action">Go back / clear filter</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TUI List -->
-    <section id="tui-list">
-      <h2>List view</h2>
-      <p>The default view. Shows all tasks in a sortable, filterable table.</p>
-
-      <div class="key-grid">
-        <div class="key-grid-header">
-          <span>Key</span>
-          <span>Action</span>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&darr; / j</div>
-          <div class="key-action">Move down</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&uarr; / k</div>
-          <div class="key-action">Move up</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">g / Home</div>
-          <div class="key-action">Jump to first task</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">G / End</div>
-          <div class="key-action">Jump to last task</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Enter</div>
-          <div class="key-action">Open task detail</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">d</div>
-          <div class="key-action">Mark selected task as done</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">s</div>
-          <div class="key-action">Cycle sort field (id &rarr; priority &rarr; updated &rarr; title)</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">f / /</div>
-          <div class="key-action">Enter filter mode</div>
-        </div>
-      </div>
-
-      <h3>Filter mode</h3>
-      <p>When filtering, type your query and use these keys:</p>
-      <div class="key-grid">
-        <div class="key-grid-header">
-          <span>Key</span>
-          <span>Action</span>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Tab</div>
-          <div class="key-action">Switch filter field (status, tag, etc.)</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Enter</div>
-          <div class="key-action">Apply filter</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Esc</div>
-          <div class="key-action">Cancel filter</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TUI Kanban -->
-    <section id="tui-kanban">
-      <h2>Kanban view</h2>
-      <p>Displays tasks in columns matching your configured statuses. Navigate between columns and rows.</p>
-
-      <div class="key-grid">
-        <div class="key-grid-header">
-          <span>Key</span>
-          <span>Action</span>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&larr; / h</div>
-          <div class="key-action">Move to left column</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&rarr; / l</div>
-          <div class="key-action">Move to right column</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&uarr; / k</div>
-          <div class="key-action">Move up in column</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&darr; / j</div>
-          <div class="key-action">Move down in column</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Enter</div>
-          <div class="key-action">Open task detail</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">d</div>
-          <div class="key-action">Mark selected task as done</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TUI Docs -->
-    <section id="tui-docs">
-      <h2>Docs view</h2>
-      <p>Browse project docs matched by your configured glob patterns. Opening a doc launches <code>$EDITOR</code>.</p>
-
-      <div class="key-grid">
-        <div class="key-grid-header">
-          <span>Key</span>
-          <span>Action</span>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&darr; / j</div>
-          <div class="key-action">Move down</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">&uarr; / k</div>
-          <div class="key-action">Move up</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Enter</div>
-          <div class="key-action">Open in editor</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- TUI Detail -->
-    <section id="tui-detail">
-      <h2>Detail view</h2>
-      <p>Shows full task metadata, body, and subtask progress. Opened by pressing Enter on a task.</p>
-
-      <div class="key-grid">
-        <div class="key-grid-header">
-          <span>Key</span>
-          <span>Action</span>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">e</div>
-          <div class="key-action">Edit task in <code>$EDITOR</code></div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">s</div>
-          <div class="key-action">Cycle status to next column</div>
-        </div>
-        <div class="key-row">
-          <div class="key-combo">Esc</div>
-          <div class="key-action">Go back to previous view</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- File watching -->
-    <section id="tui-file-watching">
-      <h2>File watching</h2>
-      <p>The TUI watches the <code>.untask/</code> directory and configured docs paths for changes. When a file is modified externally (e.g. by another editor or git), the TUI automatically refreshes.</p>
-      <ul>
-        <li>Changes are debounced to prevent UI flicker during rapid writes</li>
-        <li>Lock file changes (<code>.lock</code>) are filtered out</li>
-        <li>Missing directories are handled gracefully</li>
-      </ul>
-    </section>
-
     <!-- Project structure -->
     <section id="project-structure">
       <h2>Project structure</h2>
@@ -480,9 +270,9 @@ untask</code></pre>
     <!-- Columns -->
     <section id="columns">
       <h2>Columns &amp; statuses</h2>
-      <p>Columns define the task lifecycle stages in both the CLI and the kanban board. Each column has a canonical <code>id</code> and optional <code>aliases</code>.</p>
+      <p>Columns define the task lifecycle stages used across the CLI and desktop app. Each column has a canonical <code>id</code> and optional <code>aliases</code>.</p>
 
-      <p>When you set a status (via <code>untask status</code>, <code>untask add --status</code>, or the TUI), untask normalizes it against configured columns and aliases. For example, <code>wip</code>, <code>in progress</code>, and <code>doing</code> all resolve to <code>in-progress</code>.</p>
+      <p>When you set a status (via <code>untask status</code>, <code>untask add --status</code>, or the desktop app), untask normalizes it against configured columns and aliases. For example, <code>wip</code>, <code>in progress</code>, and <code>doing</code> all resolve to <code>in-progress</code>.</p>
 
       <p>The first column is the default status for new tasks. You can fully customize columns:</p>
 
@@ -496,7 +286,7 @@ untask</code></pre>
     <!-- Docs config -->
     <section id="docs-config">
       <h2>Docs patterns</h2>
-      <p>The <code>docs</code> array in <code>config.yml</code> takes glob patterns relative to the project root. Matched files appear in the TUI docs view and CLI <code>docs</code> command.</p>
+      <p>The <code>docs</code> array in <code>config.yml</code> takes glob patterns relative to the project root. Matched files appear in the desktop app and CLI <code>docs</code> command.</p>
 
       <pre><code><span class="fm-key">docs:</span>
   - <span class="fm-val">.untask/docs/**/*.md</span>

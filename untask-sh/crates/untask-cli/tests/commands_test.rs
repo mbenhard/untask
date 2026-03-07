@@ -131,6 +131,45 @@ fn init_creates_project() {
     assert!(tmp.path().join(".untask/tasks").is_dir());
 }
 
+#[test]
+fn bare_command_prints_help_and_guidance_inside_project() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let (stdout, stderr, ok) = run_in(tmp.path(), &[]);
+    assert!(!ok);
+    assert!(stderr.is_empty());
+    assert!(stdout.contains("Local-first project companion"));
+    assert!(stdout.contains("Use a CLI subcommand or `untask open` to launch the desktop app."));
+}
+
+#[test]
+fn bare_command_prints_help_and_guidance_outside_project() {
+    let tmp = TempDir::new().unwrap();
+
+    let (stdout, stderr, ok) = run_in(tmp.path(), &[]);
+    assert!(!ok);
+    assert!(stderr.is_empty());
+    assert!(stdout.contains("Local-first project companion"));
+    assert!(stdout.contains("Use a CLI subcommand or `untask open` to launch the desktop app."));
+}
+
+#[test]
+fn bare_command_json_returns_error_without_help_text() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let (stdout, stderr, ok) = run_in(tmp.path(), &["--json"]);
+    assert!(!ok);
+    assert!(stdout.is_empty());
+
+    let parsed: serde_json::Value = serde_json::from_str(&stderr).unwrap();
+    assert_eq!(
+        parsed["error"],
+        "Use a CLI subcommand or `untask open` to launch the desktop app."
+    );
+}
+
 // ── Add ─────────────────────────────────────────────────────────────
 
 #[test]

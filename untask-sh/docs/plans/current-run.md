@@ -1,11 +1,11 @@
 # Current Run
 
-- stage: implementation_done
-- topic: desktop-window-chrome-fix
-- design_path: docs/untask-design-language.md
-- execution_plan_path: user-approved desktop window chrome fix plan (chat, 2026-03-07)
+- stage: implementation_reviewed
+- topic: desktop-cli-consolidation
+- design_path:
+- execution_plan_path: docs/plans/2026-03-07-desktop-cli-consolidation-execution-plan.md
 - plan_review_path:
-- implementation_checkpoints_path: docs/plans/2026-03-07-desktop-window-chrome-execution-checkpoints.md
-- implementation_review_path:
-- next_skill: review-implemented-plan
-- updated_at: 2026-03-07T09:47:14+0100
+- implementation_checkpoints_path: docs/plans/2026-03-07-desktop-cli-consolidation-execution-checkpoints.md
+- implementation_review_path: docs/plans/2026-03-07-desktop-cli-consolidation-implementation-review.md
+- next_skill: none
+- updated_at: 2026-03-07T11:55:00+0100

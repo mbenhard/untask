@@ -35,7 +35,7 @@ The Taskmaster data was updated to remove drift from the approved docs:
 1. Theme modeling now points to `mono`, `color`, and `none` instead of invented light/dark/system variants.
 2. Subtask progress counting now explicitly ignores nested subtasks for v1 progress math.
 3. Store-layer verification now explicitly includes concurrency coverage for `add`, `status`, and `delete`.
-4. CLI, TUI, and desktop task-list work now includes status/tag/priority filtering and stable sort modes.
+4. CLI and desktop task-list work now includes status/tag/priority filtering and stable sort modes.
 5. `next` command subtasks now match the design doc: recent commits, open tasks, recently completed tasks, and cleanup hints, with empty sections omitted.
 6. Skill packaging now explicitly ships bundled `skill/untask.md` guidance instead of treating install as a generic config-file copy.
 7. Desktop backend doc commands now honor configured `config.docs` globs rather than assuming `.untask/docs/` only.

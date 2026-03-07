@@ -1,7 +1,6 @@
 mod cli;
 mod commands;
 pub mod output;
-mod tui;
 
 use std::ffi::OsString;
 

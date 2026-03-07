@@ -329,15 +329,15 @@ impl TaskStore {
 
         for task in tasks {
             let canonical = self.config.normalize_status(&task.status);
-            if canonical.as_deref() == Some(old_status) {
-                if let Some(ref path) = task.file_path {
-                    let mut updated = task.clone();
-                    updated.status = new_status.to_string();
-                    updated.updated = Some(Utc::now());
-                    let content = serialize_task(&updated);
-                    atomic_write(path, content.as_bytes())?;
-                    count += 1;
-                }
+            if canonical.as_deref() == Some(old_status)
+                && let Some(ref path) = task.file_path
+            {
+                let mut updated = task.clone();
+                updated.status = new_status.to_string();
+                updated.updated = Some(Utc::now());
+                let content = serialize_task(&updated);
+                atomic_write(path, content.as_bytes())?;
+                count += 1;
             }
         }
         Ok(count)
@@ -352,11 +352,11 @@ impl TaskStore {
 
         for task in tasks {
             let canonical = self.config.normalize_status(&task.status);
-            if canonical.as_deref() == Some(status) {
-                if let Some(ref path) = task.file_path {
-                    std::fs::remove_file(path)?;
-                    count += 1;
-                }
+            if canonical.as_deref() == Some(status)
+                && let Some(ref path) = task.file_path
+            {
+                std::fs::remove_file(path)?;
+                count += 1;
             }
         }
         Ok(count)
