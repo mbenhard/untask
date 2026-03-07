@@ -367,6 +367,24 @@ impl TaskStore {
         Ok(count)
     }
 
+    /// Count tasks linked to a PRD by relative path. Returns (done, total).
+    pub fn count_by_prd(&self, prd_path: &str) -> Result<(u32, u32)> {
+        let tasks = self.list(None)?;
+        let mut done = 0u32;
+        let mut total = 0u32;
+
+        for task in &tasks {
+            if task.prd.as_deref() == Some(prd_path) {
+                total += 1;
+                if self.config.is_done_status(&task.status) {
+                    done += 1;
+                }
+            }
+        }
+
+        Ok((done, total))
+    }
+
     /// Count tasks in a given column status.
     pub fn count_tasks_in_column(&self, status: &str) -> Result<u32> {
         let tasks = self.list(None)?;

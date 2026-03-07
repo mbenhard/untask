@@ -494,3 +494,31 @@ fn add_task_with_prd_sets_field() {
     let loaded = store.get(task.id.unwrap()).unwrap();
     assert_eq!(loaded.prd.as_deref(), Some(".untask/docs/spec.md"));
 }
+
+// ── count_by_prd ───────────────────────────────────────────────────
+
+#[test]
+fn count_by_prd_returns_done_and_total() {
+    let (_tmp, store) = setup();
+
+    let t1 = store.add("Task 1", None, Some(".untask/docs/my-project.md")).unwrap();
+    let _t2 = store.add("Task 2", None, Some(".untask/docs/my-project.md")).unwrap();
+    let _t3 = store.add("Task 3", None, Some(".untask/docs/my-project.md")).unwrap();
+    let _t4 = store.add("Unrelated task", None, None).unwrap();
+
+    store.mark_done(t1.id.unwrap()).unwrap();
+
+    let (done, total) = store.count_by_prd(".untask/docs/my-project.md").unwrap();
+    assert_eq!(total, 3);
+    assert_eq!(done, 1);
+}
+
+#[test]
+fn count_by_prd_returns_zero_when_no_tasks_linked() {
+    let (_tmp, store) = setup();
+    store.add("Unlinked task", None, None).unwrap();
+
+    let (done, total) = store.count_by_prd("nonexistent.md").unwrap();
+    assert_eq!(total, 0);
+    assert_eq!(done, 0);
+}
