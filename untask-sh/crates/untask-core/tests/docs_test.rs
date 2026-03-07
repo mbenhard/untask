@@ -335,3 +335,19 @@ fn list_parses_explicit_doc_type() {
 
     assert_eq!(docs[0].doc_type, untask_core::docs::DocType::Doc);
 }
+
+#[test]
+fn list_tree_includes_doc_type_on_doc_nodes() {
+    let tmp = setup();
+    write_doc(&tmp, ".untask/docs/spec.md", "---\ntype: prd\n---\n# Spec");
+    write_doc(&tmp, ".untask/docs/notes.md", "# Notes");
+
+    let store = DocsStore::new(tmp.path().to_path_buf());
+    let tree = store.list_tree().unwrap();
+
+    let spec_node = find_node(&tree, ".untask/docs/spec.md").unwrap();
+    let notes_node = find_node(&tree, ".untask/docs/notes.md").unwrap();
+
+    assert_eq!(spec_node.doc_type, Some(untask_core::docs::DocType::Prd));
+    assert_eq!(notes_node.doc_type, Some(untask_core::docs::DocType::Doc));
+}

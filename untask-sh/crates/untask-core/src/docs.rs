@@ -76,6 +76,8 @@ pub struct DocNode {
     pub can_move: bool,
     pub can_delete: bool,
     pub read_only: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc_type: Option<DocType>,
 }
 
 pub struct DocsStore {
@@ -150,7 +152,7 @@ impl DocsStore {
     }
 
     pub fn list_tree(&self) -> Result<Vec<DocNode>> {
-        let docs = self.list_refs()?;
+        let docs = self.list()?;
         let mut roots = self.root_specs();
         let mut builders: Vec<RootTree> = roots.drain(..).map(RootTree::new).collect();
 
@@ -161,7 +163,7 @@ impl DocsStore {
         for doc in &docs {
             let relative = self.relative_path(&doc.path);
             if let Some(index) = self.assign_root(relative, &builders) {
-                builders[index].insert_doc(relative, doc);
+                builders[index].insert_doc(relative, &doc.basename, doc.doc_type);
             }
         }
 
@@ -600,7 +602,7 @@ impl RootTree {
         Ok(())
     }
 
-    fn insert_doc(&mut self, project_relative: &Path, doc: &DocRef) {
+    fn insert_doc(&mut self, project_relative: &Path, basename: &str, doc_type: DocType) {
         let (relative_under_root, actual_base) = if let Some(base_dir) = self.spec.base_dir.as_ref() {
             (
                 project_relative
@@ -613,7 +615,7 @@ impl RootTree {
         };
 
         self.tree
-            .insert_doc(relative_under_root, actual_base, &doc.basename, self.spec.base_dir.is_none());
+            .insert_doc(relative_under_root, actual_base, basename, self.spec.base_dir.is_none(), doc_type);
     }
 
     fn into_node(self) -> DocNode {
@@ -628,6 +630,7 @@ impl RootTree {
             can_move: false,
             can_delete: false,
             read_only: self.spec.base_dir.is_none(),
+            doc_type: None,
         }
     }
 }
@@ -669,6 +672,7 @@ impl TreeFolder {
         actual_base: &Path,
         basename: &str,
         read_only: bool,
+        doc_type: DocType,
     ) {
         let segments = path_segments(relative_under_root);
         if segments.is_empty() {
@@ -703,6 +707,7 @@ impl TreeFolder {
             can_move: !read_only,
             can_delete: !read_only,
             read_only,
+            doc_type: Some(doc_type),
         });
     }
 
@@ -721,6 +726,7 @@ impl TreeFolder {
                 can_move: !read_only,
                 can_delete: !read_only,
                 read_only,
+                doc_type: None,
             });
         }
 

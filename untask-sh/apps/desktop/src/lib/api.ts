@@ -37,6 +37,8 @@ export interface DocInfo {
 
 export type DocNodeKind = "root" | "folder" | "doc";
 
+export type DocType = "doc" | "prd";
+
 export interface DocNode {
   node_path: string;
   relative_path: string;
@@ -48,6 +50,7 @@ export interface DocNode {
   can_move: boolean;
   can_delete: boolean;
   read_only: boolean;
+  doc_type?: DocType;
 }
 
 export interface DocDetail {
