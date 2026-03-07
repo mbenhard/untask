@@ -127,3 +127,124 @@ impl FileWatcher {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    use notify::{Event, EventKind, event::CreateKind};
+
+    use super::*;
+
+    fn event_with_paths(paths: Vec<&str>) -> Event {
+        Event {
+            kind: EventKind::Create(CreateKind::File),
+            paths: paths.into_iter().map(PathBuf::from).collect(),
+            attrs: Default::default(),
+        }
+    }
+
+    #[test]
+    fn relevant_for_md_files() {
+        let event = event_with_paths(vec!["/project/.untask/tasks/001-foo.md"]);
+        assert!(FileWatcher::is_relevant(&event));
+    }
+
+    #[test]
+    fn relevant_for_yml_files() {
+        let event = event_with_paths(vec!["/project/.untask/config.yml"]);
+        assert!(FileWatcher::is_relevant(&event));
+    }
+
+    #[test]
+    fn ignores_lock_file() {
+        let event = event_with_paths(vec!["/project/.untask/.lock"]);
+        assert!(!FileWatcher::is_relevant(&event));
+    }
+
+    #[test]
+    fn ignores_temp_files() {
+        let event = event_with_paths(vec!["/project/.untask/tasks/.tmpXa1b2c"]);
+        assert!(!FileWatcher::is_relevant(&event));
+    }
+
+    #[test]
+    fn ignores_non_md_non_yml() {
+        let event = event_with_paths(vec!["/project/.untask/tasks/notes.txt"]);
+        assert!(!FileWatcher::is_relevant(&event));
+    }
+
+    #[test]
+    fn debounce_waits_before_refresh() {
+        let (tx, rx) = mpsc::channel();
+        let mut state = DebounceHelper::new(rx);
+
+        tx.send(()).unwrap();
+
+        // Immediately: should NOT refresh
+        assert!(!state.check());
+        assert!(state.last_event.is_some());
+
+        // After debounce period: SHOULD refresh
+        std::thread::sleep(Duration::from_millis(250));
+        assert!(state.check());
+        assert!(state.last_event.is_none());
+    }
+
+    #[test]
+    fn debounce_resets_on_new_events() {
+        let (tx, rx) = mpsc::channel();
+        let mut state = DebounceHelper::new(rx);
+
+        tx.send(()).unwrap();
+        state.check(); // registers first event
+
+        std::thread::sleep(Duration::from_millis(100));
+        tx.send(()).unwrap();
+        assert!(!state.check()); // timer reset by second event
+
+        std::thread::sleep(Duration::from_millis(250));
+        assert!(state.check()); // now enough quiet time
+    }
+
+    #[test]
+    fn no_events_means_no_refresh() {
+        let (_tx, rx) = mpsc::channel();
+        let mut state = DebounceHelper::new(rx);
+        assert!(!state.check());
+    }
+
+    /// Test helper that mirrors FileWatcher's debounce logic.
+    struct DebounceHelper {
+        receiver: mpsc::Receiver<()>,
+        last_event: Option<Instant>,
+    }
+
+    impl DebounceHelper {
+        fn new(receiver: mpsc::Receiver<()>) -> Self {
+            Self {
+                receiver,
+                last_event: None,
+            }
+        }
+
+        fn check(&mut self) -> bool {
+            let mut got_event = false;
+            while self.receiver.try_recv().is_ok() {
+                got_event = true;
+            }
+            if got_event {
+                self.last_event = Some(Instant::now());
+            }
+            if let Some(last) = self.last_event {
+                if last.elapsed() >= DEBOUNCE {
+                    self.last_event = None;
+                    return true;
+                }
+            }
+            false
+        }
+    }
+}
