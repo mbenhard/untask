@@ -20,10 +20,10 @@ impl FileWatcher {
 
         let sender = tx.clone();
         let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-            if let Ok(event) = res {
-                if Self::is_relevant(&event) {
-                    let _ = sender.send(());
-                }
+            if let Ok(event) = res
+                && Self::is_relevant(&event)
+            {
+                let _ = sender.send(());
             }
         })
         .ok()?;
@@ -63,11 +63,11 @@ impl FileWatcher {
             self.last_event = Some(Instant::now());
         }
 
-        if let Some(last) = self.last_event {
-            if last.elapsed() >= DEBOUNCE {
-                self.last_event = None;
-                return true;
-            }
+        if let Some(last) = self.last_event
+            && last.elapsed() >= DEBOUNCE
+        {
+            self.last_event = None;
+            return true;
         }
 
         false

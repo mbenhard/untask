@@ -40,10 +40,10 @@ fn run_loop(
         }
 
         // Check for filesystem changes (debounced)
-        if let Some(w) = watcher {
-            if w.should_refresh() {
-                app.refresh_or_message();
-            }
+        if let Some(w) = watcher
+            && w.should_refresh()
+        {
+            app.refresh_or_message();
         }
     }
 
