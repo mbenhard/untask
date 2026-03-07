@@ -317,7 +317,7 @@
 
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div
-            class="kanban-card group cursor-pointer rounded-[6px] border border-border/60 px-2.5 py-2 transition-all duration-[120ms]"
+            class="kanban-card group relative cursor-pointer rounded-[6px] border border-border/60 px-2.5 py-2 transition-all duration-[120ms]"
             class:opacity-30={draggedTask?.id === task.id}
             class:dragging={draggedTask?.id === task.id}
             class:kanban-card-settled={justDroppedId === task.id}
@@ -331,9 +331,12 @@
             tabindex="0"
             title={task.title}
           >
-            <!-- Row 1: priority dot + title -->
-            <div class="flex items-start gap-1.5">
-              <span class="mt-[6px] shrink-0"><PriorityDot tone={priorityTone(task.priority)} /></span>
+            <div class="pointer-events-none absolute left-2.5 top-2.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/50 bg-background/90 transition-colors duration-[120ms] group-hover:border-border/70">
+              <PriorityDot tone={priorityTone(task.priority)} />
+            </div>
+
+            <!-- Row 1: title -->
+            <div class="flex items-start gap-1.5 pl-4">
               <span class="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
                 {task.title}
               </span>
@@ -346,7 +349,7 @@
 
             <!-- Row 2: metadata (only if present) -->
             {#if task.tags.length > 0 || task.updated}
-              <div class="mt-1 flex items-center gap-1.5">
+              <div class="mt-1 flex items-center gap-1.5 pl-4">
                 {#each task.tags.slice(0, 2) as tag}
                   <span class="rounded-[3px] font-mono text-[10px] text-muted-foreground/60">
                     {tag}
@@ -367,7 +370,7 @@
 
             <!-- Subtask progress bar -->
             {#if task.subtask_total > 0}
-              <div class="mt-1.5 h-[2px] w-full overflow-hidden rounded-full bg-border">
+              <div class="mt-1.5 ml-4 h-[2px] w-[calc(100%-1rem)] overflow-hidden rounded-full bg-border">
                 <div
                   class="h-full rounded-full bg-foreground/60"
                   style="width: {(task.subtask_done / task.subtask_total) * 100}%"
