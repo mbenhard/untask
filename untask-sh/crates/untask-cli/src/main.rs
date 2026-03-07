@@ -82,8 +82,8 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
 
             match cmd {
                 Commands::Init => unreachable!(),
-                Commands::Add { title, status } => {
-                    commands::add(&store, title, status.as_deref(), cli.json)
+                Commands::Add { title, status, prd } => {
+                    commands::add(&store, title, status.as_deref(), prd.as_deref(), cli.json)
                 }
                 Commands::List {
                     status,
@@ -123,7 +123,10 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                     Some(DocsCommands::RemovePath { pattern }) => {
                         commands::docs::remove_path(&root, pattern, cli.json)
                     }
-                    Some(DocsCommands::List) | None => commands::docs::list(&root, cli.json),
+                    Some(DocsCommands::List { doc_type }) => {
+                        commands::docs::list(&root, doc_type.as_deref(), cli.json)
+                    }
+                    None => commands::docs::list(&root, None, cli.json),
                 },
                 Commands::Repair { check, write } => {
                     commands::repair(&root, *check, *write, cli.json, fmt)

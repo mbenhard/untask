@@ -28,6 +28,10 @@ pub enum Commands {
         /// Initial status
         #[arg(short, long)]
         status: Option<String>,
+
+        /// Link to a PRD (relative path)
+        #[arg(long)]
+        prd: Option<String>,
     },
 
     /// List tasks
@@ -135,7 +139,11 @@ pub enum Commands {
 #[derive(Debug, Subcommand)]
 pub enum DocsCommands {
     /// List all docs
-    List,
+    List {
+        /// Filter by type (doc, prd)
+        #[arg(short = 't', long = "type")]
+        doc_type: Option<String>,
+    },
 
     /// Show a doc by name
     Show {
