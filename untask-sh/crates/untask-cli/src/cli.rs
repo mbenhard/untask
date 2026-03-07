@@ -142,6 +142,21 @@ pub enum DocsCommands {
         /// Doc name or path
         name: String,
     },
+
+    /// List active doc globs
+    Paths,
+
+    /// Add a doc glob pattern
+    AddPath {
+        /// Glob pattern (e.g. "specs/**/*.md")
+        pattern: String,
+    },
+
+    /// Remove a doc glob pattern
+    RemovePath {
+        /// Glob pattern to remove
+        pattern: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

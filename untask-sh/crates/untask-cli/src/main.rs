@@ -116,6 +116,13 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                     Some(DocsCommands::Show { name }) => {
                         commands::docs::show(&root, name, cli.json)
                     }
+                    Some(DocsCommands::Paths) => commands::docs::paths(&root, cli.json),
+                    Some(DocsCommands::AddPath { pattern }) => {
+                        commands::docs::add_path(&root, pattern, cli.json)
+                    }
+                    Some(DocsCommands::RemovePath { pattern }) => {
+                        commands::docs::remove_path(&root, pattern, cli.json)
+                    }
                     Some(DocsCommands::List) | None => commands::docs::list(&root, cli.json),
                 },
                 Commands::Repair { check, write } => {
