@@ -4,7 +4,7 @@ title: Review why I am not seeing docs in “Docs” even if we have folder docs
 status: done
 priority: urgent
 created: 2026-03-07
-updated: 2026-03-07T14:14:12.398042Z
+updated: 2026-03-07T22:44:41.524304Z
 completed: 2026-03-07T14:14:12.398037Z
-position: 3.0
+position: 17.0
 ---

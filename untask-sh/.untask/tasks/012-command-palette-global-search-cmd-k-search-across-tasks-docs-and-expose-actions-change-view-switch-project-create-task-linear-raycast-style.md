@@ -4,6 +4,6 @@ title: Command palette / global search (Cmd+K) - search across tasks, docs, and 
 status: backlog
 priority: urgent
 created: 2026-03-07
-updated: 2026-03-07T17:40:13.677815Z
-position: 8.0
+updated: 2026-03-07T22:01:54.581466Z
+position: 6.0
 ---

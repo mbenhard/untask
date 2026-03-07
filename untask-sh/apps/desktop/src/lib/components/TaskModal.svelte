@@ -158,7 +158,10 @@
   async function saveField(updates: Parameters<typeof updateTask>[1]) {
     if (!task?.id) return;
     try {
-      task = await updateTask(task.id, updates);
+      const currentBody = task.body;
+      const preserveBody = (bodyFocused || bodyDirty) && !("body" in updates);
+      const loaded = await updateTask(task.id, updates);
+      task = preserveBody ? { ...loaded, body: currentBody } : loaded;
       onTaskUpdated();
     } catch {
       flashError();
@@ -402,8 +405,8 @@
                 onblur={confirmTitle}
                 onkeydown={handleTitleKeydown}
                 rows="1"
-                class="w-full resize-none bg-transparent text-[16px] font-medium text-foreground/80 outline-none focus:outline-none"
-                style="overflow:hidden"
+                class="w-full resize-none border-0 bg-transparent p-0 text-[16px] font-medium text-foreground outline-none focus:outline-none focus:ring-0 focus:shadow-none"
+                style="overflow:hidden; box-shadow:none"
                 oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 use:focusOnMount
               ></textarea>
@@ -549,11 +552,16 @@
           {#if dateEntries.length > 0}
             <button
               type="button"
-              class="font-mono text-[8px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+              class="inline-flex appearance-none items-center gap-[2px] border-0 bg-transparent p-0 text-muted-foreground transition-colors duration-[120ms] hover:text-foreground/80"
               onclick={cycleDate}
               title="Click to cycle dates"
             >
-              <span class="text-muted-foreground/40">{dateEntries[dateIndex % dateEntries.length].label}</span> {dateEntries[dateIndex % dateEntries.length].value}
+              <span class="font-mono text-[10px] leading-none text-muted-foreground/60">
+                {dateEntries[dateIndex % dateEntries.length].label}
+              </span>
+              <span class="font-mono text-[10px] leading-none">
+                {dateEntries[dateIndex % dateEntries.length].value}
+              </span>
             </button>
           {/if}
         </div>
@@ -683,5 +691,13 @@
   @keyframes flash-border {
     0%, 100% { border-color: var(--color-border); }
     30% { border-color: var(--color-destructive); }
+  }
+
+  /* Override global :focus-visible outline on title edit textarea */
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none;
+    border-color: transparent;
+    box-shadow: none;
   }
 </style>

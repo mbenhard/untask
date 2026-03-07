@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { Editor, rootCtx, defaultValueCtx } from "@milkdown/kit/core";
   import { commonmark } from "@milkdown/kit/preset/commonmark";
   import { gfm } from "@milkdown/kit/preset/gfm";
@@ -29,10 +30,12 @@
   let dirty = $state(false);
   let initialContent = $state("");
 
+  // Create editor once when the DOM element mounts.
+  // `content` is read via untrack so changes don't recreate the editor.
   $effect(() => {
     if (!editorEl) return;
 
-    const startContent = content;
+    const startContent = untrack(() => content);
     initialContent = startContent;
     let mounted = true;
 
@@ -58,7 +61,6 @@
           return;
         }
         editorInstance = editor;
-        // Auto-focus the ProseMirror editable area
         requestAnimationFrame(() => {
           const pm = editorEl?.querySelector<HTMLElement>('.ProseMirror');
           pm?.focus();
@@ -72,13 +74,12 @@
     };
   });
 
-  // Update content when prop changes externally
+  // Update content when prop changes externally (without recreating editor)
   $effect(() => {
     if (content !== initialContent && editorInstance) {
       initialContent = content;
       editorInstance.action(replaceAll(content));
       dirty = false;
-      onContentChange?.(content);
       onDirtyChange?.(false);
     }
   });

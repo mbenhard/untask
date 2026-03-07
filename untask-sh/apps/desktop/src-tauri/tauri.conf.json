@@ -25,6 +25,8 @@
         "title": "Untask",
         "width": 900,
         "height": 640,
+        "minWidth": 680,
+        "minHeight": 480,
         "resizable": true,
         "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",

@@ -3,8 +3,8 @@ id: 3
 title: Extend Skills Capability
 status: backlog
 created: 2026-03-07
-updated: 2026-03-07T17:40:13.645491Z
-position: 4.0
+updated: 2026-03-07T22:00:51.302216Z
+position: 3.0
 ---
 We need to improve skills to better automate things/flows
 
