@@ -20,30 +20,29 @@ pub fn list(root: &Path, json: bool) -> Result<()> {
 
 pub fn add(root: &Path, name: &str, after: Option<&str>, done: bool, json: bool) -> Result<()> {
     let mut config = Config::load(root);
-    config.column_add(name, after, done)?;
+    let id = config.column_add(name, after, done)?;
     config.save(root)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
     } else {
-        println!("Added column '{}'", name.trim().to_lowercase());
+        println!("Added column '{}'", id);
     }
     Ok(())
 }
 
 pub fn rename(store: &mut TaskStore, root: &Path, old: &str, new: &str, json: bool) -> Result<()> {
     let mut config = Config::load(root);
-    let old_id = config.column_rename(old, new)?;
+    let (old_id, new_id) = config.column_rename(old, new)?;
     config.save(root)?;
 
-    // Reload config in store so migrate uses new column set
     store.reload_config();
-    let count = store.migrate_tasks_status(&old_id, &new.trim().to_lowercase())?;
+    let count = store.migrate_tasks_status(&old_id, &new_id)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
     } else {
-        println!("Renamed '{}' -> '{}'", old_id, new.trim().to_lowercase());
+        println!("Renamed '{}' -> '{}'", old_id, new_id);
         if count > 0 {
             println!("Migrated {} task(s)", count);
         }
@@ -72,13 +71,10 @@ pub fn delete(
     delete_tasks: bool,
     json: bool,
 ) -> Result<()> {
-    let config = Config::load(root);
-    let col_id = name.trim().to_lowercase();
-
-    // Check the column exists
-    if config.normalize_status(&col_id).is_none() {
-        return Err(UntaskError::InvalidConfig(format!("column not found: {name}")));
-    }
+    let mut config = Config::load(root);
+    let col_id = config
+        .normalize_status(name)
+        .ok_or_else(|| UntaskError::InvalidConfig(format!("column not found: {name}")))?;
 
     let task_count = store.count_tasks_in_column(&col_id)?;
 
@@ -95,10 +91,8 @@ pub fn delete(
         store.delete_tasks_by_status(&col_id)?;
     }
 
-    let mut config = Config::load(root);
     config.column_delete(&col_id)?;
     config.save(root)?;
-
     store.reload_config();
 
     if json {

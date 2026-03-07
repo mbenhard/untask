@@ -10,15 +10,18 @@
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import type { PriorityTone } from "$lib/components/PriorityDot.svelte";
+  import { hasKnownStatus } from "$lib/utils";
 
   let {
     taskId,
+    initialTask = null,
     columns,
     refreshRevision = 0,
     onClose,
     onTaskUpdated,
   }: {
     taskId: number | null;
+    initialTask?: TaskDto | null;
     columns: ColumnDto[];
     refreshRevision?: number;
     onClose: () => void;
@@ -34,26 +37,56 @@
   let addingTag = $state(false);
   let tagDraft = $state("");
   let errorFlash = $state<string | null>(null);
+  let bodyFocused = $state(false);
+  let bodyDirty = $state(false);
+  let lastTaskId = $state<number | null | undefined>(undefined);
+  let lastRefreshRevision = $state(-1);
 
   const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high", "urgent"];
 
   $effect(() => {
     const id = taskId;
-    const rev = refreshRevision;
-    void rev;
+    const snapshot = initialTask;
+    if (id === lastTaskId) return;
+    lastTaskId = id;
+    lastRefreshRevision = refreshRevision;
+    editingTitle = false;
+    titleDraft = "";
+    showDelete = false;
+    addingTag = false;
+    tagDraft = "";
+    bodyFocused = false;
+    bodyDirty = false;
     if (id == null) {
+      task = snapshot ? { ...snapshot } : null;
+      showBody = (snapshot?.body.trim().length ?? 0) > 0;
       loading = false;
       return;
     }
-    loadTask(id);
+    if (snapshot?.id === id) {
+      task = snapshot;
+      showBody = snapshot.body.trim().length > 0;
+    }
+    void loadTask(id, false);
   });
 
-  async function loadTask(id: number) {
+  $effect(() => {
+    const id = taskId;
+    const revision = refreshRevision;
+    if (id == null || revision === lastRefreshRevision) return;
+    lastRefreshRevision = revision;
+    void loadTask(id, true);
+  });
+
+  async function loadTask(id: number, preserveDrafts: boolean) {
     loading = true;
     try {
       const loaded = await getTask(id);
-      task = loaded;
-      showBody = loaded.body.trim().length > 0;
+      const preserveBodyDraft = preserveDrafts && (bodyFocused || bodyDirty);
+      task = preserveBodyDraft && task ? { ...loaded, body: task.body } : loaded;
+      if (!preserveBodyDraft) {
+        showBody = loaded.body.trim().length > 0;
+      }
     } catch {
       task = null;
       onClose();
@@ -63,22 +96,13 @@
 
   let isUnindexed = $derived(task?.id == null);
 
-  function hasKnownStatus(status: string): boolean {
-    const normalized = status.trim().toLowerCase();
-    return columns.some(
-      (col) =>
-        col.id === normalized ||
-        col.aliases.some((a) => a.toLowerCase() === normalized),
-    );
-  }
-
   let hasUnmatchedStatus = $derived.by(() => {
     if (!task) return false;
-    return !hasKnownStatus(task.status);
+    return !hasKnownStatus(columns, task.status);
   });
 
   let statusOptions = $derived.by(() => {
-    if (!task || hasKnownStatus(task.status)) return columns;
+    if (!task || hasKnownStatus(columns, task.status)) return columns;
     return [{ id: task.status, aliases: [] }, ...columns];
   });
 
@@ -154,7 +178,7 @@
     const current = task?.priority ?? null;
     const idx = priorityCycle.indexOf(current);
     const next = priorityCycle[(idx + 1) % priorityCycle.length];
-    saveField({ priority: next ?? undefined });
+    saveField({ priority: next });
   }
 
   // Tags
@@ -224,6 +248,7 @@
   onkeydown={handleKeydown}
   onclick={handleBackdropClick}
   role="dialog"
+  tabindex="-1"
   aria-modal="true"
 >
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -310,15 +335,19 @@
               autofocus
             />
           {:else}
-            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-            <h2
-              class="text-[16px] font-medium text-foreground"
-              class:cursor-pointer={!isUnindexed}
-              class:hover:text-primary={!isUnindexed}
-              onclick={startEditTitle}
-            >
-              {task.title}
-            </h2>
+            {#if isUnindexed}
+              <h2 class="text-[16px] font-medium text-foreground">
+                {task.title}
+              </h2>
+            {:else}
+              <button
+                type="button"
+                class="text-left text-[16px] font-medium text-foreground hover:text-primary"
+                onclick={startEditTitle}
+              >
+                {task.title}
+              </button>
+            {/if}
           {/if}
         </div>
 
@@ -421,6 +450,8 @@
               readonly={isUnindexed}
               saveOnBlur={true}
               onSave={saveBody}
+              onDirtyChange={(dirty) => { bodyDirty = dirty; }}
+              onFocusChange={(focused) => { bodyFocused = focused; }}
             />
           {:else}
             <button

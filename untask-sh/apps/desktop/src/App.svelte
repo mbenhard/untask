@@ -11,6 +11,7 @@
     type DocInfo,
     type TaskDto,
   } from "$lib/api";
+  import { hasKnownStatus } from "$lib/utils";
   import DocsEditor from "$lib/components/DocsEditor.svelte";
   import DocsViewer from "$lib/components/DocsViewer.svelte";
   import Kanban from "$lib/components/Kanban.svelte";
@@ -40,7 +41,7 @@
   };
 
   let restoring = $state(true);
-  let selectedTaskId = $state<number | null>(null);
+  let selectedTask = $state<TaskDto | null>(null);
   let selectedDoc = $state<DocInfo | null>(null);
   let refreshRevision = $state(0);
   let openProjectPath = $state<string | null>(null);
@@ -91,7 +92,7 @@
     openProjectPath = path;
     projectPath.set(path);
     projectName.set(name);
-    selectedTaskId = null;
+    selectedTask = null;
     selectedDoc = null;
 
     await refreshData();
@@ -134,7 +135,7 @@
 
   function selectView(view: ShellView) {
     activeView.set(view);
-    selectedTaskId = null;
+    selectedTask = null;
     selectedDoc = null;
   }
 
@@ -151,17 +152,17 @@
     tasks.set([]);
     docs.set([]);
     columns.set([]);
-    selectedTaskId = null;
+    selectedTask = null;
     selectedDoc = null;
     taskHealth = { unmatchedCount: 0, unindexedCount: 0 };
   }
 
   function onTaskClick(task: TaskDto) {
-    selectedTaskId = task.id;
+    selectedTask = task;
   }
 
   function onTaskClose() {
-    selectedTaskId = null;
+    selectedTask = null;
   }
 
   function onDocSelect(doc: DocInfo) {
@@ -176,26 +177,12 @@
     taskList: TaskDto[],
     configuredColumns: { id: string; aliases: string[] }[],
   ): TaskHealth {
-    const columnIds = new Set(configuredColumns.map((column) => column.id));
-    const aliases = new Map<string, string>();
-    for (const column of configuredColumns) {
-      for (const alias of column.aliases) {
-        aliases.set(alias.toLowerCase(), column.id);
-      }
-    }
-
     let unmatchedCount = 0;
     let unindexedCount = 0;
 
     for (const task of taskList) {
-      if (task.id == null) {
-        unindexedCount += 1;
-      }
-
-      const normalizedStatus = task.status.toLowerCase();
-      if (!columnIds.has(normalizedStatus) && !aliases.has(normalizedStatus)) {
-        unmatchedCount += 1;
-      }
+      if (task.id == null) unindexedCount += 1;
+      if (!hasKnownStatus(configuredColumns, task.status)) unmatchedCount += 1;
     }
 
     return { unmatchedCount, unindexedCount };
@@ -271,9 +258,10 @@
       </main>
     </div>
 
-    {#if selectedTaskId != null}
+    {#if selectedTask}
       <TaskModal
-        taskId={selectedTaskId}
+        taskId={selectedTask.id}
+        initialTask={selectedTask}
         columns={$columns}
         {refreshRevision}
         onClose={onTaskClose}

@@ -167,15 +167,7 @@ pub fn get_config(state: State<'_, AppState>) -> Result<ConfigDto, String> {
     let root = require_project(&state)?;
     let config = untask_core::config::Config::load(&root);
     Ok(ConfigDto {
-        columns: config
-            .columns
-            .into_iter()
-            .map(|c| ColumnDto {
-                id: c.id,
-                aliases: c.aliases,
-                done: c.done,
-            })
-            .collect(),
+        columns: columns_to_dto(&config),
     })
 }
 
@@ -217,13 +209,13 @@ pub fn column_rename(
 ) -> Result<Vec<ColumnDto>, String> {
     let root = require_project(&state)?;
     let mut config = untask_core::config::Config::load(&root);
-    let old_id = config.column_rename(&old, &new).map_err(|e| e.to_string())?;
+    let (old_id, new_id) = config.column_rename(&old, &new).map_err(|e| e.to_string())?;
     config.save(&root).map_err(|e| e.to_string())?;
 
-    let mut store = TaskStore::new(root.clone()).map_err(|e| e.to_string())?;
+    let mut store = TaskStore::new(root).map_err(|e| e.to_string())?;
     store.reload_config();
     store
-        .migrate_tasks_status(&old_id, &new.trim().to_lowercase())
+        .migrate_tasks_status(&old_id, &new_id)
         .map_err(|e| e.to_string())?;
     Ok(columns_to_dto(&config))
 }
@@ -252,9 +244,12 @@ pub fn column_delete(
     state: State<'_, AppState>,
 ) -> Result<Vec<ColumnDto>, String> {
     let root = require_project(&state)?;
-    let store = TaskStore::new(root.clone()).map_err(|e| e.to_string())?;
-    let col_id = name.trim().to_lowercase();
+    let mut config = untask_core::config::Config::load(&root);
+    let col_id = config
+        .normalize_status(&name)
+        .ok_or_else(|| format!("column not found: {name}"))?;
 
+    let store = TaskStore::new(root.clone()).map_err(|e| e.to_string())?;
     let task_count = store.count_tasks_in_column(&col_id).map_err(|e| e.to_string())?;
 
     if task_count > 0 && move_to.is_none() && !delete_tasks {
@@ -274,7 +269,6 @@ pub fn column_delete(
             .map_err(|e| e.to_string())?;
     }
 
-    let mut config = untask_core::config::Config::load(&root);
     config.column_delete(&col_id).map_err(|e| e.to_string())?;
     config.save(&root).map_err(|e| e.to_string())?;
 

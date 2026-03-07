@@ -1,6 +1,7 @@
 <script lang="ts">
   import { addTask, updateTask, type ColumnDto, type TaskDto } from "$lib/api";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
+  import { resolveStatus } from "$lib/utils";
 
   let {
     tasks,
@@ -36,19 +37,10 @@
       tasks: [],
     }));
 
-    const colIds = new Set(columns.map((c) => c.id));
-    const aliasMap = new Map<string, string>();
-    for (const col of columns) {
-      for (const alias of col.aliases) {
-        aliasMap.set(alias.toLowerCase(), col.id);
-      }
-    }
-
     const unmatched: TaskDto[] = [];
 
     for (const task of tasks) {
-      const status = task.status.toLowerCase();
-      const targetId = colIds.has(status) ? status : aliasMap.get(status);
+      const targetId = resolveStatus(columns, task.status);
       if (targetId) {
         const col = cols.find((c) => c.id === targetId);
         col?.tasks.push(task);
@@ -199,23 +191,15 @@
           sourceCol.tasks.filter((t) => t.id !== task.id),
         );
       }
-      await persistColumnOrder(nextTargetOrder, columnId, task.id);
+      await persistColumnOrder(nextTargetOrder, columnId, task.id ?? undefined);
       onTasksChanged();
     } catch (err) {
       console.error("Failed to move task:", err);
     }
   }
 
-  function resolveColumnId(task: TaskDto): string | undefined {
-    const status = task.status.toLowerCase();
-    const colIds = new Set(columns.map((c) => c.id));
-    if (colIds.has(status)) return status;
-    for (const col of columns) {
-      for (const alias of col.aliases) {
-        if (alias.toLowerCase() === status) return col.id;
-      }
-    }
-    return "__unmatched";
+  function resolveColumnId(task: TaskDto): string {
+    return resolveStatus(columns, task.status) ?? "__unmatched";
   }
 
   async function persistColumnOrder(
@@ -227,6 +211,7 @@
       (task): task is TaskDto & { id: number } => task.id != null,
     );
 
+    const promises: Promise<unknown>[] = [];
     for (const [index, task] of managedTasks.entries()) {
       const nextPosition = index + 1;
       const updates: Parameters<typeof updateTask>[1] = {};
@@ -237,9 +222,10 @@
         updates.status = movedStatus;
       }
       if (Object.keys(updates).length > 0) {
-        await updateTask(task.id, updates);
+        promises.push(updateTask(task.id, updates));
       }
     }
+    await Promise.all(promises);
   }
 
   function insertTaskAtIndex(tasks: TaskDto[], task: TaskDto, index: number): TaskDto[] {

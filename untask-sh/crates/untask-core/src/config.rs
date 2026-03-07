@@ -161,13 +161,9 @@ impl Config {
 
     /// Check if a status resolves to a terminal (done) column.
     pub fn is_done_status(&self, raw: &str) -> bool {
-        let normalized = raw.trim().to_lowercase();
-        for col in &self.columns {
-            if col.id == normalized || col.aliases.iter().any(|a| a.to_lowercase() == normalized) {
-                return col.done;
-            }
-        }
-        false
+        self.normalize_status(raw)
+            .and_then(|id| self.columns.iter().find(|c| c.id == id))
+            .is_some_and(|c| c.done)
     }
 
     /// Save config to `.untask/config.yml`.
@@ -182,11 +178,12 @@ impl Config {
     // ── Column operations ────────────────────────────────────────
 
     /// Add a new column. Inserts after `after` if given, otherwise appends.
-    pub fn column_add(&mut self, name: &str, after: Option<&str>, done: bool) -> Result<()> {
+    /// Returns the canonical column ID.
+    pub fn column_add(&mut self, name: &str, after: Option<&str>, done: bool) -> Result<String> {
         let id = validate_column_id(name)?;
         self.check_id_available(&id)?;
 
-        let col = Column { id, aliases: vec![], done };
+        let col = Column { id: id.clone(), aliases: vec![], done };
 
         if let Some(after_id) = after {
             let pos = self.find_column_index(after_id)?;
@@ -194,20 +191,20 @@ impl Config {
         } else {
             self.columns.push(col);
         }
-        Ok(())
+        Ok(id)
     }
 
     /// Rename a column. Old name becomes an alias.
-    /// Returns the old ID so callers can migrate tasks.
-    pub fn column_rename(&mut self, old: &str, new: &str) -> Result<String> {
+    /// Returns `(old_id, new_id)` so callers can migrate tasks.
+    pub fn column_rename(&mut self, old: &str, new: &str) -> Result<(String, String)> {
         let new_id = validate_column_id(new)?;
         self.check_id_available(&new_id)?;
         let idx = self.find_column_index(old)?;
 
         let old_id = self.columns[idx].id.clone();
         self.columns[idx].aliases.push(old_id.clone());
-        self.columns[idx].id = new_id;
-        Ok(old_id)
+        self.columns[idx].id = new_id.clone();
+        Ok((old_id, new_id))
     }
 
     /// Move a column before or after another column.

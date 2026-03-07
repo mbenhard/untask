@@ -7,6 +7,7 @@
   } from "$lib/api";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
+  import { hasKnownStatus } from "$lib/utils";
 
   let {
     task,
@@ -91,22 +92,13 @@
     }
   }
 
-  function hasKnownStatus(status: string): boolean {
-    const normalized = status.trim().toLowerCase();
-    return columns.some(
-      (column) =>
-        column.id === normalized ||
-        column.aliases.some((alias) => alias.toLowerCase() === normalized),
-    );
-  }
-
   let isUnindexed = $derived(fullTask?.id == null);
   let hasUnmatchedStatus = $derived.by(() => {
     if (!fullTask) return false;
-    return !hasKnownStatus(fullTask.status);
+    return !hasKnownStatus(columns, fullTask.status);
   });
   let statusOptions = $derived.by(() => {
-    if (!fullTask || hasKnownStatus(fullTask.status)) {
+    if (!fullTask || hasKnownStatus(columns, fullTask.status)) {
       return columns;
     }
 
