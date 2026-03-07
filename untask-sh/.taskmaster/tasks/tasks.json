@@ -921,7 +921,7 @@
         "dependencies": [
           "14"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -929,9 +929,10 @@
             "description": "Set up the notify crate file watcher to monitor .untask/ directory and configured documentation paths with recursive watching mode.",
             "dependencies": [],
             "details": "Add notify = \"7.0\" dependency to Cargo.toml. Create crates/untask-cli/src/tui/watcher.rs with FileWatcher struct. Implement FileWatcher::new() that accepts project_root and config parameters, creates a notify::RecommendedWatcher, and watches both .untask/ directory and configured doc paths using RecursiveMode::Recursive. Set up mpsc channel for event communication between watcher thread and main application.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test watcher initializes successfully. Verify watcher monitors correct paths (.untask/ and configured docs). Test watcher survives invalid path configurations gracefully.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:07:18.920Z"
           },
           {
             "id": 2,
@@ -941,9 +942,10 @@
               1
             ],
             "details": "Implement should_trigger_refresh() function that filters file events. Add debouncing logic to coalesce multiple events within 100-200ms window to prevent UI flicker. Filter out .lock file changes, temp files from atomic writes, and other noise events. Implement FileWatcher::check_refresh() method that uses try_recv() on the channel to check for pending refresh signals without blocking.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test rapid file changes are debounced (event storm produces single refresh). Verify .lock file changes don't trigger refresh. Verify temp files from atomic writes are ignored. Test legitimate changes trigger refresh after debounce window.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:07:21.043Z"
           },
           {
             "id": 3,
@@ -953,14 +955,16 @@
               2
             ],
             "details": "Integrate FileWatcher into App struct in main TUI loop. Add check_refresh() polling in main event loop. Implement app.refresh() method that reloads tasks and docs from store when watcher signals changes. Add keyboard handlers for 'd' (mark done) and 's' (cycle status) commands that perform immediate local UI update plus write to file. Ensure watcher cleanup on project switch or app exit.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test external file change triggers TUI refresh. Test 'd' key marks task done with immediate UI update and file write. Test 's' key cycles status with immediate feedback. Test watcher cleanup on project switch doesn't leak resources. Test refresh doesn't block UI responsiveness.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:07:23.058Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: (1) File watcher setup using notify crate with path configuration, (2) Event debouncing and filtering logic ignoring temp files and lock files, (3) Integration with app main loop for refresh triggering and immediate UI updates on status changes."
+        "expansionPrompt": "Break down into: (1) File watcher setup using notify crate with path configuration, (2) Event debouncing and filtering logic ignoring temp files and lock files, (3) Integration with app main loop for refresh triggering and immediate UI updates on status changes.",
+        "updatedAt": "2026-03-07T01:07:23.058Z"
       },
       {
         "id": "16",
@@ -1261,9 +1265,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-07T00:36:57.681Z",
+      "lastModified": "2026-03-07T01:07:23.058Z",
       "taskCount": 19,
-      "completedCount": 17,
+      "completedCount": 18,
       "tags": [
         "master"
       ]
