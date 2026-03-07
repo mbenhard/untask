@@ -389,9 +389,11 @@
               <textarea
                 bind:value={quickAddTitle}
                 onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
-                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
+                onblur={() => { if (quickAddTitle.trim()) submitQuickAdd(col.id); else addingInColumn = null; }}
+                oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 placeholder="Task title..."
-                rows="2"
+                rows="1"
+                style="overflow:hidden"
                 class="w-full resize-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
                 class:border-destructive={quickAddErrorFlash}
                 autofocus
@@ -423,9 +425,11 @@
               <textarea
                 bind:value={quickAddTitle}
                 onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
-                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
+                onblur={() => { if (quickAddTitle.trim()) submitQuickAdd(col.id); else addingInColumn = null; }}
+                oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 placeholder="Task title..."
-                rows="2"
+                rows="1"
+                style="overflow:hidden"
                 class="w-full resize-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
                 class:border-destructive={quickAddErrorFlash}
                 autofocus

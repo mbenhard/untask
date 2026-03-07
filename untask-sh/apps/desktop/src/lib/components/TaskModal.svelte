@@ -33,8 +33,9 @@
   let loading = $state(true);
   let editingTitle = $state(false);
   let titleDraft = $state("");
-  let overflowOpen = $state(false);
   let showDeleteConfirm = $state(false);
+  let dateIndex = $state(0);
+  let copyFeedback = $state(false);
   let showBody = $state(false);
   let addingTag = $state(false);
   let tagDraft = $state("");
@@ -51,7 +52,13 @@
   const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
   function focusOnMount(el: HTMLElement) {
-    requestAnimationFrame(() => el.focus());
+    requestAnimationFrame(() => {
+      el.focus();
+      if (el instanceof HTMLTextAreaElement) {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+      }
+    });
   }
 
   onMount(() => {
@@ -70,8 +77,9 @@
     lastRefreshRevision = refreshRevision;
     editingTitle = false;
     titleDraft = "";
-    overflowOpen = false;
     showDeleteConfirm = false;
+    dateIndex = 0;
+    copyFeedback = false;
     addingTag = false;
     tagDraft = "";
     bodyFocused = false;
@@ -246,12 +254,21 @@
     saveField({ body: markdown });
   }
 
-  // Delete (overflow menu flow)
-  function toggleOverflow() {
-    overflowOpen = !overflowOpen;
-    showDeleteConfirm = false;
+  // Copy as agent prompt
+  function copyAsPrompt() {
+    if (!task) return;
+    const parts = [`Work on task #${task.id}: ${task.title}`];
+    if (task.body.trim()) parts.push(task.body.trim());
+    const tags = task.tags.length > 0 ? `Tags: ${task.tags.join(", ")}` : "";
+    const priority = task.priority ? `Priority: ${task.priority}` : "";
+    const meta = [tags, priority].filter(Boolean).join(" | ");
+    if (meta) parts.push(meta);
+    navigator.clipboard.writeText(parts.join("\n\n"));
+    copyFeedback = true;
+    setTimeout(() => { copyFeedback = false; }, 1200);
   }
 
+  // Delete
   async function confirmDelete() {
     if (!task?.id) return;
     try {
@@ -267,8 +284,7 @@
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault();
-      if (overflowOpen) {
-        overflowOpen = false;
+      if (showDeleteConfirm) {
         showDeleteConfirm = false;
       } else if (editingTitle) {
         cancelTitle();
@@ -305,23 +321,20 @@
     }
   }
 
-  // Close overflow on outside click
-  function handleModalClick() {
-    if (overflowOpen) {
-      overflowOpen = false;
-      showDeleteConfirm = false;
-    }
-  }
-
-  // Build dates line
-  let datesLine = $derived.by(() => {
-    if (!task) return "";
-    const parts: string[] = [];
-    if (task.created) parts.push(`Created ${formatDate(task.created)}`);
-    if (task.updated) parts.push(`Updated ${formatDate(task.updated)}`);
-    if (task.completed) parts.push(`Completed ${formatDate(task.completed)}`);
-    return parts.join(" · ");
+  // Date cycling
+  let dateEntries = $derived.by(() => {
+    if (!task) return [];
+    const entries: { label: string; value: string }[] = [];
+    if (task.created) entries.push({ label: "Created", value: formatDate(task.created) });
+    if (task.updated) entries.push({ label: "Updated", value: formatDate(task.updated) });
+    if (task.completed) entries.push({ label: "Completed", value: formatDate(task.completed) });
+    return entries;
   });
+
+  function cycleDate() {
+    if (dateEntries.length === 0) return;
+    dateIndex = (dateIndex + 1) % dateEntries.length;
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -339,93 +352,30 @@
     class="task-modal flex max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]"
     class:error-flash={errorFlash}
     class:task-modal-closing={closing}
-    onclick={handleModalClick}
   >
     {#if loading}
       <div class="flex items-center justify-center py-12">
         <span class="font-mono text-[11px] text-muted-foreground animate-pulse">Loading...</span>
       </div>
     {:else if task}
-      <!-- Header: ID left, overflow + close right -->
+      <!-- Header: ID left, close right -->
       <div class="flex items-center justify-between border-b border-border/60 px-3 py-1.5">
         <div>
           {#if task.id != null}
             <span class="font-mono text-[10px] text-muted-foreground">#{task.id}</span>
           {/if}
         </div>
-
-        <div class="flex items-center gap-0.5">
-          {#if bodyDirty}
-            <span class="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
-          {/if}
-
-          {#if !isUnindexed}
-            <div class="relative">
-              <button
-                type="button"
-                class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                onclick={(e) => { e.stopPropagation(); toggleOverflow(); }}
-                title="More actions"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.5" />
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="12" cy="19" r="1.5" />
-                </svg>
-              </button>
-
-              {#if overflowOpen}
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                <div
-                  class="absolute right-0 top-full z-10 mt-1 w-[180px] rounded-[6px] border border-border/60 bg-popover shadow-lg backdrop-blur"
-                  onclick={(e) => e.stopPropagation()}
-                >
-                  {#if showDeleteConfirm}
-                    <div class="p-2">
-                      <p class="mb-2 font-mono text-[10px] text-muted-foreground">Delete this task?</p>
-                      <div class="flex gap-1.5">
-                        <button
-                          type="button"
-                          class="flex-1 rounded-[4px] border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                          onclick={() => { showDeleteConfirm = false; }}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          class="flex-1 rounded-[4px] bg-destructive px-2 py-1 font-mono text-[10px] text-red-300 transition-colors duration-[120ms] hover:bg-destructive/80"
-                          onclick={confirmDelete}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  {:else}
-                    <button
-                      type="button"
-                      class="w-full px-3 py-2 text-left text-[12px] text-red-400 transition-colors duration-[120ms] hover:bg-accent"
-                      onclick={() => { showDeleteConfirm = true; }}
-                    >
-                      Delete task
-                    </button>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {/if}
-
-          <button
-            type="button"
-            class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-            onclick={handleClose}
-            title="Close"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
+        <button
+          type="button"
+          class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+          onclick={handleClose}
+          title="Close"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -446,8 +396,10 @@
                 bind:value={titleDraft}
                 onblur={confirmTitle}
                 onkeydown={handleTitleKeydown}
-                rows="2"
-                class="w-full resize-none bg-transparent text-[16px] font-medium text-foreground/80 outline-none"
+                rows="1"
+                class="w-full resize-none bg-transparent text-[16px] font-medium text-foreground/80 outline-none focus:outline-none"
+                style="overflow:hidden"
+                oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 use:focusOnMount
               ></textarea>
             </div>
@@ -500,15 +452,12 @@
           {#each task.tags as tag}
             <button
               type="button"
-              class="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 transition-colors duration-[120ms] hover:border-border"
+              class="rounded-full border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border"
               disabled={isUnindexed}
               onclick={() => removeTag(tag)}
               title={isUnindexed ? tag : "Click to remove"}
             >
-              <PriorityDot tone="neutral" />
-              <span class="font-mono text-[10px] text-muted-foreground">
-                {tag}
-              </span>
+              {tag}
             </button>
           {/each}
 
@@ -521,17 +470,16 @@
                 onblur={() => { if (!tagDraft.trim()) addingTag = false; else addTag(); }}
                 onkeydown={handleTagKeydown}
                 placeholder="tag..."
-                class="w-[80px] rounded-full border border-dashed border-border bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"
+                class="w-[80px] rounded-full border border-dashed border-border/60 bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
                 use:focusOnMount
               />
             {:else}
               <button
                 type="button"
-                class="flex items-center gap-1 rounded-full border border-dashed border-border/50 px-1.5 py-0.5 transition-colors duration-[120ms] hover:border-border"
+                class="rounded-full border border-dashed border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
                 onclick={() => { addingTag = true; }}
               >
-                <PriorityDot tone="neutral" />
-                <span class="font-mono text-[10px] text-muted-foreground/60">+ tag</span>
+                + tag
               </button>
             {/if}
           {/if}
@@ -585,10 +533,79 @@
           {/if}
         </div>
 
-        <!-- Dates footer -->
-        {#if datesLine}
-          <div class="mt-auto border-t border-border/60 px-4 py-2">
-            <p class="font-mono text-[10px] text-muted-foreground/60">{datesLine}</p>
+      </div>
+
+      <!-- Footer: date cycling left, actions right -->
+      <div class="flex items-center justify-between border-t border-border/60 px-3 py-1.5">
+        <div class="flex items-center gap-1.5">
+          {#if bodyDirty}
+            <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
+          {/if}
+          {#if dateEntries.length > 0}
+            <button
+              type="button"
+              class="font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+              onclick={cycleDate}
+              title="Click to cycle dates"
+            >
+              {dateEntries[dateIndex % dateEntries.length].label} {dateEntries[dateIndex % dateEntries.length].value}
+            </button>
+          {/if}
+        </div>
+
+        {#if !isUnindexed}
+          <div class="flex items-center gap-0.5">
+            <!-- Copy as agent prompt -->
+            <button
+              type="button"
+              class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+              onclick={copyAsPrompt}
+              title="Copy as agent prompt"
+            >
+              {#if copyFeedback}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              {:else}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              {/if}
+            </button>
+
+            <!-- Delete -->
+            {#if showDeleteConfirm}
+              <div class="flex items-center gap-1 ml-1">
+                <span class="font-mono text-[10px] text-muted-foreground">Delete?</span>
+                <button
+                  type="button"
+                  class="rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
+                  onclick={confirmDelete}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  class="rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+                  onclick={() => { showDeleteConfirm = false; }}
+                >
+                  No
+                </button>
+              </div>
+            {:else}
+              <button
+                type="button"
+                class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-red-400"
+                onclick={() => { showDeleteConfirm = true; }}
+                title="Delete task"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
