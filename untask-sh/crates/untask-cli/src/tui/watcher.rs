@@ -8,6 +8,18 @@ use untask_core::config::Config;
 
 const DEBOUNCE: Duration = Duration::from_millis(200);
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WatchTarget {
+    path: PathBuf,
+    mode: RecursiveMode,
+}
+
+impl WatchTarget {
+    fn new(path: PathBuf, mode: RecursiveMode) -> Self {
+        Self { path, mode }
+    }
+}
+
 pub struct FileWatcher {
     _watcher: notify::RecommendedWatcher,
     receiver: mpsc::Receiver<()>,
@@ -28,17 +40,8 @@ impl FileWatcher {
         })
         .ok()?;
 
-        // Watch .untask/ recursively (covers tasks + default docs)
-        let untask_dir = project_root.join(".untask");
-        if untask_dir.is_dir() {
-            let _ = watcher.watch(&untask_dir, RecursiveMode::Recursive);
-        }
-
-        // Watch additional doc root directories outside .untask/
-        for path in Self::extra_doc_roots(project_root, config) {
-            if path.is_dir() {
-                let _ = watcher.watch(&path, RecursiveMode::Recursive);
-            }
+        for target in Self::watch_targets(project_root, config) {
+            let _ = watcher.watch(&target.path, target.mode);
         }
 
         Some(Self {
@@ -73,6 +76,38 @@ impl FileWatcher {
         false
     }
 
+    fn watch_targets(project_root: &Path, config: &Config) -> Vec<WatchTarget> {
+        let mut targets = Vec::new();
+
+        let untask_dir = project_root.join(".untask");
+        if untask_dir.is_dir() {
+            Self::push_watch_target(
+                &mut targets,
+                WatchTarget::new(untask_dir, RecursiveMode::Recursive),
+            );
+        }
+
+        for target in Self::extra_doc_watch_targets(project_root, config) {
+            Self::push_watch_target(&mut targets, target);
+        }
+
+        targets
+    }
+
+    fn push_watch_target(targets: &mut Vec<WatchTarget>, target: WatchTarget) {
+        if let Some(existing) = targets
+            .iter_mut()
+            .find(|existing| existing.path == target.path)
+        {
+            if matches!(target.mode, RecursiveMode::Recursive) {
+                existing.mode = RecursiveMode::Recursive;
+            }
+            return;
+        }
+
+        targets.push(target);
+    }
+
     /// Filter: only care about .md file changes; ignore .lock and temp files.
     fn is_relevant(event: &Event) -> bool {
         event.paths.iter().any(|path| {
@@ -86,45 +121,51 @@ impl FileWatcher {
         })
     }
 
-    /// Extract doc glob root directories that are outside .untask/.
-    fn extra_doc_roots(project_root: &Path, config: &Config) -> Vec<PathBuf> {
+    /// Extract watch targets for doc globs that are outside `.untask/`.
+    fn extra_doc_watch_targets(project_root: &Path, config: &Config) -> Vec<WatchTarget> {
         config
             .docs
             .iter()
-            .filter_map(|pattern| {
-                // Extract static prefix before any glob characters
-                let prefix: String = pattern
-                    .chars()
-                    .take_while(|c| !matches!(c, '*' | '?' | '['))
-                    .collect();
-
-                let prefix = prefix.trim_end_matches('/');
-                if prefix.is_empty() {
-                    return None;
-                }
-
-                let path = project_root.join(prefix);
-
-                // Skip if already under .untask/
-                let untask_dir = project_root.join(".untask");
-                if path.starts_with(&untask_dir) {
-                    return None;
-                }
-
-                // Walk up to find an existing directory
-                let mut candidate = path.as_path();
-                while !candidate.is_dir() {
-                    candidate = candidate.parent()?;
-                }
-
-                // Don't watch the project root itself (too broad)
-                if candidate == project_root {
-                    return None;
-                }
-
-                Some(candidate.to_path_buf())
-            })
+            .filter_map(|pattern| Self::watch_target_for_pattern(project_root, pattern))
             .collect()
+    }
+
+    fn watch_target_for_pattern(project_root: &Path, pattern: &str) -> Option<WatchTarget> {
+        let untask_dir = project_root.join(".untask");
+        let prefix: String = pattern
+            .chars()
+            .take_while(|c| !matches!(c, '*' | '?' | '['))
+            .collect();
+        let prefix = prefix.trim_end_matches('/');
+
+        if prefix.is_empty() {
+            return Some(WatchTarget::new(
+                project_root.to_path_buf(),
+                RecursiveMode::NonRecursive,
+            ));
+        }
+
+        let path = project_root.join(prefix);
+        if path.starts_with(&untask_dir) {
+            return None;
+        }
+
+        if path.is_file() {
+            return Some(WatchTarget::new(path, RecursiveMode::NonRecursive));
+        }
+
+        let mut candidate = path.as_path();
+        while !candidate.is_dir() {
+            candidate = candidate.parent()?;
+        }
+
+        let mode = if candidate == project_root {
+            RecursiveMode::NonRecursive
+        } else {
+            RecursiveMode::Recursive
+        };
+
+        Some(WatchTarget::new(candidate.to_path_buf(), mode))
     }
 }
 
@@ -174,6 +215,38 @@ mod tests {
     fn ignores_non_md_non_yml() {
         let event = event_with_paths(vec!["/project/.untask/tasks/notes.txt"]);
         assert!(!FileWatcher::is_relevant(&event));
+    }
+
+    #[test]
+    fn existing_root_level_doc_is_watched_directly() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("README.md"), "# Readme\n").unwrap();
+
+        let target = FileWatcher::watch_target_for_pattern(tmp.path(), "README.md").unwrap();
+
+        assert_eq!(target.path, tmp.path().join("README.md"));
+        assert_eq!(target.mode, RecursiveMode::NonRecursive);
+    }
+
+    #[test]
+    fn missing_external_doc_dir_falls_back_to_project_root() {
+        let tmp = tempfile::TempDir::new().unwrap();
+
+        let target = FileWatcher::watch_target_for_pattern(tmp.path(), "notes/**/*.md").unwrap();
+
+        assert_eq!(target.path, tmp.path());
+        assert_eq!(target.mode, RecursiveMode::NonRecursive);
+    }
+
+    #[test]
+    fn existing_external_doc_dir_is_watched_recursively() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("notes/nested")).unwrap();
+
+        let target = FileWatcher::watch_target_for_pattern(tmp.path(), "notes/**/*.md").unwrap();
+
+        assert_eq!(target.path, tmp.path().join("notes"));
+        assert_eq!(target.mode, RecursiveMode::Recursive);
     }
 
     #[test]
@@ -238,11 +311,11 @@ mod tests {
             if got_event {
                 self.last_event = Some(Instant::now());
             }
-            if let Some(last) = self.last_event {
-                if last.elapsed() >= DEBOUNCE {
-                    self.last_event = None;
-                    return true;
-                }
+            if let Some(last) = self.last_event
+                && last.elapsed() >= DEBOUNCE
+            {
+                self.last_event = None;
+                return true;
             }
             false
         }

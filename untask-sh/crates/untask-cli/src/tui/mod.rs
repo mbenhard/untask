@@ -40,14 +40,20 @@ fn run_loop(
         }
 
         // Check for filesystem changes (debounced)
-        if let Some(w) = watcher
-            && w.should_refresh()
+        if watcher
+            .as_mut()
+            .is_some_and(|watcher| watcher.should_refresh())
         {
-            app.refresh_or_message();
+            refresh_from_filesystem(app, watcher);
         }
     }
 
     Ok(())
+}
+
+fn refresh_from_filesystem(app: &mut App, watcher: &mut Option<FileWatcher>) {
+    app.refresh_or_message();
+    *watcher = FileWatcher::new(app.project_root(), app.config());
 }
 
 fn with_terminal<T, Setup, Restore, Run>(

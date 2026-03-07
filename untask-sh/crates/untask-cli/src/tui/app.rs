@@ -62,6 +62,8 @@ impl App {
     }
 
     pub fn refresh(&mut self) -> untask_core::error::Result<()> {
+        self.store = TaskStore::new(self.project_root.clone())?;
+        self.docs_store = DocsStore::new(self.project_root.clone());
         self.tasks = self.store.list(None)?;
 
         // Clamp kanban selection
@@ -91,6 +93,14 @@ impl App {
         }
 
         Ok(())
+    }
+
+    pub(super) fn config(&self) -> &untask_core::config::Config {
+        self.store.config()
+    }
+
+    pub(super) fn project_root(&self) -> &Path {
+        &self.project_root
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
@@ -791,6 +801,50 @@ mod tests {
         assert_eq!(
             app.message.as_deref(),
             Some("Unindexed task has no ID; run untask repair --check.")
+        );
+    }
+
+    #[test]
+    fn refresh_reloads_config_and_docs_after_external_changes() {
+        let tmp = TempDir::new().unwrap();
+        init::init(tmp.path()).unwrap();
+
+        let mut app = App::new(
+            TaskStore::new(tmp.path().to_path_buf()).unwrap(),
+            tmp.path().to_path_buf(),
+        )
+        .unwrap();
+
+        assert_eq!(app.store.config().columns.len(), 5);
+        assert!(app.docs_state.docs.is_empty());
+
+        fs::write(
+            tmp.path().join(".untask/config.yml"),
+            "columns:\n  - id: queued\n  - id: done\ndocs:\n  - notes/**/*.md\n",
+        )
+        .unwrap();
+        fs::create_dir_all(tmp.path().join("notes")).unwrap();
+        fs::write(tmp.path().join("notes/guide.md"), "# Guide\n").unwrap();
+
+        app.refresh().unwrap();
+
+        let column_ids: Vec<&str> = app
+            .store
+            .config()
+            .columns
+            .iter()
+            .map(|column| column.id.as_str())
+            .collect();
+        assert_eq!(column_ids, vec!["queued", "done"]);
+        assert_eq!(app.store.config().docs, vec!["notes/**/*.md"]);
+        assert_eq!(app.docs_state.docs.len(), 1);
+        assert_eq!(
+            app.docs_state.docs[0]
+                .path
+                .strip_prefix(tmp.path())
+                .unwrap()
+                .to_string_lossy(),
+            "notes/guide.md"
         );
     }
 }
