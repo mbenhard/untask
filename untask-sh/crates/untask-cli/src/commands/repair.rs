@@ -3,7 +3,9 @@ use std::path::Path;
 use untask_core::error::Result;
 use untask_core::repair;
 
-pub fn run(root: &Path, _check: bool, write: bool, json: bool) -> Result<()> {
+use crate::output::Formatter;
+
+pub fn run(root: &Path, _check: bool, write: bool, json: bool, fmt: &Formatter) -> Result<()> {
     let report = if write {
         repair::repair(root)?
     } else {
@@ -16,58 +18,77 @@ pub fn run(root: &Path, _check: bool, write: bool, json: bool) -> Result<()> {
     }
 
     if report.is_clean() && report.actions_taken.is_empty() {
-        println!("Project is clean. No issues found.");
+        println!("{}", fmt.success("Project is clean. No issues found."));
         return Ok(());
     }
 
     if !report.unindexed_tasks.is_empty() {
-        println!("Unindexed tasks:");
+        println!("{}", fmt.section_title("Unindexed tasks"));
         for u in &report.unindexed_tasks {
-            println!("  {} - {}", u.path.display(), u.title);
+            println!(
+                "{}",
+                fmt.path_detail(&u.path.display().to_string(), &u.title)
+            );
         }
     }
 
     if !report.mismatched_ids.is_empty() {
-        println!("Mismatched IDs:");
+        println!("{}", fmt.section_title("Mismatched IDs"));
         for m in &report.mismatched_ids {
             println!(
-                "  {} - filename:{} frontmatter:{}",
-                m.path.display(),
-                m.filename_id,
-                m.frontmatter_id
+                "{}",
+                fmt.path_detail(
+                    &m.path.display().to_string(),
+                    &format!(
+                        "filename:{} frontmatter:{}",
+                        m.filename_id, m.frontmatter_id
+                    ),
+                )
             );
         }
     }
 
     if !report.unknown_statuses.is_empty() {
-        println!("Unknown statuses:");
+        println!("{}", fmt.section_title("Unknown statuses"));
         for u in &report.unknown_statuses {
-            println!("  {} - '{}' on {}", u.path.display(), u.status, u.title);
+            println!(
+                "{}",
+                fmt.path_detail(
+                    &u.path.display().to_string(),
+                    &format!("'{}' on {}", u.status, u.title),
+                )
+            );
         }
     }
 
     if !report.noncanonical_statuses.is_empty() {
-        println!("Non-canonical statuses:");
+        println!("{}", fmt.section_title("Non-canonical statuses"));
         for n in &report.noncanonical_statuses {
             println!(
-                "  {} - '{}' should be '{}' on {}",
-                n.path.display(),
-                n.status,
-                n.canonical_status,
-                n.title
+                "{}",
+                fmt.path_detail(
+                    &n.path.display().to_string(),
+                    &format!(
+                        "'{}' should be '{}' on {}",
+                        n.status, n.canonical_status, n.title
+                    ),
+                )
             );
         }
     }
 
     if !report.actions_taken.is_empty() {
         println!();
-        println!("Actions taken:");
+        println!("{}", fmt.section_title("Actions taken"));
         for a in &report.actions_taken {
-            println!("  {}", a.description);
+            println!("{}", fmt.bullet(&a.description));
         }
     } else if !report.is_clean() && !write {
         println!();
-        println!("Run 'untask repair --write' to fix these issues.");
+        println!(
+            "{}",
+            fmt.warning("Run 'untask repair --write' to fix these issues.")
+        );
     }
 
     Ok(())

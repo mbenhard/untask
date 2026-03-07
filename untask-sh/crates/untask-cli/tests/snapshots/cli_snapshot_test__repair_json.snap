@@ -1,0 +1,24 @@
+---
+source: crates/untask-cli/tests/cli_snapshot_test.rs
+assertion_line: 207
+expression: redacted
+---
+{
+  "actions_taken": [],
+  "mismatched_ids": [],
+  "noncanonical_statuses": [],
+  "unindexed_tasks": [
+    {
+      "has_frontmatter_id": false,
+      "path": "[path]",
+      "title": "Loose note"
+    }
+  ],
+  "unknown_statuses": [
+    {
+      "path": "[path]",
+      "status": "yolo",
+      "title": "Loose note"
+    }
+  ]
+}

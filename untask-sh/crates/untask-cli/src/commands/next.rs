@@ -2,26 +2,37 @@ use std::path::Path;
 
 use untask_core::error::Result;
 use untask_core::next::{self, NextSummary};
-use untask_core::types::Priority;
 
-pub fn run(root: &Path, json: bool) -> Result<()> {
+use crate::output::Formatter;
+
+pub fn run(root: &Path, json: bool, fmt: &Formatter) -> Result<()> {
     let summary = next::generate_next(root)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&summary)?);
     } else {
-        print_summary(&summary);
+        print_summary(&summary, fmt);
     }
 
     Ok(())
 }
 
-fn print_summary(summary: &NextSummary) {
+fn print_summary(summary: &NextSummary, fmt: &Formatter) {
+    let id_width = summary
+        .open_tasks
+        .iter()
+        .chain(summary.recently_completed.iter())
+        .filter_map(|task| task.id)
+        .map(count_digits)
+        .max()
+        .unwrap_or(2)
+        .max(2);
+
     if let Some(ref git) = summary.git {
-        println!("## Git");
+        println!("{}", fmt.heading("Git"));
         println!("Branch: {}", git.branch);
         if git.has_uncommitted_changes {
-            println!("Uncommitted changes present");
+            println!("{}", fmt.warning("Uncommitted changes present"));
         }
         if !git.recent_commits.is_empty() {
             println!("Recent:");
@@ -33,33 +44,25 @@ fn print_summary(summary: &NextSummary) {
     }
 
     if !summary.open_tasks.is_empty() {
-        println!("## Open Tasks");
+        println!("{}", fmt.heading("Open Tasks"));
         for task in &summary.open_tasks {
-            let id = task.id.map(|id| format!("#{id}")).unwrap_or_default();
-            let priority = task.priority.map(format_priority).unwrap_or("");
-            let status = &task.status;
-            println!("  {id} {:<40} [{status}] {priority}", task.title);
+            println!("{}", fmt.task_row(task, id_width));
         }
         println!();
     }
 
     if !summary.recently_completed.is_empty() {
-        println!("## Recently Completed");
+        println!("{}", fmt.heading("Recently Completed"));
         for task in &summary.recently_completed {
-            let id = task.id.map(|id| format!("#{id}")).unwrap_or_default();
-            let when = task
-                .completed
-                .map(|c| c.format("%Y-%m-%d").to_string())
-                .unwrap_or_default();
-            println!("  {id} {} ({})", task.title, when);
+            println!("{}", fmt.completed_task_row(task, id_width));
         }
         println!();
     }
 
     if !summary.cleanup_hints.is_empty() {
-        println!("## Cleanup");
+        println!("{}", fmt.heading("Cleanup"));
         for hint in &summary.cleanup_hints {
-            println!("  - {}", hint.message);
+            println!("{}", fmt.bullet(&hint.message));
         }
         println!();
     }
@@ -68,15 +71,10 @@ fn print_summary(summary: &NextSummary) {
         && summary.recently_completed.is_empty()
         && summary.cleanup_hints.is_empty()
     {
-        println!("Nothing to do.");
+        println!("{}", fmt.success("Nothing to do."));
     }
 }
 
-fn format_priority(p: Priority) -> &'static str {
-    match p {
-        Priority::Low => "low",
-        Priority::Medium => "medium",
-        Priority::High => "high",
-        Priority::Urgent => "urgent",
-    }
+fn count_digits(id: u32) -> usize {
+    id.to_string().len()
 }

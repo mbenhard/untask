@@ -720,7 +720,7 @@
           "10",
           "11"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -728,9 +728,10 @@
             "description": "Implement TTY detection, NO_COLOR environment variable handling, and the OutputMode enum with Color/Monochrome/Plain variants and auto-detection logic.",
             "dependencies": [],
             "details": "Create `crates/untask-cli/src/output.rs` with the OutputMode enum (Color, Monochrome, Plain). Implement `OutputMode::detect(no_color: bool)` that checks: (1) no_color flag or NO_COLOR env var for Monochrome, (2) atty::is(Stream::Stdout) for Color on TTY, (3) Plain for non-TTY. Add atty crate dependency to Cargo.toml. This provides the foundation for all formatting decisions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for detect() covering: NO_COLOR=1 returns Monochrome, --no-color flag returns Monochrome, TTY detection returns Color, piped output returns Plain. Mock environment variables and stdout TTY status.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:18:52.132Z"
           },
           {
             "id": 2,
@@ -740,9 +741,10 @@
               1
             ],
             "details": "In `output.rs`, create Formatter struct holding OutputMode. Implement methods: task_row() for tabular list format with ID/title/status/priority/tags columns using proper Unicode width calculation for alignment, task_detail() for full task view with body rendering, success()/error()/warning() with appropriate ANSI color codes (green/red/yellow) in Color mode or plain text in other modes. Handle table column alignment, ANSI escape sequences, and markdown rendering for next command. Integrate Formatter into all CLI commands (list, show, search, next, repair) replacing ad-hoc formatting.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration tests verifying: (1) task_row produces aligned columns with Unicode characters, (2) Color mode emits ANSI codes, (3) Monochrome strips colors, (4) Plain mode outputs minimal formatting. Test with sample tasks containing emojis, long titles, and various statuses.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:18:54.204Z"
           },
           {
             "id": 3,
@@ -752,14 +754,16 @@
               2
             ],
             "details": "Add `insta` crate to dev-dependencies in `crates/untask-cli/Cargo.toml`. Create `crates/untask-cli/tests/cli_snapshot_test.rs` with tests capturing JSON output from commands: (1) list --json with multiple tasks showing full schema, (2) show --json with rich task including all fields, (3) next --json with recommended task selection, (4) search --json with results and snippets, (5) repair --check --json with report structure. Use insta::assert_json_snapshot! for each test. Store snapshots in snapshots/ directory. These snapshots serve as regression tests ensuring JSON schema stability across changes.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `cargo insta test` to generate initial snapshots, then verify: (1) snapshots capture complete JSON structure, (2) changes to output trigger snapshot diff review, (3) all five command JSON formats are covered. Manual review of generated snapshots for completeness and correctness.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:18:56.270Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: (1) Output mode detection (Color/Monochrome/Plain) based on TTY, NO_COLOR, and flags, (2) Formatter implementation with consistent formatting methods for different content types, (3) Snapshot testing setup with insta crate covering all JSON output formats."
+        "expansionPrompt": "Break down into: (1) Output mode detection (Color/Monochrome/Plain) based on TTY, NO_COLOR, and flags, (2) Formatter implementation with consistent formatting methods for different content types, (3) Snapshot testing setup with insta crate covering all JSON output formats.",
+        "updatedAt": "2026-03-07T00:18:56.270Z"
       },
       {
         "id": "13",
@@ -1251,9 +1255,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-06T23:48:41.674Z",
+      "lastModified": "2026-03-07T00:18:56.270Z",
       "taskCount": 19,
-      "completedCount": 14,
+      "completedCount": 15,
       "tags": [
         "master"
       ]

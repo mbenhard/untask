@@ -1,0 +1,49 @@
+---
+source: crates/untask-cli/tests/cli_snapshot_test.rs
+assertion_line: 233
+expression: redacted
+---
+{
+  "cleanup_hints": [
+    {
+      "kind": "Unindexed",
+      "message": "Unindexed task file: Loose note",
+      "path": "[path]"
+    }
+  ],
+  "git": {
+    "branch": "main",
+    "has_uncommitted_changes": true,
+    "recent_commits": [
+      {
+        "author": "Test User",
+        "hash": "[hash]",
+        "message": "initial commit",
+        "timestamp": "[timestamp]"
+      }
+    ]
+  },
+  "open_tasks": [
+    {
+      "created": "[timestamp]",
+      "id": 1,
+      "status": "backlog",
+      "title": "Open task",
+      "updated": "[timestamp]"
+    },
+    {
+      "status": "todo",
+      "title": "Loose note"
+    }
+  ],
+  "recently_completed": [
+    {
+      "completed": "[timestamp]",
+      "created": "[timestamp]",
+      "id": 2,
+      "status": "done",
+      "title": "Completed task",
+      "updated": "[timestamp]"
+    }
+  ]
+}

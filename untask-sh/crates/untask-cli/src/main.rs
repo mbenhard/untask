@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+pub mod output;
 mod tui;
 
 use std::ffi::OsString;
@@ -7,6 +8,7 @@ use std::ffi::OsString;
 use clap::Parser;
 use cli::{Cli, Commands, DocsCommands};
 use colored::control::set_override;
+use output::{Formatter, OutputMode};
 use untask_core::store::TaskStore;
 
 fn main() {
@@ -17,14 +19,16 @@ fn main() {
         set_override(false);
     }
 
-    let code = match run(&cli) {
+    let fmt = Formatter::new(OutputMode::detect(cli.no_color));
+
+    let code = match run(&cli, &fmt) {
         Ok(()) => 0,
         Err(e) => {
             if cli.json {
                 let msg = serde_json::json!({ "error": e.to_string() });
                 eprintln!("{msg}");
             } else {
-                eprintln!("error: {e}");
+                eprintln!("{}", fmt.error(&format!("error: {e}")));
             }
             1
         }
@@ -36,7 +40,7 @@ fn should_disable_color(no_color_flag: bool, no_color_env: Option<OsString>) -> 
     no_color_flag || no_color_env.is_some()
 }
 
-fn run(cli: &Cli) -> untask_core::error::Result<()> {
+fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
     match &cli.command {
         None => {
             let cwd = std::env::current_dir()?;
@@ -80,8 +84,9 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
                     priority.as_deref(),
                     sort,
                     cli.json,
+                    fmt,
                 ),
-                Commands::Show { reference } => commands::show(&store, reference, cli.json),
+                Commands::Show { reference } => commands::show(&store, reference, cli.json, fmt),
                 Commands::Edit { reference } => commands::edit(&store, reference),
                 Commands::Status { reference, status } => {
                     commands::status(&store, reference, status, cli.json)
@@ -90,9 +95,9 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
                 Commands::Delete { reference, force } => {
                     commands::delete(&store, reference, *force, cli.json)
                 }
-                Commands::Next => commands::next::run(&root, cli.json),
+                Commands::Next => commands::next::run(&root, cli.json, fmt),
                 Commands::Search { query, tasks_only } => {
-                    commands::search(&root, query, *tasks_only, cli.json)
+                    commands::search(&root, query, *tasks_only, cli.json, fmt)
                 }
                 Commands::Docs { cmd: subcmd } => match subcmd {
                     Some(DocsCommands::Show { name }) => {
@@ -101,7 +106,7 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
                     Some(DocsCommands::List) | None => commands::docs::list(&root, cli.json),
                 },
                 Commands::Repair { check, write } => {
-                    commands::repair(&root, *check, *write, cli.json)
+                    commands::repair(&root, *check, *write, cli.json, fmt)
                 }
                 Commands::Skill { cmd: _ } => commands::skill_install(cli.json),
                 Commands::Open => commands::open(&root),

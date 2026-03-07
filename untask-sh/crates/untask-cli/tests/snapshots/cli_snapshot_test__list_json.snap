@@ -1,0 +1,35 @@
+---
+source: crates/untask-cli/tests/cli_snapshot_test.rs
+assertion_line: 156
+expression: redacted
+---
+[
+  {
+    "created": "[timestamp]",
+    "id": 1,
+    "priority": "high",
+    "status": "backlog",
+    "tags": [
+      "backend",
+      "security"
+    ],
+    "title": "Implement auth",
+    "updated": "[timestamp]"
+  },
+  {
+    "created": "[timestamp]",
+    "id": 2,
+    "priority": "medium",
+    "status": "in-progress",
+    "title": "Write tests",
+    "updated": "[timestamp]"
+  },
+  {
+    "completed": "[timestamp]",
+    "created": "[timestamp]",
+    "id": 3,
+    "status": "done",
+    "title": "Deploy app",
+    "updated": "[timestamp]"
+  }
+]

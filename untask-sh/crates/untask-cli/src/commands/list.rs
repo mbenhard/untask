@@ -1,3 +1,4 @@
+use crate::output::Formatter;
 use untask_core::error::{Result, UntaskError};
 use untask_core::store::{ListFilter, TaskStore};
 use untask_core::task::Task;
@@ -10,6 +11,7 @@ pub fn run(
     priority: Option<&str>,
     sort: &str,
     json: bool,
+    fmt: &Formatter,
 ) -> Result<()> {
     let status = status
         .map(|raw| {
@@ -45,7 +47,7 @@ pub fn run(
     } else if tasks.is_empty() {
         println!("No tasks found.");
     } else {
-        print_task_table(&tasks);
+        print_task_table(&tasks, fmt);
     }
 
     Ok(())
@@ -77,8 +79,7 @@ fn sort_tasks(tasks: &mut [Task], field: &str) -> Result<()> {
     Ok(())
 }
 
-fn print_task_table(tasks: &[Task]) {
-    // Find max widths for formatting
+fn print_task_table(tasks: &[Task], fmt: &Formatter) {
     let id_width = tasks
         .iter()
         .filter_map(|t| t.id)
@@ -88,36 +89,6 @@ fn print_task_table(tasks: &[Task]) {
         .max(2);
 
     for task in tasks {
-        let id_str = task
-            .id
-            .map(|id| format!("{id:>width$}", width = id_width))
-            .unwrap_or_else(|| " ".repeat(id_width));
-
-        let priority_dot = match task.priority {
-            Some(Priority::Urgent) => "!",
-            Some(Priority::High) => "*",
-            Some(Priority::Medium) => ".",
-            Some(Priority::Low) | None => " ",
-        };
-
-        let progress = if task.subtask_progress.1 > 0 {
-            format!(" [{}/{}]", task.subtask_progress.0, task.subtask_progress.1)
-        } else {
-            String::new()
-        };
-
-        let tags = if task.tags.is_empty() {
-            String::new()
-        } else {
-            format!(" [{}]", task.tags.join(", "))
-        };
-
-        println!(
-            "  {priority_dot} #{id_str}  {status:<12}  {title}{tags}{progress}",
-            status = task.status,
-            title = task.title,
-            tags = tags,
-            progress = progress,
-        );
+        println!("{}", fmt.task_row(task, id_width));
     }
 }
