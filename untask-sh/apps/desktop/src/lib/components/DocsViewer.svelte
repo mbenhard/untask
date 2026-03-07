@@ -119,6 +119,7 @@
   });
 
   $effect(() => {
+    externalRevision;
     if (selectedDoc && selectedNode?.doc_type === "prd") {
       getPrdTaskCounts(selectedDoc.path).then((counts) => {
         prdTaskCounts = counts;

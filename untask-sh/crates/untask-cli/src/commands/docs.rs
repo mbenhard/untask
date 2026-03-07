@@ -33,6 +33,7 @@ pub fn list(root: &Path, doc_type: Option<&str>, json: bool) -> Result<()> {
                     .unwrap_or(&d.path)
                     .to_string_lossy()
                     .into_owned(),
+                doc_type: d.doc_type,
             })
             .collect();
         println!("{}", serde_json::to_string_pretty(&items)?);
@@ -61,6 +62,7 @@ pub fn show(root: &Path, name: &str, json: bool) -> Result<()> {
                 .unwrap_or(&doc.path)
                 .to_string_lossy()
                 .into_owned(),
+            doc_type: doc.doc_type,
             content: &doc.content,
         };
         println!("{}", serde_json::to_string_pretty(&entry)?);
@@ -145,11 +147,13 @@ pub fn remove_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
 struct DocEntry<'a> {
     name: &'a str,
     path: String,
+    doc_type: untask_core::docs::DocType,
 }
 
 #[derive(Serialize)]
 struct DocDetail<'a> {
     name: &'a str,
     path: String,
+    doc_type: untask_core::docs::DocType,
     content: &'a str,
 }
