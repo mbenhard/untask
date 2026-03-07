@@ -106,7 +106,7 @@ fn check_detects_status_aliases_that_need_canonicalization() {
 fn repair_assigns_ids_to_unindexed_tasks() {
     let (tmp, store) = setup();
     // Create a managed task first (takes ID 1)
-    store.add("Existing task", None).unwrap();
+    store.add("Existing task", None, None).unwrap();
 
     write_task(
         tmp.path(),

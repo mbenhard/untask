@@ -38,6 +38,7 @@ pub struct TaskDto {
     pub subtask_done: u32,
     pub subtask_total: u32,
     pub position: Option<f64>,
+    pub prd: Option<String>,
 }
 
 impl From<Task> for TaskDto {
@@ -55,6 +56,7 @@ impl From<Task> for TaskDto {
             subtask_done: task.subtask_progress.0,
             subtask_total: task.subtask_progress.1,
             position: task.position,
+            prd: task.prd,
         }
     }
 }
@@ -120,6 +122,8 @@ pub struct TaskUpdateDto {
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
     pub position: Option<f64>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub prd: Option<Option<String>>,
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -384,7 +388,7 @@ pub fn add_task(
     let root = require_project(&state)?;
     let store = TaskStore::new(root).map_err(|e| e.to_string())?;
     let task = store
-        .add(&title, status.as_deref())
+        .add(&title, status.as_deref(), None)
         .map_err(|e| e.to_string())?;
     Ok(TaskDto::from(task))
 }
@@ -407,6 +411,7 @@ pub fn update_task(
                 tags: updates.tags,
                 body: updates.body,
                 position: updates.position,
+                prd: updates.prd,
             },
         )
         .map_err(|e| e.to_string())?;

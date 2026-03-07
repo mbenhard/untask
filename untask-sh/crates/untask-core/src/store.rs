@@ -24,6 +24,7 @@ pub struct TaskUpdate {
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
     pub position: Option<f64>,
+    pub prd: Option<Option<String>>,
 }
 
 /// Filter for listing tasks.
@@ -172,7 +173,7 @@ impl TaskStore {
     // ── Write operations (acquire lock, atomic writes) ─────────────
 
     /// Add a new task. Returns the created task.
-    pub fn add(&self, title: &str, status: Option<&str>) -> Result<Task> {
+    pub fn add(&self, title: &str, status: Option<&str>, prd: Option<&str>) -> Result<Task> {
         let _lock = ProjectLock::acquire(&self.project_root)?;
 
         let id = self.next_id()?;
@@ -189,6 +190,7 @@ impl TaskStore {
             created: Some(now.date_naive()),
             updated: Some(now),
             position: Some(position),
+            prd: prd.map(|s| s.to_string()),
             ..Task::default()
         };
 
@@ -229,6 +231,9 @@ impl TaskStore {
         }
         if let Some(position) = updates.position {
             task.position = Some(position);
+        }
+        if let Some(prd) = updates.prd {
+            task.prd = prd;
         }
 
         task.updated = Some(Utc::now());

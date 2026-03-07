@@ -102,9 +102,9 @@ fn git_summary_handles_empty_history() {
 #[test]
 fn next_includes_open_tasks_sorted_by_priority() {
     let (tmp, store) = setup();
-    store.add("Low priority", None).unwrap();
-    store.add("High priority", None).unwrap();
-    store.add("Urgent task", None).unwrap();
+    store.add("Low priority", None, None).unwrap();
+    store.add("High priority", None, None).unwrap();
+    store.add("Urgent task", None, None).unwrap();
 
     store
         .update(
@@ -144,8 +144,8 @@ fn next_includes_open_tasks_sorted_by_priority() {
 #[test]
 fn next_includes_recently_completed_tasks() {
     let (tmp, store) = setup();
-    store.add("Done task", Some("done")).unwrap();
-    store.add("Open task", None).unwrap();
+    store.add("Done task", Some("done"), None).unwrap();
+    store.add("Open task", None, None).unwrap();
 
     let summary = next::generate_next(tmp.path()).unwrap();
     assert_eq!(summary.recently_completed.len(), 1);
@@ -241,7 +241,7 @@ fn next_includes_cleanup_hints_for_unknown_statuses() {
 #[test]
 fn next_works_in_non_git_directory() {
     let (tmp, store) = setup();
-    store.add("Task in non-git dir", None).unwrap();
+    store.add("Task in non-git dir", None, None).unwrap();
 
     let summary = next::generate_next(tmp.path()).unwrap();
     assert!(summary.git.is_none());

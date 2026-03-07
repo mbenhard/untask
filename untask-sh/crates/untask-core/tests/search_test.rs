@@ -22,8 +22,8 @@ fn write_doc(tmp: &tempfile::TempDir, rel_path: &str, content: &str) {
 fn search_finds_matches_in_task_titles() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Fix login bug", None).unwrap();
-    store.add("Add signup form", None).unwrap();
+    store.add("Fix login bug", None, None).unwrap();
+    store.add("Add signup form", None, None).unwrap();
 
     let results = search(tmp.path(), "login", false).unwrap();
 
@@ -36,7 +36,7 @@ fn search_finds_matches_in_task_titles() {
 fn search_is_case_insensitive() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Fix Login Bug", None).unwrap();
+    store.add("Fix Login Bug", None, None).unwrap();
 
     let results = search(tmp.path(), "fix login", false).unwrap();
     assert_eq!(results.len(), 1);
@@ -46,7 +46,7 @@ fn search_is_case_insensitive() {
 fn search_finds_matches_in_task_bodies() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Generic task", None).unwrap();
+    store.add("Generic task", None, None).unwrap();
 
     // Write body content directly to the task file
     let task = store.get(1).unwrap();
@@ -66,7 +66,7 @@ fn search_finds_matches_in_task_bodies() {
 fn search_finds_matches_in_tags() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Tagged task", None).unwrap();
+    store.add("Tagged task", None, None).unwrap();
     store
         .update(
             1,
@@ -105,7 +105,7 @@ fn search_finds_matches_in_docs() {
 fn search_tasks_only_excludes_docs() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Fix deploy script", None).unwrap();
+    store.add("Fix deploy script", None, None).unwrap();
     write_doc(
         &tmp,
         ".untask/docs/deploy.md",
@@ -124,7 +124,7 @@ fn search_tasks_only_excludes_docs() {
 fn search_returns_empty_when_no_matches() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Some task", None).unwrap();
+    store.add("Some task", None, None).unwrap();
 
     let results = search(tmp.path(), "nonexistent_query_xyz", false).unwrap();
     assert!(results.is_empty());
@@ -134,7 +134,7 @@ fn search_returns_empty_when_no_matches() {
 fn search_generates_snippets_with_highlight() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Fix the login page", None).unwrap();
+    store.add("Fix the login page", None, None).unwrap();
 
     let results = search(tmp.path(), "login", false).unwrap();
 
@@ -146,8 +146,8 @@ fn search_generates_snippets_with_highlight() {
 fn search_prioritizes_title_matches_over_body_matches() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
-    store.add("Background cleanup", None).unwrap();
-    store.add("Login follow-up", None).unwrap();
+    store.add("Background cleanup", None, None).unwrap();
+    store.add("Login follow-up", None, None).unwrap();
 
     let body_match = store.get(1).unwrap();
     let body_match_path = body_match.file_path.unwrap();
@@ -171,7 +171,7 @@ fn search_handles_special_characters_in_query() {
     let tmp = setup();
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
     store
-        .add("Task with (parens) and [brackets]", None)
+        .add("Task with (parens) and [brackets]", None, None)
         .unwrap();
 
     // Should not panic or error on regex-special chars

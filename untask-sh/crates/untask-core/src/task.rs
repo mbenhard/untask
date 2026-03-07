@@ -16,6 +16,8 @@ pub struct Task {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prd: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created: Option<NaiveDate>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated: Option<DateTime<Utc>>,
@@ -51,6 +53,8 @@ struct TaskFrontmatter {
     #[serde(default)]
     tags: Vec<String>,
     #[serde(default)]
+    prd: Option<String>,
+    #[serde(default)]
     created: Option<NaiveDate>,
     #[serde(default)]
     updated: Option<DateTime<Utc>>,
@@ -68,6 +72,7 @@ impl From<TaskFrontmatter> for Task {
             status: frontmatter.status,
             priority: frontmatter.priority,
             tags: frontmatter.tags,
+            prd: frontmatter.prd,
             created: frontmatter.created,
             updated: frontmatter.updated,
             completed: frontmatter.completed,

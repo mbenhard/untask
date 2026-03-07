@@ -15,7 +15,7 @@ fn setup() -> (tempfile::TempDir, TaskStore) {
 #[test]
 fn add_creates_file_with_correct_format() {
     let (tmp, store) = setup();
-    let task = store.add("Fix login bug", None).unwrap();
+    let task = store.add("Fix login bug", None, None).unwrap();
 
     assert_eq!(task.id, Some(1));
     assert_eq!(task.title, "Fix login bug");
@@ -34,21 +34,21 @@ fn add_creates_file_with_correct_format() {
 #[test]
 fn add_with_status() {
     let (_tmp, store) = setup();
-    let task = store.add("Deploy service", Some("in-progress")).unwrap();
+    let task = store.add("Deploy service", Some("in-progress"), None).unwrap();
     assert_eq!(task.status, "in-progress");
 }
 
 #[test]
 fn add_normalizes_status_alias() {
     let (_tmp, store) = setup();
-    let task = store.add("WIP task", Some("doing")).unwrap();
+    let task = store.add("WIP task", Some("doing"), None).unwrap();
     assert_eq!(task.status, "in-progress");
 }
 
 #[test]
 fn add_rejects_unknown_status() {
     let (_tmp, store) = setup();
-    let err = store.add("Mystery task", Some("mystery")).unwrap_err();
+    let err = store.add("Mystery task", Some("mystery"), None).unwrap_err();
     assert!(matches!(
         err,
         untask_core::error::UntaskError::InvalidConfig(message)
@@ -59,9 +59,9 @@ fn add_rejects_unknown_status() {
 #[test]
 fn add_increments_ids() {
     let (_tmp, store) = setup();
-    let t1 = store.add("First", None).unwrap();
-    let t2 = store.add("Second", None).unwrap();
-    let t3 = store.add("Third", None).unwrap();
+    let t1 = store.add("First", None, None).unwrap();
+    let t2 = store.add("Second", None, None).unwrap();
+    let t3 = store.add("Third", None, None).unwrap();
     assert_eq!(t1.id, Some(1));
     assert_eq!(t2.id, Some(2));
     assert_eq!(t3.id, Some(3));
@@ -70,14 +70,14 @@ fn add_increments_ids() {
 #[test]
 fn add_is_gap_tolerant() {
     let (_tmp, store) = setup();
-    let t1 = store.add("First", None).unwrap();
-    let t2 = store.add("Second", None).unwrap();
+    let t1 = store.add("First", None, None).unwrap();
+    let t2 = store.add("Second", None, None).unwrap();
     assert_eq!(t1.id, Some(1));
     assert_eq!(t2.id, Some(2));
 
     // Delete task 1, next ID should be 3 (not 1)
     store.delete(1).unwrap();
-    let t3 = store.add("Third", None).unwrap();
+    let t3 = store.add("Third", None, None).unwrap();
     assert_eq!(t3.id, Some(3));
 }
 
@@ -91,7 +91,7 @@ fn add_uses_frontmatter_ids_when_allocating_next_id() {
     )
     .unwrap();
 
-    let task = store.add("Fresh task", None).unwrap();
+    let task = store.add("Fresh task", None, None).unwrap();
 
     assert_eq!(task.id, Some(8));
     assert_eq!(
@@ -106,7 +106,7 @@ fn add_uses_frontmatter_ids_when_allocating_next_id() {
 #[test]
 fn add_done_sets_completed() {
     let (_tmp, store) = setup();
-    let task = store.add("Ship it", Some("done")).unwrap();
+    let task = store.add("Ship it", Some("done"), None).unwrap();
 
     assert_eq!(task.status, "done");
     assert!(task.completed.is_some());
@@ -115,9 +115,9 @@ fn add_done_sets_completed() {
 #[test]
 fn add_assigns_position_within_status_column() {
     let (_tmp, store) = setup();
-    let backlog_one = store.add("Backlog one", None).unwrap();
-    let in_progress = store.add("Doing", Some("in-progress")).unwrap();
-    let backlog_two = store.add("Backlog two", None).unwrap();
+    let backlog_one = store.add("Backlog one", None, None).unwrap();
+    let in_progress = store.add("Doing", Some("in-progress"), None).unwrap();
+    let backlog_two = store.add("Backlog two", None, None).unwrap();
 
     assert_eq!(backlog_one.position, Some(1.0));
     assert_eq!(in_progress.position, Some(1.0));
@@ -129,8 +129,8 @@ fn add_assigns_position_within_status_column() {
 #[test]
 fn list_returns_all_tasks() {
     let (_tmp, store) = setup();
-    store.add("A", None).unwrap();
-    store.add("B", None).unwrap();
+    store.add("A", None, None).unwrap();
+    store.add("B", None, None).unwrap();
     let tasks = store.list(None).unwrap();
     assert_eq!(tasks.len(), 2);
 }
@@ -138,7 +138,7 @@ fn list_returns_all_tasks() {
 #[test]
 fn list_does_not_modify_files() {
     let (_tmp, store) = setup();
-    store.add("Check me", None).unwrap();
+    store.add("Check me", None, None).unwrap();
 
     // Create an unindexed file (no ID prefix in filename)
     let unindexed_path = _tmp.path().join(".untask/tasks/random-note.md");
@@ -173,7 +173,7 @@ fn list_does_not_modify_files() {
 #[test]
 fn list_orders_managed_tasks_before_unindexed_files() {
     let (tmp, store) = setup();
-    store.add("Managed task", None).unwrap();
+    store.add("Managed task", None, None).unwrap();
     std::fs::write(
         tmp.path().join(".untask/tasks/notes.md"),
         "---\ntitle: Loose note\nstatus: todo\n---\n",
@@ -189,8 +189,8 @@ fn list_orders_managed_tasks_before_unindexed_files() {
 #[test]
 fn list_filters_by_status() {
     let (_tmp, store) = setup();
-    store.add("Backlog task", None).unwrap();
-    store.add("In-progress task", Some("in-progress")).unwrap();
+    store.add("Backlog task", None, None).unwrap();
+    store.add("In-progress task", Some("in-progress"), None).unwrap();
 
     let tasks = store
         .list(Some(ListFilter {
@@ -205,8 +205,8 @@ fn list_filters_by_status() {
 #[test]
 fn list_filters_by_tag() {
     let (_tmp, store) = setup();
-    let t1 = store.add("Tagged", None).unwrap();
-    store.add("Untagged", None).unwrap();
+    let t1 = store.add("Tagged", None, None).unwrap();
+    store.add("Untagged", None, None).unwrap();
 
     store
         .update(
@@ -233,7 +233,7 @@ fn list_filters_by_tag() {
 #[test]
 fn get_by_id() {
     let (_tmp, store) = setup();
-    store.add("Find me", None).unwrap();
+    store.add("Find me", None, None).unwrap();
     let task = store.get(1).unwrap();
     assert_eq!(task.title, "Find me");
 }
@@ -241,7 +241,7 @@ fn get_by_id() {
 #[test]
 fn get_by_ref_numeric() {
     let (_tmp, store) = setup();
-    store.add("By ref", None).unwrap();
+    store.add("By ref", None, None).unwrap();
     let task = store.get_by_ref("1").unwrap();
     assert_eq!(task.title, "By ref");
 }
@@ -249,7 +249,7 @@ fn get_by_ref_numeric() {
 #[test]
 fn get_by_ref_slug() {
     let (_tmp, store) = setup();
-    store.add("Fix login bug", None).unwrap();
+    store.add("Fix login bug", None, None).unwrap();
     let task = store.get_by_ref("fix-login-bug").unwrap();
     assert_eq!(task.title, "Fix login bug");
 }
@@ -269,7 +269,7 @@ fn get_not_found() {
 #[test]
 fn update_modifies_fields_and_refreshes_updated() {
     let (_tmp, store) = setup();
-    let created = store.add("Original", None).unwrap();
+    let created = store.add("Original", None, None).unwrap();
     let original_updated = created.updated;
 
     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -291,7 +291,7 @@ fn update_modifies_fields_and_refreshes_updated() {
 #[test]
 fn update_can_clear_priority() {
     let (_tmp, store) = setup();
-    store.add("Priority test", None).unwrap();
+    store.add("Priority test", None, None).unwrap();
 
     let with_priority = store
         .update(
@@ -324,7 +324,7 @@ fn update_can_clear_priority() {
 #[test]
 fn delete_removes_file() {
     let (_tmp, store) = setup();
-    let task = store.add("Delete me", None).unwrap();
+    let task = store.add("Delete me", None, None).unwrap();
     let path = task.file_path.unwrap();
     assert!(path.exists());
 
@@ -347,7 +347,7 @@ fn delete_not_found() {
 #[test]
 fn set_status_normalizes_alias() {
     let (_tmp, store) = setup();
-    store.add("Status test", None).unwrap();
+    store.add("Status test", None, None).unwrap();
     let task = store.set_status(1, "doing").unwrap();
     assert_eq!(task.status, "in-progress");
 }
@@ -355,7 +355,7 @@ fn set_status_normalizes_alias() {
 #[test]
 fn mark_done_sets_completed() {
     let (_tmp, store) = setup();
-    store.add("Complete me", None).unwrap();
+    store.add("Complete me", None, None).unwrap();
 
     let task = store.mark_done(1).unwrap();
     assert_eq!(task.status, "done");
@@ -365,7 +365,7 @@ fn mark_done_sets_completed() {
 #[test]
 fn moving_out_of_done_clears_completed() {
     let (_tmp, store) = setup();
-    store.add("Reopen me", None).unwrap();
+    store.add("Reopen me", None, None).unwrap();
 
     let done = store.mark_done(1).unwrap();
     assert!(done.completed.is_some());
@@ -390,7 +390,7 @@ fn concurrent_adds_serialize_under_lock() {
         handles.push(std::thread::spawn(move || {
             let store = TaskStore::new(root).unwrap();
             barrier.wait();
-            store.add(&format!("Task {i}"), None).unwrap()
+            store.add(&format!("Task {i}"), None, None).unwrap()
         }));
     }
 
@@ -408,7 +408,7 @@ fn concurrent_adds_serialize_under_lock() {
 fn concurrent_status_changes() {
     let (tmp, store) = setup();
     for i in 0..3 {
-        store.add(&format!("Task {i}"), None).unwrap();
+        store.add(&format!("Task {i}"), None, None).unwrap();
     }
 
     let root = tmp.path().to_path_buf();
@@ -441,7 +441,7 @@ fn concurrent_status_changes() {
 fn concurrent_deletes_remove_all_targets() {
     let (tmp, store) = setup();
     for i in 0..5 {
-        store.add(&format!("Task {i}"), None).unwrap();
+        store.add(&format!("Task {i}"), None, None).unwrap();
     }
 
     let root = tmp.path().to_path_buf();
@@ -464,4 +464,33 @@ fn concurrent_deletes_remove_all_targets() {
 
     let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
     assert!(store.list(None).unwrap().is_empty());
+}
+
+// ── PRD field ──────────────────────────────────────────────────────
+
+#[test]
+fn add_task_preserves_prd_field_through_roundtrip() {
+    let (tmp, store) = setup();
+    let task = store.add("Setup boilerplate", None, None).unwrap();
+
+    let path = task.file_path.unwrap();
+    let updated_content = format!(
+        "---\nid: {}\ntitle: Setup boilerplate\nstatus: backlog\nprd: .untask/docs/my-project.md\ncreated: 2026-03-08\nupdated: 2026-03-08T00:00:00Z\nposition: 1.0\n---\n",
+        task.id.unwrap()
+    );
+    std::fs::write(&path, updated_content).unwrap();
+
+    let loaded = store.get(task.id.unwrap()).unwrap();
+    assert_eq!(loaded.prd.as_deref(), Some(".untask/docs/my-project.md"));
+}
+
+#[test]
+fn add_task_with_prd_sets_field() {
+    let (_tmp, store) = setup();
+    let task = store.add("Task from PRD", None, Some(".untask/docs/spec.md")).unwrap();
+
+    assert_eq!(task.prd.as_deref(), Some(".untask/docs/spec.md"));
+
+    let loaded = store.get(task.id.unwrap()).unwrap();
+    assert_eq!(loaded.prd.as_deref(), Some(".untask/docs/spec.md"));
 }
