@@ -108,11 +108,11 @@ pub enum Commands {
     /// Check and repair project integrity
     Repair {
         /// Check only, do not write
-        #[arg(long)]
+        #[arg(long, conflicts_with = "write")]
         check: bool,
 
         /// Apply fixes
-        #[arg(long)]
+        #[arg(long, conflicts_with = "check")]
         write: bool,
     },
 
@@ -182,5 +182,15 @@ mod tests {
                 cmd: SkillCommands::Install
             })
         ));
+    }
+
+    #[test]
+    fn rejects_conflicting_repair_flags() {
+        let err = Cli::try_parse_from(["untask", "repair", "--check", "--write"]).unwrap_err();
+        let rendered = err.to_string();
+
+        assert!(rendered.contains("cannot be used with"));
+        assert!(rendered.contains("--check"));
+        assert!(rendered.contains("--write"));
     }
 }

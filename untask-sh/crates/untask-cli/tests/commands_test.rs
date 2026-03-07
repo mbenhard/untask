@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    env, fs,
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -72,6 +72,52 @@ fn insert_frontmatter_lines(path: &Path, lines: &[&str]) {
     let content = fs::read_to_string(path).unwrap();
     let injected = content.replacen("\n---\n", &format!("\n{}\n---\n", lines.join("\n")), 1);
     fs::write(path, injected).unwrap();
+}
+
+fn write_doc(dir: &Path, rel_path: &str, content: &str) {
+    let path = dir.join(rel_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).unwrap();
+    }
+    fs::write(path, content).unwrap();
+}
+
+fn write_task_file(dir: &Path, filename: &str, content: &str) {
+    fs::write(dir.join(".untask/tasks").join(filename), content).unwrap();
+}
+
+fn configure_docs(dir: &Path, patterns: &[&str]) {
+    let docs = patterns
+        .iter()
+        .map(|pattern| format!("  - \"{pattern}\""))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(dir.join(".untask/config.yml"), format!("docs:\n{docs}\n")).unwrap();
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git command failed: git {}\nstderr: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn init_git_repo(dir: &Path) {
+    git(dir, &["init"]);
+    git(dir, &["config", "user.email", "test@example.com"]);
+    git(dir, &["config", "user.name", "Test User"]);
+}
+
+fn prepend_path(dir: &Path) -> String {
+    let existing = env::var("PATH").unwrap_or_default();
+    format!("{}:{existing}", dir.display())
 }
 
 // ── Init ────────────────────────────────────────────────────────────
@@ -432,6 +478,243 @@ fn delete_json_output() {
     assert!(ok);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(parsed["deleted"], 1);
+}
+
+// ── Docs / Search / Next / Repair / Skill / Open ───────────────────
+
+#[test]
+fn docs_list_shows_all_discovered_docs() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    configure_docs(tmp.path(), &[".untask/docs/**/*.md", "docs/**/*.md"]);
+    write_doc(tmp.path(), ".untask/docs/guide.md", "# Guide\n");
+    write_doc(tmp.path(), "docs/plan.md", "# Plan\n");
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs"]);
+    assert!(ok);
+    assert!(stdout.contains(".untask/docs/guide.md"));
+    assert!(stdout.contains("docs/plan.md"));
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "docs"]);
+    assert!(ok);
+    let parsed: Vec<serde_json::Value> = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(parsed.len(), 2);
+}
+
+#[test]
+fn docs_show_displays_doc_content() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    write_doc(tmp.path(), ".untask/docs/guide.md", "# Guide\nRead me.\n");
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["docs", "show", "guide.md"]);
+    assert!(ok);
+    assert!(stdout.contains("# Guide"));
+    assert!(stdout.contains("Read me."));
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "docs", "show", "guide.md"]);
+    assert!(ok);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(parsed["name"], "guide.md");
+    assert!(parsed["content"].as_str().unwrap().contains("Read me."));
+}
+
+#[test]
+fn docs_show_with_ambiguous_name_returns_helpful_error() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    configure_docs(tmp.path(), &[".untask/docs/**/*.md", "docs/**/*.md"]);
+    write_doc(tmp.path(), ".untask/docs/notes.md", "root notes");
+    write_doc(tmp.path(), "docs/notes.md", "project notes");
+
+    let (_, stderr, ok) = run_in(tmp.path(), &["docs", "show", "notes.md"]);
+    assert!(!ok);
+    assert!(stderr.contains("Ambiguous reference 'notes.md'"));
+    assert!(stderr.contains(".untask/docs/notes.md"));
+    assert!(stderr.contains("docs/notes.md"));
+}
+
+#[test]
+fn search_returns_matches_and_json_output() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    run_in(tmp.path(), &["add", "Deploy backend"]);
+    write_doc(
+        tmp.path(),
+        ".untask/docs/deploy.md",
+        "Production deploy checklist.\n",
+    );
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["search", "deploy"]);
+    assert!(ok);
+    assert!(stdout.contains("[task] Deploy backend"));
+    assert!(stdout.contains("[doc] deploy.md"));
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["search", "deploy", "--tasks-only"]);
+    assert!(ok);
+    assert!(stdout.contains("[task] Deploy backend"));
+    assert!(!stdout.contains("[doc] deploy.md"));
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "search", "deploy"]);
+    assert!(ok);
+    let parsed: Vec<serde_json::Value> = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(parsed.len(), 2);
+    assert!(parsed.iter().any(|entry| entry["kind"] == "task"));
+    assert!(parsed.iter().any(|entry| entry["kind"] == "doc"));
+}
+
+#[test]
+fn next_outputs_formatted_sections_and_json() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    init_git_repo(tmp.path());
+    fs::write(tmp.path().join("README.md"), "hello\n").unwrap();
+    git(tmp.path(), &["add", "."]);
+    git(tmp.path(), &["commit", "-m", "initial commit"]);
+
+    run_in(tmp.path(), &["add", "Urgent task"]);
+    run_in(tmp.path(), &["add", "Done task", "--status", "done"]);
+    insert_frontmatter_lines(
+        &find_task_file(tmp.path(), "urgent-task"),
+        &["priority: urgent"],
+    );
+    write_task_file(
+        tmp.path(),
+        "loose-note.md",
+        "---\ntitle: Loose note\nstatus: todo\n---\n",
+    );
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["next"]);
+    assert!(ok);
+    assert!(stdout.contains("## Git"));
+    assert!(stdout.contains("## Open Tasks"));
+    assert!(stdout.contains("## Recently Completed"));
+    assert!(stdout.contains("## Cleanup"));
+    assert!(stdout.contains("Urgent task"));
+    assert!(stdout.contains("Done task"));
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "next"]);
+    assert!(ok);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(parsed["open_tasks"][0]["title"], "Urgent task");
+    assert_eq!(parsed["recently_completed"][0]["title"], "Done task");
+    assert_eq!(parsed["cleanup_hints"][0]["kind"], "Unindexed");
+    assert!(
+        parsed["cleanup_hints"][0]["path"]
+            .as_str()
+            .unwrap()
+            .contains("loose-note.md")
+    );
+    assert_eq!(
+        parsed["git"]["recent_commits"][0]["message"],
+        "initial commit"
+    );
+    assert!(parsed["git"]["recent_commits"][0]["timestamp"].is_string());
+}
+
+#[test]
+fn repair_check_reports_issues_without_modifying_files() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    write_task_file(
+        tmp.path(),
+        "loose-note.md",
+        "---\ntitle: Loose note\nstatus: yolo\n---\nBody\n",
+    );
+
+    let before = fs::read_to_string(tmp.path().join(".untask/tasks/loose-note.md")).unwrap();
+    let (stdout, _, ok) = run_in(tmp.path(), &["repair", "--check"]);
+    assert!(ok);
+    assert!(stdout.contains("Unindexed tasks:"));
+    assert!(stdout.contains("Unknown statuses:"));
+    assert!(stdout.contains("Run 'untask repair --write' to fix these issues."));
+
+    let after = fs::read_to_string(tmp.path().join(".untask/tasks/loose-note.md")).unwrap();
+    assert_eq!(before, after);
+}
+
+#[test]
+fn repair_write_fixes_issues_and_json_output() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+    write_task_file(
+        tmp.path(),
+        "loose-note.md",
+        "---\ntitle: Loose note\nstatus: yolo\n---\n",
+    );
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["repair", "--write"]);
+    assert!(ok);
+    assert!(stdout.contains("Actions taken:"));
+    assert!(tmp.path().join(".untask/tasks/001-loose-note.md").exists());
+
+    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "repair", "--check"]);
+    assert!(ok);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(parsed["unindexed_tasks"].as_array().unwrap().len(), 0);
+    assert_eq!(parsed["unknown_statuses"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn skill_install_prints_fallback_instructions_when_path_not_found() {
+    let tmp = TempDir::new().unwrap();
+    let home = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let home_env = home.path().to_str().unwrap();
+    let (stdout, _, ok) = run_in_with(
+        tmp.path(),
+        &["skill", "install"],
+        None,
+        &[("HOME", home_env)],
+    );
+    assert!(ok);
+    assert!(stdout.contains("No supported agent config directory found."));
+    assert!(stdout.contains("mkdir -p ~/.claude/commands"));
+}
+
+#[test]
+fn skill_install_copies_bundled_skill_when_supported_path_exists() {
+    let tmp = TempDir::new().unwrap();
+    let home = TempDir::new().unwrap();
+    init_project(tmp.path());
+    fs::create_dir_all(home.path().join(".claude")).unwrap();
+
+    let home_env = home.path().to_str().unwrap();
+    let (stdout, _, ok) = run_in_with(
+        tmp.path(),
+        &["skill", "install"],
+        None,
+        &[("HOME", home_env)],
+    );
+    assert!(ok);
+    assert!(stdout.contains("Installed skill"));
+
+    let installed = home.path().join(".claude/commands/untask.md");
+    assert!(installed.exists());
+    let content = fs::read_to_string(installed).unwrap();
+    assert!(content.contains("untask next --json"));
+    assert!(content.contains("status <id> in-progress"));
+    assert!(content.contains("docs/plans/"));
+}
+
+#[test]
+fn open_fails_gracefully_when_app_is_unavailable() {
+    let tmp = TempDir::new().unwrap();
+    init_project(tmp.path());
+
+    let mock_bin = tmp.path().join("mock-bin");
+    fs::create_dir_all(&mock_bin).unwrap();
+    fs::write(mock_bin.join("open"), "#!/bin/sh\nexit 1\n").unwrap();
+    Command::new("chmod")
+        .args(["+x", mock_bin.join("open").to_str().unwrap()])
+        .status()
+        .unwrap();
+
+    let path_env = prepend_path(&mock_bin);
+    let (_, stderr, ok) = run_in_with(tmp.path(), &["open"], None, &[("PATH", &path_env)]);
+    assert!(!ok);
+    assert!(stderr.contains("Could not open the Untask desktop app"));
 }
 
 // ── Full workflow ───────────────────────────────────────────────────

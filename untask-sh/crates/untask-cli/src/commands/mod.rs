@@ -1,9 +1,15 @@
 mod add;
 mod delete;
+pub mod docs;
 mod done;
 mod edit;
 mod list;
+pub mod next;
+mod open;
+mod repair;
+mod search;
 mod show;
+mod skill;
 mod status;
 
 pub use add::run as add;
@@ -11,5 +17,9 @@ pub use delete::run as delete;
 pub use done::run as done;
 pub use edit::run as edit;
 pub use list::run as list;
+pub use open::run as open;
+pub use repair::run as repair;
+pub use search::run as search;
 pub use show::run as show;
+pub use skill::install as skill_install;
 pub use status::run as status;

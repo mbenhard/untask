@@ -5,7 +5,7 @@ mod tui;
 use std::ffi::OsString;
 
 use clap::Parser;
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, DocsCommands};
 use colored::control::set_override;
 use untask_core::store::TaskStore;
 
@@ -61,7 +61,7 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
             // All other commands require an initialized project
             let cwd = std::env::current_dir()?;
             let root = untask_core::project::find_project_root(&cwd)?;
-            let store = TaskStore::new(root)?;
+            let store = TaskStore::new(root.clone())?;
 
             match cmd {
                 Commands::Init => unreachable!(),
@@ -90,10 +90,21 @@ fn run(cli: &Cli) -> untask_core::error::Result<()> {
                 Commands::Delete { reference, force } => {
                     commands::delete(&store, reference, *force, cli.json)
                 }
-                _ => {
-                    println!("Command not yet implemented.");
-                    Ok(())
+                Commands::Next => commands::next::run(&root, cli.json),
+                Commands::Search { query, tasks_only } => {
+                    commands::search(&root, query, *tasks_only, cli.json)
                 }
+                Commands::Docs { cmd: subcmd } => match subcmd {
+                    Some(DocsCommands::Show { name }) => {
+                        commands::docs::show(&root, name, cli.json)
+                    }
+                    Some(DocsCommands::List) | None => commands::docs::list(&root, cli.json),
+                },
+                Commands::Repair { check, write } => {
+                    commands::repair(&root, *check, *write, cli.json)
+                }
+                Commands::Skill { cmd: _ } => commands::skill_install(cli.json),
+                Commands::Open => commands::open(&root),
             }
         }
     }

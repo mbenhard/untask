@@ -646,7 +646,7 @@
           "8",
           "10"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -654,9 +654,10 @@
             "description": "Create CLI commands for listing all discovered docs and showing specific doc content with ambiguity error handling when multiple docs share the same basename.",
             "dependencies": [],
             "details": "Implement `docs_list(json: bool)` and `docs_show(reference: &str, json: bool)` functions in the CLI layer. The list command should display all docs from DocsStore. The show command should call DocsStore::get() and handle the Ambiguous error variant by presenting available paths to the user. Support both human-readable and JSON output formats. Handle cases where the reference doesn't match any doc with a clear error message.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test docs list shows all discovered docs. Test docs show displays doc content for unique basename. Test docs show with ambiguous name returns helpful error listing all matching paths. Test JSON output format is valid.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:48:33.056Z"
           },
           {
             "id": 2,
@@ -664,9 +665,10 @@
             "description": "Create search CLI command that queries tasks and docs, returning results with context snippets in both human-readable and JSON formats.",
             "dependencies": [],
             "details": "Implement `search(query: &str, tasks_only: bool, json: bool)` function that calls the search::search() module from task 7. Format results as a list with context snippets showing where the match occurred. When --tasks-only flag is set, exclude doc matches. For JSON output, serialize results as an array with fields for path, title, snippet, and match location. Ensure snippets are truncated appropriately and highlight match context.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test search returns matching tasks and docs. Test search --tasks-only excludes docs. Test search --json outputs valid JSON array. Test snippets show relevant context around matches.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:48:35.206Z"
           },
           {
             "id": 3,
@@ -674,9 +676,10 @@
             "description": "Create next CLI command that generates and displays recent commits, open tasks, recently completed tasks, and cleanup hints in markdown or structured JSON.",
             "dependencies": [],
             "details": "Implement `next(json: bool)` function that calls next::generate_next() to get the summary structure. For human-readable output, render markdown sections for: recent commits when available, open tasks sorted by priority and recency, recently completed tasks, and cleanup hints for unindexed or unmatched items. Omit empty sections. For JSON mode, serialize the full summary structure. Ensure markdown formatting is clean with appropriate headers, bullets, and spacing.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test next outputs formatted markdown sections. Test next --json outputs valid structured JSON. Test output includes recent commits when available, open tasks sorted by priority and recency, recently completed tasks, and cleanup hints. Test empty sections are omitted.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:48:37.356Z"
           },
           {
             "id": 4,
@@ -684,9 +687,10 @@
             "description": "Create repair CLI command with --check and --write flags that detects issues (unindexed tasks, mismatched IDs, unknown statuses) and optionally fixes them, outputting a detailed report.",
             "dependencies": [],
             "details": "Implement `repair(check: bool, write: bool, json: bool)` function. When check=true (default), call repair::check() to detect issues without modifying files. When write=true, call repair::repair() to fix detected problems. Output a RepairReport showing: unindexed tasks (with/without frontmatter IDs), mismatched filename/frontmatter IDs, unknown statuses, and actions taken (if --write). Format report as human-readable summary or JSON. Ensure --check and --write are mutually exclusive.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test repair --check detects unindexed tasks without modifying files. Test repair --write fixes issues and reports actions taken. Test repair --check --json outputs valid JSON report. Test detection of mismatched IDs and unknown statuses. Test report accuracy.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:48:39.500Z"
           },
           {
             "id": 5,
@@ -694,14 +698,16 @@
             "description": "Create skill install command to bundle and install `skill/untask.md` into the primary target agent config directory with path detection and fallback instructions, plus open command for macOS app launch.",
             "dependencies": [],
             "details": "For skill install: ship a bundled `skill/untask.md` file with the CLI, detect the primary target agent config path first (Claude Code today), and copy the bundled skill into the agent skills directory. The bundled skill must instruct agents to start sessions with `untask next`, set task status before work, mark tasks done after work, and write docs/plans into tracked project locations. If path detection fails or the environment is unsupported, print clear fallback instructions for manual installation. For open command: on macOS, execute 'open -a Untask .' to launch the desktop app. On other platforms or if app not found, print a clear error message with installation instructions. Both commands should handle errors gracefully.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test skill install detects config path correctly on supported environments. Test skill install copies bundled `skill/untask.md` to the correct location. Test the bundled skill content includes the `untask next` / status-before-work / done-after-work guidance. Test skill install fallback instructions when path not found. Test open command launches macOS app. Test open command fails gracefully when app not installed.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-06T23:48:41.673Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: (1) Docs list/show commands with ambiguity error handling, (2) Search command with JSON output formatting, (3) Next command with markdown section rendering, (4) Repair command with --check/--write flags and report output, (5) Skill install with config path detection and open command for macOS app."
+        "expansionPrompt": "Break down into: (1) Docs list/show commands with ambiguity error handling, (2) Search command with JSON output formatting, (3) Next command with markdown section rendering, (4) Repair command with --check/--write flags and report output, (5) Skill install with config path detection and open command for macOS app.",
+        "updatedAt": "2026-03-06T23:48:41.673Z"
       },
       {
         "id": "12",
@@ -1245,9 +1251,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-06T23:26:13.265Z",
+      "lastModified": "2026-03-06T23:48:41.674Z",
       "taskCount": 19,
-      "completedCount": 13,
+      "completedCount": 14,
       "tags": [
         "master"
       ]

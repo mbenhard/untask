@@ -2,13 +2,16 @@ use std::path::Path;
 use std::process::Command;
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 
+#[derive(Serialize)]
 pub struct GitSummary {
     pub recent_commits: Vec<Commit>,
     pub branch: String,
     pub has_uncommitted_changes: bool,
 }
 
+#[derive(Serialize)]
 pub struct Commit {
     pub hash: String,
     pub message: String,

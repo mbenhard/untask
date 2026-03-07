@@ -29,6 +29,9 @@ pub enum UntaskError {
     #[error("Repair failed: {0}")]
     RepairFailed(String),
 
+    #[error("{0}")]
+    CommandFailed(String),
+
     #[error("Lock acquisition failed: {0}")]
     LockFailed(String),
 }

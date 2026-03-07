@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use chrono::{Duration, Utc};
+use serde::Serialize;
 
 use crate::config::Config;
 use crate::error::Result;
@@ -9,6 +10,7 @@ use crate::repair;
 use crate::store::TaskStore;
 use crate::task::Task;
 
+#[derive(Serialize)]
 pub struct NextSummary {
     pub git: Option<GitSummary>,
     pub open_tasks: Vec<Task>,
@@ -16,13 +18,14 @@ pub struct NextSummary {
     pub cleanup_hints: Vec<CleanupHint>,
 }
 
+#[derive(Serialize)]
 pub struct CleanupHint {
     pub kind: CleanupKind,
     pub path: PathBuf,
     pub message: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub enum CleanupKind {
     Unindexed,
     MismatchedId,
