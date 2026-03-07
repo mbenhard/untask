@@ -382,20 +382,42 @@
           <div class="drop-indicator"></div>
         {/if}
 
-        <!-- Empty column drop zone -->
+        <!-- Empty column: combined drop zone + add task -->
         {#if col.tasks.length === 0 && !isUnmatchedColumn(col.id)}
-          <div
-            class="flex min-h-[80px] flex-1 items-center justify-center rounded-[6px] border border-dashed border-border/40"
-            class:border-ring={dropTarget?.columnId === col.id}
-          >
-            {#if isDragging}
-              <span class="font-mono text-[10px] text-muted-foreground/40">Drop here</span>
-            {/if}
-          </div>
+          {#if addingInColumn === col.id}
+            <div class="rounded-[6px] border border-border/60 bg-card px-2.5 py-2">
+              <textarea
+                bind:value={quickAddTitle}
+                onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
+                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
+                placeholder="Task title..."
+                rows="2"
+                class="w-full resize-none bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
+                class:border-destructive={quickAddErrorFlash}
+                autofocus
+              ></textarea>
+              {#if quickAddError}
+                <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
+              {/if}
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="flex min-h-[80px] w-full flex-1 items-center justify-center rounded-[6px] border border-dashed border-border/40 font-mono text-[10px] text-muted-foreground/40 transition-colors duration-[120ms] hover:border-border/60 hover:text-muted-foreground"
+              class:border-ring={dropTarget?.columnId === col.id}
+              onclick={() => startQuickAdd(col.id)}
+            >
+              {#if isDragging}
+                Drop here
+              {:else}
+                + Add task
+              {/if}
+            </button>
+          {/if}
         {/if}
 
-        <!-- Quick-add at bottom -->
-        {#if !isUnmatchedColumn(col.id)}
+        <!-- Quick-add at bottom (only when column has tasks) -->
+        {#if col.tasks.length > 0 && !isUnmatchedColumn(col.id)}
           {#if addingInColumn === col.id}
             <div class="rounded-[6px] border border-border/60 bg-card px-2.5 py-2">
               <textarea

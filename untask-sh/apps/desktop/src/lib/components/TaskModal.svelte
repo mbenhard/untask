@@ -500,15 +500,15 @@
           {#each task.tags as tag}
             <button
               type="button"
-              class="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border"
+              class="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 transition-colors duration-[120ms] hover:border-border"
               disabled={isUnindexed}
               onclick={() => removeTag(tag)}
               title={isUnindexed ? tag : "Click to remove"}
             >
-              {tag}
-              {#if !isUnindexed}
-                <span class="text-muted-foreground/40">&times;</span>
-              {/if}
+              <PriorityDot tone="neutral" />
+              <span class="font-mono text-[10px] text-muted-foreground">
+                {tag}
+              </span>
             </button>
           {/each}
 
