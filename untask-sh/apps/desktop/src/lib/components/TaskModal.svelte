@@ -18,6 +18,7 @@
     initialTask = null,
     columns,
     refreshRevision = 0,
+    onClosingStart,
     onClose,
     onTaskUpdated,
   }: {
@@ -25,6 +26,7 @@
     initialTask?: TaskDto | null;
     columns: ColumnDto[];
     refreshRevision?: number;
+    onClosingStart: () => void;
     onClose: () => void;
     onTaskUpdated: () => void;
   } = $props();
@@ -48,6 +50,7 @@
   let lastRefreshRevision = $state(-1);
   let modalEl: HTMLDivElement | undefined = $state();
   let triggerEl: Element | null = null;
+  const closeAnimationMs = 220;
 
   const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
@@ -134,7 +137,7 @@
   });
 
   function priorityTone(p: Priority | null): PriorityTone {
-    if (p === "high" || p === "urgent") return "high";
+    if (p === "high") return "high";
     if (p === "medium") return "medium";
     if (p === "low") return "low";
     return "neutral";
@@ -172,10 +175,11 @@
   function handleClose() {
     if (closing) return;
     closing = true;
+    onClosingStart();
     setTimeout(() => {
       closing = false;
       onClose();
-    }, 120);
+    }, closeAnimationMs);
   }
 
   // Title
@@ -339,7 +343,8 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
+  class="task-modal-shell fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
+  class:task-modal-shell-closing={closing}
   onkeydown={handleKeydown}
   onclick={handleBackdropClick}
   role="dialog"
@@ -614,14 +619,41 @@
 </div>
 
 <style>
+  .task-modal-shell {
+    animation: modal-shell-in 190ms linear both;
+  }
+
+  @keyframes modal-shell-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .task-modal-shell-closing {
+    animation: modal-shell-out 200ms linear both;
+  }
+
+  @keyframes modal-shell-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
   .task-modal {
-    animation: modal-in 180ms ease-out both;
+    transform-origin: center center;
+    animation: modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   @keyframes modal-in {
     from {
       opacity: 0;
-      transform: scale(0.97);
+      transform: scale(0.944);
     }
     to {
       opacity: 1;
@@ -630,7 +662,7 @@
   }
 
   .task-modal-closing {
-    animation: modal-out 120ms ease-in both;
+    animation: modal-out 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 
   @keyframes modal-out {
@@ -640,7 +672,7 @@
     }
     to {
       opacity: 0;
-      transform: scale(0.98);
+      transform: scale(0.956);
     }
   }
 

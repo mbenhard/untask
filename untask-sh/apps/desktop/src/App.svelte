@@ -42,6 +42,7 @@
   let healthDismissed = $state(false);
   let restoring = $state(true);
   let selectedTask = $state<TaskDto | null>(null);
+  let taskModalActive = $state(false);
   let refreshRevision = $state(0);
   let showProjectSwitcher = $state(false);
   let projectRevision = $state(0);
@@ -106,6 +107,7 @@
     projectPath.set(path);
     projectName.set(name);
     selectedTask = null;
+    taskModalActive = false;
 
     await refreshData();
     projectRevision += 1;
@@ -171,6 +173,7 @@
     }
     activeView.set(view);
     selectedTask = null;
+    taskModalActive = false;
   }
 
   async function switchProject() {
@@ -187,6 +190,7 @@
     docs.set([]);
     columns.set([]);
     selectedTask = null;
+    taskModalActive = false;
     docsExternalRevision = 0;
     docsExternalPaths = [];
     pendingRefreshPaths = new Set();
@@ -199,10 +203,16 @@
 
   function onTaskClick(task: TaskDto) {
     selectedTask = task;
+    taskModalActive = true;
+  }
+
+  function onTaskClosingStart() {
+    taskModalActive = false;
   }
 
   function onTaskClose() {
     selectedTask = null;
+    taskModalActive = false;
   }
 
   function summarizeTaskHealth(
@@ -264,113 +274,148 @@
   });
 </script>
 
-<div class="flex h-screen min-h-screen flex-col bg-background text-foreground">
-  <WindowChrome
-    title={$projectName ?? "Untask"}
-    onProjectClick={$projectPath ? () => { showProjectSwitcher = !showProjectSwitcher; } : undefined}
-  />
+<div class="relative h-screen min-h-screen overflow-hidden bg-background text-foreground">
+  <div class="flex h-full min-h-full flex-col">
+    <WindowChrome
+      title={$projectName ?? "Untask"}
+      onProjectClick={$projectPath ? () => { showProjectSwitcher = !showProjectSwitcher; } : undefined}
+    />
 
-  {#if restoring}
-    <div class="flex min-h-0 flex-1 items-center justify-center">
-      <p class="animate-pulse font-mono text-[11px] text-muted-foreground">Loading...</p>
-    </div>
-  {:else if !$projectPath}
-    <div class="flex min-h-0 flex-1 overflow-hidden">
-      <ProjectPicker {onProjectOpened} />
-    </div>
-  {:else}
-    <div class="flex min-h-0 flex-1 overflow-hidden">
-      <SidebarNav
-        activeView={$activeView}
-        onSelect={selectView}
-      />
-      <main class="flex min-w-0 flex-1 flex-col bg-background/80">
-        {#if !healthDismissed && (taskHealth.unindexedCount > 0 || taskHealth.unmatchedCount > 0)}
-          <div class="flex items-center gap-2 border-b border-border/60 px-4 py-1.5">
-            <div class="flex flex-1 flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
-              {#if taskHealth.unmatchedCount > 0}
-                <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
-                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-priority-medium"></span>
-                  {taskHealth.unmatchedCount} unmatched
-                </span>
-              {/if}
-              {#if taskHealth.unindexedCount > 0}
-                <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
-                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
-                  {taskHealth.unindexedCount} unindexed
-                </span>
+    {#if restoring}
+      <div
+        class="content-shell flex min-h-0 flex-1 items-center justify-center"
+        class:content-shell-modal-open={taskModalActive}
+      >
+        <p class="animate-pulse font-mono text-[11px] text-muted-foreground">Loading...</p>
+      </div>
+    {:else if !$projectPath}
+      <div
+        class="content-shell flex min-h-0 flex-1 overflow-hidden"
+        class:content-shell-modal-open={taskModalActive}
+      >
+        <ProjectPicker {onProjectOpened} />
+      </div>
+    {:else}
+      <div
+        class="content-shell flex min-h-0 flex-1 overflow-hidden"
+        class:content-shell-modal-open={taskModalActive}
+      >
+        <SidebarNav
+          activeView={$activeView}
+          onSelect={selectView}
+        />
+        <main class="flex min-w-0 flex-1 flex-col bg-background/80">
+          {#if !healthDismissed && (taskHealth.unindexedCount > 0 || taskHealth.unmatchedCount > 0)}
+            <div class="flex items-center gap-2 border-b border-border/60 px-4 py-1.5">
+              <div class="flex flex-1 flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                {#if taskHealth.unmatchedCount > 0}
+                  <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-priority-medium"></span>
+                    {taskHealth.unmatchedCount} unmatched
+                  </span>
+                {/if}
+                {#if taskHealth.unindexedCount > 0}
+                  <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
+                    {taskHealth.unindexedCount} unindexed
+                  </span>
+                {/if}
+              </div>
+              <button
+                type="button"
+                class="rounded-[4px] p-0.5 text-muted-foreground/40 transition-colors duration-[120ms] hover:text-muted-foreground"
+                onclick={() => { healthDismissed = true; }}
+                title="Dismiss"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          {/if}
+
+          {#key `${projectRevision}-${$activeView}`}
+            <div class="view-transition flex min-h-0 flex-1 flex-col">
+              {#if $activeView === "board"}
+                <Kanban
+                  tasks={$tasks}
+                  columns={$columns}
+                  onTaskClick={onTaskClick}
+                  onTasksChanged={refreshTasks}
+                />
+              {:else if $activeView === "list"}
+                <TaskList
+                  tasks={$tasks}
+                  columns={$columns}
+                  onTaskClick={onTaskClick}
+                  onTasksChanged={refreshTasks}
+                />
+              {:else if $activeView === "docs"}
+                <DocsViewer
+                  docs={$docs}
+                  refreshRevision={refreshRevision}
+                  externalRevision={docsExternalRevision}
+                  externalPaths={docsExternalPaths}
+                  onDocsChanged={refreshDocs}
+                />
+              {:else if $activeView === "next"}
+                <div class="flex flex-1 items-center justify-center">
+                  <p class="font-mono text-[11px] text-muted-foreground">Next view — coming soon</p>
+                </div>
               {/if}
             </div>
-            <button
-              type="button"
-              class="rounded-[4px] p-0.5 text-muted-foreground/40 transition-colors duration-[120ms] hover:text-muted-foreground"
-              onclick={() => { healthDismissed = true; }}
-              title="Dismiss"
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        {/if}
+          {/key}
+        </main>
+      </div>
 
-        {#key `${projectRevision}-${$activeView}`}
-          <div class="view-transition flex min-h-0 flex-1 flex-col">
-            {#if $activeView === "board"}
-              <Kanban
-                tasks={$tasks}
-                columns={$columns}
-                onTaskClick={onTaskClick}
-                onTasksChanged={refreshTasks}
-              />
-            {:else if $activeView === "list"}
-              <TaskList
-                tasks={$tasks}
-                columns={$columns}
-                onTaskClick={onTaskClick}
-                onTasksChanged={refreshTasks}
-              />
-            {:else if $activeView === "docs"}
-              <DocsViewer
-                docs={$docs}
-                refreshRevision={refreshRevision}
-                externalRevision={docsExternalRevision}
-                externalPaths={docsExternalPaths}
-                onDocsChanged={refreshDocs}
-              />
-            {:else if $activeView === "next"}
-              <div class="flex flex-1 items-center justify-center">
-                <p class="font-mono text-[11px] text-muted-foreground">Next view — coming soon</p>
-              </div>
-            {/if}
-          </div>
-        {/key}
-      </main>
-    </div>
-
-    {#if selectedTask}
-      <TaskModal
-        taskId={selectedTask.id}
-        initialTask={selectedTask}
-        columns={$columns}
-        {refreshRevision}
-        onClose={onTaskClose}
-        onTaskUpdated={refreshTasks}
-      />
+      {#if showProjectSwitcher}
+        <ProjectPicker
+          mode="dropdown"
+          onProjectOpened={async (path, name) => {
+            showProjectSwitcher = false;
+            await switchProject();
+            await openProject(path);
+            await onProjectOpened(path, name);
+          }}
+          onClose={() => { showProjectSwitcher = false; }}
+        />
+      {/if}
     {/if}
+  </div>
 
-    {#if showProjectSwitcher}
-      <ProjectPicker
-        mode="dropdown"
-        onProjectOpened={async (path, name) => {
-          showProjectSwitcher = false;
-          await switchProject();
-          await openProject(path);
-          await onProjectOpened(path, name);
-        }}
-        onClose={() => { showProjectSwitcher = false; }}
-      />
-    {/if}
+  {#if selectedTask}
+    <TaskModal
+      taskId={selectedTask.id}
+      initialTask={selectedTask}
+      columns={$columns}
+      {refreshRevision}
+      onClosingStart={onTaskClosingStart}
+      onClose={onTaskClose}
+      onTaskUpdated={refreshTasks}
+    />
   {/if}
 </div>
+
+<style>
+  .content-shell {
+    --content-shell-scale: 1;
+    --content-shell-opacity: 1;
+    transform: scale(var(--content-shell-scale));
+    transform-origin: center center;
+    opacity: var(--content-shell-opacity);
+    transition:
+      transform 220ms cubic-bezier(0.18, 0.9, 0.22, 1),
+      opacity 200ms ease;
+    overflow: hidden;
+  }
+
+  .content-shell-modal-open {
+    --content-shell-scale: 0.989;
+    --content-shell-opacity: 0.9;
+    transition-duration: 220ms, 160ms;
+    transition-timing-function:
+      cubic-bezier(0.16, 1, 0.3, 1),
+      ease;
+  }
+</style>
