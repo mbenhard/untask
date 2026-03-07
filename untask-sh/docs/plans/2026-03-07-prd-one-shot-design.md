@@ -118,3 +118,28 @@ All say the same thing: check for PRDs, read them, use them as scope. Start with
 - For one-shots: build what the PRD says
 - For breakdowns: propose tasks, create them with `prd: <filename>` linkage
 - When generating a PRD: write to `.untask/docs/` with `type: prd` frontmatter
+
+## Implementation Notes
+
+### Docs need frontmatter parsing
+
+The current `Doc` struct is `{path, basename, content}` — docs are treated as opaque content with no YAML parsing. Unlike tasks, there's no frontmatter extraction. Adding `type: prd` requires:
+- A `DocFrontmatter` struct (similar to `TaskFrontmatter`) with at least a `type` field
+- Parsing logic in `DocsStore` to extract frontmatter from doc content
+- A `doc_type` field on `DocNode` so the tree view can distinguish PRDs from docs
+
+### Task struct needs a `prd` field
+
+`Task` and `TaskFrontmatter` need a new optional `prd: Option<String>` field to store the PRD filename reference. Straightforward addition — follows the same pattern as `priority`, `tags`, etc.
+
+### Cross-concern query for linked task counts
+
+The compact "3 tasks · 1 done" line on PRD views requires querying tasks filtered by `prd` field. Currently docs and tasks are separate systems. Options:
+- **Frontend join** — the desktop app queries both docs and tasks, joins client-side. Simple, no core changes beyond the `prd` field.
+- **Core helper** — a method on `TaskStore` like `count_by_prd(filename: &str) -> (done, total)`. Cleaner for CLI use.
+
+Recommend the core helper since the CLI will also want `untask doc list --type prd` to optionally show linked task counts.
+
+### PRD location is frontmatter-driven, not folder-driven
+
+PRDs can live in any discovered docs root (`.untask/docs/`, `docs/`, or any custom glob in config). The `type: prd` frontmatter is the sole identifier — location doesn't matter. A PRD in `docs/specs/my-project.md` is just as valid as one in `.untask/docs/my-project.md`.
