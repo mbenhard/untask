@@ -1,11 +1,11 @@
 # Current Run
 
-- stage: implementation_reviewed
-- topic: untask-taskmaster-19
+- stage: implementation_done
+- topic: desktop-window-chrome-fix
 - design_path: docs/untask-design-language.md
-- execution_plan_path: .taskmaster/tasks/task_019.md; .taskmaster/tasks/tasks.json; docs/plans/2026-03-06-untask-implementation.md
+- execution_plan_path: user-approved desktop window chrome fix plan (chat, 2026-03-07)
 - plan_review_path:
-- implementation_checkpoints_path:
-- implementation_review_path: docs/plans/2026-03-07-untask-taskmaster-19-implementation-review.md
-- next_skill: none
-- updated_at: 2026-03-07T02:29:30+0100
+- implementation_checkpoints_path: docs/plans/2026-03-07-desktop-window-chrome-execution-checkpoints.md
+- implementation_review_path:
+- next_skill: review-implemented-plan
+- updated_at: 2026-03-07T09:47:14+0100

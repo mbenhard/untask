@@ -26,6 +26,7 @@
         "width": 900,
         "height": 640,
         "resizable": true,
+        "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
       }
