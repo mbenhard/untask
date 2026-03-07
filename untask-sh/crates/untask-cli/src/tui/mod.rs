@@ -3,6 +3,7 @@ mod detail;
 mod docs;
 mod kanban;
 mod list;
+mod watcher;
 
 use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
