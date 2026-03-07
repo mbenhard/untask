@@ -49,8 +49,7 @@ fn relative_path<'a>(path: &'a Path, root: &Path) -> &'a Path {
 
 pub fn draw(state: &DocsViewState, project_root: &Path, frame: &mut Frame, area: Rect) {
     if state.docs.is_empty() {
-        let placeholder =
-            Paragraph::new("No docs found").block(Block::bordered().title("Docs"));
+        let placeholder = Paragraph::new("No docs found").block(Block::bordered().title("Docs"));
         frame.render_widget(placeholder, area);
         return;
     }

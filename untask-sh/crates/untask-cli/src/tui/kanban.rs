@@ -72,14 +72,20 @@ fn build_columns(tasks: &[Task], config: &Config) -> Vec<Column> {
         .collect();
 
     let mut unmatched_indices = Vec::new();
+    let mut unindexed_indices = Vec::new();
 
     for (i, task) in tasks.iter().enumerate() {
+        if task.kind() != TaskKind::Managed {
+            unindexed_indices.push(i);
+            continue;
+        }
+
         let canonical = config.normalize_status(&task.status);
-        if let Some(ref status) = canonical {
-            if let Some(col) = columns.iter_mut().find(|c| &c.id == status) {
-                col.tasks.push(i);
-                continue;
-            }
+        if let Some(ref status) = canonical
+            && let Some(col) = columns.iter_mut().find(|c| &c.id == status)
+        {
+            col.tasks.push(i);
+            continue;
         }
         unmatched_indices.push(i);
     }
@@ -89,6 +95,13 @@ fn build_columns(tasks: &[Task], config: &Config) -> Vec<Column> {
         columns.push(Column {
             id: "unmatched".into(),
             tasks: unmatched_indices,
+        });
+    }
+
+    if !unindexed_indices.is_empty() {
+        columns.push(Column {
+            id: "unindexed".into(),
+            tasks: unindexed_indices,
         });
     }
 
@@ -112,20 +125,33 @@ fn format_card(task: &Task) -> String {
     } else {
         String::new()
     };
+    let tags = if task.tags.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", task.tags.join(", "))
+    };
     let unindexed = if task.kind() == TaskKind::UnindexedWithoutId {
         " ~"
     } else {
         ""
     };
-    format!("{marker} {id_str}{}{progress}{unindexed}", task.title)
+    format!("{marker} {id_str}{}{progress}{tags}{unindexed}", task.title)
 }
 
-pub fn selected_task_id(tasks: &[Task], config: &Config, state: &KanbanState) -> Option<u32> {
+fn selected_task_index(tasks: &[Task], config: &Config, state: &KanbanState) -> Option<usize> {
     let columns = build_columns(tasks, config);
     columns
         .get(state.col)
         .and_then(|col| col.tasks.get(state.row))
-        .and_then(|&idx| tasks[idx].id)
+        .copied()
+}
+
+pub fn selected_task<'a>(
+    tasks: &'a [Task],
+    config: &Config,
+    state: &KanbanState,
+) -> Option<&'a Task> {
+    selected_task_index(tasks, config, state).map(|idx| &tasks[idx])
 }
 
 pub fn column_count(tasks: &[Task], config: &Config) -> usize {
@@ -182,5 +208,66 @@ pub fn draw(tasks: &[Task], config: &Config, state: &KanbanState, frame: &mut Fr
 
         let list = List::new(items).block(block);
         frame.render_widget(list, col_areas[ci]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{KanbanState, build_columns, selected_task};
+    use untask_core::config::Config;
+    use untask_core::task::Task;
+
+    fn task(path: &str, id: Option<u32>, title: &str, status: &str) -> Task {
+        Task {
+            id,
+            title: title.into(),
+            status: status.into(),
+            file_path: Some(PathBuf::from(path)),
+            ..Task::default()
+        }
+    }
+
+    #[test]
+    fn builds_unmatched_and_unindexed_columns_separately() {
+        let config = Config::default();
+        let tasks = vec![
+            task("001-managed.md", Some(1), "Managed todo", "todo"),
+            task("002-weird.md", Some(2), "Managed weird", "blocked"),
+            task("legacy-task.md", Some(9), "Legacy", "todo"),
+            task("loose-note.md", None, "Loose", "todo"),
+        ];
+
+        let columns = build_columns(&tasks, &config);
+
+        let todo = columns.iter().find(|column| column.id == "todo").unwrap();
+        assert_eq!(todo.tasks, vec![0]);
+
+        let unmatched = columns
+            .iter()
+            .find(|column| column.id == "unmatched")
+            .unwrap();
+        assert_eq!(unmatched.tasks, vec![1]);
+
+        let unindexed = columns
+            .iter()
+            .find(|column| column.id == "unindexed")
+            .unwrap();
+        assert_eq!(unindexed.tasks, vec![2, 3]);
+    }
+
+    #[test]
+    fn selected_task_helpers_follow_the_selected_column_and_row() {
+        let config = Config::default();
+        let tasks = vec![
+            task("001-managed.md", Some(1), "Managed todo", "todo"),
+            task("legacy-task.md", Some(9), "Legacy", "todo"),
+        ];
+        let state = KanbanState { col: 5, row: 0 };
+
+        let task = selected_task(&tasks, &config, &state).unwrap();
+        assert_eq!(task.title, "Legacy");
+        assert_eq!(task.id, Some(9));
     }
 }

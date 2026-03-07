@@ -37,6 +37,7 @@ pub struct App {
     store: TaskStore,
     docs_store: DocsStore,
     project_root: PathBuf,
+    detail_return_view: View,
 }
 
 impl App {
@@ -53,6 +54,7 @@ impl App {
             store,
             docs_store,
             project_root,
+            detail_return_view: View::List,
         };
 
         app.refresh()?;
@@ -64,8 +66,10 @@ impl App {
 
         // Clamp kanban selection
         let row_counts = kanban::row_counts(&self.tasks, self.store.config());
-        self.kanban
-            .clamp(kanban::column_count(&self.tasks, self.store.config()), &row_counts);
+        self.kanban.clamp(
+            kanban::column_count(&self.tasks, self.store.config()),
+            &row_counts,
+        );
 
         // Clamp list selection
         let visible = list::filtered_tasks(&self.tasks, &self.list, self.store.config());
@@ -83,7 +87,7 @@ impl App {
         if let View::TaskDetail(id) = self.view
             && !self.tasks.iter().any(|task| task.id == Some(id))
         {
-            self.view = View::List;
+            self.exit_detail_view();
         }
 
         Ok(())
@@ -108,7 +112,7 @@ impl App {
         if key.code == KeyCode::Esc {
             match self.view {
                 View::TaskDetail(_) => {
-                    self.view = View::List;
+                    self.exit_detail_view();
                     return;
                 }
                 View::List if self.list.has_active_filter() => {
@@ -122,15 +126,15 @@ impl App {
         // View switching (number keys)
         match key.code {
             KeyCode::Char('1') => {
-                self.view = View::Kanban;
+                self.set_main_view(View::Kanban);
                 return;
             }
             KeyCode::Char('2') => {
-                self.view = View::List;
+                self.set_main_view(View::List);
                 return;
             }
             KeyCode::Char('3') => {
-                self.view = View::Docs;
+                self.set_main_view(View::Docs);
                 return;
             }
             KeyCode::Tab if !matches!(self.view, View::TaskDetail(_)) => {
@@ -150,12 +154,78 @@ impl App {
     }
 
     fn cycle_view(&mut self) {
-        self.view = match self.view {
+        let next_view = match self.view {
             View::Kanban => View::List,
             View::List => View::Docs,
             View::Docs => View::Kanban,
             View::TaskDetail(_) => View::List,
         };
+        self.set_main_view(next_view);
+    }
+
+    fn set_main_view(&mut self, view: View) {
+        debug_assert!(!matches!(view, View::TaskDetail(_)));
+        self.detail_return_view = view;
+        self.view = view;
+    }
+
+    fn exit_detail_view(&mut self) {
+        self.view = self.detail_return_view;
+    }
+
+    fn open_task_detail(&mut self, id: u32) {
+        self.detail_return_view = match self.view {
+            View::TaskDetail(_) => self.detail_return_view,
+            view => view,
+        };
+        self.view = View::TaskDetail(id);
+    }
+
+    fn refresh_or_message(&mut self) {
+        if let Err(err) = self.refresh() {
+            self.message = Some(format!("Refresh failed: {err}"));
+        }
+    }
+
+    fn show_missing_id_message(&mut self) {
+        self.message = Some("Unindexed task has no ID; run untask repair --check.".into());
+    }
+
+    fn open_task_or_message(&mut self, id: Option<u32>) {
+        if let Some(id) = id {
+            self.open_task_detail(id);
+        } else {
+            self.show_missing_id_message();
+        }
+    }
+
+    fn mark_task_done(&mut self, id: Option<u32>) {
+        let Some(id) = id else {
+            self.show_missing_id_message();
+            return;
+        };
+
+        match self.store.mark_done(id) {
+            Ok(_) => {
+                self.message = Some(format!("Task #{id} marked done"));
+                self.refresh_or_message();
+            }
+            Err(err) => {
+                self.message = Some(format!("Failed to mark task #{id} done: {err}"));
+            }
+        }
+    }
+
+    fn open_path_in_editor(&mut self, path: &Path) {
+        match self.open_in_editor(path) {
+            Ok(()) => self.refresh_or_message(),
+            Err(err) => {
+                self.message = Some(format!(
+                    "Failed to open editor for {}: {err}",
+                    path.display()
+                ));
+            }
+        }
     }
 
     // ── Kanban input ──────────────────────────────────────────────
@@ -172,11 +242,9 @@ impl App {
             KeyCode::Up | KeyCode::Char('k') => self.kanban.move_up(),
             KeyCode::Down | KeyCode::Char('j') => self.kanban.move_down(current_rows),
             KeyCode::Enter => {
-                if let Some(id) =
-                    kanban::selected_task_id(&self.tasks, config, &self.kanban)
-                {
-                    self.view = View::TaskDetail(id);
-                }
+                let id = kanban::selected_task(&self.tasks, config, &self.kanban)
+                    .and_then(|task| task.id);
+                self.open_task_or_message(id);
             }
             KeyCode::Char('d') => {
                 self.mark_selected_done_kanban();
@@ -187,18 +255,15 @@ impl App {
 
     fn mark_selected_done_kanban(&mut self) {
         let config = self.store.config();
-        if let Some(id) = kanban::selected_task_id(&self.tasks, config, &self.kanban) {
-            if let Ok(_) = self.store.mark_done(id) {
-                self.message = Some(format!("Task #{id} marked done"));
-                let _ = self.refresh();
-            }
-        }
+        let id = kanban::selected_task(&self.tasks, config, &self.kanban).and_then(|task| task.id);
+        self.mark_task_done(id);
     }
 
     // ── List input ────────────────────────────────────────────────
 
     fn handle_list_key(&mut self, key: KeyEvent) {
-        let visible_count = list::filtered_tasks(&self.tasks, &self.list, self.store.config()).len();
+        let visible_count =
+            list::filtered_tasks(&self.tasks, &self.list, self.store.config()).len();
 
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
@@ -258,23 +323,14 @@ impl App {
 
     fn open_selected_list_task(&mut self) {
         let visible = list::filtered_tasks(&self.tasks, &self.list, self.store.config());
-        if let Some(task) = visible.get(self.list.selected) {
-            if let Some(id) = task.id {
-                self.view = View::TaskDetail(id);
-            }
-        }
+        let id = visible.get(self.list.selected).and_then(|task| task.id);
+        self.open_task_or_message(id);
     }
 
     fn mark_selected_done_list(&mut self) {
         let visible = list::filtered_tasks(&self.tasks, &self.list, self.store.config());
-        if let Some(task) = visible.get(self.list.selected) {
-            if let Some(id) = task.id {
-                if let Ok(_) = self.store.mark_done(id) {
-                    self.message = Some(format!("Task #{id} marked done"));
-                    let _ = self.refresh();
-                }
-            }
-        }
+        let id = visible.get(self.list.selected).and_then(|task| task.id);
+        self.mark_task_done(id);
     }
 
     // ── Docs input ────────────────────────────────────────────────
@@ -293,7 +349,7 @@ impl App {
     fn open_selected_doc(&mut self) {
         if let Some(doc) = self.docs_state.selected_doc() {
             let path = doc.path.clone();
-            self.open_in_editor(&path);
+            self.open_path_in_editor(&path);
         }
     }
 
@@ -302,12 +358,11 @@ impl App {
     fn handle_detail_key(&mut self, key: KeyEvent, id: u32) {
         match key.code {
             KeyCode::Char('e') => {
-                if let Some(task) = self.tasks.iter().find(|t| t.id == Some(id)) {
-                    if let Some(ref path) = task.file_path {
-                        let path = path.clone();
-                        self.open_in_editor(&path);
-                        let _ = self.refresh();
-                    }
+                if let Some(task) = self.tasks.iter().find(|t| t.id == Some(id))
+                    && let Some(ref path) = task.file_path
+                {
+                    let path = path.clone();
+                    self.open_path_in_editor(&path);
                 }
             }
             KeyCode::Char('s') => {
@@ -340,25 +395,42 @@ impl App {
             let next_idx = (current_idx + 1) % columns.len();
             let next_status = &columns[next_idx];
 
-            if let Ok(_) = self.store.set_status(id, next_status) {
-                self.message = Some(format!("Task #{id} -> {next_status}"));
-                let _ = self.refresh();
+            match self.store.set_status(id, next_status) {
+                Ok(_) => {
+                    self.message = Some(format!("Task #{id} -> {next_status}"));
+                    self.refresh_or_message();
+                }
+                Err(err) => {
+                    self.message = Some(format!("Failed to update task #{id}: {err}"));
+                }
             }
         }
     }
 
     // ── Editor ────────────────────────────────────────────────────
 
-    fn open_in_editor(&mut self, path: &Path) {
+    fn open_in_editor(&mut self, path: &Path) -> std::io::Result<()> {
         let (editor, args) = resolve_editor();
 
         // Temporarily restore terminal before spawning editor
         ratatui::restore();
 
-        let _ = Command::new(&editor).args(&args).arg(path).status();
+        let status = Command::new(&editor).args(&args).arg(path).status();
 
         // Re-initialize terminal after editor exits
         ratatui::init();
+
+        match status {
+            Ok(status) if status.success() => Ok(()),
+            Ok(status) => {
+                let description = match status.code() {
+                    Some(code) => format!("editor exited with status {code}"),
+                    None => "editor terminated by signal".to_string(),
+                };
+                Err(std::io::Error::other(description))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     // ── Drawing ───────────────────────────────────────────────────
@@ -411,7 +483,12 @@ impl App {
             View::Kanban => 0,
             View::List => 1,
             View::Docs => 2,
-            View::TaskDetail(_) => 1,
+            View::TaskDetail(_) => match self.detail_return_view {
+                View::Kanban => 0,
+                View::List => 1,
+                View::Docs => 2,
+                View::TaskDetail(_) => 1,
+            },
         };
 
         let tabs = Tabs::new(titles)
@@ -423,11 +500,12 @@ impl App {
 
     fn draw_footer(&mut self, frame: &mut Frame, area: Rect) {
         let chunks = if self.message.is_some() {
-            let parts = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(area);
+            let parts =
+                Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(area);
             // Message line
             if let Some(ref msg) = self.message {
-                let msg_widget =
-                    Paragraph::new(msg.as_str()).style(Style::default().add_modifier(Modifier::DIM));
+                let msg_widget = Paragraph::new(msg.as_str())
+                    .style(Style::default().add_modifier(Modifier::DIM));
                 frame.render_widget(msg_widget, parts[0]);
             }
             parts[1]
@@ -437,7 +515,9 @@ impl App {
 
         let help = match self.view {
             View::TaskDetail(_) => "e:edit  s:cycle status  esc:back  q:quit",
-            View::Docs => "\u{2191}\u{2193}/jk:navigate  enter:open in editor  tab:next view  q:quit",
+            View::Docs => {
+                "\u{2191}\u{2193}/jk:navigate  enter:open in editor  tab:next view  q:quit"
+            }
             View::List if self.list.editing_filter => {
                 "type to filter  tab:switch field  enter:apply  esc:cancel"
             }
@@ -458,13 +538,12 @@ fn resolve_editor() -> (String, Vec<String>) {
     for key in ["EDITOR", "VISUAL"] {
         if let Ok(val) = std::env::var(key) {
             let val = val.trim().to_string();
-            if !val.is_empty() {
-                if let Some(mut parts) = shlex::split(&val) {
-                    if !parts.is_empty() {
-                        let program = parts.remove(0);
-                        return (program, parts);
-                    }
-                }
+            if !val.is_empty()
+                && let Some(mut parts) = shlex::split(&val)
+                && !parts.is_empty()
+            {
+                let program = parts.remove(0);
+                return (program, parts);
             }
         }
     }
@@ -547,6 +626,19 @@ mod tests {
     }
 
     #[test]
+    fn escape_returns_to_the_previous_main_view() {
+        let (_tmp, mut app) = make_app();
+        app.handle_key(key(KeyCode::Char('1')));
+        assert_eq!(app.view, View::Kanban);
+
+        app.handle_key(key(KeyCode::Enter));
+        assert_eq!(app.view, View::TaskDetail(1));
+
+        app.handle_key(key(KeyCode::Esc));
+        assert_eq!(app.view, View::Kanban);
+    }
+
+    #[test]
     fn refresh_clamps_selection_after_task_removal() {
         let (_tmp, mut app) = make_app();
         app.list.selected = 1;
@@ -583,7 +675,7 @@ mod tests {
 
         // Navigate right between columns
         app.handle_key(key(KeyCode::Right));
-        assert!(app.kanban.col > 0 || app.kanban.col == 0); // at least doesn't crash
+        assert!(app.kanban.col < app.store.config().columns.len());
 
         // Navigate down within column
         app.handle_key(key(KeyCode::Down));
@@ -673,5 +765,32 @@ mod tests {
         // Escape clears it
         app.handle_key(key(KeyCode::Esc));
         assert!(!app.list.has_active_filter());
+    }
+
+    #[test]
+    fn enter_on_unindexed_task_without_id_shows_guidance() {
+        let tmp = TempDir::new().unwrap();
+        init::init(tmp.path()).unwrap();
+
+        fs::write(
+            tmp.path().join(".untask/tasks/loose-note.md"),
+            "---\ntitle: Loose note\nstatus: todo\n---\nbody\n",
+        )
+        .unwrap();
+
+        let mut app = App::new(
+            TaskStore::new(tmp.path().to_path_buf()).unwrap(),
+            tmp.path().to_path_buf(),
+        )
+        .unwrap();
+
+        app.list.selected = app.tasks.iter().position(|task| task.id.is_none()).unwrap();
+        app.handle_key(key(KeyCode::Enter));
+
+        assert_eq!(app.view, View::List);
+        assert_eq!(
+            app.message.as_deref(),
+            Some("Unindexed task has no ID; run untask repair --check.")
+        );
     }
 }

@@ -73,8 +73,7 @@ pub fn draw(tasks: &[Task], id: u32, frame: &mut Frame, area: Rect) {
         meta.push_str(&format!("\n Completed: {completed}"));
     }
 
-    let meta_widget =
-        Paragraph::new(meta).block(Block::bordered().title(format!("Task #{id}")));
+    let meta_widget = Paragraph::new(meta).block(Block::bordered().title(format!("Task #{id}")));
     frame.render_widget(meta_widget, chunks[0]);
 
     // Progress bar (if subtasks exist)

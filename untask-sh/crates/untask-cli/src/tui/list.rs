@@ -86,9 +86,7 @@ impl ListViewState {
     }
 
     pub fn has_active_filter(&self) -> bool {
-        self.filter_status.is_some()
-            || self.filter_tag.is_some()
-            || self.filter_priority.is_some()
+        self.filter_status.is_some() || self.filter_tag.is_some() || self.filter_priority.is_some()
     }
 
     pub fn clear_filters(&mut self) {
@@ -155,14 +153,16 @@ fn format_priority_label(priority: Option<Priority>) -> &'static str {
     }
 }
 
-pub fn filtered_tasks<'a>(tasks: &'a [Task], state: &ListViewState, config: &Config) -> Vec<&'a Task> {
+pub fn filtered_tasks<'a>(
+    tasks: &'a [Task],
+    state: &ListViewState,
+    config: &Config,
+) -> Vec<&'a Task> {
     let mut result: Vec<&Task> = tasks.iter().collect();
 
     if let Some(ref status) = state.filter_status {
         let canonical = config.normalize_status(status).unwrap_or_default();
-        result.retain(|t| {
-            config.normalize_status(&t.status).unwrap_or_default() == canonical
-        });
+        result.retain(|t| config.normalize_status(&t.status).unwrap_or_default() == canonical);
     }
     if let Some(ref tag) = state.filter_tag {
         let tag_lower = tag.to_lowercase();
@@ -185,13 +185,7 @@ pub fn filtered_tasks<'a>(tasks: &'a [Task], state: &ListViewState, config: &Con
     result
 }
 
-pub fn draw(
-    tasks: &[Task],
-    state: &ListViewState,
-    config: &Config,
-    frame: &mut Frame,
-    area: Rect,
-) {
+pub fn draw(tasks: &[Task], state: &ListViewState, config: &Config, frame: &mut Frame, area: Rect) {
     let visible = filtered_tasks(tasks, state, config);
 
     // Layout: optional filter bar + table
