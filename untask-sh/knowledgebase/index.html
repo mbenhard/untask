@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Untask — Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<button class="mobile-toggle" id="mobile-toggle">menu</button>
+
+<div class="layout">
+  <!-- ── Sidebar ──────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <a href="#" class="sidebar-logo">untask</a>
+      <div class="sidebar-version">v0.1.0 &middot; docs</div>
+    </div>
+
+    <div class="search-wrap">
+      <input type="text" class="search-input" id="search" placeholder="Filter… ( / )">
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-group">
+        <div class="nav-group-label">Getting started</div>
+        <a href="#introduction" class="nav-link">Introduction</a>
+        <a href="#installation" class="nav-link">Installation</a>
+        <a href="#quick-start" class="nav-link">Quick start</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">CLI</div>
+        <a href="#commands" class="nav-link">Commands</a>
+        <a href="#global-flags" class="nav-link">Global flags</a>
+        <a href="#task-references" class="nav-link">Task references</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">TUI</div>
+        <a href="#tui-overview" class="nav-link">Overview</a>
+        <a href="#tui-list" class="nav-link">List view</a>
+        <a href="#tui-kanban" class="nav-link">Kanban view</a>
+        <a href="#tui-docs" class="nav-link">Docs view</a>
+        <a href="#tui-detail" class="nav-link">Detail view</a>
+        <a href="#tui-file-watching" class="nav-link">File watching</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Configuration</div>
+        <a href="#project-structure" class="nav-link">Project structure</a>
+        <a href="#config-file" class="nav-link">config.yml</a>
+        <a href="#columns" class="nav-link">Columns &amp; statuses</a>
+        <a href="#docs-config" class="nav-link">Docs patterns</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Advanced</div>
+        <a href="#task-format" class="nav-link">Task file format</a>
+        <a href="#json-output" class="nav-link">JSON output</a>
+        <a href="#skill" class="nav-link">Claude skill</a>
+        <a href="#repair" class="nav-link">Repair</a>
+        <a href="#desktop" class="nav-link">Desktop app</a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="theme-toggle">dark mode</button>
+    </div>
+  </aside>
+
+  <!-- ── Main ─────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Introduction -->
+    <section id="introduction">
+      <h1>Untask</h1>
+      <p class="section-lead">Local-first, keyboard-first task management for the terminal. No cloud. No tracking. Your data stays on your machine.</p>
+
+      <p>Untask is a CLI and TUI application that manages tasks as plain markdown files inside your project. It gives you a kanban board, list view, and docs browser — all from the terminal.</p>
+
+      <ul>
+        <li>Tasks are markdown files with YAML frontmatter</li>
+        <li>Everything lives in a <code>.untask/</code> directory</li>
+        <li>Works with git — commit your tasks alongside your code</li>
+        <li>JSON output mode for scripting and AI agent integration</li>
+        <li>Configurable columns, statuses, and doc patterns</li>
+      </ul>
+    </section>
+
+    <!-- Installation -->
+    <section id="installation">
+      <h2>Installation</h2>
+
+      <h3>Build from source</h3>
+      <p>Requires <a href="https://rustup.rs">Rust</a> 1.85+ (edition 2024).</p>
+      <pre><code>git clone https://github.com/mbenhard/untask-sh.git
+cd untask-sh
+cargo build --release</code></pre>
+      <p>The binary will be at <code>target/release/untask</code>. Move it to a directory in your <code>$PATH</code>:</p>
+      <pre><code>cp target/release/untask /usr/local/bin/</code></pre>
+
+      <h3>Verify installation</h3>
+      <pre><code>untask --version</code></pre>
+    </section>
+
+    <!-- Quick start -->
+    <section id="quick-start">
+      <h2>Quick start</h2>
+
+      <p>Initialize a project, add some tasks, and launch the TUI.</p>
+
+      <pre><code><span class="fm-comment"># Initialize untask in your project</span>
+cd my-project
+untask init
+
+<span class="fm-comment"># Add tasks</span>
+untask add "Set up CI pipeline"
+untask add "Write API docs" --status todo
+untask add "Fix login bug" --status in-progress
+
+<span class="fm-comment"># List tasks</span>
+untask list
+
+<span class="fm-comment"># Mark a task done</span>
+untask done 1
+
+<span class="fm-comment"># See what's next</span>
+untask next
+
+<span class="fm-comment"># Launch the TUI</span>
+untask</code></pre>
+
+      <div class="callout">
+        <span class="callout-label">Tip</span>
+        Running <code>untask</code> with no subcommand launches the interactive TUI.
+      </div>
+    </section>
+
+    <!-- Commands -->
+    <section id="commands">
+      <h2>Commands</h2>
+
+      <div class="cmd-grid">
+        <div class="cmd-row">
+          <div class="cmd-name">init</div>
+          <div class="cmd-desc">Initialize a new untask project in the current directory</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">add &lt;title&gt;</div>
+          <div class="cmd-desc">Add a new task. Use <code>-s, --status</code> to set initial status</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">list</div>
+          <div class="cmd-desc">List tasks. Filter with <code>-s</code> status, <code>-t</code> tag, <code>-p</code> priority. Sort with <code>--sort</code></div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">show &lt;ref&gt;</div>
+          <div class="cmd-desc">Show full task details by ID or slug</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">edit &lt;ref&gt;</div>
+          <div class="cmd-desc">Open task in <code>$EDITOR</code> (falls back to vi)</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">status &lt;ref&gt; &lt;status&gt;</div>
+          <div class="cmd-desc">Change a task's status to any configured column</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">done &lt;ref&gt;</div>
+          <div class="cmd-desc">Mark a task as done (sets completed timestamp)</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">delete &lt;ref&gt;</div>
+          <div class="cmd-desc">Delete a task. Use <code>-f, --force</code> to skip confirmation</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">next</div>
+          <div class="cmd-desc">Show a summary of next actions across columns</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">search &lt;query&gt;</div>
+          <div class="cmd-desc">Search tasks and docs. Use <code>--tasks-only</code> to skip docs</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">docs list</div>
+          <div class="cmd-desc">List all project docs matched by configured glob patterns</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">docs show &lt;name&gt;</div>
+          <div class="cmd-desc">Display a doc by name or path</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">repair</div>
+          <div class="cmd-desc">Check and repair project integrity. Use <code>--check</code> or <code>--write</code></div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">skill install</div>
+          <div class="cmd-desc">Install the untask skill for an AI agent (Claude)</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">open</div>
+          <div class="cmd-desc">Open the desktop app for this project</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Global flags -->
+    <section id="global-flags">
+      <h2>Global flags</h2>
+      <p>These flags work with any command.</p>
+
+      <div class="cmd-grid">
+        <div class="cmd-row">
+          <div class="cmd-name">--json</div>
+          <div class="cmd-desc">Output as JSON. Useful for scripting and agent consumption</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">--no-color</div>
+          <div class="cmd-desc">Disable colored output. Also respects <code>NO_COLOR</code> env var</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Task references -->
+    <section id="task-references">
+      <h2>Task references</h2>
+      <p>Commands that accept a <code>&lt;ref&gt;</code> argument resolve tasks in this order:</p>
+      <ol>
+        <li><strong>Numeric ID</strong> — e.g. <code>untask show 3</code></li>
+        <li><strong>Slug match</strong> — e.g. <code>untask show fix-login</code> matches a task titled "Fix login bug"</li>
+      </ol>
+      <p>If a slug matches multiple tasks, you'll get an error listing the ambiguous matches.</p>
+    </section>
+
+    <!-- TUI Overview -->
+    <section id="tui-overview">
+      <h2>TUI overview</h2>
+      <p>Launch the TUI by running <code>untask</code> with no subcommand inside an initialized project. The TUI has three main views accessible via tabs.</p>
+
+      <div class="key-grid">
+        <div class="key-grid-header">
+          <span>Key</span>
+          <span>Action</span>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">1</div>
+          <div class="key-action">Switch to Kanban view</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">2</div>
+          <div class="key-action">Switch to List view</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">3</div>
+          <div class="key-action">Switch to Docs view</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Tab</div>
+          <div class="key-action">Cycle to next view</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">q / Ctrl+C</div>
+          <div class="key-action">Quit</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Esc</div>
+          <div class="key-action">Go back / clear filter</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TUI List -->
+    <section id="tui-list">
+      <h2>List view</h2>
+      <p>The default view. Shows all tasks in a sortable, filterable table.</p>
+
+      <div class="key-grid">
+        <div class="key-grid-header">
+          <span>Key</span>
+          <span>Action</span>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&darr; / j</div>
+          <div class="key-action">Move down</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&uarr; / k</div>
+          <div class="key-action">Move up</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">g / Home</div>
+          <div class="key-action">Jump to first task</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">G / End</div>
+          <div class="key-action">Jump to last task</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Enter</div>
+          <div class="key-action">Open task detail</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">d</div>
+          <div class="key-action">Mark selected task as done</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">s</div>
+          <div class="key-action">Cycle sort field (id &rarr; priority &rarr; updated &rarr; title)</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">f / /</div>
+          <div class="key-action">Enter filter mode</div>
+        </div>
+      </div>
+
+      <h3>Filter mode</h3>
+      <p>When filtering, type your query and use these keys:</p>
+      <div class="key-grid">
+        <div class="key-grid-header">
+          <span>Key</span>
+          <span>Action</span>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Tab</div>
+          <div class="key-action">Switch filter field (status, tag, etc.)</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Enter</div>
+          <div class="key-action">Apply filter</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Esc</div>
+          <div class="key-action">Cancel filter</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TUI Kanban -->
+    <section id="tui-kanban">
+      <h2>Kanban view</h2>
+      <p>Displays tasks in columns matching your configured statuses. Navigate between columns and rows.</p>
+
+      <div class="key-grid">
+        <div class="key-grid-header">
+          <span>Key</span>
+          <span>Action</span>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&larr; / h</div>
+          <div class="key-action">Move to left column</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&rarr; / l</div>
+          <div class="key-action">Move to right column</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&uarr; / k</div>
+          <div class="key-action">Move up in column</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&darr; / j</div>
+          <div class="key-action">Move down in column</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Enter</div>
+          <div class="key-action">Open task detail</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">d</div>
+          <div class="key-action">Mark selected task as done</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TUI Docs -->
+    <section id="tui-docs">
+      <h2>Docs view</h2>
+      <p>Browse project docs matched by your configured glob patterns. Opening a doc launches <code>$EDITOR</code>.</p>
+
+      <div class="key-grid">
+        <div class="key-grid-header">
+          <span>Key</span>
+          <span>Action</span>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&darr; / j</div>
+          <div class="key-action">Move down</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">&uarr; / k</div>
+          <div class="key-action">Move up</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Enter</div>
+          <div class="key-action">Open in editor</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TUI Detail -->
+    <section id="tui-detail">
+      <h2>Detail view</h2>
+      <p>Shows full task metadata, body, and subtask progress. Opened by pressing Enter on a task.</p>
+
+      <div class="key-grid">
+        <div class="key-grid-header">
+          <span>Key</span>
+          <span>Action</span>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">e</div>
+          <div class="key-action">Edit task in <code>$EDITOR</code></div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">s</div>
+          <div class="key-action">Cycle status to next column</div>
+        </div>
+        <div class="key-row">
+          <div class="key-combo">Esc</div>
+          <div class="key-action">Go back to previous view</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- File watching -->
+    <section id="tui-file-watching">
+      <h2>File watching</h2>
+      <p>The TUI watches the <code>.untask/</code> directory and configured docs paths for changes. When a file is modified externally (e.g. by another editor or git), the TUI automatically refreshes.</p>
+      <ul>
+        <li>Changes are debounced to prevent UI flicker during rapid writes</li>
+        <li>Lock file changes (<code>.lock</code>) are filtered out</li>
+        <li>Missing directories are handled gracefully</li>
+      </ul>
+    </section>
+
+    <!-- Project structure -->
+    <section id="project-structure">
+      <h2>Project structure</h2>
+      <p>Running <code>untask init</code> creates the following structure inside your project:</p>
+
+      <div class="file-tree">
+<span class="dir">.untask/</span>
+  <span class="dir">tasks/</span>         <span class="comment"># task markdown files</span>
+    001-set-up-ci.md
+    002-write-api-docs.md
+  <span class="dir">docs/</span>          <span class="comment"># default docs location</span>
+  <span class="dir">attachments/</span>   <span class="comment"># file attachments</span>
+  <span class="dir">cache/</span>         <span class="comment"># temporary data (gitignored)</span>
+  config.yml      <span class="comment"># project configuration</span>
+  .gitignore      <span class="comment"># ignores .lock and cache/</span>
+      </div>
+
+      <p>Task files are named with a zero-padded ID prefix and a slug: <code>001-fix-login-bug.md</code>. IDs are never reused — deleted task IDs create gaps.</p>
+    </section>
+
+    <!-- Config file -->
+    <section id="config-file">
+      <h2>config.yml</h2>
+      <p>Located at <code>.untask/config.yml</code>. Falls back to sensible defaults if missing or invalid.</p>
+
+      <pre><code><span class="fm-comment"># .untask/config.yml</span>
+<span class="fm-key">columns:</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">backlog</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">todo</span>
+    <span class="fm-key">aliases:</span> <span class="fm-val">[to-do, to do, pending]</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">in-progress</span>
+    <span class="fm-key">aliases:</span> <span class="fm-val">[wip, in progress, doing, working]</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">review</span>
+    <span class="fm-key">aliases:</span> <span class="fm-val">[reviewing, in review]</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">done</span>
+    <span class="fm-key">aliases:</span> <span class="fm-val">[complete, finished, closed]</span>
+
+<span class="fm-key">docs:</span>
+  - <span class="fm-val">.untask/docs/**/*.md</span>
+
+<span class="fm-key">theme:</span> <span class="fm-val">mono</span></code></pre>
+    </section>
+
+    <!-- Columns -->
+    <section id="columns">
+      <h2>Columns &amp; statuses</h2>
+      <p>Columns define the task lifecycle stages in both the CLI and the kanban board. Each column has a canonical <code>id</code> and optional <code>aliases</code>.</p>
+
+      <p>When you set a status (via <code>untask status</code>, <code>untask add --status</code>, or the TUI), untask normalizes it against configured columns and aliases. For example, <code>wip</code>, <code>in progress</code>, and <code>doing</code> all resolve to <code>in-progress</code>.</p>
+
+      <p>The first column is the default status for new tasks. You can fully customize columns:</p>
+
+      <pre><code><span class="fm-key">columns:</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">icebox</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">next</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">doing</span>
+  - <span class="fm-key">id:</span> <span class="fm-val">shipped</span></code></pre>
+    </section>
+
+    <!-- Docs config -->
+    <section id="docs-config">
+      <h2>Docs patterns</h2>
+      <p>The <code>docs</code> array in <code>config.yml</code> takes glob patterns relative to the project root. Matched files appear in the TUI docs view and CLI <code>docs</code> command.</p>
+
+      <pre><code><span class="fm-key">docs:</span>
+  - <span class="fm-val">.untask/docs/**/*.md</span>
+  - <span class="fm-val">notes/**/*.md</span>
+  - <span class="fm-val">specs/*.md</span></code></pre>
+
+      <div class="callout">
+        <span class="callout-label">Security</span>
+        Absolute paths and parent traversal (<code>../</code>) are rejected. All doc globs must be relative to the project root.
+      </div>
+    </section>
+
+    <!-- Task file format -->
+    <section id="task-format">
+      <h2>Task file format</h2>
+      <p>Each task is a markdown file with YAML frontmatter. The body supports standard markdown including checklists for subtasks.</p>
+
+      <pre><code>---
+<span class="fm-key">id:</span> <span class="fm-val">3</span>
+<span class="fm-key">title:</span> <span class="fm-val">Fix login bug</span>
+<span class="fm-key">status:</span> <span class="fm-val">in-progress</span>
+<span class="fm-key">priority:</span> <span class="fm-val">high</span>
+<span class="fm-key">tags:</span>
+  - <span class="fm-val">auth</span>
+  - <span class="fm-val">bug</span>
+<span class="fm-key">created:</span> <span class="fm-val">2026-03-01</span>
+<span class="fm-key">updated:</span> <span class="fm-val">2026-03-07T10:30:00Z</span>
+---
+The login form returns a 500 error when the email
+contains a plus sign.
+
+- [x] Reproduce the issue
+- [ ] Fix the email parser
+- [ ] Add regression test</code></pre>
+
+      <h3>Frontmatter fields</h3>
+      <div class="cmd-grid">
+        <div class="cmd-row">
+          <div class="cmd-name">id</div>
+          <div class="cmd-desc">Numeric identifier. Auto-assigned on creation, never reused</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">title</div>
+          <div class="cmd-desc">Task title (required)</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">status</div>
+          <div class="cmd-desc">Current column. Normalized against config aliases</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">priority</div>
+          <div class="cmd-desc"><span class="dot dot-low"></span>low, <span class="dot dot-medium"></span>medium, <span class="dot dot-high"></span>high, or urgent</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">tags</div>
+          <div class="cmd-desc">List of string tags for filtering</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">created</div>
+          <div class="cmd-desc">Date created (YYYY-MM-DD)</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">updated</div>
+          <div class="cmd-desc">Last modification timestamp (ISO 8601)</div>
+        </div>
+        <div class="cmd-row">
+          <div class="cmd-name">completed</div>
+          <div class="cmd-desc">Timestamp when marked done. Cleared if re-opened</div>
+        </div>
+      </div>
+
+      <h3>Subtask progress</h3>
+      <p>Top-level checklist items in the body (<code>- [x]</code> and <code>- [ ]</code>) are tracked as subtask progress. Indented checklists are ignored.</p>
+    </section>
+
+    <!-- JSON output -->
+    <section id="json-output">
+      <h2>JSON output</h2>
+      <p>Pass <code>--json</code> to any command for machine-readable output. Useful for piping into <code>jq</code>, scripting, or feeding to AI agents.</p>
+
+      <pre><code>untask list --json | jq '.[].title'
+
+untask show 3 --json</code></pre>
+
+      <div class="callout">
+        <span class="callout-label">Agents</span>
+        The JSON output mode is designed for AI agent consumption. Combine it with <code>untask skill install</code> to give Claude context about your project's tasks.
+      </div>
+    </section>
+
+    <!-- Skill -->
+    <section id="skill">
+      <h2>Claude skill</h2>
+      <p>Untask can install a skill that gives Claude (and other AI agents) awareness of your project's tasks.</p>
+
+      <pre><code>untask skill install</code></pre>
+
+      <p>This registers the untask skill so that AI agents can read, search, and reason about your tasks using the CLI's JSON output.</p>
+    </section>
+
+    <!-- Repair -->
+    <section id="repair">
+      <h2>Repair</h2>
+      <p>The <code>repair</code> command checks project integrity and can fix common issues like unindexed task files.</p>
+
+      <pre><code><span class="fm-comment"># Check only — reports issues without modifying files</span>
+untask repair --check
+
+<span class="fm-comment"># Apply fixes</span>
+untask repair --write</code></pre>
+
+      <p>The <code>--check</code> and <code>--write</code> flags are mutually exclusive. Running <code>repair</code> with no flags shows a usage hint.</p>
+    </section>
+
+    <!-- Desktop -->
+    <section id="desktop">
+      <h2>Desktop app</h2>
+      <p>Untask has a companion desktop application (Tauri + Svelte) that provides a graphical interface for the same task data.</p>
+
+      <pre><code><span class="fm-comment"># Open the desktop app for the current project</span>
+untask open</code></pre>
+
+      <p>The desktop app reads from the same <code>.untask/</code> directory, so changes sync automatically between CLI and GUI.</p>
+    </section>
+
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

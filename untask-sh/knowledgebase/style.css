@@ -1,0 +1,579 @@
+/* ── Reset & Base ────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Dark mode (default) */
+  --bg: #161616;
+  --fg: #F5F5F5;
+  --card: #1A1A1A;
+  --accent: #1E1E1E;
+  --border: #2A2A2A;
+  --border-strong: #383838;
+  --muted: #999999;
+  --muted-dim: #666666;
+  --primary: #E5E5E5;
+  --primary-fg: #161616;
+  --ring: #8A8A8A;
+  --code-bg: #1E1E1E;
+  --selection: rgba(138, 138, 138, 0.2);
+  --sidebar-w: 240px;
+  --priority-low: #10B981;
+  --priority-medium: #F59E0B;
+  --priority-high: #F43F5E;
+}
+
+[data-theme="light"] {
+  --bg: #F7F7F7;
+  --fg: #171717;
+  --card: #FFFFFF;
+  --accent: #F1F1F1;
+  --border: #E3E3E3;
+  --border-strong: #D0D0D0;
+  --muted: #636363;
+  --muted-dim: #999999;
+  --primary: #262626;
+  --primary-fg: #F7F7F7;
+  --ring: #737373;
+  --code-bg: #EFEFEF;
+  --selection: rgba(115, 115, 115, 0.15);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 24px;
+}
+
+body {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Layout ──────────────────────────────────────── */
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────────── */
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  padding: 20px 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 0 16px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.sidebar-logo {
+  font-family: 'Geist Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+  text-decoration: none;
+  display: block;
+}
+
+.sidebar-version {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+
+.nav-group {
+  margin-bottom: 16px;
+}
+
+.nav-group-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-dim);
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+
+.nav-link {
+  display: block;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: color 120ms, background 120ms;
+}
+
+.nav-link:hover {
+  color: var(--fg);
+  background: var(--accent);
+}
+
+.nav-link.active {
+  color: var(--fg);
+  background: var(--accent);
+}
+
+.sidebar-footer {
+  padding: 12px 16px 0;
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+.theme-toggle {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  width: 100%;
+  transition: color 120ms, border-color 120ms;
+}
+
+.theme-toggle:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+
+/* ── Main Content ────────────────────────────────── */
+
+.main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  max-width: 720px;
+  padding: 32px 40px 80px;
+}
+
+/* ── Mobile nav toggle ───────────────────────────── */
+
+.mobile-toggle {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+/* ── Typography ──────────────────────────────────── */
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+h1 + .section-lead {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 40px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.005em;
+}
+
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+p {
+  margin-bottom: 12px;
+}
+
+a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--muted-dim);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 120ms;
+}
+
+a:hover {
+  text-decoration-color: var(--fg);
+}
+
+strong {
+  font-weight: 600;
+}
+
+/* ── Section spacing ─────────────────────────────── */
+
+section {
+  margin-bottom: 48px;
+}
+
+section:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Inline code ─────────────────────────────────── */
+
+code {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  background: var(--code-bg);
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+/* ── Code blocks ─────────────────────────────────── */
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--fg);
+}
+
+.code-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-dim);
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ── Command reference cards ─────────────────────── */
+
+.cmd-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.cmd-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  background: var(--card);
+  min-height: 40px;
+  align-items: center;
+}
+
+.cmd-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.cmd-name {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 12px;
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.cmd-desc {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Key shortcut tables ─────────────────────────── */
+
+.key-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.key-grid-header {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  background: var(--accent);
+  min-height: 32px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.key-grid-header span {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-dim);
+  padding: 6px 12px;
+}
+
+.key-grid-header span:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.key-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  background: var(--card);
+  min-height: 36px;
+  align-items: center;
+}
+
+.key-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.key-combo {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  padding: 6px 12px;
+  color: var(--fg);
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.key-action {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Callout boxes ───────────────────────────────── */
+
+.callout {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--muted-dim);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--card);
+}
+
+.callout code {
+  font-size: 11px;
+}
+
+.callout-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-dim);
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* ── File tree ───────────────────────────────────── */
+
+.file-tree {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: var(--muted);
+}
+
+.file-tree .dir {
+  color: var(--fg);
+}
+
+.file-tree .comment {
+  color: var(--muted-dim);
+}
+
+/* ── Priority dots ───────────────────────────────── */
+
+.dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.dot-low { background: var(--priority-low); }
+.dot-medium { background: var(--priority-medium); }
+.dot-high { background: var(--priority-high); }
+
+/* ── Frontmatter example ─────────────────────────── */
+
+.fm-key { color: var(--muted); }
+.fm-val { color: var(--fg); }
+.fm-comment { color: var(--muted-dim); }
+
+/* ── Lists ───────────────────────────────────────── */
+
+ul, ol {
+  margin-bottom: 12px;
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+li code {
+  font-size: 11px;
+}
+
+/* ── Search ──────────────────────────────────────── */
+
+.search-wrap {
+  padding: 0 8px 12px;
+}
+
+.search-input {
+  width: 100%;
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 120ms;
+}
+
+.search-input::placeholder {
+  color: var(--muted-dim);
+}
+
+.search-input:focus {
+  border-color: var(--ring);
+}
+
+/* ── Responsive ──────────────────────────────────── */
+
+@media (max-width: 860px) {
+  :root {
+    --sidebar-w: 0px;
+  }
+
+  .sidebar {
+    transform: translateX(-260px);
+    width: 260px;
+    transition: transform 200ms;
+    box-shadow: none;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 8px 0 30px -12px rgba(0,0,0,0.5);
+  }
+
+  .mobile-toggle {
+    display: block;
+  }
+
+  .main {
+    margin-left: 0;
+    padding: 48px 20px 80px;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1080px) {
+  .main {
+    padding: 32px 28px 80px;
+  }
+}
