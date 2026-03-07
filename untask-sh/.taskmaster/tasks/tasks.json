@@ -775,7 +775,7 @@
         "dependencies": [
           "10"
         ],
-        "status": "review",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -783,10 +783,10 @@
             "description": "Implement terminal initialization and restoration functions with proper error handling and panic recovery to ensure the user's terminal is never left in a broken state.",
             "dependencies": [],
             "details": "Create terminal setup/teardown infrastructure in `crates/untask-cli/src/tui/mod.rs`:\n\n1. Implement `setup_terminal()` function:\n   - Enable raw mode with crossterm\n   - Enter alternate screen\n   - Enable mouse capture\n   - Return configured ratatui Terminal instance\n\n2. Implement `restore_terminal()` function:\n   - Disable raw mode\n   - Leave alternate screen\n   - Show cursor\n   - Ensure idempotent (safe to call multiple times)\n\n3. Wrap main event loop in panic handler:\n   - Use `std::panic::catch_unwind` to catch panics\n   - Always call `restore_terminal()` even on panic\n   - Re-throw panic after cleanup\n\n4. Add dependencies to `crates/untask-cli/Cargo.toml`:\n   - ratatui = \"0.29\"\n   - crossterm = \"0.28\"\n\nThis ensures clean terminal state restoration regardless of how the application exits.",
-            "status": "review",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Run TUI and quit normally with 'q' - verify terminal is clean, (2) Run TUI and kill with Ctrl+C - verify terminal is restored, (3) Introduce intentional panic in event loop - verify terminal is still restored and panic message is visible, (4) Verify cursor is visible after all exit scenarios.",
             "parentId": "undefined",
-            "updatedAt": "2026-03-06T22:45:50.866Z"
+            "updatedAt": "2026-03-07T00:29:00.161Z"
           },
           {
             "id": 2,
@@ -796,10 +796,10 @@
               1
             ],
             "details": "Create `crates/untask-cli/src/tui/app.rs` with core state management:\n\n1. Define View enum:\n   - Kanban (default view)\n   - List\n   - Docs\n   - TaskDetail(u32) - holds task ID\n\n2. Create App struct:\n   - current_view: View\n   - store: TaskStore (from untask-core)\n   - docs_store: DocsStore (from untask-core)\n   - tasks: Vec<Task> (cached task list)\n   - should_quit: bool\n\n3. Implement `App::new()` constructor:\n   - Initialize stores from project root\n   - Load initial task list\n   - Default to Kanban view\n   - Handle errors if .untask/ not found\n\n4. Implement `App::refresh()` method:\n   - Reload tasks from store\n   - Reload docs from docs_store\n   - Update cached state\n\nThis establishes the central state container for the TUI application.",
-            "status": "review",
+            "status": "done",
             "testStrategy": "Unit tests: (1) Test App::new() successfully initializes with valid project, (2) Test App::new() returns error when .untask/ missing, (3) Test App::refresh() updates task list after external changes, (4) Verify View enum can transition between all states.",
             "parentId": "undefined",
-            "updatedAt": "2026-03-06T22:45:52.915Z"
+            "updatedAt": "2026-03-07T00:29:02.318Z"
           },
           {
             "id": 3,
@@ -809,10 +809,10 @@
               2
             ],
             "details": "Create event loop infrastructure in `crates/untask-cli/src/tui/mod.rs`:\n\n1. Implement `run_app(terminal: &mut Terminal, app: App)` function:\n   - Loop until app.should_quit is true\n   - Poll for crossterm events with timeout\n   - Handle keyboard events via app.handle_key()\n   - Render current view on each iteration\n\n2. Implement `App::handle_key(key: KeyEvent)` in app.rs:\n   - Global shortcuts (work in all views):\n     - 'q' or Ctrl+C: set should_quit = true\n     - '1': switch to Kanban view\n     - '2': switch to List view\n     - '3': switch to Docs view\n     - Tab: cycle through views\n     - Escape: go back (TaskDetail → previous view)\n   - Delegate other keys to current view handler\n\n3. Return control to main when should_quit is true\n\nThis provides the core interaction model for the TUI.",
-            "status": "review",
+            "status": "done",
             "testStrategy": "Integration tests using crossterm test utilities: (1) Simulate 'q' keypress - verify should_quit becomes true, (2) Simulate '1', '2', '3' keypresses - verify view switches correctly, (3) Simulate Tab - verify view cycles through Kanban → List → Docs → Kanban, (4) Simulate Escape from TaskDetail - verify returns to previous view, (5) Verify event loop exits cleanly when should_quit is set.",
             "parentId": "undefined",
-            "updatedAt": "2026-03-06T22:45:54.969Z"
+            "updatedAt": "2026-03-07T00:29:04.475Z"
           },
           {
             "id": 4,
@@ -822,16 +822,16 @@
               3
             ],
             "details": "Complete navigation framework and main.rs integration:\n\n1. Add navigation support to App:\n   - Implement direction enum (Up, Down, Left, Right)\n   - Map arrow keys and hjkl to directions\n   - Add view-specific navigation state (selected index, column, etc.)\n\n2. Implement view-specific key handlers (stubs for now):\n   - `Kanban::handle_navigation(direction)` - move between columns/tasks\n   - `List::handle_navigation(direction)` - move through task list\n   - `Docs::handle_navigation(direction)` - navigate docs tree\n   - `TaskDetail::handle_navigation(direction)` - scroll detail pane\n   - Enter key: Kanban/List → open TaskDetail, Docs → open document\n\n3. Create stub view modules:\n   - `crates/untask-cli/src/tui/kanban.rs` (empty struct)\n   - `crates/untask-cli/src/tui/list.rs` (empty struct)\n   - `crates/untask-cli/src/tui/docs.rs` (empty struct)\n   - `crates/untask-cli/src/tui/detail.rs` (empty struct)\n\n4. Wire up main.rs:\n   - When Cli::command is None, call tui::run()\n   - Pass through subcommands as before\n\nThis completes the TUI scaffold foundation.",
-            "status": "review",
+            "status": "done",
             "testStrategy": "End-to-end manual testing: (1) Run `cargo run -p untask` with no args - TUI should launch in Kanban view, (2) Press h/j/k/l and arrow keys - verify navigation state updates (can add debug logging), (3) Press '1', '2', '3' - verify view switches, (4) Press 'q' - verify clean exit and terminal restoration, (5) Run with subcommand like `cargo run -p untask -- list` - verify CLI mode still works, (6) Verify no panics during any navigation sequence.",
             "parentId": "undefined",
-            "updatedAt": "2026-03-06T22:45:57.093Z"
+            "updatedAt": "2026-03-07T00:29:06.643Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
         "expansionPrompt": "Break down into: (1) Terminal setup and teardown with proper cleanup on panic, (2) App state structure with view enum and stores, (3) Event loop with keyboard input handling and view switching, (4) Navigation framework with hjkl/arrow keys and view transitions.",
-        "updatedAt": "2026-03-06T22:45:59.146Z"
+        "updatedAt": "2026-03-07T00:29:06.643Z"
       },
       {
         "id": "14",
@@ -843,7 +843,7 @@
         "dependencies": [
           "13"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -851,9 +851,10 @@
             "description": "Implement the kanban board view with multi-column layout, task cards showing title/priority/progress, selection highlighting, and special sections for Unmatched/Unindexed tasks.",
             "dependencies": [],
             "details": "Create `crates/untask-cli/src/tui/kanban.rs` with column rendering based on config, task card layout displaying title with priority badge and subtask progress bar, highlight logic for selected column and task using terminal styling, Unmatched column for tasks with unknown statuses, and Unindexed section for unmanaged tasks. Handle dynamic task distribution across columns and proper spacing/borders for TUI layout.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Create tasks with various statuses matching config columns, (2) Verify columns render with correct headers, (3) Verify task cards show title, priority badge, and subtask progress, (4) Test selection highlighting by navigating with arrow keys, (5) Create task with unknown status and verify Unmatched column appears, (6) Create unmanaged task file and verify Unindexed section displays it.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:36:37.771Z"
           },
           {
             "id": 2,
@@ -861,9 +862,10 @@
             "description": "Implement the tabular task list view with proper column alignment, row selection highlighting, and filter bar UI for status/tag/priority filtering and stable sorting.",
             "dependencies": [],
             "details": "Create `crates/untask-cli/src/tui/list.rs` with table rendering logic using column headers (ID, Title, Status, Priority, Tags), proper text alignment and truncation for each column to fit terminal width, selection highlighting for the current row, and filter bar UI at top or bottom showing active filters and sort mode. Implement filtering logic to show/hide tasks based on status, tag, or priority criteria with visual indicators of active filters. Support stable sort modes for priority, updated, created, and title.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Verify table renders with all column headers, (2) Check columns align properly with varying content lengths, (3) Test row selection highlighting with up/down arrow keys, (4) Apply status filter and verify only matching tasks shown, (5) Apply tag filter and verify correct filtering, (6) Apply priority filter and verify correct filtering, (7) Verify filter bar displays active filters and sort mode clearly, (8) Test combined filters (status + tag + priority), (9) Test stable sort modes for priority, updated, created, and title.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:36:39.937Z"
           },
           {
             "id": 3,
@@ -871,9 +873,10 @@
             "description": "Implement the documentation browser view displaying discovered markdown documents as a tree or flat list with selection highlighting.",
             "dependencies": [],
             "details": "Create `crates/untask-cli/src/tui/docs.rs` with file tree or flat list rendering of discovered documentation files, display doc path and extracted title for each entry, implement selection highlighting for the currently selected document, and handle navigation through the document list. Consider using simple tree structure with indent for nested directories or flat list with full paths depending on complexity.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Create sample markdown docs in various subdirectories, (2) Verify docs view discovers and lists all docs, (3) Check doc paths and titles display correctly, (4) Test selection highlighting with arrow key navigation, (5) Verify both nested and top-level docs appear, (6) Test with empty docs directory (graceful handling).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:36:42.089Z"
           },
           {
             "id": 4,
@@ -881,9 +884,10 @@
             "description": "Implement the task detail pane showing full task metadata, rendered markdown body as plain text with formatting hints, subtask progress bar, and action hints footer.",
             "dependencies": [],
             "details": "Create `crates/untask-cli/src/tui/detail.rs` with complete metadata display (ID, title, status, priority, tags, created/updated/completed dates), markdown body rendering as plain text with basic formatting hints (e.g., # headers bold, list bullets preserved), subtask progress bar visualization showing completed/total count, and action hints footer displaying available keyboard shortcuts ('e' to edit, 's' to change status, Escape to go back). Handle long content with scrolling if needed.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) Select task and enter detail view, (2) Verify all metadata fields display correctly, (3) Check markdown body renders with formatting preserved as plain text, (4) Verify subtask progress bar shows correct counts for tasks with subtasks, (5) Confirm action hints footer displays at bottom, (6) Test scrolling for tasks with long bodies, (7) Verify dates format correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:36:44.231Z"
           },
           {
             "id": 5,
@@ -896,14 +900,16 @@
               4
             ],
             "details": "Add keyboard handlers to each view module: Kanban/List views handle Enter to switch to detail view and 'd' to mark task done, Docs view handles Enter to open document in $EDITOR, Detail view handles 'e' to edit task in $EDITOR and Escape to return to previous view. Implement $EDITOR integration: detect $EDITOR environment variable, spawn editor process with task/doc file path, block until editor exits, reload task/doc data after editor closes, and handle errors (missing $EDITOR, editor failure).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual testing: (1) In kanban/list, press Enter on task and verify detail view opens, (2) Press 'd' on task and verify status changes to done, (3) In docs, press Enter and verify $EDITOR launches with doc file, (4) Edit and save doc, exit editor, verify changes reflected, (5) In detail view, press 'e' and verify editor launches with task file, (6) Edit task, save, exit, verify changes reload, (7) Test with unset $EDITOR (error handling), (8) Press Escape in detail and verify return to previous view.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T00:36:57.680Z"
           }
         ],
         "complexity": 7,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: (1) Kanban view with column rendering, card layout, and selection state, (2) List view with table formatting and filtering UI, (3) Docs view with file tree/list rendering, (4) Detail view with metadata display and markdown body rendering, (5) View-specific keyboard actions and $EDITOR integration."
+        "expansionPrompt": "Break down into: (1) Kanban view with column rendering, card layout, and selection state, (2) List view with table formatting and filtering UI, (3) Docs view with file tree/list rendering, (4) Detail view with metadata display and markdown body rendering, (5) View-specific keyboard actions and $EDITOR integration.",
+        "updatedAt": "2026-03-07T00:36:57.680Z"
       },
       {
         "id": "15",
@@ -1255,9 +1261,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-07T00:18:56.270Z",
+      "lastModified": "2026-03-07T00:36:57.681Z",
       "taskCount": 19,
-      "completedCount": 15,
+      "completedCount": 17,
       "tags": [
         "master"
       ]

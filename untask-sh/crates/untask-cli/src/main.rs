@@ -46,8 +46,8 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
             let cwd = std::env::current_dir()?;
             match untask_core::project::find_project_root(&cwd) {
                 Ok(root) => {
-                    let store = TaskStore::new(root)?;
-                    tui::run(store)
+                    let store = TaskStore::new(root.clone())?;
+                    tui::run(store, root)
                 }
                 Err(_) => {
                     eprintln!("No untask project found. Run 'untask init' first.");

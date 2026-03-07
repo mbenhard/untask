@@ -1,6 +1,11 @@
 pub mod app;
+mod detail;
+mod docs;
+mod kanban;
+mod list;
 
 use std::panic::{self, AssertUnwindSafe};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
@@ -8,9 +13,9 @@ use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use app::App;
 use untask_core::store::TaskStore;
 
-pub fn run(store: TaskStore) -> untask_core::error::Result<()> {
+pub fn run(store: TaskStore, project_root: PathBuf) -> untask_core::error::Result<()> {
     with_terminal(ratatui::init, ratatui::restore, |terminal| {
-        let mut app = App::new(store)?;
+        let mut app = App::new(store, project_root)?;
         run_loop(terminal, &mut app)
     })
 }
