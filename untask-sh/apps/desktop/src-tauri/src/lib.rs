@@ -1,5 +1,6 @@
 mod commands;
 mod state;
+mod watcher;
 
 pub fn run() {
     tauri::Builder::default()

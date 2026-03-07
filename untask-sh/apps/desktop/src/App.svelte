@@ -45,6 +45,7 @@
   let refreshRevision = $state(0);
   let openProjectPath = $state<string | null>(null);
   let taskHealth = $state<TaskHealth>({ unmatchedCount: 0, unindexedCount: 0 });
+  let refreshTimeout: number | null = null;
 
   onMount(() => {
     let unlisten: (() => void) | undefined;
@@ -52,12 +53,12 @@
     void (async () => {
       unlisten = await listen<ProjectRefreshEvent>(
         "untask://project-refresh",
-        async (event) => {
+        (event) => {
           if (!openProjectPath || event.payload.project_path !== openProjectPath) {
             return;
           }
 
-          await refreshData();
+          scheduleRefresh();
         },
       );
 
@@ -65,6 +66,9 @@
     })();
 
     return () => {
+      if (refreshTimeout !== null) {
+        window.clearTimeout(refreshTimeout);
+      }
       unlisten?.();
     };
   });
@@ -120,6 +124,17 @@
 
   async function refreshTasks() {
     await refreshData();
+  }
+
+  function scheduleRefresh() {
+    if (refreshTimeout !== null) {
+      window.clearTimeout(refreshTimeout);
+    }
+
+    refreshTimeout = window.setTimeout(() => {
+      refreshTimeout = null;
+      void refreshData();
+    }, 120);
   }
 
   function selectView(view: ShellView) {

@@ -1211,7 +1211,7 @@
           "15",
           "18"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1219,9 +1219,10 @@
             "description": "Add notify-based file watcher to the Tauri backend that monitors .untask/ directory and configured docs paths, emitting events to frontend when changes are detected.",
             "dependencies": [],
             "details": "Create a file watcher module in apps/desktop/src-tauri/src/watcher.rs using the notify crate. Implement a start_watcher Tauri command that sets up a RecommendedWatcher for the project directory. Configure the watcher to monitor .untask/ and docs paths from config. Implement debouncing (100-200ms) to prevent event storms. Emit 'tasks-changed' events via app.emit() when file changes are detected. Add watcher cleanup on project switch by storing watcher handle in AppState. Handle recursive watching and filter out temporary/lock files.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test watcher detects external file changes and emits events. Test CLI edit triggers event. Test debouncing prevents event storm during rapid saves. Test watcher cleanup on project switch prevents memory leaks. Test .lock files don't trigger refresh.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:17:54.183Z"
           },
           {
             "id": 2,
@@ -1231,9 +1232,10 @@
               1
             ],
             "details": "In apps/desktop/src/lib/stores.ts, add event listener setup using Tauri's event API. Subscribe to 'tasks-changed' events using listen() from @tauri-apps/api/event. On event receipt, call backend commands to reload tasks, docs, and current task data. Update tasks, docs, and selectedTask stores with fresh data. Implement debouncing on frontend side as additional safety (100-200ms window). Clean up event listeners when project changes or component unmounts using unlisten(). Ensure store updates trigger reactive UI updates in Kanban, List, and Docs views.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test frontend receives watcher events and refreshes stores. Test Kanban board updates when external file changes. Test task detail view updates when CLI modifies task. Test store cleanup prevents duplicate subscriptions. Verify UI reflects changes within 200ms.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:17:56.381Z"
           },
           {
             "id": 3,
@@ -1241,9 +1243,10 @@
             "description": "Create GitHub Actions CI workflow that runs Rust formatting, linting, and tests, plus desktop typecheck/build verification on macOS.",
             "dependencies": [],
             "details": "Create .github/workflows/ci.yml with two jobs: 'rust' and 'desktop'. Rust job runs on ubuntu-latest with steps for checkout, Rust toolchain setup, cargo fmt --all --check, cargo clippy --workspace --all-targets -- -D warnings, and cargo test --workspace. Desktop job runs on macos-latest, installs Node dependencies, runs `npm run check`, and runs `npm run tauri build` to verify the macOS desktop app builds in CI. Configure workflow to trigger on push and pull_request events. Set appropriate timeouts and caching for node_modules and cargo dependencies.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify CI workflow passes on clean branch. Test fmt failure blocks merge. Test clippy warnings block merge. Test failing Rust tests block merge. Test macOS desktop build failure blocks merge. Verify workflow runs on PRs and pushes.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:19:34.159Z"
           },
           {
             "id": 4,
@@ -1253,21 +1256,23 @@
               3
             ],
             "details": "Create .github/workflows/release.yml triggered on version tags (v*). Implement 'cli' job with matrix strategy for [ubuntu-latest, macos-latest, windows-latest]. Build CLI binaries using cargo build --release for untask-cli. Create release archives (.tar.gz for Unix, .zip for Windows) with proper naming (untask-cli-v{version}-{platform}-{arch}). Implement 'desktop-preview' job on macos-latest that builds unsigned .dmg using npm run tauri build. Label desktop artifact as 'PREVIEW - UNSIGNED' in filename and release notes. Upload all artifacts to GitHub Release using actions/upload-release-asset. Add release notes template explaining desktop builds are unsigned previews. Skip code signing/notarization (add later when credentials available).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test release workflow produces 3 CLI binaries (Linux, macOS, Windows). Test CLI binaries are properly archived with correct naming. Test unsigned .dmg builds successfully on macOS. Test all assets upload to GitHub Release. Verify preview labeling on desktop build. Test workflow only triggers on version tags.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-03-07T01:19:42.584Z"
           }
         ],
         "complexity": 6,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: (1) File watcher in desktop backend with Tauri event emission, (2) Frontend subscription to watcher events with store refresh, (3) CI workflow for Rust (fmt, clippy, test) and desktop (npm check, build) on multiple platforms, (4) Release workflow with CLI binary builds for 3 platforms and unsigned desktop preview builds with proper labeling."
+        "expansionPrompt": "Break down into: (1) File watcher in desktop backend with Tauri event emission, (2) Frontend subscription to watcher events with store refresh, (3) CI workflow for Rust (fmt, clippy, test) and desktop (npm check, build) on multiple platforms, (4) Release workflow with CLI binary builds for 3 platforms and unsigned desktop preview builds with proper labeling.",
+        "updatedAt": "2026-03-07T01:19:42.584Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-03-07T01:07:23.058Z",
+      "lastModified": "2026-03-07T01:19:42.585Z",
       "taskCount": 19,
-      "completedCount": 18,
+      "completedCount": 19,
       "tags": [
         "master"
       ]
