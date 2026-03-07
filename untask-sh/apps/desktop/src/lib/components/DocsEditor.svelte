@@ -32,6 +32,7 @@
   let focused = $state(false);
   let stale = $state(false);
   let staleMessage = $state("File changed on disk.");
+  let saveError = $state<string | null>(null);
   let saveAsNewPending = $state(false);
   let saveAsNewError = $state<string | null>(null);
 
@@ -122,9 +123,10 @@
       await saveDoc(savePath, fullContent);
       liveContent = markdown;
       stale = false;
+      saveError = null;
       staleMessage = "File changed on disk.";
-    } catch (e) {
-      console.error("Failed to save doc:", e);
+    } catch {
+      saveError = "Could not save — check file permissions";
     }
   }
 
@@ -159,67 +161,89 @@
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
-  <!-- Header -->
-  <div class="flex items-center gap-2 border-b border-border/80 px-4 py-2.5">
-    <button
-      type="button"
-      class="rounded-[4px] border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      onclick={onClose}
-    >
-      &larr; Back
-    </button>
-    <span class="text-[13px] font-medium text-foreground">{doc.basename}</span>
-    <span class="font-mono text-[10px] text-muted-foreground">{doc.path}</span>
+  <!-- Breadcrumb header -->
+  <div class="border-b border-border/60 px-4 py-2">
+    <div class="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+      {#each doc.path.split("/").filter(Boolean) as segment, i}
+        {#if i > 0}
+          <span class="text-muted-foreground/40">&gt;</span>
+        {/if}
+        {#if i === doc.path.split("/").filter(Boolean).length - 1}
+          <span class="text-foreground">{segment}</span>
+        {:else}
+          <span class="text-muted-foreground/60">{segment}</span>
+        {/if}
+      {/each}
+    </div>
+    <p class="mt-0.5 text-[16px] text-foreground">{doc.basename}</p>
   </div>
 
   {#if stale}
-    <div class="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-2">
-      <span class="font-mono text-[10px] text-muted-foreground">{staleMessage}</span>
-      <div class="flex items-center gap-1.5">
-        <button
-          type="button"
-          class="rounded-[4px] border border-border px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors hover:bg-accent"
-          onclick={() => void reloadFromDisk()}
-        >
-          Reload
-        </button>
-        {#if missingOnDisk && onSaveAsNew}
+    <div class="mx-4 mt-2 rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 px-3 py-2">
+      <div class="flex items-center justify-between gap-3">
+        <span class="font-mono text-[10px] text-muted-foreground">{staleMessage}</span>
+        <div class="flex items-center gap-1.5">
           <button
             type="button"
-            class="rounded-[4px] border border-border px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-            disabled={saveAsNewPending}
-            onclick={() => void handleSaveAsNew()}
+            class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-accent"
+            onclick={() => void reloadFromDisk()}
           >
-            {saveAsNewPending ? "Saving..." : "Save as new"}
+            Reload
           </button>
-        {/if}
-        <button
-          type="button"
-          class="rounded-[4px] border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          onclick={() => {
-            stale = false;
-            staleMessage = "File changed on disk.";
-          }}
-        >
-          Keep editing
-        </button>
+          {#if missingOnDisk && onSaveAsNew}
+            <button
+              type="button"
+              class="rounded-[4px] px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground disabled:opacity-50"
+              disabled={saveAsNewPending}
+              onclick={() => void handleSaveAsNew()}
+            >
+              {saveAsNewPending ? "Saving..." : "Save as new"}
+            </button>
+          {/if}
+          <button
+            type="button"
+            class="rounded-[4px] px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+            onclick={() => {
+              stale = false;
+              staleMessage = "File changed on disk.";
+            }}
+          >
+            Keep editing
+          </button>
+        </div>
       </div>
+      {#if saveAsNewError}
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">{saveAsNewError}</p>
+      {/if}
     </div>
-    {#if saveAsNewError}
-      <div class="border-b border-border/70 px-4 py-2">
-        <span class="font-mono text-[10px] text-muted-foreground">{saveAsNewError}</span>
-      </div>
-    {/if}
+  {/if}
+
+  {#if saveError}
+    <div class="mx-4 mt-2 flex items-center justify-between rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 px-3 py-1.5">
+      <span class="font-mono text-[10px] text-muted-foreground">{saveError}</span>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        class="rounded-[4px] p-0.5 text-muted-foreground/40 transition-colors duration-[120ms] hover:text-muted-foreground"
+        onclick={() => { saveError = null; }}
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
   {/if}
 
   {#if loading}
     <div class="flex flex-1 items-center justify-center">
-      <span class="font-mono text-[11px] text-muted-foreground">Loading...</span>
+      <span class="animate-pulse font-mono text-[11px] text-muted-foreground">Loading...</span>
     </div>
   {:else if content != null}
     <div class="min-h-0 flex-1 overflow-y-auto">
       <MilkdownEditor
         content={content}
+        saveOnBlur={true}
         onSave={handleSave}
         onContentChange={(value) => (liveContent = value)}
         onDirtyChange={(value) => (dirty = value)}

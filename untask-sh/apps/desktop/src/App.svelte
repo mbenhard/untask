@@ -39,9 +39,12 @@
     unindexedCount: number;
   };
 
+  let healthDismissed = $state(false);
   let restoring = $state(true);
   let selectedTask = $state<TaskDto | null>(null);
   let refreshRevision = $state(0);
+  let showProjectSwitcher = $state(false);
+  let projectRevision = $state(0);
   let docsExternalRevision = $state(0);
   let docsExternalPaths = $state<string[]>([]);
   let openProjectPath = $state<string | null>(null);
@@ -67,10 +70,19 @@
       await restoreLastProject();
     })();
 
+    // Auto-save any focused editor on app close
+    function handleBeforeUnload() {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
       if (refreshTimeout !== null) {
         window.clearTimeout(refreshTimeout);
       }
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       unlisten?.();
     };
   });
@@ -96,6 +108,7 @@
     selectedTask = null;
 
     await refreshData();
+    projectRevision += 1;
     restoring = false;
   }
 
@@ -109,7 +122,11 @@
     columns.set(config.columns);
     tasks.set(taskList);
     docs.set(docList);
-    taskHealth = summarizeTaskHealth(taskList, config.columns);
+    const nextHealth = summarizeTaskHealth(taskList, config.columns);
+    if (nextHealth.unmatchedCount !== taskHealth.unmatchedCount || nextHealth.unindexedCount !== taskHealth.unindexedCount) {
+      healthDismissed = false;
+    }
+    taskHealth = nextHealth;
     refreshRevision += 1;
 
     if (options?.externalPaths && affectsDocsExternally(options.externalPaths)) {
@@ -148,6 +165,10 @@
   }
 
   function selectView(view: ShellView) {
+    // Trigger blur to auto-save any focused editor before switching
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     activeView.set(view);
     selectedTask = null;
   }
@@ -202,14 +223,56 @@
   $effect(() => {
     document.documentElement.classList.toggle("dark", $theme === "dark");
   });
+
+  // ── Global view keyboard shortcuts (7.1) ─────────────────────────
+  const viewShortcuts: Record<string, ShellView> = {
+    "1": "board",
+    "2": "list",
+    "3": "docs",
+    "4": "next",
+  };
+
+  onMount(() => {
+    function handleGlobalKeydown(e: KeyboardEvent) {
+      // Cmd+O: toggle project switcher
+      if (e.metaKey && e.key === "o") {
+        e.preventDefault();
+        if ($projectPath) {
+          showProjectSwitcher = !showProjectSwitcher;
+        }
+        return;
+      }
+
+      // Skip when typing in an input, textarea, select, or contenteditable
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+      // Skip when modal is open
+      if (selectedTask) return;
+      // Skip with modifier keys
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const view = viewShortcuts[e.key];
+      if (view && $projectPath) {
+        e.preventDefault();
+        selectView(view);
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeydown);
+    return () => window.removeEventListener("keydown", handleGlobalKeydown);
+  });
 </script>
 
 <div class="flex h-screen min-h-screen flex-col bg-background text-foreground">
-  <WindowChrome title={$projectName ?? "Untask"} />
+  <WindowChrome
+    title={$projectName ?? "Untask"}
+    onProjectClick={$projectPath ? () => { showProjectSwitcher = !showProjectSwitcher; } : undefined}
+  />
 
   {#if restoring}
     <div class="flex min-h-0 flex-1 items-center justify-center">
-      <p class="font-mono text-[11px] text-muted-foreground">Loading...</p>
+      <p class="animate-pulse font-mono text-[11px] text-muted-foreground">Loading...</p>
     </div>
   {:else if !$projectPath}
     <div class="flex min-h-0 flex-1 overflow-hidden">
@@ -219,57 +282,70 @@
     <div class="flex min-h-0 flex-1 overflow-hidden">
       <SidebarNav
         activeView={$activeView}
-        projectName={$projectName}
         onSelect={selectView}
-        onSwitchProject={switchProject}
       />
       <main class="flex min-w-0 flex-1 flex-col bg-background/80">
-        {#if taskHealth.unindexedCount > 0 || taskHealth.unmatchedCount > 0}
-          <div class="border-b border-border/80 px-4 py-2">
-            <div class="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-              {#if taskHealth.unindexedCount > 0}
-                <span class="rounded-[4px] border border-border/70 px-1.5 py-0.5">
-                  {taskHealth.unindexedCount} unindexed
-                </span>
-              {/if}
+        {#if !healthDismissed && (taskHealth.unindexedCount > 0 || taskHealth.unmatchedCount > 0)}
+          <div class="flex items-center gap-2 border-b border-border/60 px-4 py-1.5">
+            <div class="flex flex-1 flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
               {#if taskHealth.unmatchedCount > 0}
-                <span class="rounded-[4px] border border-border/70 px-1.5 py-0.5">
+                <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
+                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-priority-medium"></span>
                   {taskHealth.unmatchedCount} unmatched
                 </span>
               {/if}
-              <span class="text-[11px] normal-case tracking-normal text-muted-foreground">
-                Visible for review only until you normalize or repair them.
-              </span>
+              {#if taskHealth.unindexedCount > 0}
+                <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
+                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
+                  {taskHealth.unindexedCount} unindexed
+                </span>
+              {/if}
             </div>
+            <button
+              type="button"
+              class="rounded-[4px] p-0.5 text-muted-foreground/40 transition-colors duration-[120ms] hover:text-muted-foreground"
+              onclick={() => { healthDismissed = true; }}
+              title="Dismiss"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
         {/if}
-        {#if $activeView === "board"}
-          <Kanban
-            tasks={$tasks}
-            columns={$columns}
-            onTaskClick={onTaskClick}
-            onTasksChanged={refreshTasks}
-          />
-        {:else if $activeView === "list"}
-          <TaskList
-            tasks={$tasks}
-            columns={$columns}
-            onTaskClick={onTaskClick}
-            onTasksChanged={refreshTasks}
-          />
-        {:else if $activeView === "docs"}
-          <DocsViewer
-            docs={$docs}
-            refreshRevision={refreshRevision}
-            externalRevision={docsExternalRevision}
-            externalPaths={docsExternalPaths}
-            onDocsChanged={refreshDocs}
-          />
-        {:else if $activeView === "next"}
-          <div class="flex flex-1 items-center justify-center">
-            <p class="font-mono text-[11px] text-muted-foreground">Next view — coming soon</p>
+
+        {#key `${projectRevision}-${$activeView}`}
+          <div class="view-transition flex min-h-0 flex-1 flex-col">
+            {#if $activeView === "board"}
+              <Kanban
+                tasks={$tasks}
+                columns={$columns}
+                onTaskClick={onTaskClick}
+                onTasksChanged={refreshTasks}
+              />
+            {:else if $activeView === "list"}
+              <TaskList
+                tasks={$tasks}
+                columns={$columns}
+                onTaskClick={onTaskClick}
+                onTasksChanged={refreshTasks}
+              />
+            {:else if $activeView === "docs"}
+              <DocsViewer
+                docs={$docs}
+                refreshRevision={refreshRevision}
+                externalRevision={docsExternalRevision}
+                externalPaths={docsExternalPaths}
+                onDocsChanged={refreshDocs}
+              />
+            {:else if $activeView === "next"}
+              <div class="flex flex-1 items-center justify-center">
+                <p class="font-mono text-[11px] text-muted-foreground">Next view — coming soon</p>
+              </div>
+            {/if}
           </div>
-        {/if}
+        {/key}
       </main>
     </div>
 
@@ -281,6 +357,19 @@
         {refreshRevision}
         onClose={onTaskClose}
         onTaskUpdated={refreshTasks}
+      />
+    {/if}
+
+    {#if showProjectSwitcher}
+      <ProjectPicker
+        mode="dropdown"
+        onProjectOpened={async (path, name) => {
+          showProjectSwitcher = false;
+          await switchProject();
+          await openProject(path);
+          await onProjectOpened(path, name);
+        }}
+        onClose={() => { showProjectSwitcher = false; }}
       />
     {/if}
   {/if}

@@ -5,69 +5,67 @@
     id: ShellView;
     label: string;
     shortcut: string;
+    icon: string;
   };
 
   const items: NavItem[] = [
-    { id: "board", label: "Board", shortcut: "1" },
-    { id: "list", label: "List", shortcut: "2" },
-    { id: "docs", label: "Docs", shortcut: "3" },
-    { id: "next", label: "Next", shortcut: "4" },
+    { id: "board", label: "Board", shortcut: "1", icon: "board" },
+    { id: "list", label: "List", shortcut: "2", icon: "list" },
+    { id: "docs", label: "Docs", shortcut: "3", icon: "docs" },
+    { id: "next", label: "Next", shortcut: "4", icon: "next" },
   ];
 
   let {
     activeView,
-    projectName,
     onSelect,
-    onSwitchProject,
   }: {
     activeView: ShellView;
-    projectName: string | null;
     onSelect: (view: ShellView) => void;
-    onSwitchProject: () => void;
   } = $props();
 </script>
 
-<aside class="flex w-[200px] shrink-0 flex-col border-r border-border/80 bg-card/70">
-  <div class="border-b border-border/80 px-3 py-3">
+<aside class="flex w-[52px] shrink-0 flex-col items-center border-r border-border/60 bg-card/70 py-2 gap-1">
+  {#each items as item}
     <button
       type="button"
-      class="group flex w-full items-center justify-between text-left"
-      onclick={onSwitchProject}
+      onclick={() => onSelect(item.id)}
+      class={`relative flex h-8 w-8 items-center justify-center rounded-[6px] transition-colors duration-[120ms] ease-out ${
+        activeView === item.id
+          ? "bg-accent text-foreground"
+          : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+      }`}
+      title={item.label}
     >
-      <div class="min-w-0">
-        <p
-          class="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground"
-        >
-          Project
-        </p>
-        <p class="mt-0.5 truncate text-[13px] font-medium text-foreground">
-          {projectName ?? "No project"}
-        </p>
-      </div>
-      <span
-        class="text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-      >
-        Switch
+      {#if item.icon === "board"}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1.5" y="2" width="4" height="12" rx="1" />
+          <rect x="6.5" y="2" width="4" height="8" rx="1" />
+          <rect x="11.5" y="2" width="4" height="10" rx="1" />
+        </svg>
+      {:else if item.icon === "list"}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="4" y1="4" x2="14" y2="4" />
+          <line x1="4" y1="8" x2="14" y2="8" />
+          <line x1="4" y1="12" x2="14" y2="12" />
+          <circle cx="2" cy="4" r="0.75" fill="currentColor" stroke="none" />
+          <circle cx="2" cy="8" r="0.75" fill="currentColor" stroke="none" />
+          <circle cx="2" cy="12" r="0.75" fill="currentColor" stroke="none" />
+        </svg>
+      {:else if item.icon === "docs"}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 1.5H3.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6L9 1.5Z" />
+          <polyline points="9,1.5 9,6 13.5,6" />
+        </svg>
+      {:else if item.icon === "next"}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6.5" />
+          <polyline points="8,4.5 8,8 11,9.5" />
+        </svg>
+      {/if}
+
+      <span class="absolute -right-0.5 top-0 font-mono text-[10px] leading-none text-muted-foreground/60">
+        {item.shortcut}
       </span>
     </button>
-  </div>
-
-  <nav class="flex flex-1 flex-col gap-0.5 p-1.5">
-    {#each items as item}
-      <button
-        type="button"
-        onclick={() => onSelect(item.id)}
-        class={`flex items-center justify-between rounded-[4px] px-2.5 py-1.5 text-left transition-colors ${
-          activeView === item.id
-            ? "bg-accent text-foreground"
-            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-        }`}
-      >
-        <span class="text-[13px]">{item.label}</span>
-        <span class="font-mono text-[10px] text-muted-foreground">
-          {item.shortcut}
-        </span>
-      </button>
-    {/each}
-  </nav>
+  {/each}
 </aside>

@@ -68,3 +68,58 @@ select {
 ::selection {
   background: rgb(245 245 245 / 0.16);
 }
+
+/* 6.1 Focus rings — only on keyboard navigation */
+:focus-visible {
+  outline: 1px solid rgb(138 138 138 / 0.5);
+  outline-offset: -1px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 6.4 Global scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(42 42 42 / 0.4) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(42 42 42 / 0.4);
+  border-radius: 3px;
+}
+
+/* View transition animation */
+@keyframes view-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-transition {
+  animation: view-fade-in 150ms ease-out;
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse-loading {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse {
+  animation: pulse-loading 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

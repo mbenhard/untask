@@ -11,4 +11,4 @@
   };
 </script>
 
-<span class={`inline-flex h-[5px] w-[5px] rounded-full ${toneClass[tone]}`} aria-hidden="true"></span>
+<span class={`inline-flex h-[5px] w-[5px] rounded-full transition-colors duration-[120ms] ${toneClass[tone]}`} aria-hidden="true"></span>

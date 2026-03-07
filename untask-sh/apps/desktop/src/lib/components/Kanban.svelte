@@ -18,22 +18,28 @@
   type KanbanColumn = {
     id: string;
     label: string;
+    done: boolean;
     tasks: TaskDto[];
   };
 
   // ── Quick-add state ──────────────────────────────────────────────
   let addingInColumn = $state<string | null>(null);
   let quickAddTitle = $state("");
+  let quickAddError = $state<string | null>(null);
+  let quickAddErrorFlash = $state(false);
 
   // ── Drag state ───────────────────────────────────────────────────
   let draggedTask = $state<TaskDto | null>(null);
   let dropTarget = $state<{ columnId: string; index: number } | null>(null);
+  let isDragging = $state(false);
+  let justDroppedId = $state<number | null>(null);
 
   // ── Column derivation with position sort ─────────────────────────
   let kanbanColumns = $derived.by(() => {
     const cols: KanbanColumn[] = columns.map((col) => ({
       id: col.id,
       label: col.id,
+      done: col.done ?? false,
       tasks: [],
     }));
 
@@ -49,7 +55,6 @@
       }
     }
 
-    // Sort each column by position (nulls sorted by id at end)
     for (const col of cols) {
       col.tasks.sort((a, b) => {
         const ap = a.position ?? Infinity;
@@ -60,7 +65,7 @@
     }
 
     if (unmatched.length > 0) {
-      cols.push({ id: "__unmatched", label: "unmatched", tasks: unmatched });
+      cols.push({ id: "__unmatched", label: "unmatched", done: false, tasks: unmatched });
     }
 
     return cols;
@@ -70,6 +75,8 @@
   function startQuickAdd(columnId: string) {
     addingInColumn = columnId;
     quickAddTitle = "";
+    quickAddError = null;
+    quickAddErrorFlash = false;
   }
 
   async function submitQuickAdd(columnId: string) {
@@ -78,9 +85,14 @@
     try {
       await addTask(title, columnId);
       quickAddTitle = "";
+      quickAddError = null;
+      addingInColumn = null;
       onTasksChanged();
-    } catch (e) {
-      console.error("Failed to add task:", e);
+    } catch {
+      quickAddError = "Failed to create task";
+      quickAddErrorFlash = true;
+      setTimeout(() => { quickAddErrorFlash = false; }, 800);
+      setTimeout(() => { quickAddError = null; }, 3000);
     }
   }
 
@@ -108,6 +120,7 @@
       return;
     }
     draggedTask = task;
+    isDragging = true;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", String(task.id));
@@ -117,6 +130,7 @@
   function handleDragEnd() {
     draggedTask = null;
     dropTarget = null;
+    isDragging = false;
   }
 
   function handleDragOver(e: DragEvent, columnId: string, index: number) {
@@ -146,21 +160,20 @@
     if (!draggedTask || isUnmatchedColumn(columnId) || draggedTask.id == null) {
       draggedTask = null;
       dropTarget = null;
+      isDragging = false;
       return;
     }
 
-    // Capture reference before async work — handleDragEnd fires during await and nulls draggedTask
     const task = draggedTask;
     draggedTask = null;
     dropTarget = null;
+    isDragging = false;
 
     const sourceColId = resolveColumnId(task);
     const col = kanbanColumns.find((c) => c.id === columnId);
     const sourceCol = kanbanColumns.find((c) => c.id === sourceColId);
     if (!col || !sourceCol) return;
 
-    // Adjust index for same-column downward drags: the dragged task inflates
-    // the hover index but is removed before insertion, causing an off-by-one.
     let adjustedIndex = index;
     if (sourceColId === columnId) {
       const sourceIndex = col.tasks.findIndex((t) => t.id === task.id);
@@ -192,6 +205,8 @@
         );
       }
       await persistColumnOrder(nextTargetOrder, columnId, task.id ?? undefined);
+      justDroppedId = task.id ?? null;
+      setTimeout(() => { justDroppedId = null; }, 80);
       onTasksChanged();
     } catch (err) {
       console.error("Failed to move task:", err);
@@ -264,32 +279,77 @@
   }
 </script>
 
-<div class="flex min-h-0 flex-1 gap-px overflow-x-auto bg-border/40 p-0">
-  {#each kanbanColumns as col}
-    <section class="flex min-w-[200px] flex-1 flex-col bg-background/80">
-      <div class="flex items-center justify-between border-b border-border/80 px-3 py-2">
-        <span class="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+<div class="flex min-h-0 flex-1 overflow-x-auto p-0">
+  {#each kanbanColumns as col, colIdx}
+    <section
+      class={`flex min-w-[240px] max-w-[300px] flex-1 flex-col bg-background/80 ${
+        colIdx < kanbanColumns.length - 1 ? "border-r border-border/40" : ""
+      }`}
+    >
+      <!-- Column header -->
+      <div class="flex items-center justify-between border-b border-border/60 px-3 py-2">
+        <span
+          class={`font-mono text-[11px] uppercase tracking-[0.08em] ${
+            col.done ? "text-muted-foreground/50" : "text-muted-foreground"
+          }`}
+        >
           {col.label}
         </span>
-        <span class="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <span class="font-mono text-[10px] text-muted-foreground/60">
           {col.tasks.length}
         </span>
       </div>
 
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="flex flex-1 flex-col gap-0 overflow-y-auto"
-        ondragover={(e) => handleColumnDragOver(e, col.id, col.tasks.length)}
-        ondragleave={handleDragLeave}
-        ondrop={(e) => handleDrop(e, col.id, col.tasks.length)}
-      >
+      <div class="relative min-h-0 flex-1">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="kanban-scroll flex h-full flex-col gap-1.5 overflow-y-auto p-1.5"
+          ondragover={(e) => handleColumnDragOver(e, col.id, col.tasks.length)}
+          ondragleave={handleDragLeave}
+          ondrop={(e) => handleDrop(e, col.id, col.tasks.length)}
+        >
+        <!-- Quick-add at top for non-empty columns -->
+        {#if !isUnmatchedColumn(col.id)}
+          {#if addingInColumn === col.id}
+            <div class="rounded-[6px] border border-border/60 bg-card px-2.5 py-2">
+              <input
+                type="text"
+                bind:value={quickAddTitle}
+                onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
+                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
+                placeholder="Task title..."
+                class="w-full bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
+                class:border-destructive={quickAddErrorFlash}
+                autofocus
+              />
+              {#if quickAddError}
+                <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
+              {/if}
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="w-full rounded-[6px] border border-dashed border-border/40 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground/40 transition-colors duration-[120ms] hover:border-border/60 hover:text-muted-foreground"
+              onclick={() => startQuickAdd(col.id)}
+            >
+              + Add task
+            </button>
+          {/if}
+        {/if}
+
+        <!-- Task cards -->
         {#each col.tasks as task, i}
+          <!-- Drop indicator line -->
+          {#if dropTarget?.columnId === col.id && dropTarget?.index === i}
+            <div class="drop-indicator"></div>
+          {/if}
+
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div
-            class="group flex min-h-[40px] w-full cursor-pointer flex-col border-b border-border/40 px-3 py-1.5 text-left transition-colors hover:bg-accent/60"
+            class="kanban-card group cursor-pointer rounded-[6px] border border-border/60 px-2.5 py-2 transition-all duration-[120ms]"
             class:opacity-30={draggedTask?.id === task.id}
-            class:border-t-2={dropTarget?.columnId === col.id && dropTarget?.index === i}
-            class:border-t-ring={dropTarget?.columnId === col.id && dropTarget?.index === i}
+            class:dragging={draggedTask?.id === task.id}
+            class:kanban-card-settled={justDroppedId === task.id}
             draggable={canDrag(task) && !isUnmatchedColumn(col.id)}
             ondragstart={(e) => handleDragStart(e, task)}
             ondragend={handleDragEnd}
@@ -298,11 +358,12 @@
             onclick={() => onTaskClick(task)}
             role="button"
             tabindex="0"
+            title={task.title}
           >
             <!-- Row 1: priority dot + title -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
               <PriorityDot tone={priorityTone(task.priority)} />
-              <span class="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
+              <span class="min-w-0 flex-1 truncate text-[13px] leading-snug text-foreground">
                 {task.title}
               </span>
               {#if task.id == null}
@@ -311,74 +372,106 @@
                 </span>
               {/if}
             </div>
-            <!-- Row 2: metadata (tags, subtasks, date) -->
-            {#if task.tags.length > 0 || task.subtask_total > 0 || task.updated}
-              <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                {#each task.tags.slice(0, 3) as tag}
-                  <span class="flex h-[18px] items-center rounded-[3px] border border-border/60 px-1 font-mono text-[9px] text-muted-foreground">
+
+            <!-- Row 2: metadata (only if present) -->
+            {#if task.tags.length > 0 || task.updated}
+              <div class="mt-1 flex items-center gap-1.5">
+                {#each task.tags.slice(0, 2) as tag}
+                  <span class="rounded-[3px] font-mono text-[10px] text-muted-foreground/60">
                     {tag}
                   </span>
                 {/each}
-                {#if task.tags.length > 3}
-                  <span class="font-mono text-[9px] text-muted-foreground/50">
-                    +{task.tags.length - 3}
-                  </span>
-                {/if}
-                {#if task.subtask_total > 0}
-                  <span class="font-mono text-[9px] text-muted-foreground/60">
-                    {task.subtask_done}/{task.subtask_total}
+                {#if task.tags.length > 2}
+                  <span class="font-mono text-[10px] text-muted-foreground/40">
+                    +{task.tags.length - 2}
                   </span>
                 {/if}
                 {#if task.updated}
-                  <span class="ml-auto font-mono text-[9px] text-muted-foreground/40">
+                  <span class="ml-auto font-mono text-[10px] text-muted-foreground/40">
                     {relativeDate(task.updated)}
                   </span>
                 {/if}
               </div>
             {/if}
+
+            <!-- Subtask progress bar -->
+            {#if task.subtask_total > 0}
+              <div class="mt-1.5 h-[2px] w-full overflow-hidden rounded-full bg-border">
+                <div
+                  class="h-full rounded-full bg-foreground/60"
+                  style="width: {(task.subtask_done / task.subtask_total) * 100}%"
+                ></div>
+              </div>
+            {/if}
           </div>
         {/each}
 
+        <!-- Drop indicator at end -->
+        {#if dropTarget?.columnId === col.id && dropTarget?.index === col.tasks.length && col.tasks.length > 0}
+          <div class="drop-indicator"></div>
+        {/if}
+
         <!-- Empty column drop zone -->
-        {#if col.tasks.length === 0}
+        {#if col.tasks.length === 0 && !isUnmatchedColumn(col.id)}
           <div
-            class="flex min-h-[80px] flex-1 items-center justify-center border border-dashed border-border/30 p-4"
+            class="flex min-h-[80px] flex-1 items-center justify-center rounded-[6px] border border-dashed border-border/40"
             class:border-ring={dropTarget?.columnId === col.id}
           >
-            <span class="font-mono text-[10px] text-muted-foreground/50">Empty</span>
+            {#if isDragging}
+              <span class="font-mono text-[10px] text-muted-foreground/40">Drop here</span>
+            {/if}
           </div>
         {/if}
-
-        <!-- Drop-at-end indicator -->
-        {#if dropTarget?.columnId === col.id && dropTarget?.index === col.tasks.length && col.tasks.length > 0}
-          <div class="h-0.5 bg-ring"></div>
-        {/if}
-
-        <!-- Quick-add -->
-        {#if !isUnmatchedColumn(col.id)}
-          {#if addingInColumn === col.id}
-            <div class="border-t border-border/40 px-3 py-1.5">
-              <input
-                type="text"
-                bind:value={quickAddTitle}
-                onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
-                onblur={() => { if (!quickAddTitle.trim()) addingInColumn = null; }}
-                placeholder="Task title..."
-                class="w-full rounded-[4px] border border-dashed border-border bg-transparent px-2 py-1 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"
-                autofocus
-              />
-            </div>
-          {:else}
-            <button
-              type="button"
-              class="w-full border-t border-border/40 px-3 py-1.5 text-left font-mono text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground"
-              onclick={() => startQuickAdd(col.id)}
-            >
-              + Add task
-            </button>
-          {/if}
-        {/if}
+        </div>
+        <div class="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background/80 to-transparent"></div>
       </div>
     </section>
   {/each}
 </div>
+
+<style>
+  .kanban-card:hover {
+    border-color: var(--color-border);
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+  }
+
+  .kanban-card.dragging {
+    transform: scale(0.97) rotate(1deg);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
+  }
+
+  .drop-indicator {
+    height: 2px;
+    background: var(--color-ring);
+    border-radius: 1px;
+    box-shadow: 0 0 6px var(--color-ring);
+    flex-shrink: 0;
+  }
+
+  @keyframes card-settle {
+    0% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
+
+  .kanban-card-settled {
+    animation: card-settle 80ms ease-out;
+  }
+
+  .kanban-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(42 42 42 / 0.4) transparent;
+  }
+
+  .kanban-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .kanban-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .kanban-scroll::-webkit-scrollbar-thumb {
+    background: rgb(42 42 42 / 0.4);
+    border-radius: 3px;
+  }
+</style>

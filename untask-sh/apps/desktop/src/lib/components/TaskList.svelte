@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addTask, type ColumnDto, type TaskDto } from "$lib/api";
+  import { addTask, updateTask, type ColumnDto, type Priority, type TaskDto } from "$lib/api";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
 
   let {
@@ -14,17 +14,21 @@
     onTasksChanged: () => void;
   } = $props();
 
-  type SortKey = "id" | "title" | "status" | "priority" | "updated" | "position";
+  type SortKey = "title" | "status" | "priority" | "updated" | "position";
   type SortDir = "asc" | "desc";
 
   let sortKey = $state<SortKey>("position");
   let sortDir = $state<SortDir>("asc");
   let filterText = $state("");
   let filterStatus = $state("");
-
-  // ── Quick-add state ──────────────────────────────────────────────
-  let showQuickAdd = $state(false);
   let quickAddTitle = $state("");
+  let quickAddError = $state<string | null>(null);
+  let errorRowId = $state<number | null>(null);
+  let focusedTaskId = $state<number | null>(null);
+  let statusPopoverTaskId = $state<number | null>(null);
+  let popoverIndex = $state(0);
+
+  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high", "urgent"];
 
   let defaultStatus = $derived(columns.length > 0 ? columns[0].id : "backlog");
   let statuses = $derived([...new Set(tasks.map((t) => t.status))].sort());
@@ -55,9 +59,6 @@
           if (cmp === 0) cmp = (a.id ?? 0) - (b.id ?? 0);
           break;
         }
-        case "id":
-          cmp = (a.id ?? 0) - (b.id ?? 0);
-          break;
         case "title":
           cmp = a.title.localeCompare(b.title);
           break;
@@ -90,11 +91,6 @@
     }
   }
 
-  function sortIndicator(key: SortKey): string {
-    if (sortKey !== key) return "";
-    return sortDir === "asc" ? " \u2191" : " \u2193";
-  }
-
   function priorityTone(p: string | null): "low" | "medium" | "high" | "neutral" {
     if (p === "high" || p === "urgent") return "high";
     if (p === "medium") return "medium";
@@ -122,6 +118,98 @@
     }
   }
 
+  // ── Inline priority cycling ────────────────────────────────────
+  async function cyclePriority(e: MouseEvent, task: TaskDto) {
+    e.stopPropagation();
+    if (task.id == null) return;
+    const current = task.priority ?? null;
+    const idx = priorityCycle.indexOf(current);
+    const next = priorityCycle[(idx + 1) % priorityCycle.length];
+    try {
+      await updateTask(task.id, { priority: next });
+      onTasksChanged();
+    } catch {
+      errorRowId = task.id;
+      setTimeout(() => { errorRowId = null; }, 800);
+    }
+  }
+
+  // ── Inline status change ───────────────────────────────────────
+  async function changeStatus(e: Event, task: TaskDto) {
+    e.stopPropagation();
+    if (task.id == null) return;
+    const newStatus = (e.target as HTMLSelectElement).value;
+    if (newStatus === task.status) return;
+    try {
+      await updateTask(task.id, { status: newStatus });
+      onTasksChanged();
+    } catch {
+      errorRowId = task.id;
+      setTimeout(() => { errorRowId = null; }, 800);
+    }
+  }
+
+  async function changeStatusTo(task: TaskDto, newStatus: string) {
+    if (task.id == null) return;
+    if (newStatus === task.status) return;
+    try {
+      await updateTask(task.id, { status: newStatus });
+      onTasksChanged();
+    } catch {
+      errorRowId = task.id;
+      setTimeout(() => { errorRowId = null; }, 800);
+    }
+  }
+
+  function openStatusPopover(e: MouseEvent, taskId: number | null) {
+    e.stopPropagation();
+    if (taskId == null) return;
+    if (statusPopoverTaskId === taskId) {
+      statusPopoverTaskId = null;
+      return;
+    }
+    statusPopoverTaskId = taskId;
+    // Find the current status index for keyboard navigation
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      const idx = columns.findIndex((c) => c.id === task.status);
+      popoverIndex = idx >= 0 ? idx : 0;
+    }
+    // Close on outside click
+    setTimeout(() => {
+      const handler = () => {
+        statusPopoverTaskId = null;
+        window.removeEventListener("click", handler);
+      };
+      window.addEventListener("click", handler);
+    }, 0);
+  }
+
+  function handlePopoverKeydown(e: KeyboardEvent) {
+    if (statusPopoverTaskId == null) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      popoverIndex = Math.min(popoverIndex + 1, columns.length - 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      popoverIndex = Math.max(popoverIndex - 1, 0);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      const task = tasks.find((t) => t.id === statusPopoverTaskId);
+      if (task && columns[popoverIndex]) {
+        changeStatusTo(task, columns[popoverIndex].id);
+      }
+      statusPopoverTaskId = null;
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      statusPopoverTaskId = null;
+    }
+  }
+
   // ── Quick-add ────────────────────────────────────────────────────
   async function submitQuickAdd() {
     const title = quickAddTitle.trim();
@@ -129,9 +217,11 @@
     try {
       await addTask(title, defaultStatus);
       quickAddTitle = "";
+      quickAddError = null;
       onTasksChanged();
-    } catch (e) {
-      console.error("Failed to add task:", e);
+    } catch {
+      quickAddError = "Failed to create task";
+      setTimeout(() => { quickAddError = null; }, 3000);
     }
   }
 
@@ -139,104 +229,171 @@
     if (e.key === "Enter") {
       e.preventDefault();
       submitQuickAdd();
-    } else if (e.key === "Escape") {
-      showQuickAdd = false;
-      quickAddTitle = "";
     }
   }
 
-  const colHeaders: { key: SortKey; label: string; width: string }[] = [
-    { key: "id", label: "#", width: "w-[48px]" },
-    { key: "title", label: "Title", width: "flex-1" },
+  const colHeaders: { key: SortKey | null; label: string; width: string }[] = [
+    { key: null, label: "", width: "w-[24px]" },
+    { key: "title", label: "Title", width: "flex-1 min-w-0" },
+    { key: null, label: "Tags", width: "w-[160px]" },
     { key: "status", label: "Status", width: "w-[100px]" },
-    { key: "priority", label: "Pri", width: "w-[48px]" },
-    { key: "updated", label: "Updated", width: "w-[80px]" },
+    { key: "updated", label: "Updated", width: "w-[72px]" },
   ];
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
   <!-- Filter bar -->
-  <div class="flex items-center gap-2 border-b border-border/80 px-3 py-1.5">
+  <div class="flex items-center gap-2 border-b border-border/60 px-3 py-1.5">
     <input
       type="text"
       placeholder="Filter..."
       bind:value={filterText}
-      class="h-7 w-[180px] rounded-[4px] border border-border bg-card px-2 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:border-ring focus:outline-none"
+      class="h-7 w-[180px] rounded-[4px] border border-transparent bg-transparent px-2 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/50 transition-colors duration-[120ms] focus:border-border focus:bg-card focus:outline-none"
     />
     <select
       bind:value={filterStatus}
-      class="h-7 rounded-[4px] border border-border bg-card px-2 font-mono text-[11px] text-foreground focus:border-ring focus:outline-none"
+      class="h-7 rounded-[4px] border border-transparent bg-transparent px-2 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] focus:border-border focus:bg-card focus:outline-none"
     >
       <option value="">All statuses</option>
       {#each statuses as status}
         <option value={status}>{status}</option>
       {/each}
     </select>
-    <span class="ml-auto font-mono text-[10px] text-muted-foreground">
-      {filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"}
+    <span class="ml-auto font-mono text-[10px] text-muted-foreground/60">
+      {filteredTasks.length}
     </span>
   </div>
 
   <!-- Header row -->
-  <div class="flex items-center border-b border-border/80 bg-card/50 px-3">
+  <div class="flex items-center border-b border-border/60 px-3">
     {#each colHeaders as col}
-      <button
-        type="button"
-        class={`${col.width} shrink-0 py-1.5 text-left font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground hover:text-foreground`}
-        onclick={() => toggleSort(col.key)}
-      >
-        {col.label}{sortIndicator(col.key)}
-      </button>
+      {#if col.key}
+        <button
+          type="button"
+          class={`group ${col.width} shrink-0 py-1.5 text-left font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground transition-colors duration-[120ms] hover:text-foreground`}
+          onclick={() => toggleSort(col.key!)}
+        >
+          {col.label}
+          {#if sortKey === col.key}
+            <span class="text-muted-foreground">{sortDir === "asc" ? "↑" : "↓"}</span>
+          {:else}
+            <span class="text-muted-foreground/0 transition-colors duration-[120ms] group-hover:text-muted-foreground/40">↑</span>
+          {/if}
+        </button>
+      {:else}
+        <span class={`${col.width} shrink-0 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground`}>
+          {col.label}
+        </span>
+      {/if}
     {/each}
   </div>
 
   <!-- Rows -->
-  <div class="flex-1 overflow-y-auto">
+  <div class="list-scroll flex-1 overflow-y-auto">
     {#each filteredTasks as task}
-      <button
-        type="button"
-        class="flex min-h-[40px] w-full items-center border-b border-border/40 px-3 text-left transition-colors hover:bg-accent/60"
-        onclick={() => onTaskClick(task)}
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+      <div
+        class={`flex h-10 w-full items-center border-b border-border/40 border-l-2 px-3 transition-colors duration-[120ms] hover:bg-accent/50 ${
+          focusedTaskId === task.id ? "border-l-ring" : "border-l-transparent"
+        } ${errorRowId === task.id ? "error-row-flash" : ""}`}
+        onclick={() => { focusedTaskId = task.id; onTaskClick(task); }}
+        role="button"
+        tabindex="0"
       >
-        <span class="w-[48px] shrink-0 font-mono text-[11px] text-muted-foreground">
-          {task.id ?? "\u2014"}
+        <!-- Priority dot (clickable) -->
+        <span class="flex w-[24px] shrink-0 justify-center">
+          <button
+            type="button"
+            class="priority-cycle rounded-full p-1 transition-colors duration-[120ms] hover:bg-accent"
+            onclick={(e) => cyclePriority(e, task)}
+            title="Click to cycle priority"
+          >
+            <PriorityDot tone={priorityTone(task.priority)} />
+          </button>
         </span>
-        <span class="flex min-w-0 flex-1 items-center gap-1.5">
-          <PriorityDot tone={priorityTone(task.priority)} />
-          <span class="min-w-0 flex-1 truncate text-[13px] text-foreground">
-            {task.title}
-          </span>
-          {#each task.tags.slice(0, 2) as tag}
-            <span class="flex h-[18px] shrink-0 items-center rounded-[3px] border border-border/60 px-1 font-mono text-[9px] text-muted-foreground">
-              {tag}
-            </span>
+
+        <!-- Title -->
+        <span class="min-w-0 flex-1 truncate text-[13px] text-foreground" title={task.title}>
+          {task.title}
+        </span>
+
+        <!-- Tags -->
+        <span class="flex w-[160px] shrink-0 items-center gap-0 overflow-hidden font-mono text-[10px] text-muted-foreground/60">
+          {#each task.tags.slice(0, 3) as tag, i}
+            {#if i > 0}<span class="mx-0.5 text-muted-foreground/30">·</span>{/if}
+            <span class="truncate">{tag}</span>
           {/each}
-          {#if task.tags.length > 2}
-            <span class="shrink-0 font-mono text-[9px] text-muted-foreground/50">
-              +{task.tags.length - 2}
-            </span>
-          {/if}
-          {#if task.subtask_total > 0}
-            <span class="shrink-0 font-mono text-[9px] text-muted-foreground/60">
-              {task.subtask_done}/{task.subtask_total}
-            </span>
+          {#if task.tags.length > 3}
+            <span class="ml-0.5 text-muted-foreground/40">+{task.tags.length - 3}</span>
           {/if}
         </span>
-        {#if task.id == null}
-          <span class="mr-2 rounded-[4px] border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-            unindexed
-          </span>
-        {/if}
-        <span class="w-[100px] shrink-0 font-mono text-[10px] text-muted-foreground">
-          {task.status}
+
+        <!-- Status -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <span class="relative w-[100px] shrink-0">
+          {#if task.id == null}
+            <select
+              class="h-[20px] w-full cursor-pointer rounded-[4px] border border-border/60 bg-transparent px-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border focus:border-ring focus:outline-none"
+              value={task.status}
+              disabled
+              onchange={(e) => changeStatus(e, task)}
+            >
+              {#each columns as col}
+                <option value={col.id}>{col.id}</option>
+              {/each}
+              {#if !columns.some((c) => c.id === task.status)}
+                <option value={task.status}>{task.status}</option>
+              {/if}
+            </select>
+          {:else}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span
+              class="inline-block cursor-pointer rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border"
+              onclick={(e) => openStatusPopover(e, task.id)}
+              onkeydown={handlePopoverKeydown}
+              role="button"
+              tabindex="-1"
+            >
+              {task.status}
+            </span>
+            {#if statusPopoverTaskId === task.id}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="absolute left-0 top-full z-10 mt-1 w-[180px] rounded-[6px] border border-border/60 bg-popover shadow-lg backdrop-blur"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={handlePopoverKeydown}
+                role="listbox"
+                tabindex="-1"
+              >
+                {#each columns as col, i}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <div
+                    class={`cursor-pointer px-3 py-1.5 text-[12px] transition-colors duration-[120ms] hover:bg-accent/50 ${
+                      col.id === task.status ? "bg-accent" : ""
+                    } ${col.done ? "text-muted-foreground" : "text-foreground"} ${
+                      popoverIndex === i ? "bg-accent/50" : ""
+                    }`}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      changeStatusTo(task, col.id);
+                      statusPopoverTaskId = null;
+                    }}
+                    role="option"
+                    aria-selected={col.id === task.status}
+                  >
+                    {col.id}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          {/if}
         </span>
-        <span class="flex w-[48px] shrink-0 justify-center">
-          <PriorityDot tone={priorityTone(task.priority)} />
-        </span>
-        <span class="w-[80px] shrink-0 text-right font-mono text-[10px] text-muted-foreground">
+
+        <!-- Updated -->
+        <span class="w-[72px] shrink-0 text-right font-mono text-[10px] text-muted-foreground/60">
           {relativeDate(task.updated)}
         </span>
-      </button>
+      </div>
     {/each}
 
     {#if filteredTasks.length === 0}
@@ -245,29 +402,52 @@
       </div>
     {/if}
 
-    <!-- Quick-add row -->
-    {#if showQuickAdd}
-      <div class="flex min-h-[40px] items-center border-b border-border/40 px-3">
-        <span class="w-[48px] shrink-0"></span>
-        <input
-          type="text"
-          bind:value={quickAddTitle}
-          onkeydown={handleQuickAddKeydown}
-          onblur={() => { if (!quickAddTitle.trim()) showQuickAdd = false; }}
-          placeholder={`Add task to ${defaultStatus}...`}
-          class="min-w-0 flex-1 border-none bg-transparent py-1 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
-          autofocus
-        />
-      </div>
-    {:else}
-      <button
-        type="button"
-        class="flex min-h-[36px] w-full items-center px-3 text-left font-mono text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground"
-        onclick={() => { showQuickAdd = true; }}
-      >
-        <span class="w-[48px] shrink-0"></span>
-        + Add task
-      </button>
-    {/if}
+    <!-- Permanent quick-add row -->
+    <div class="flex h-10 items-center border-b border-border/40 px-3">
+      <span class="w-[24px] shrink-0"></span>
+      <input
+        type="text"
+        bind:value={quickAddTitle}
+        onkeydown={handleQuickAddKeydown}
+        placeholder="Add task..."
+        class="min-w-0 flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none"
+      />
+      {#if quickAddError}
+        <span class="font-mono text-[10px] text-red-400">{quickAddError}</span>
+      {/if}
+    </div>
   </div>
 </div>
+
+<style>
+  .list-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(42 42 42 / 0.4) transparent;
+  }
+
+  .list-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .list-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .list-scroll::-webkit-scrollbar-thumb {
+    background: rgb(42 42 42 / 0.4);
+    border-radius: 3px;
+  }
+
+  .priority-cycle {
+    line-height: 0;
+  }
+
+  .error-row-flash {
+    animation: row-flash 800ms ease-out;
+  }
+
+  @keyframes row-flash {
+    0%, 100% { border-color: rgb(42 42 42 / 0.4); }
+    30% { border-color: var(--color-destructive); }
+  }
+</style>
