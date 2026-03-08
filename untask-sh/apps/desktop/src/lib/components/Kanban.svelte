@@ -478,6 +478,7 @@
   .kanban-card:hover {
     border-color: var(--color-border);
     box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+    transform: scale(0.98);
   }
 
   .kanban-card.dragging {

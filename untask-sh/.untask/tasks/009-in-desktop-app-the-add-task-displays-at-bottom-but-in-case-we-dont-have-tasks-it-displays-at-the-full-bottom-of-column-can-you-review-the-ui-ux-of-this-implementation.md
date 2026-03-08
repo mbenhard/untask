@@ -3,7 +3,7 @@ id: 9
 title: in Desktop app, the “Add task” displays at the top, i want it to display at the bottomm and in case we dont have any tasks just display normally like in the beginning?
 status: done
 created: 2026-03-07
-updated: 2026-03-07T22:44:41.461165Z
+updated: 2026-03-08T13:03:01.334424Z
 completed: 2026-03-07T14:18:35.478864Z
-position: 10.0
+position: 14.0
 ---

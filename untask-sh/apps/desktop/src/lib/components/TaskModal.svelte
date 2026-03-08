@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertDialog, Dialog } from "bits-ui";
+  import { Dialog } from "bits-ui";
   import {
     deleteTask,
     getTask,
@@ -62,7 +62,7 @@
     }`,
   );
   let contentClass = $derived(
-    `task-modal fixed left-1/2 top-1/2 z-50 flex max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
+    `task-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
       errorFlash ? " error-flash" : ""
     }${closing ? " task-modal-closing" : ""}`,
   );
@@ -105,6 +105,7 @@
     if (snapshot?.id === id) {
       task = snapshot;
       showBody = stripSubtasksFromBody(snapshot.body).length > 0;
+      loading = false;
     }
     void loadTask(id, false);
   });
@@ -118,7 +119,7 @@
   });
 
   async function loadTask(id: number, preserveDrafts: boolean) {
-    if (!preserveDrafts) loading = true;
+    if (!preserveDrafts && task == null) loading = true;
     try {
       const loaded = await getTask(id);
       const preserveBodyDraft = preserveDrafts && (bodyFocused || bodyDirty);
@@ -500,27 +501,22 @@
             <span class="font-mono text-[10px] text-muted-foreground">#{task.id}</span>
           {/if}
         </div>
-        <MetaTooltip text="Close">
-          {#snippet children({ props })}
-            <button
-              {...props}
-              type="button"
-              aria-label="Close"
-              class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-              onclick={handleClose}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          {/snippet}
-        </MetaTooltip>
+        <button
+          type="button"
+          aria-label="Close"
+          class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+          onclick={handleClose}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <!-- Title -->
-        <div class="px-4 pt-3 pb-2">
+        <div class="px-4 pt-3 pb-1">
           {#if isUnindexed}
             <div class="mb-2 rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 bg-accent/60 px-2.5 py-2">
               <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Unindexed</p>
@@ -561,10 +557,10 @@
         </div>
 
         <!-- Metadata row: status, priority, tags -->
-        <div class="flex max-h-[80px] flex-wrap items-center gap-x-3 gap-y-1.5 overflow-y-auto px-4 pb-3">
+        <div class="flex max-h-[80px] flex-wrap items-center gap-x-4 gap-y-1.5 overflow-y-auto border-b border-border/40 px-4 pb-3">
           <!-- Status -->
           <div class="flex items-center gap-1.5">
-            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Status</span>
+            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Status</span>
             <MetaSelect
               value={task.status}
               items={statusOptions.map(col => ({ value: col.id, label: col.id }))}
@@ -576,8 +572,8 @@
           <!-- Confidence (review only) -->
           {#if task.confidence}
             <div class="flex items-center gap-1.5">
-              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Confidence</span>
-              <span class="inline-flex h-5 items-center rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground">
+              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Confidence</span>
+              <span class="inline-flex h-6 items-center rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground">
                 {task.confidence}
               </span>
             </div>
@@ -585,13 +581,13 @@
 
           <!-- Priority -->
           <div class="flex items-center gap-1.5">
-            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Priority</span>
+            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Priority</span>
             <MetaTooltip text="Cycle priority">
               {#snippet children({ props })}
                 <button
                   {...props}
                   type="button"
-                  class="inline-flex h-5 items-center gap-1 rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
+                  class="inline-flex h-6 items-center gap-1 rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
                   disabled={isUnindexed}
                   onclick={cyclePriority}
                 >
@@ -605,11 +601,11 @@
           <!-- Tags -->
           {#if task.tags.length > 0 || !isUnindexed}
             <div class="flex items-center gap-1.5">
-              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Tags</span>
+              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Tags</span>
               {#each task.tags as tag}
                 <button
                   type="button"
-                  class="inline-flex h-5 items-center rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
+                  class="inline-flex h-6 items-center rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
                   disabled={isUnindexed}
                   onclick={() => removeTag(tag)}
                   title={isUnindexed ? tag : "Click to remove"}
@@ -626,13 +622,13 @@
                     onblur={() => { if (!tagDraft.trim()) addingTag = false; else addTag(); }}
                     onkeydown={handleTagKeydown}
                     placeholder="tag..."
-                    class="h-5 w-[80px] rounded-[4px] border border-dashed border-border/60 bg-transparent px-1.5 font-mono text-[10px] leading-none text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
+                    class="h-6 w-[80px] rounded-[4px] border border-dashed border-border/60 bg-transparent px-2 font-mono text-[10px] leading-none text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
                     use:focusOnMount
                   />
                 {:else}
                   <button
                     type="button"
-                    class="inline-flex h-5 items-center rounded-[4px] border border-dashed border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
+                    class="inline-flex h-6 items-center rounded-[4px] border border-dashed border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
                     onclick={() => { addingTag = true; }}
                   >
                     + tag
@@ -703,7 +699,7 @@
           {:else}
             <button
               type="button"
-              class="w-full px-4 py-3 text-left font-mono text-[12px] text-muted-foreground/50 transition-colors duration-[120ms] hover:text-muted-foreground"
+              class="w-full px-4 py-3 text-left text-[13px] text-muted-foreground/50 transition-colors duration-[120ms] hover:text-muted-foreground"
               disabled={isUnindexed}
               onclick={() => { showBody = true; }}
             >
@@ -732,14 +728,14 @@
           <div class="mt-1.5 flex justify-end gap-1.5">
             <button
               type="button"
-              class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+              class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
               onclick={() => { kickBackOpen = false; kickBackNotes = ""; }}
             >
               Cancel
             </button>
             <button
               type="button"
-              class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+              class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
               onclick={kickBack}
             >
               Kick back
@@ -749,7 +745,7 @@
       {/if}
 
       <!-- Footer: date cycling left, actions right -->
-      <div class="flex items-center justify-between border-t border-border/60 px-3 py-1.5">
+      <div class="flex items-center justify-between border-t border-border/60 px-3 py-2">
         <div class="flex items-center gap-1.5">
           {#if bodyDirty}
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
@@ -776,19 +772,19 @@
         </div>
 
         {#if !isUnindexed}
-          <div class="flex items-center gap-0.5">
+          <div class="flex items-center gap-1">
             <!-- Review actions -->
             {#if isReviewStatus}
               <button
                 type="button"
-                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
                 onclick={() => { kickBackOpen = !kickBackOpen; }}
               >
                 Kick back
               </button>
               <button
                 type="button"
-                class="rounded-[4px] border border-border/60 bg-foreground/5 px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-foreground/10"
+                class="rounded-[4px] border border-border/60 bg-foreground/5 px-2.5 py-1 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-foreground/10"
                 onclick={approveTask}
               >
                 Approve
@@ -796,64 +792,57 @@
               <span class="mx-0.5 h-3 w-px bg-border/60"></span>
             {/if}
             <!-- Copy as agent prompt -->
-            <MetaTooltip text="Copy as agent prompt">
-              {#snippet children({ props })}
-                <button
-                  {...props}
-                  type="button"
-                  class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                  onclick={copyAsPrompt}
-                >
-                  {#if copyFeedback}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  {:else}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                  {/if}
-                </button>
-              {/snippet}
-            </MetaTooltip>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+              onclick={copyAsPrompt}
+            >
+              {#if copyFeedback}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Copied
+              {:else}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy as prompt
+              {/if}
+            </button>
 
-            <!-- Delete -->
-            <AlertDialog.Root bind:open={showDeleteConfirm}>
-              <AlertDialog.Trigger
+            <!-- Delete (inline confirm) -->
+            {#if showDeleteConfirm}
+              <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+                <span class="text-red-400">Delete?</span>
+                <button
+                  type="button"
+                  class="rounded-[4px] border border-border/60 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
+                  onclick={confirmDelete}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                  onclick={() => { showDeleteConfirm = false; }}
+                >
+                  No
+                </button>
+              </span>
+            {:else}
+              <button
+                type="button"
                 class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-red-400"
                 title="Delete task"
+                onclick={() => { showDeleteConfirm = true; }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-              </AlertDialog.Trigger>
-              <AlertDialog.Portal>
-                <AlertDialog.Overlay class="fixed inset-0 z-[60] bg-black/30" />
-                <AlertDialog.Content class="fixed left-1/2 top-1/2 z-[60] w-full max-w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border border-border/60 bg-card p-4 shadow-lg">
-                  <AlertDialog.Title class="font-mono text-[12px] font-medium text-foreground">
-                    Delete task?
-                  </AlertDialog.Title>
-                  <AlertDialog.Description class="mt-1 text-[11px] text-muted-foreground">
-                    This action cannot be undone.
-                  </AlertDialog.Description>
-                  <div class="mt-3 flex justify-end gap-2">
-                    <AlertDialog.Cancel
-                      class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                    >
-                      Cancel
-                    </AlertDialog.Cancel>
-                    <AlertDialog.Action
-                      class="rounded-[4px] border border-border/60 bg-destructive/10 px-2.5 py-1 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
-                      onclick={confirmDelete}
-                    >
-                      Delete
-                    </AlertDialog.Action>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Portal>
-            </AlertDialog.Root>
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -897,11 +886,11 @@
   @keyframes modal-in {
     from {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.944);
+      scale: 0.944;
     }
     to {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      scale: 1;
     }
   }
 
@@ -912,11 +901,11 @@
   @keyframes modal-out {
     from {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      scale: 1;
     }
     to {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.956);
+      scale: 0.956;
     }
   }
 
