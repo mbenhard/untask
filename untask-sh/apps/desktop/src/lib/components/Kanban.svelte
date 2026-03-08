@@ -2,6 +2,7 @@
   import { Progress } from "bits-ui";
   import { addTask, updateTask, type ColumnDto, type TaskDto } from "$lib/api";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
+  import { tagColor } from "$lib/tagColor";
   import { resolveStatus } from "$lib/utils";
 
   let {
@@ -149,6 +150,7 @@
     e.preventDefault();
     e.stopPropagation();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    if (dropTarget?.columnId === columnId && dropTarget.index === index) return;
     dropTarget = { columnId, index };
   }
 
@@ -156,6 +158,7 @@
     if (!draggedTask || isUnmatchedColumn(columnId)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    if (dropTarget?.columnId === columnId && dropTarget.index === taskCount) return;
     dropTarget = { columnId, index: taskCount };
   }
 
@@ -261,6 +264,14 @@
     return next;
   }
 
+  function isDropBeforeTask(columnId: string, index: number): boolean {
+    return dropTarget?.columnId === columnId && dropTarget.index === index;
+  }
+
+  function isDropAtColumnEnd(columnId: string, taskCount: number): boolean {
+    return dropTarget?.columnId === columnId && dropTarget.index === taskCount;
+  }
+
   // ── Display helpers ──────────────────────────────────────────────
   function priorityTone(p: string | null): "low" | "medium" | "high" | "neutral" {
     if (p === "high" || p === "urgent") return "high";
@@ -303,16 +314,12 @@
         >
         <!-- Task cards -->
         {#each col.tasks as task, i}
-          <!-- Drop indicator line -->
-          {#if dropTarget?.columnId === col.id && dropTarget?.index === i}
-            <div class="drop-indicator"></div>
-          {/if}
-
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div
-            class="kanban-card group cursor-pointer rounded-[6px] border border-border/60 px-2.5 py-2 transition-all duration-[120ms]"
+            class="kanban-card group relative cursor-pointer rounded-[6px] border border-border/60 px-2.5 py-2 transition-all duration-[120ms]"
             class:opacity-30={draggedTask?.id === task.id}
             class:dragging={draggedTask?.id === task.id}
+            class:drop-before={isDropBeforeTask(col.id, i)}
             class:kanban-card-settled={justDroppedId === task.id}
             draggable={canDrag(task) && !isUnmatchedColumn(col.id)}
             ondragstart={(e) => handleDragStart(e, task)}
@@ -340,7 +347,8 @@
             {#if task.tags.length > 0 || task.body?.trim()}
               <div class="mt-1 flex items-center gap-1.5">
                 {#each task.tags.slice(0, 2) as tag}
-                  <span class="rounded-[3px] font-mono text-[10px] text-muted-foreground/60">
+                  <span class="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/60">
+                    <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {tagColor(tag)}"></span>
                     {tag}
                   </span>
                 {/each}
@@ -387,18 +395,34 @@
               </Progress.Root>
             {/if}
 
-            <!-- Bottom row: priority dot (bottom-left) -->
-            <div class="mt-1.5 flex items-center">
+            <!-- Bottom row: priority dot + owner icon + attachment count (bottom-left) -->
+            <div class="mt-1.5 flex items-center gap-1">
               <div class="pointer-events-none flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/50 bg-background/90 transition-colors duration-[120ms] group-hover:border-border/70">
                 <PriorityDot tone={priorityTone(task.priority)} />
               </div>
+              {#if task.owner === "user"}
+                <div class="pointer-events-none flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/50 bg-background/90 text-muted-foreground/60">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </div>
+              {/if}
+              {#if task.attachments?.length > 0}
+                <span class="inline-flex items-center gap-0.5 font-mono text-[9px] text-muted-foreground/50" title="{task.attachments.length} attachment{task.attachments.length > 1 ? 's' : ''}">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  {task.attachments.length}
+                </span>
+              {/if}
             </div>
           </div>
         {/each}
 
         <!-- Drop indicator at end -->
-        {#if dropTarget?.columnId === col.id && dropTarget?.index === col.tasks.length && col.tasks.length > 0}
-          <div class="drop-indicator"></div>
+        {#if isDropAtColumnEnd(col.id, col.tasks.length) && col.tasks.length > 0}
+          <div class="drop-indicator-end"></div>
         {/if}
 
         <!-- Empty column: combined drop zone + add task -->
@@ -486,11 +510,26 @@
     box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
   }
 
-  .drop-indicator {
+  .kanban-card.drop-before::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: -6px;
     height: 2px;
-    background: var(--color-ring);
-    border-radius: 1px;
-    box-shadow: 0 0 6px var(--color-ring);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-foreground) 55%, transparent);
+    box-shadow: 0 0 0 1px rgb(245 245 245 / 0.08);
+    pointer-events: none;
+  }
+
+  .drop-indicator-end {
+    height: 2px;
+    margin: 0 8px 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-foreground) 55%, transparent);
+    box-shadow: 0 0 0 1px rgb(245 245 245 / 0.08);
+    pointer-events: none;
     flex-shrink: 0;
   }
 

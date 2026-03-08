@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { Dialog } from "bits-ui";
   import {
     deleteTask,
@@ -48,13 +46,14 @@
   let showDeleteConfirm = $state(false);
   let copyFeedback = $state(false);
   let dropActive = $state(false);
+  let dragDepth = $state(0);
   let showBody = $state(false);
   let errorFlash = $state<string | null>(null);
   let closing = $state(false);
   let saveErrorText = $state<string | null>(null);
   let attachmentListRef = $state<{
     handlePaste: (e: ClipboardEvent) => Promise<void>;
-    handleDroppedFiles: (paths: string[]) => Promise<void>;
+    handleDroppedFiles: (files: File[]) => Promise<void>;
   } | null>(null);
   let bodyFocused = $state(false);
   let bodyDirty = $state(false);
@@ -63,6 +62,7 @@
   let kickBackOpen = $state(false);
   let kickBackNotes = $state("");
   let bodySaveRevision = 0;
+  let dropActivateTimer: ReturnType<typeof setTimeout> | null = null;
   const closeAnimationMs = 220;
   let overlayClass = $derived(
     `task-modal-shell fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]${
@@ -87,53 +87,64 @@
     });
   }
 
-  onMount(() => {
-    let disposed = false;
-    let unlisten: (() => void) | null = null;
+  function hasDraggedFiles(e: DragEvent): boolean {
+    const types = e.dataTransfer?.types;
+    return !!types && Array.from(types).includes("Files");
+  }
 
-    void getCurrentWindow()
-      .onDragDropEvent((event) => {
-        if (disposed) return;
+  function clearDropActivationTimer() {
+    if (dropActivateTimer != null) {
+      clearTimeout(dropActivateTimer);
+      dropActivateTimer = null;
+    }
+  }
 
-        if (event.payload.type === "leave") {
-          dropActive = false;
-          return;
-        }
+  function clearDropState() {
+    clearDropActivationTimer();
+    dragDepth = 0;
+    dropActive = false;
+  }
 
-        if (task?.id == null || !attachmentListRef) {
-          if (event.payload.type === "drop") {
-            dropActive = false;
-          }
-          return;
-        }
+  function scheduleDropActive() {
+    if (dropActive || dropActivateTimer != null) return;
+    dropActivateTimer = setTimeout(() => {
+      dropActive = true;
+      dropActivateTimer = null;
+    }, 75);
+  }
 
-        if (event.payload.type === "enter" || event.payload.type === "over") {
-          dropActive = true;
-          return;
-        }
+  function handleFileDragEnter(e: DragEvent) {
+    if (!task?.id || !attachmentListRef || !hasDraggedFiles(e)) return;
+    e.preventDefault();
+    dragDepth += 1;
+    scheduleDropActive();
+  }
 
-        if (event.payload.type === "drop") {
-          dropActive = false;
-          void attachmentListRef.handleDroppedFiles(event.payload.paths);
-        }
-      })
-      .then((cleanup) => {
-        if (disposed) {
-          cleanup();
-          return;
-        }
-        unlisten = cleanup;
-      })
-      .catch((error) => {
-        console.error("Failed to register drag and drop handler:", error);
-      });
+  function handleFileDragOver(e: DragEvent) {
+    if (!task?.id || !attachmentListRef || !hasDraggedFiles(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+    scheduleDropActive();
+  }
 
-    return () => {
-      disposed = true;
-      dropActive = false;
-      unlisten?.();
-    };
-  });
+  function handleFileDragLeave(e: DragEvent) {
+    if (!hasDraggedFiles(e) && dragDepth === 0) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) {
+      clearDropState();
+    }
+  }
+
+  function handleFileDrop(e: DragEvent) {
+    if (!task?.id || !attachmentListRef || !hasDraggedFiles(e)) return;
+    e.preventDefault();
+    clearDropState();
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length === 0) return;
+    void attachmentListRef.handleDroppedFiles(files);
+  }
 
   $effect(() => {
     const id = taskId;
@@ -145,6 +156,7 @@
     titleDraft = "";
     showDeleteConfirm = false;
     copyFeedback = false;
+    clearDropState();
     bodyFocused = false;
     bodyDirty = false;
     kickBackOpen = false;
@@ -560,6 +572,10 @@
         else if (promptDropdownOpen) { promptDropdownOpen = false; }
         else if (!closing) { handleClose(); }
       }}
+      ondragenter={handleFileDragEnter}
+      ondragover={handleFileDragOver}
+      ondragleave={handleFileDragLeave}
+      ondrop={handleFileDrop}
       onpaste={(e) => {
         if (e.clipboardData?.items) {
           for (const item of e.clipboardData.items) {
@@ -572,9 +588,10 @@
       }}
     >
     {#if dropActive && task?.id != null}
-      <div class="pointer-events-none fixed left-1/2 top-1/2 z-10 flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[12px] border border-dashed border-foreground/25 bg-card/85">
-        <div class="flex h-full items-center justify-center">
-          <div class="rounded-[6px] border border-border/60 bg-card/90 px-3 py-2">
+      <div class="pointer-events-none fixed left-1/2 top-1/2 z-10 flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[12px] border border-foreground/16 bg-card/56 backdrop-blur-[1px]">
+        <div class="rounded-[6px] border border-border/70 bg-card/94 px-3 py-2 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)]">
+          <div class="flex items-center gap-2">
+            <span class="inline-block h-1.5 w-1.5 rounded-full bg-foreground/60"></span>
             <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/55">Drop files to attach</p>
           </div>
         </div>

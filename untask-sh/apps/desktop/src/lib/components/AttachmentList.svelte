@@ -62,6 +62,7 @@
   let preview = $state<AttachmentPreview | null>(null);
   let previewLoading = $state(false);
   let previewError = $state<string | null>(null);
+  let attachFeedback = $state<string | null>(null);
   let attachmentState = $state<
     Record<
       string,
@@ -80,6 +81,7 @@
     "xml",
     "html",
   ]);
+  let attachFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   function isImage(mime: string): boolean {
     return mime.startsWith("image/");
@@ -114,6 +116,17 @@
     return message.includes("invalid attachment filename") ? "invalid" : "missing";
   }
 
+  function setAttachFeedback(message: string) {
+    attachFeedback = message;
+    if (attachFeedbackTimer != null) {
+      clearTimeout(attachFeedbackTimer);
+    }
+    attachFeedbackTimer = setTimeout(() => {
+      attachFeedback = null;
+      attachFeedbackTimer = null;
+    }, 1400);
+  }
+
   function metaLabel(att: AttachmentRefDto): string {
     const resolved = attachmentState[att.filename];
     if (resolved?.status === "missing") return "Missing on disk";
@@ -124,10 +137,12 @@
   async function attachPaths(paths: string[]) {
     if (readonly || paths.length === 0) return;
     uploading = true;
+    attachFeedback = null;
     try {
       for (const filePath of paths) {
         await attachFile(taskId, filePath);
       }
+      setAttachFeedback(`attached ${paths.length} file${paths.length === 1 ? "" : "s"}`);
       onTaskUpdated();
     } catch (error) {
       console.error("Failed to attach files:", error);
@@ -146,8 +161,28 @@
     await attachPaths(paths);
   }
 
-  export async function handleDroppedFiles(paths: string[]) {
-    await attachPaths(paths);
+  export async function handleDroppedFiles(files: File[]) {
+    if (readonly || files.length === 0) return;
+    uploading = true;
+    attachFeedback = null;
+    try {
+      for (const file of files) {
+        const buffer = await file.arrayBuffer();
+        const bytes = Array.from(new Uint8Array(buffer));
+        await attachFileBytes(
+          taskId,
+          bytes,
+          file.name || `drop-${Date.now()}`,
+          file.type || "application/octet-stream",
+        );
+      }
+      setAttachFeedback(`attached ${files.length} file${files.length === 1 ? "" : "s"}`);
+      onTaskUpdated();
+    } catch (error) {
+      console.error("Failed to attach dropped files:", error);
+    } finally {
+      uploading = false;
+    }
   }
 
   async function handleDelete(filename: string) {
@@ -177,12 +212,14 @@
       if (!blob) continue;
 
       uploading = true;
+      attachFeedback = null;
       try {
         const buffer = await blob.arrayBuffer();
         const bytes = Array.from(new Uint8Array(buffer));
         const ext = extFromMime(item.type);
         const filename = `paste-${Date.now()}.${ext}`;
         await attachFileBytes(taskId, bytes, filename, item.type);
+        setAttachFeedback("attached 1 file");
         onTaskUpdated();
       } catch (error) {
         console.error("Failed to paste attachment:", error);
@@ -334,7 +371,7 @@
 {#if visible}
   <div
     class={`mx-4 mt-2 mb-3 overflow-hidden rounded-[6px] border transition-colors duration-[120ms] ${
-      dropActive ? "border-foreground/30 bg-accent/30" : "border-border/60"
+      dropActive ? "border-foreground/24 bg-accent/18" : "border-border/60"
     }`}
   >
     <div class="flex items-center gap-2 border-b border-border/40 px-3 py-2">
@@ -346,9 +383,13 @@
       {/if}
       {#if uploading}
         <span class="animate-pulse font-mono text-[10px] text-muted-foreground/40">syncing...</span>
+      {:else if attachFeedback}
+        <span class="font-mono text-[10px] text-muted-foreground/45">{attachFeedback}</span>
       {/if}
       {#if !readonly}
-        <span class="ml-auto font-mono text-[10px] text-muted-foreground/35">paste or drop files</span>
+        <span class="ml-auto font-mono text-[10px] text-muted-foreground/35">
+          {dropActive ? "drop to attach" : "paste or drop files"}
+        </span>
       {/if}
     </div>
 
