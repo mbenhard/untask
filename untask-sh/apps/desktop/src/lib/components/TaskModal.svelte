@@ -70,7 +70,7 @@
     }`,
   );
   let contentClass = $derived(
-    `task-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 relative flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
+    `task-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
       errorFlash ? " error-flash" : ""
     }${closing ? " task-modal-closing" : ""}`,
   );
@@ -572,7 +572,7 @@
       }}
     >
     {#if dropActive && task?.id != null}
-      <div class="pointer-events-none absolute inset-3 z-10 rounded-[10px] border border-dashed border-foreground/25 bg-card/85">
+      <div class="pointer-events-none fixed left-1/2 top-1/2 z-10 flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[12px] border border-dashed border-foreground/25 bg-card/85">
         <div class="flex h-full items-center justify-center">
           <div class="rounded-[6px] border border-border/60 bg-card/90 px-3 py-2">
             <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/55">Drop files to attach</p>

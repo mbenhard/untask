@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
+use base64::Engine as _;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use tauri::State;
@@ -225,6 +227,55 @@ fn attachment_text_preview_for_store(
         .read_attachment_text(id, filename)
         .map_err(|e| e.to_string())?;
     Ok(AttachmentTextPreviewDto::from(preview))
+}
+
+fn attachment_data_url_for_store(
+    store: &TaskStore,
+    id: u32,
+    filename: &str,
+) -> Result<String, String> {
+    let task = store.get(id).map_err(|e| e.to_string())?;
+    let attachment = task
+        .attachments
+        .iter()
+        .find(|attachment| attachment.filename == filename)
+        .ok_or_else(|| format!("attachment not found: {filename}"))?;
+    let path = store.attachment_path(id, filename).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{};base64,{}", attachment.mime_type, encoded))
+}
+
+fn open_attachment_for_store(store: &TaskStore, id: u32, filename: &str) -> Result<(), String> {
+    let path = store.attachment_path(id, filename).map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg(&path);
+        command
+    };
+
+    #[cfg(target_os = "linux")]
+    let mut command = {
+        let mut command = Command::new("xdg-open");
+        command.arg(&path);
+        command
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", ""]);
+        command.arg(&path);
+        command
+    };
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    return Err("open_attachment is not supported on this platform".to_string());
+
+    command.spawn().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -545,6 +596,17 @@ pub fn get_attachment_path(
 }
 
 #[tauri::command]
+pub fn get_attachment_data_url(
+    id: u32,
+    filename: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    attachment_data_url_for_store(&store, id, &filename)
+}
+
+#[tauri::command]
 pub fn read_attachment_text(
     id: u32,
     filename: String,
@@ -553,6 +615,17 @@ pub fn read_attachment_text(
     let root = require_project(&state)?;
     let store = TaskStore::new(root).map_err(|e| e.to_string())?;
     attachment_text_preview_for_store(&store, id, &filename)
+}
+
+#[tauri::command]
+pub fn open_attachment(
+    id: u32,
+    filename: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    open_attachment_for_store(&store, id, &filename)
 }
 
 // ── Tags ────────────────────────────────────────────────────────────
@@ -878,5 +951,20 @@ mod tests {
             )
             .unwrap();
         assert!(cleared.attachments.is_empty());
+    }
+
+    #[test]
+    fn attachment_data_url_helper_returns_inline_payload() {
+        let tmp = setup_project();
+        let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+        let task = store.add("Task with image", None, None).unwrap();
+        let task_id = task.id.unwrap();
+
+        store
+            .attach_file_bytes(task_id, b"png-bytes", "thumb.png", "image/png")
+            .unwrap();
+
+        let data_url = attachment_data_url_for_store(&store, task_id, "thumb.png").unwrap();
+        assert!(data_url.starts_with("data:image/png;base64,"));
     }
 }

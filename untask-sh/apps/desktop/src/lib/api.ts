@@ -273,9 +273,17 @@ export function getAttachmentPath(id: number, filename: string): Promise<string>
   return invoke("get_attachment_path", { id, filename });
 }
 
+export function getAttachmentDataUrl(id: number, filename: string): Promise<string> {
+  return invoke("get_attachment_data_url", { id, filename });
+}
+
 export function readAttachmentText(
   id: number,
   filename: string,
 ): Promise<AttachmentTextPreviewDto> {
   return invoke("read_attachment_text", { id, filename });
+}
+
+export function openAttachment(id: number, filename: string): Promise<void> {
+  return invoke("open_attachment", { id, filename });
 }

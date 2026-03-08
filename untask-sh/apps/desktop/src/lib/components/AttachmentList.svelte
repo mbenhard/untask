@@ -1,12 +1,12 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
-  import { openPath } from "@tauri-apps/plugin-opener";
-  import { convertFileSrc } from "@tauri-apps/api/core";
   import {
     attachFile,
     attachFileBytes,
     deleteAttachment,
+    getAttachmentDataUrl,
     getAttachmentPath,
+    openAttachment,
     readAttachmentText,
     type AttachmentRefDto,
     type AttachmentTextPreviewDto,
@@ -63,7 +63,10 @@
   let previewLoading = $state(false);
   let previewError = $state<string | null>(null);
   let attachmentState = $state<
-    Record<string, { status: AttachmentStatus; path?: string; src?: string; error?: string }>
+    Record<
+      string,
+      { status: AttachmentStatus; path?: string; thumbnailUrl?: string; error?: string }
+    >
   >({});
 
   const textPreviewExtensions = new Set([
@@ -192,7 +195,7 @@
 
   async function ensureResolved(att: AttachmentRefDto) {
     const cached = attachmentState[att.filename];
-    if (cached && cached.status !== "pending") return cached;
+    if (cached) return cached;
 
     attachmentState = {
       ...attachmentState,
@@ -201,10 +204,13 @@
 
     try {
       const path = await getAttachmentPath(taskId, att.filename);
+      const thumbnailUrl = isImage(att.mime_type)
+        ? await getAttachmentDataUrl(taskId, att.filename)
+        : undefined;
       const resolved = {
         status: "ready" as const,
         path,
-        src: convertFileSrc(path),
+        thumbnailUrl,
       };
       attachmentState = {
         ...attachmentState,
@@ -243,24 +249,26 @@
         return;
       }
 
-      if (resolved.status === "ready" && isImage(att.mime_type) && resolved.src) {
+      if (resolved.status === "ready" && isImage(att.mime_type)) {
+        const src = resolved.thumbnailUrl ?? (await getAttachmentDataUrl(taskId, att.filename));
         preview = {
           kind: "image",
           filename: att.filename,
           mimeType: att.mime_type,
           size: att.size,
-          src: resolved.src,
+          src,
         };
         return;
       }
 
-      if (resolved.status === "ready" && isPdf(att.mime_type) && resolved.src) {
+      if (resolved.status === "ready" && isPdf(att.mime_type)) {
+        const src = await getAttachmentDataUrl(taskId, att.filename);
         preview = {
           kind: "pdf",
           filename: att.filename,
           mimeType: att.mime_type,
           size: att.size,
-          src: resolved.src,
+          src,
         };
         return;
       }
@@ -302,7 +310,7 @@
     try {
       const resolved = await ensureResolved(att);
       if (resolved.status !== "ready" || !resolved.path) return;
-      await openPath(resolved.path);
+      await openAttachment(taskId, att.filename);
     } catch (error) {
       console.error("Failed to open attachment:", error);
     }
@@ -363,9 +371,9 @@
           }`}
           onclick={() => showPreview(att)}
         >
-          {#if isImage(att.mime_type) && resolved?.status === "ready" && resolved.src}
+          {#if isImage(att.mime_type) && resolved?.status === "ready" && resolved.thumbnailUrl}
             <img
-              src={resolved.src}
+              src={resolved.thumbnailUrl}
               alt={att.filename}
               class="h-8 w-8 shrink-0 rounded-[4px] border border-border/40 object-cover"
             />

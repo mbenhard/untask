@@ -37,7 +37,8 @@
     "security": {
       "csp": null,
       "assetProtocol": {
-        "scope": ["**/.untask/attachments/**"]
+        "enable": true,
+        "scope": ["**"]
       }
     }
   }
