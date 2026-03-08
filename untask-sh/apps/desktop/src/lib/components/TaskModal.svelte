@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertDialog, Dialog, Progress } from "bits-ui";
+  import { AlertDialog, Dialog } from "bits-ui";
   import {
     deleteTask,
     getTask,
@@ -11,6 +11,7 @@
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import type { PriorityTone } from "$lib/components/PriorityDot.svelte";
+  import SubtaskList from "$lib/components/SubtaskList.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import MetaTooltip from "$lib/components/ui/MetaTooltip.svelte";
   import { hasKnownStatus } from "$lib/utils";
@@ -403,6 +404,20 @@
     saveField({ body: full });
   }
 
+  function handleSubtaskBodyChange(newDescription: string) {
+    if (!task) return;
+    if (!hasAgentSections) {
+      saveField({ body: newDescription });
+      return;
+    }
+    let full = newDescription.trimEnd();
+    if (parsedBody.agentSummary != null) full += "\n\n## Agent Summary\n" + parsedBody.agentSummary;
+    if (parsedBody.deferred != null) full += "\n\n## Deferred\n" + parsedBody.deferred;
+    if (parsedBody.reviewNotes != null) full += "\n\n## Review Notes\n" + parsedBody.reviewNotes;
+    full += "\n";
+    saveField({ body: full });
+  }
+
   // Copy as agent prompt
   function copyAsPrompt() {
     if (!task) return;
@@ -621,19 +636,12 @@
           </div>
         {/if}
 
-        <!-- Subtask progress bar -->
-        {#if task.subtask_total > 0}
-          <Progress.Root
-            value={task.subtask_done}
-            max={task.subtask_total}
-            class="mx-4 mb-2 h-[2px] overflow-hidden rounded-full bg-border"
-          >
-            <div
-              class="h-full rounded-full bg-foreground/60 transition-[width] duration-200"
-              style="width: {(task.subtask_done / task.subtask_total) * 100}%"
-            ></div>
-          </Progress.Root>
-        {/if}
+        <!-- Subtask list -->
+        <SubtaskList
+          body={hasAgentSections ? parsedBody.description : task.body}
+          readonly={isUnindexed}
+          onBodyChange={handleSubtaskBodyChange}
+        />
 
         <!-- Unmatched status warning -->
         {#if hasUnmatchedStatus}
