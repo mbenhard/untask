@@ -117,6 +117,9 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Required column IDs that define the core workflow.
+    const REQUIRED_COLUMNS: &'static [&'static str] = &["backlog", "todo", "in-progress", "review", "done"];
+
     /// Create a config with specific columns (and default docs/theme).
     pub fn with_columns(columns: Vec<Column>) -> Self {
         Self {
@@ -228,6 +231,7 @@ impl Config {
         let idx = self.find_column_index(old)?;
 
         let old_id = self.columns[idx].id.clone();
+        self.ensure_column_is_not_required(&old_id, "rename")?;
         self.columns[idx].aliases.push(old_id.clone());
         self.columns[idx].id = new_id.clone();
         Ok((old_id, new_id))
@@ -252,9 +256,6 @@ impl Config {
         Ok(())
     }
 
-    /// Required column IDs that cannot be deleted.
-    const REQUIRED_COLUMNS: &'static [&'static str] = &["backlog", "todo", "in-progress", "review", "done"];
-
     /// Delete a column. Returns the list of task statuses that need migration.
     /// Caller must handle task migration/deletion before calling this.
     pub fn column_delete(&mut self, name: &str) -> Result<()> {
@@ -265,11 +266,7 @@ impl Config {
         }
         let idx = self.find_column_index(name)?;
         let col_id = &self.columns[idx].id;
-        if Self::REQUIRED_COLUMNS.contains(&col_id.as_str()) {
-            return Err(UntaskError::InvalidConfig(
-                format!("cannot delete required column: {col_id}"),
-            ));
-        }
+        self.ensure_column_is_not_required(col_id, "delete")?;
         self.columns.remove(idx);
         Ok(())
     }
@@ -299,6 +296,15 @@ impl Config {
                     )));
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn ensure_column_is_not_required(&self, id: &str, action: &str) -> Result<()> {
+        if Self::REQUIRED_COLUMNS.contains(&id) {
+            return Err(UntaskError::InvalidConfig(format!(
+                "cannot {action} required column: {id}"
+            )));
         }
         Ok(())
     }

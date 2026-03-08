@@ -152,3 +152,31 @@ fn normalize_status_unknown_returns_none() {
     let config = Config::default();
     assert_eq!(config.normalize_status("archived"), None);
 }
+
+#[test]
+fn cannot_delete_required_columns() {
+    let mut config = Config::default();
+    let err = config.column_delete("review").unwrap_err();
+    assert!(matches!(err, UntaskError::InvalidConfig(_)));
+    assert!(err.to_string().contains("cannot delete required column: review"));
+}
+
+#[test]
+fn cannot_rename_required_columns() {
+    let mut config = Config::default();
+    let err = config.column_rename("review", "qa").unwrap_err();
+    assert!(matches!(err, UntaskError::InvalidConfig(_)));
+    assert!(err.to_string().contains("cannot rename required column: review"));
+}
+
+#[test]
+fn can_rename_custom_columns() {
+    let mut config = Config::default();
+    config.column_add("blocked", Some("review"), false).unwrap();
+
+    let (old_id, new_id) = config.column_rename("blocked", "qa").unwrap();
+
+    assert_eq!(old_id, "blocked");
+    assert_eq!(new_id, "qa");
+    assert!(config.columns.iter().any(|column| column.id == "qa"));
+}
