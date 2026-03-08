@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Progress } from "bits-ui";
   import {
     getTask,
     updateTask,
@@ -7,6 +8,7 @@
   } from "$lib/api";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
+  import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import { hasKnownStatus } from "$lib/utils";
 
   let {
@@ -139,40 +141,43 @@
       <div class="border-b border-border/80 px-4 py-3">
         <h2 class="text-[16px] font-medium text-foreground">{fullTask.title}</h2>
 
-        <div class="mt-2 flex flex-wrap items-center gap-2">
+        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           {#if isUnindexed}
-            <span class="rounded-[4px] border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            <span class="inline-flex h-5 items-center rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground">
               unindexed
             </span>
           {/if}
-          <!-- Status selector -->
-          <select
-            class="h-5 rounded-[4px] border border-border bg-card px-1.5 font-mono text-[10px] text-foreground focus:border-ring focus:outline-none"
-            value={fullTask.status}
-            disabled={isUnindexed}
-            onchange={(e) => changeStatus(e.currentTarget.value)}
-          >
-            {#each statusOptions as col}
-              <option value={col.id}>{col.id}</option>
-            {/each}
-          </select>
+          <!-- Status -->
+          <div class="flex items-center gap-1.5">
+            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Status</span>
+            <MetaSelect
+              value={fullTask.status}
+              items={statusOptions.map(col => ({ value: col.id, label: col.id }))}
+              disabled={isUnindexed}
+              onValueChange={changeStatus}
+            />
+          </div>
 
           <!-- Priority -->
-          <span class="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5">
-            <PriorityDot tone={priorityTone(fullTask.priority)} />
-            <span class="font-mono text-[10px] text-muted-foreground">
-              {fullTask.priority ?? "none"}
+          <div class="flex items-center gap-1.5">
+            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Priority</span>
+            <span class="inline-flex h-5 items-center gap-1 rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground">
+              <PriorityDot tone={priorityTone(fullTask.priority)} />
+              <span>{fullTask.priority ?? "none"}</span>
             </span>
-          </span>
+          </div>
 
           <!-- Tags -->
-          {#each fullTask.tags as tag}
-            <span
-              class="rounded-[4px] border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-            >
-              {tag}
-            </span>
-          {/each}
+          {#if fullTask.tags.length > 0}
+            <div class="flex items-center gap-1.5">
+              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Tags</span>
+              {#each fullTask.tags as tag}
+                <span class="inline-flex h-5 items-center rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground">
+                  {tag}
+                </span>
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <!-- Dates -->
@@ -193,12 +198,16 @@
         <!-- Subtask progress -->
         {#if fullTask.subtask_total > 0}
           <div class="mt-2 flex items-center gap-2">
-            <div class="h-1 w-24 overflow-hidden rounded-full bg-border">
+            <Progress.Root
+              value={fullTask.subtask_done}
+              max={fullTask.subtask_total}
+              class="h-1 w-24 overflow-hidden rounded-full bg-border"
+            >
               <div
                 class="h-full rounded-full bg-foreground/60"
                 style="width: {(fullTask.subtask_done / fullTask.subtask_total) * 100}%"
               ></div>
-            </div>
+            </Progress.Root>
             <span class="font-mono text-[10px] text-muted-foreground">
               {fullTask.subtask_done}/{fullTask.subtask_total}
             </span>
@@ -231,3 +240,4 @@
     </div>
   {/if}
 </div>
+

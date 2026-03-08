@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Progress } from "bits-ui";
   import { addTask, updateTask, type ColumnDto, type TaskDto } from "$lib/api";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import { resolveStatus } from "$lib/utils";
@@ -33,6 +34,16 @@
   let dropTarget = $state<{ columnId: string; index: number } | null>(null);
   let isDragging = $state(false);
   let justDroppedId = $state<number | null>(null);
+
+  function focusOnMount(el: HTMLElement) {
+    requestAnimationFrame(() => {
+      el.focus();
+      if (el instanceof HTMLTextAreaElement) {
+        el.style.height = "auto";
+        el.style.height = `${el.scrollHeight}px`;
+      }
+    });
+  }
 
   // ── Column derivation with position sort ─────────────────────────
   let kanbanColumns = $derived.by(() => {
@@ -364,12 +375,16 @@
 
             <!-- Subtask progress bar -->
             {#if task.subtask_total > 0}
-              <div class="mt-1.5 h-[2px] w-full overflow-hidden rounded-full bg-border">
+              <Progress.Root
+                value={task.subtask_done}
+                max={task.subtask_total}
+                class="mt-1.5 h-[2px] w-full overflow-hidden rounded-full bg-border"
+              >
                 <div
                   class="h-full rounded-full bg-foreground/60"
                   style="width: {(task.subtask_done / task.subtask_total) * 100}%"
                 ></div>
-              </div>
+              </Progress.Root>
             {/if}
 
             <!-- Bottom row: priority dot (bottom-left) -->
@@ -400,7 +415,7 @@
                 style="overflow:hidden; box-shadow:none"
                 class="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-snug text-foreground placeholder:text-muted-foreground/40 outline-none focus:outline-none focus:ring-0 focus:shadow-none"
                 class:border-destructive={quickAddErrorFlash}
-                autofocus
+                use:focusOnMount
               ></textarea>
               {#if quickAddError}
                 <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
@@ -436,7 +451,7 @@
                 style="overflow:hidden; box-shadow:none"
                 class="w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-snug text-foreground placeholder:text-muted-foreground/40 outline-none focus:outline-none focus:ring-0 focus:shadow-none"
                 class:border-destructive={quickAddErrorFlash}
-                autofocus
+                use:focusOnMount
               ></textarea>
               {#if quickAddError}
                 <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>

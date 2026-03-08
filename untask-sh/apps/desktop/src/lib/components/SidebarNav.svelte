@@ -24,7 +24,7 @@
   } = $props();
 </script>
 
-<aside class="flex w-[52px] shrink-0 flex-col items-center border-r border-border/60 bg-card/70 py-2 gap-1">
+<aside role="navigation" class="flex w-[52px] shrink-0 flex-col items-center border-r border-border/60 bg-card/70 py-2 gap-1">
   {#each items as item}
     <button
       type="button"
@@ -34,6 +34,7 @@
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
       }`}
+      aria-current={activeView === item.id ? "page" : undefined}
       title={item.label}
     >
       {#if item.icon === "board"}

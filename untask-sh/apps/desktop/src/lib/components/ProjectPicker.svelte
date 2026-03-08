@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { Dialog } from "bits-ui";
 
   import {
     getRecentProjects,
@@ -27,7 +28,6 @@
   let filterQuery = $state("");
   let selectedIndex = $state(0);
   let filterInputEl = $state<HTMLInputElement | null>(null);
-  let backdropEl = $state<HTMLDivElement | null>(null);
 
   const filteredProjects = $derived(
     filterQuery.trim()
@@ -127,21 +127,7 @@
     }
   }
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === backdropEl) {
-      onClose?.();
-    }
-  }
-
   function handleKeydown(e: KeyboardEvent) {
-    if (mode !== "dropdown") return;
-
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onClose?.();
-      return;
-    }
-
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (filteredProjects.length > 0) {
@@ -191,69 +177,75 @@
 </script>
 
 {#if mode === "dropdown"}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-40 flex items-start justify-center pt-12 bg-black/30 backdrop-blur-[2px]"
-    bind:this={backdropEl}
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
+  <Dialog.Root
+    open={true}
+    onOpenChange={(open) => { if (!open) onClose?.(); }}
   >
-    <div class="picker-dropdown w-full max-w-[320px] rounded-[6px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.4)]">
-      <div class="border-b border-border/60 px-3 py-2">
-        <input
-          bind:this={filterInputEl}
-          bind:value={filterQuery}
-          type="text"
-          placeholder="Search projects..."
-          class="w-full bg-transparent font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 border-transparent outline-none focus:border-border transition-colors duration-[120ms]"
-        />
-      </div>
-
-      {#if filteredProjects.length > 0}
-        <div class="max-h-[280px] overflow-y-auto divide-y divide-border/40">
-          {#each filteredProjects as project, i}
-            <button
-              type="button"
-              class="flex w-full items-center justify-between px-3 py-2 text-left transition-colors duration-[120ms] {i === selectedIndex ? 'bg-accent/60' : 'hover:bg-accent/40'}"
-              onclick={() => openRecent(project)}
-              onmouseenter={() => { selectedIndex = i; }}
-            >
-              <div class="min-w-0 flex-1">
-                <p class="text-[12px] font-medium text-foreground truncate">
-                  {project.name}
-                </p>
-                <p class="font-mono text-[10px] text-muted-foreground truncate">
-                  {project.path}
-                </p>
-              </div>
-              {#if project.last_opened}
-                <span class="ml-2 shrink-0 font-mono text-[10px] text-muted-foreground/40">
-                  {relativeTime(project.last_opened)}
-                </span>
-              {/if}
-            </button>
-          {/each}
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" />
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <Dialog.Content
+        class="fixed inset-x-0 top-12 z-40 mx-auto w-full max-w-[320px] rounded-[6px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.4)]"
+        style="animation: picker-in 150ms ease-out both"
+        onkeydown={handleKeydown}
+      >
+        <Dialog.Title class="sr-only">Switch project</Dialog.Title>
+        <div class="border-b border-border/60 px-3 py-2">
+          <input
+            bind:this={filterInputEl}
+            bind:value={filterQuery}
+            type="text"
+            placeholder="Search projects..."
+            class="w-full bg-transparent font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 border-transparent outline-none focus:border-border transition-colors duration-[120ms]"
+          />
         </div>
-      {:else if filterQuery.trim()}
-        <div class="px-3 py-4">
-          <p class="font-mono text-[10px] text-muted-foreground/60 text-center">No matches</p>
-        </div>
-      {/if}
 
-      <div class="border-t border-border/60 px-3 py-2">
-        <button
-          type="button"
-          class="flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 text-left font-mono text-[11px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent/40 hover:text-foreground"
-          onclick={chooseFolder}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-          Open folder...
-        </button>
-      </div>
-    </div>
-  </div>
+        {#if filteredProjects.length > 0}
+          <div class="max-h-[280px] overflow-y-auto divide-y divide-border/40">
+            {#each filteredProjects as project, i}
+              <button
+                type="button"
+                class="flex w-full items-center justify-between px-3 py-2 text-left transition-colors duration-[120ms] {i === selectedIndex ? 'bg-accent/60' : 'hover:bg-accent/40'}"
+                onclick={() => openRecent(project)}
+                onmouseenter={() => { selectedIndex = i; }}
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="text-[12px] font-medium text-foreground truncate">
+                    {project.name}
+                  </p>
+                  <p class="font-mono text-[10px] text-muted-foreground truncate">
+                    {project.path}
+                  </p>
+                </div>
+                {#if project.last_opened}
+                  <span class="ml-2 shrink-0 font-mono text-[10px] text-muted-foreground/40">
+                    {relativeTime(project.last_opened)}
+                  </span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {:else if filterQuery.trim()}
+          <div class="px-3 py-4">
+            <p class="font-mono text-[10px] text-muted-foreground/60 text-center">No matches</p>
+          </div>
+        {/if}
+
+        <div class="border-t border-border/60 px-3 py-2">
+          <button
+            type="button"
+            class="flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 text-left font-mono text-[11px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent/40 hover:text-foreground"
+            onclick={chooseFolder}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+            Open folder...
+          </button>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 {:else}
   <section class="flex min-w-0 flex-1 items-center justify-center bg-background/80">
     <div class="w-full max-w-[320px] space-y-4 px-4">
@@ -344,10 +336,6 @@
 {/if}
 
 <style>
-  .picker-dropdown {
-    animation: picker-in 150ms ease-out both;
-  }
-
   @keyframes picker-in {
     from {
       opacity: 0;

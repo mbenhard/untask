@@ -1,6 +1,7 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
+  import { Tooltip } from "bits-ui";
   import {
     closeProject,
     getConfig,
@@ -274,6 +275,7 @@
   });
 </script>
 
+<Tooltip.Provider delayDuration={400} skipDelayDuration={200}>
 <div class="relative h-screen min-h-screen overflow-hidden bg-background text-foreground">
   <div class="flex h-full min-h-full flex-col">
     <WindowChrome
@@ -396,6 +398,7 @@
     />
   {/if}
 </div>
+</Tooltip.Provider>
 
 <style>
   .content-shell {

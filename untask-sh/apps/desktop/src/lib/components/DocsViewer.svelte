@@ -10,6 +10,7 @@
     type DocInfo,
     type DocNode,
   } from "$lib/api";
+  import { DropdownMenu, Select } from "bits-ui";
   import DocsEditor from "$lib/components/DocsEditor.svelte";
   import { cn } from "$lib/utils";
 
@@ -572,14 +573,23 @@
         </div>
       {:else}
         {#each flatNodes as item}
-          <button
-            type="button"
+          <div
+            role="treeitem"
+            aria-selected={selectedPath === item.node.node_path}
+            aria-expanded={item.node.kind === "doc" ? undefined : expandedPaths.has(item.node.node_path)}
+            tabindex={selectedPath === item.node.node_path ? 0 : -1}
             class={cn(
-              "flex h-8 w-full items-center transition-colors duration-[120ms] hover:bg-accent/30",
-              selectedPath === item.node.node_path && "bg-accent/50 border-l-2 border-l-ring",
+              "flex h-8 w-full items-center transition-colors duration-[120ms] hover:bg-accent/30 focus:outline-none",
+              selectedPath === item.node.node_path && "border-l-2 border-l-ring bg-accent/50",
             )}
             style={`padding-left: ${Math.min(12 + item.depth * 16, 108)}px;`}
             onclick={() => onNodeSelect(item.node)}
+            onkeydown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onNodeSelect(item.node);
+              }
+            }}
           >
             {#if item.node.kind === "doc"}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5 shrink-0 text-muted-foreground/50">
@@ -587,8 +597,10 @@
                 <polyline points="14,2 14,8 20,8" />
               </svg>
             {:else}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <span
+              <button
+                type="button"
+                aria-label={expandedPaths.has(item.node.node_path) ? "Collapse folder" : "Expand folder"}
+                tabindex="-1"
                 class="mr-1 flex shrink-0 cursor-pointer items-center justify-center text-muted-foreground/50 transition-transform duration-[120ms]"
                 class:rotate-90={expandedPaths.has(item.node.node_path)}
                 onclick={(e) => { e.stopPropagation(); onToggle(item.node); }}
@@ -596,7 +608,7 @@
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="3.5,2 6.5,5 3.5,8" />
                 </svg>
-              </span>
+              </button>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5 shrink-0 text-muted-foreground/50">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z" />
               </svg>
@@ -616,7 +628,7 @@
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             {/if}
-          </button>
+          </div>
         {/each}
       {/if}
     </div>
@@ -638,67 +650,89 @@
             </span>
           {/if}
 
-          <div class="flex shrink-0 items-center gap-1">
-            {#if canCreateInSelectedNode(selectedNode)}
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-accent"
-                onclick={startNewDoc}
+          {#if canCreateInSelectedNode(selectedNode) || selectedNode.can_rename || selectedNode.can_move || selectedNode.can_delete}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger
+                class="rounded-[4px] border border-border/60 px-1.5 py-0.5 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
               >
-                New doc
-              </button>
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-accent"
-                onclick={startNewFolder}
-              >
-                New folder
-              </button>
-            {/if}
-
-            {#if selectedNode.can_rename}
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                onclick={startRename}
-              >
-                Rename
-              </button>
-            {/if}
-
-            {#if selectedNode.can_move}
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                onclick={startMove}
-              >
-                Move
-              </button>
-            {/if}
-
-            {#if selectedNode.can_delete}
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                onclick={startDelete}
-              >
-                Delete
-              </button>
-            {/if}
-          </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="5" cy="12" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="19" cy="12" r="1.5" />
+                </svg>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  class="z-50 min-w-[140px] rounded-[6px] border border-border/60 bg-popover p-0.5 shadow-lg backdrop-blur"
+                  sideOffset={4}
+                  align="end"
+                >
+                  {#if canCreateInSelectedNode(selectedNode)}
+                    <DropdownMenu.Item
+                      class="cursor-pointer rounded-[4px] px-2.5 py-1.5 font-mono text-[11px] text-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50"
+                      onSelect={startNewDoc}
+                    >
+                      New doc
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="cursor-pointer rounded-[4px] px-2.5 py-1.5 font-mono text-[11px] text-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50"
+                      onSelect={startNewFolder}
+                    >
+                      New folder
+                    </DropdownMenu.Item>
+                  {/if}
+                  {#if canCreateInSelectedNode(selectedNode) && (selectedNode.can_rename || selectedNode.can_move || selectedNode.can_delete)}
+                    <DropdownMenu.Separator class="my-0.5 h-px bg-border/60" />
+                  {/if}
+                  {#if selectedNode.can_rename}
+                    <DropdownMenu.Item
+                      class="cursor-pointer rounded-[4px] px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50 data-[highlighted]:text-foreground"
+                      onSelect={startRename}
+                    >
+                      Rename
+                    </DropdownMenu.Item>
+                  {/if}
+                  {#if selectedNode.can_move}
+                    <DropdownMenu.Item
+                      class="cursor-pointer rounded-[4px] px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50 data-[highlighted]:text-foreground"
+                      onSelect={startMove}
+                    >
+                      Move
+                    </DropdownMenu.Item>
+                  {/if}
+                  {#if selectedNode.can_delete}
+                    <DropdownMenu.Item
+                      class="cursor-pointer rounded-[4px] px-2.5 py-1.5 font-mono text-[11px] text-red-400 outline-none transition-colors duration-75 data-[highlighted]:bg-red-400/10"
+                      onSelect={startDelete}
+                    >
+                      Delete
+                    </DropdownMenu.Item>
+                  {/if}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          {/if}
         </div>
 
         {#if actionMode}
           <div class="mt-2 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2">
             {#if actionMode === "move"}
-              <select
-                bind:value={moveDestination}
-                class="min-w-[220px] rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-ring"
-              >
-                {#each moveTargets as target}
-                  <option value={target.relative_path}>{target.relative_path}</option>
-                {/each}
-              </select>
+              <Select.Root type="single" bind:value={moveDestination} items={moveTargets.map(t => ({ value: t.relative_path, label: t.relative_path }))}>
+                <Select.Trigger class="min-w-[220px] inline-flex items-center rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-ring">
+                  {moveDestination || "Select destination"}
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content class="z-50 max-h-[200px] rounded-[6px] border border-border/60 bg-popover shadow-lg backdrop-blur" sideOffset={4}>
+                    <Select.Viewport class="p-0.5">
+                      {#each moveTargets as target}
+                        <Select.Item class="cursor-pointer rounded-[4px] px-2 py-1 font-mono text-[11px] text-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50" value={target.relative_path} label={target.relative_path}>
+                          {target.relative_path}
+                        </Select.Item>
+                      {/each}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
             {:else if actionMode === "delete"}
               <span class="font-mono text-[10px] text-muted-foreground">
                 {selectedNode.kind === "doc"
@@ -706,13 +740,19 @@
                   : `Delete empty folder ${selectedNode.name}?`}
               </span>
             {:else if actionMode === "new-doc"}
-              <select
-                bind:value={newDocType}
-                class="rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-ring"
-              >
-                <option value="doc">Doc</option>
-                <option value="prd">PRD</option>
-              </select>
+              <Select.Root type="single" bind:value={newDocType} items={[{ value: "doc", label: "Doc" }, { value: "prd", label: "PRD" }]}>
+                <Select.Trigger class="inline-flex items-center rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-ring">
+                  {newDocType === "prd" ? "PRD" : "Doc"}
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content class="z-50 rounded-[6px] border border-border/60 bg-popover shadow-lg backdrop-blur" sideOffset={4}>
+                    <Select.Viewport class="p-0.5">
+                      <Select.Item class="cursor-pointer rounded-[4px] px-2 py-1 font-mono text-[11px] text-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50" value="doc" label="Doc">Doc</Select.Item>
+                      <Select.Item class="cursor-pointer rounded-[4px] px-2 py-1 font-mono text-[11px] text-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50" value="prd" label="PRD">PRD</Select.Item>
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
               <input
                 bind:value={draftName}
                 class="min-w-[220px] rounded-[4px] border border-border/60 bg-background px-2 py-1 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-ring"

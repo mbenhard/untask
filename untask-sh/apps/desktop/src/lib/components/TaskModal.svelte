@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { AlertDialog, Dialog, Progress } from "bits-ui";
   import {
     deleteTask,
     getTask,
@@ -11,6 +11,8 @@
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import type { PriorityTone } from "$lib/components/PriorityDot.svelte";
+  import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
+  import MetaTooltip from "$lib/components/ui/MetaTooltip.svelte";
   import { hasKnownStatus } from "$lib/utils";
 
   let {
@@ -48,9 +50,17 @@
   let bodyDirty = $state(false);
   let lastTaskId = $state<number | null | undefined>(undefined);
   let lastRefreshRevision = $state(-1);
-  let modalEl: HTMLDivElement | undefined = $state();
-  let triggerEl: Element | null = null;
   const closeAnimationMs = 220;
+  let overlayClass = $derived(
+    `task-modal-shell fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]${
+      closing ? " task-modal-shell-closing" : ""
+    }`,
+  );
+  let contentClass = $derived(
+    `task-modal fixed left-1/2 top-1/2 z-50 flex max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
+      errorFlash ? " error-flash" : ""
+    }${closing ? " task-modal-closing" : ""}`,
+  );
 
   const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
@@ -63,14 +73,6 @@
       }
     });
   }
-
-  onMount(() => {
-    triggerEl = document.activeElement;
-    modalEl?.focus();
-    return () => {
-      if (triggerEl instanceof HTMLElement) triggerEl.focus();
-    };
-  });
 
   $effect(() => {
     const id = taskId;
@@ -287,47 +289,6 @@
     }
   }
 
-  // Focus trap + keyboard
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      if (showDeleteConfirm) {
-        showDeleteConfirm = false;
-      } else if (editingTitle) {
-        cancelTitle();
-      } else if (addingTag) {
-        addingTag = false;
-        tagDraft = "";
-      } else {
-        handleClose();
-      }
-      return;
-    }
-
-    // Focus trap: Tab cycles within modal
-    if (e.key === "Tab" && modalEl) {
-      const focusable = modalEl.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  }
-
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  }
-
   // Date cycling
   let dateEntries = $derived.by(() => {
     if (!task) return [];
@@ -344,23 +305,21 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  class="task-modal-shell fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
-  class:task-modal-shell-closing={closing}
-  onkeydown={handleKeydown}
-  onclick={handleBackdropClick}
-  role="dialog"
-  tabindex="-1"
-  aria-modal="true"
-  bind:this={modalEl}
->
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div
-    class="task-modal flex max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]"
-    class:error-flash={errorFlash}
-    class:task-modal-closing={closing}
-  >
+<Dialog.Root open>
+  <Dialog.Portal>
+    <Dialog.Overlay
+      class={overlayClass}
+    />
+    <Dialog.Content
+      class={contentClass}
+      onInteractOutside={(e) => { e.preventDefault(); if (!closing) handleClose(); }}
+      onEscapeKeydown={(e) => {
+        e.preventDefault();
+        if (editingTitle) { cancelTitle(); }
+        else if (addingTag) { addingTag = false; tagDraft = ""; }
+        else if (!closing) { handleClose(); }
+      }}
+    >
     {#if loading}
       <div class="flex items-center justify-center py-12">
         <span class="font-mono text-[11px] text-muted-foreground animate-pulse">Loading...</span>
@@ -373,17 +332,22 @@
             <span class="font-mono text-[10px] text-muted-foreground">#{task.id}</span>
           {/if}
         </div>
-        <button
-          type="button"
-          class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-          onclick={handleClose}
-          title="Close"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <MetaTooltip text="Close">
+          {#snippet children({ props })}
+            <button
+              {...props}
+              type="button"
+              aria-label="Close"
+              class="rounded-[4px] p-1 text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+              onclick={handleClose}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          {/snippet}
+        </MetaTooltip>
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -429,67 +393,75 @@
         </div>
 
         <!-- Metadata row: status, priority, tags -->
-        <div class="flex max-h-[80px] flex-wrap items-center gap-2 overflow-y-auto px-4 pb-3">
-          <!-- Status chip -->
-          <select
-            class="h-[20px] cursor-pointer rounded-[4px] border border-border/60 bg-card px-1.5 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:border-border focus:border-ring focus:outline-none"
-            value={task.status}
-            disabled={isUnindexed}
-            onchange={(e) => changeStatus(e.currentTarget.value)}
-          >
-            {#each statusOptions as col}
-              <option value={col.id}>{col.id}</option>
-            {/each}
-          </select>
+        <div class="flex max-h-[80px] flex-wrap items-center gap-x-3 gap-y-1.5 overflow-y-auto px-4 pb-3">
+          <!-- Status -->
+          <div class="flex items-center gap-1.5">
+            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Status</span>
+            <MetaSelect
+              value={task.status}
+              items={statusOptions.map(col => ({ value: col.id, label: col.id }))}
+              disabled={isUnindexed}
+              onValueChange={changeStatus}
+            />
+          </div>
 
-          <!-- Priority cycling dot -->
-          <button
-            type="button"
-            class="flex items-center gap-1 rounded-full border border-border/60 px-1.5 py-0.5 transition-colors duration-[120ms] hover:border-border"
-            disabled={isUnindexed}
-            onclick={cyclePriority}
-            title="Click to cycle priority"
-          >
-            <PriorityDot tone={priorityTone(task.priority)} />
-            <span class="font-mono text-[10px] text-muted-foreground">
-              {task.priority ?? "none"}
-            </span>
-          </button>
+          <!-- Priority -->
+          <div class="flex items-center gap-1.5">
+            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Priority</span>
+            <MetaTooltip text="Cycle priority">
+              {#snippet children({ props })}
+                <button
+                  {...props}
+                  type="button"
+                  class="inline-flex h-5 items-center gap-1 rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
+                  disabled={isUnindexed}
+                  onclick={cyclePriority}
+                >
+                  <PriorityDot tone={priorityTone(task?.priority ?? null)} />
+                  <span>{task?.priority ?? "none"}</span>
+                </button>
+              {/snippet}
+            </MetaTooltip>
+          </div>
 
           <!-- Tags -->
-          {#each task.tags as tag}
-            <button
-              type="button"
-              class="rounded-full border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border"
-              disabled={isUnindexed}
-              onclick={() => removeTag(tag)}
-              title={isUnindexed ? tag : "Click to remove"}
-            >
-              {tag}
-            </button>
-          {/each}
+          {#if task.tags.length > 0 || !isUnindexed}
+            <div class="flex items-center gap-1.5">
+              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Tags</span>
+              {#each task.tags as tag}
+                <button
+                  type="button"
+                  class="inline-flex h-5 items-center rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
+                  disabled={isUnindexed}
+                  onclick={() => removeTag(tag)}
+                  title={isUnindexed ? tag : "Click to remove"}
+                >
+                  {tag}
+                </button>
+              {/each}
 
-          <!-- Add tag -->
-          {#if !isUnindexed}
-            {#if addingTag}
-              <input
-                type="text"
-                bind:value={tagDraft}
-                onblur={() => { if (!tagDraft.trim()) addingTag = false; else addTag(); }}
-                onkeydown={handleTagKeydown}
-                placeholder="tag..."
-                class="w-[80px] rounded-full border border-dashed border-border/60 bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
-                use:focusOnMount
-              />
-            {:else}
-              <button
-                type="button"
-                class="rounded-full border border-dashed border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
-                onclick={() => { addingTag = true; }}
-              >
-                + tag
-              </button>
-            {/if}
+              {#if !isUnindexed}
+                {#if addingTag}
+                  <input
+                    type="text"
+                    bind:value={tagDraft}
+                    onblur={() => { if (!tagDraft.trim()) addingTag = false; else addTag(); }}
+                    onkeydown={handleTagKeydown}
+                    placeholder="tag..."
+                    class="h-5 w-[80px] rounded-[4px] border border-dashed border-border/60 bg-transparent px-1.5 font-mono text-[10px] leading-none text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
+                    use:focusOnMount
+                  />
+                {:else}
+                  <button
+                    type="button"
+                    class="inline-flex h-5 items-center rounded-[4px] border border-dashed border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
+                    onclick={() => { addingTag = true; }}
+                  >
+                    + tag
+                  </button>
+                {/if}
+              {/if}
+            </div>
           {/if}
         </div>
 
@@ -501,12 +473,16 @@
 
         <!-- Subtask progress bar -->
         {#if task.subtask_total > 0}
-          <div class="mx-4 mb-2 h-[2px] overflow-hidden rounded-full bg-border">
+          <Progress.Root
+            value={task.subtask_done}
+            max={task.subtask_total}
+            class="mx-4 mb-2 h-[2px] overflow-hidden rounded-full bg-border"
+          >
             <div
               class="h-full rounded-full bg-foreground/60 transition-[width] duration-200"
               style="width: {(task.subtask_done / task.subtask_total) * 100}%"
             ></div>
-          </div>
+          </Progress.Root>
         {/if}
 
         <!-- Unmatched status warning -->
@@ -550,84 +526,97 @@
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
           {/if}
           {#if dateEntries.length > 0}
-            <button
-              type="button"
-              class="inline-flex appearance-none items-center gap-[2px] border-0 bg-transparent p-0 text-muted-foreground transition-colors duration-[120ms] hover:text-foreground/80"
-              onclick={cycleDate}
-              title="Click to cycle dates"
-            >
-              <span class="font-mono text-[10px] leading-none text-muted-foreground/60">
-                {dateEntries[dateIndex % dateEntries.length].label}
-              </span>
-              <span class="font-mono text-[10px] leading-none">
-                {dateEntries[dateIndex % dateEntries.length].value}
-              </span>
-            </button>
+            <MetaTooltip text="Cycle dates">
+              {#snippet children({ props })}
+                <button
+                  {...props}
+                  type="button"
+                  class="inline-flex appearance-none items-center gap-[3px] border-0 bg-transparent p-0 text-muted-foreground transition-colors duration-[120ms] hover:text-foreground/80"
+                  onclick={cycleDate}
+                >
+                  <span class="font-mono text-[10px] leading-none text-muted-foreground/60">
+                    {dateEntries[dateIndex % dateEntries.length].label}
+                  </span>
+                  <span class="font-mono text-[10px] leading-none">
+                    {dateEntries[dateIndex % dateEntries.length].value}
+                  </span>
+                </button>
+              {/snippet}
+            </MetaTooltip>
           {/if}
         </div>
 
         {#if !isUnindexed}
           <div class="flex items-center gap-0.5">
             <!-- Copy as agent prompt -->
-            <button
-              type="button"
-              class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-              onclick={copyAsPrompt}
-              title="Copy as agent prompt"
-            >
-              {#if copyFeedback}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              {:else}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              {/if}
-            </button>
+            <MetaTooltip text="Copy as agent prompt">
+              {#snippet children({ props })}
+                <button
+                  {...props}
+                  type="button"
+                  class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+                  onclick={copyAsPrompt}
+                >
+                  {#if copyFeedback}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  {:else}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  {/if}
+                </button>
+              {/snippet}
+            </MetaTooltip>
 
             <!-- Delete -->
-            {#if showDeleteConfirm}
-              <div class="flex items-center gap-1 ml-1">
-                <span class="font-mono text-[10px] text-muted-foreground">Delete?</span>
-                <button
-                  type="button"
-                  class="rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
-                  onclick={confirmDelete}
-                >
-                  Yes
-                </button>
-                <button
-                  type="button"
-                  class="rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
-                  onclick={() => { showDeleteConfirm = false; }}
-                >
-                  No
-                </button>
-              </div>
-            {:else}
-              <button
-                type="button"
+            <AlertDialog.Root bind:open={showDeleteConfirm}>
+              <AlertDialog.Trigger
                 class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-red-400"
-                onclick={() => { showDeleteConfirm = true; }}
                 title="Delete task"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-              </button>
-            {/if}
+              </AlertDialog.Trigger>
+              <AlertDialog.Portal>
+                <AlertDialog.Overlay class="fixed inset-0 z-[60] bg-black/30" />
+                <AlertDialog.Content class="fixed left-1/2 top-1/2 z-[60] w-full max-w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border border-border/60 bg-card p-4 shadow-lg">
+                  <AlertDialog.Title class="font-mono text-[12px] font-medium text-foreground">
+                    Delete task?
+                  </AlertDialog.Title>
+                  <AlertDialog.Description class="mt-1 text-[11px] text-muted-foreground">
+                    This action cannot be undone.
+                  </AlertDialog.Description>
+                  <div class="mt-3 flex justify-end gap-2">
+                    <AlertDialog.Cancel
+                      class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground"
+                    >
+                      Cancel
+                    </AlertDialog.Cancel>
+                    <AlertDialog.Action
+                      class="rounded-[4px] border border-border/60 bg-destructive/10 px-2.5 py-1 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
+                      onclick={confirmDelete}
+                    >
+                      Delete
+                    </AlertDialog.Action>
+                  </div>
+                </AlertDialog.Content>
+              </AlertDialog.Portal>
+            </AlertDialog.Root>
           </div>
         {/if}
       </div>
     {/if}
-  </div>
-</div>
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
 
 <style>
-  .task-modal-shell {
+  :global(.task-modal-shell) {
     animation: modal-shell-in 190ms linear both;
   }
 
@@ -640,7 +629,7 @@
     }
   }
 
-  .task-modal-shell-closing {
+  :global(.task-modal-shell-closing) {
     animation: modal-shell-out 200ms linear both;
   }
 
@@ -653,7 +642,7 @@
     }
   }
 
-  .task-modal {
+  :global(.task-modal) {
     transform-origin: center center;
     animation: modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
@@ -661,30 +650,30 @@
   @keyframes modal-in {
     from {
       opacity: 0;
-      transform: scale(0.944);
+      transform: translate(-50%, -50%) scale(0.944);
     }
     to {
       opacity: 1;
-      transform: scale(1);
+      transform: translate(-50%, -50%) scale(1);
     }
   }
 
-  .task-modal-closing {
+  :global(.task-modal-closing) {
     animation: modal-out 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 
   @keyframes modal-out {
     from {
       opacity: 1;
-      transform: scale(1);
+      transform: translate(-50%, -50%) scale(1);
     }
     to {
       opacity: 0;
-      transform: scale(0.956);
+      transform: translate(-50%, -50%) scale(0.956);
     }
   }
 
-  .error-flash {
+  :global(.error-flash) {
     animation: flash-border 800ms ease-out;
   }
 

@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { Select } from "bits-ui";
   import { addTask, updateTask, type ColumnDto, type Priority, type TaskDto } from "$lib/api";
+  import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
 
   let {
@@ -25,8 +27,6 @@
   let quickAddError = $state<string | null>(null);
   let errorRowId = $state<number | null>(null);
   let focusedTaskId = $state<number | null>(null);
-  let statusPopoverTaskId = $state<number | null>(null);
-  let popoverIndex = $state(0);
 
   const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
@@ -135,21 +135,7 @@
   }
 
   // ── Inline status change ───────────────────────────────────────
-  async function changeStatus(e: Event, task: TaskDto) {
-    e.stopPropagation();
-    if (task.id == null) return;
-    const newStatus = (e.target as HTMLSelectElement).value;
-    if (newStatus === task.status) return;
-    try {
-      await updateTask(task.id, { status: newStatus });
-      onTasksChanged();
-    } catch {
-      errorRowId = task.id;
-      setTimeout(() => { errorRowId = null; }, 800);
-    }
-  }
-
-  async function changeStatusTo(task: TaskDto, newStatus: string) {
+  async function handleStatusChange(task: TaskDto, newStatus: string) {
     if (task.id == null) return;
     if (newStatus === task.status) return;
     try {
@@ -158,55 +144,6 @@
     } catch {
       errorRowId = task.id;
       setTimeout(() => { errorRowId = null; }, 800);
-    }
-  }
-
-  function openStatusPopover(e: MouseEvent, taskId: number | null) {
-    e.stopPropagation();
-    if (taskId == null) return;
-    if (statusPopoverTaskId === taskId) {
-      statusPopoverTaskId = null;
-      return;
-    }
-    statusPopoverTaskId = taskId;
-    // Find the current status index for keyboard navigation
-    const task = tasks.find((t) => t.id === taskId);
-    if (task) {
-      const idx = columns.findIndex((c) => c.id === task.status);
-      popoverIndex = idx >= 0 ? idx : 0;
-    }
-    // Close on outside click
-    setTimeout(() => {
-      const handler = () => {
-        statusPopoverTaskId = null;
-        window.removeEventListener("click", handler);
-      };
-      window.addEventListener("click", handler);
-    }, 0);
-  }
-
-  function handlePopoverKeydown(e: KeyboardEvent) {
-    if (statusPopoverTaskId == null) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      e.stopPropagation();
-      popoverIndex = Math.min(popoverIndex + 1, columns.length - 1);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      e.stopPropagation();
-      popoverIndex = Math.max(popoverIndex - 1, 0);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-      const task = tasks.find((t) => t.id === statusPopoverTaskId);
-      if (task && columns[popoverIndex]) {
-        changeStatusTo(task, columns[popoverIndex].id);
-      }
-      statusPopoverTaskId = null;
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      statusPopoverTaskId = null;
     }
   }
 
@@ -250,15 +187,25 @@
       bind:value={filterText}
       class="h-7 w-[180px] rounded-[4px] border border-transparent bg-transparent px-2 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/50 transition-colors duration-[120ms] focus:border-border focus:bg-card focus:outline-none"
     />
-    <select
-      bind:value={filterStatus}
-      class="h-7 rounded-[4px] border border-transparent bg-transparent px-2 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] focus:border-border focus:bg-card focus:outline-none"
-    >
-      <option value="">All statuses</option>
-      {#each statuses as status}
-        <option value={status}>{status}</option>
-      {/each}
-    </select>
+    <Select.Root type="single" bind:value={filterStatus} items={[{ value: "", label: "All statuses" }, ...statuses.map(s => ({ value: s, label: s }))]}>
+      <Select.Trigger class="h-7 inline-flex items-center rounded-[4px] border border-transparent bg-transparent px-2 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] focus:border-border focus:bg-card focus:outline-none">
+        {filterStatus || "All statuses"}
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content class="z-50 rounded-[6px] border border-border/60 bg-popover shadow-lg backdrop-blur" sideOffset={4}>
+          <Select.Viewport class="p-0.5">
+            <Select.Item class="cursor-pointer rounded-[4px] px-2.5 py-1 font-mono text-[11px] text-muted-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50" value="" label="All statuses">
+              All statuses
+            </Select.Item>
+            {#each statuses as status}
+              <Select.Item class="cursor-pointer rounded-[4px] px-2.5 py-1 font-mono text-[11px] text-foreground outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50" value={status} label={status}>
+                {status}
+              </Select.Item>
+            {/each}
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
     <span class="ml-auto font-mono text-[10px] text-muted-foreground/60">
       {filteredTasks.length}
     </span>
@@ -353,63 +300,16 @@
 
         <!-- Status -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <span class="relative w-[100px] shrink-0">
-          {#if task.id == null}
-            <select
-              class="h-[20px] w-full cursor-pointer rounded-[4px] border border-border/60 bg-transparent px-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border focus:border-ring focus:outline-none"
-              value={task.status}
-              disabled
-              onchange={(e) => changeStatus(e, task)}
-            >
-              {#each columns as col}
-                <option value={col.id}>{col.id}</option>
-              {/each}
-              {#if !columns.some((c) => c.id === task.status)}
-                <option value={task.status}>{task.status}</option>
-              {/if}
-            </select>
-          {:else}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <span
-              class="inline-block cursor-pointer rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border"
-              onclick={(e) => openStatusPopover(e, task.id)}
-              onkeydown={handlePopoverKeydown}
-              role="button"
-              tabindex="-1"
-            >
-              {task.status}
-            </span>
-            {#if statusPopoverTaskId === task.id}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div
-                class="absolute left-0 top-full z-10 mt-1 w-[180px] rounded-[6px] border border-border/60 bg-popover shadow-lg backdrop-blur"
-                onclick={(e) => e.stopPropagation()}
-                onkeydown={handlePopoverKeydown}
-                role="listbox"
-                tabindex="-1"
-              >
-                {#each columns as col, i}
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <div
-                    class={`cursor-pointer px-3 py-1.5 text-[12px] transition-colors duration-[120ms] hover:bg-accent/50 ${
-                      col.id === task.status ? "bg-accent" : ""
-                    } ${col.done ? "text-muted-foreground" : "text-foreground"} ${
-                      popoverIndex === i ? "bg-accent/50" : ""
-                    }`}
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      changeStatusTo(task, col.id);
-                      statusPopoverTaskId = null;
-                    }}
-                    role="option"
-                    aria-selected={col.id === task.status}
-                  >
-                    {col.id}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          {/if}
+        <span class="w-[100px] shrink-0" onclick={(e) => e.stopPropagation()}>
+          <MetaSelect
+            value={task.status}
+            items={[
+              ...columns.map(col => ({ value: col.id, label: col.id })),
+              ...(!columns.some(c => c.id === task.status) ? [{ value: task.status, label: task.status }] : []),
+            ]}
+            disabled={task.id == null}
+            onValueChange={(v) => handleStatusChange(task, v)}
+          />
         </span>
 
         <!-- Updated -->
