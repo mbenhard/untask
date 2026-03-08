@@ -43,7 +43,6 @@
   let editingTitle = $state(false);
   let titleDraft = $state("");
   let showDeleteConfirm = $state(false);
-  let dateIndex = $state(0);
   let copyFeedback = $state(false);
   let showBody = $state(false);
   let errorFlash = $state<string | null>(null);
@@ -89,7 +88,6 @@
     editingTitle = false;
     titleDraft = "";
     showDeleteConfirm = false;
-    dateIndex = 0;
     copyFeedback = false;
     bodyFocused = false;
     bodyDirty = false;
@@ -150,16 +148,6 @@
     if (p === "medium") return "medium";
     if (p === "low") return "low";
     return "neutral";
-  }
-
-  function formatDate(iso: string | null): string {
-    if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    } catch {
-      return "";
-    }
   }
 
   // ── Agent section parsing ─────────────────────────────────────────
@@ -485,20 +473,6 @@
     }
   }
 
-  // Date cycling
-  let dateEntries = $derived.by(() => {
-    if (!task) return [];
-    const entries: { label: string; value: string }[] = [];
-    if (task.created) entries.push({ label: "Created", value: formatDate(task.created) });
-    if (task.updated) entries.push({ label: "Updated", value: formatDate(task.updated) });
-    if (task.completed) entries.push({ label: "Completed", value: formatDate(task.completed) });
-    return entries;
-  });
-
-  function cycleDate() {
-    if (dateEntries.length === 0) return;
-    dateIndex = (dateIndex + 1) % dateEntries.length;
-  }
 </script>
 
 <Dialog.Root open>
@@ -783,30 +757,45 @@
         </div>
       {/if}
 
-      <!-- Footer: date cycling left, actions right -->
+      <!-- Footer: delete left, actions right -->
       <div class="flex items-center justify-between border-t border-border/60 px-3 py-2">
         <div class="flex items-center gap-1.5">
           {#if bodyDirty}
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
           {/if}
-          {#if dateEntries.length > 0}
-            <MetaTooltip text="Cycle dates">
-              {#snippet children({ props })}
+          {#if !isUnindexed}
+            <!-- Delete (inline confirm) -->
+            {#if showDeleteConfirm}
+              <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
                 <button
-                  {...props}
                   type="button"
-                  class="inline-flex appearance-none items-center gap-[3px] border-0 bg-transparent p-0 text-muted-foreground transition-colors duration-[120ms] hover:text-foreground/80"
-                  onclick={cycleDate}
+                  class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                  onclick={() => { showDeleteConfirm = false; }}
                 >
-                  <span class="font-mono text-[10px] leading-none text-muted-foreground/60">
-                    {dateEntries[dateIndex % dateEntries.length].label}
-                  </span>
-                  <span class="font-mono text-[10px] leading-none">
-                    {dateEntries[dateIndex % dateEntries.length].value}
-                  </span>
+                  No
                 </button>
-              {/snippet}
-            </MetaTooltip>
+                <button
+                  type="button"
+                  class="rounded-[4px] border border-border/60 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
+                  onclick={confirmDelete}
+                >
+                  Yes
+                </button>
+                <span class="text-red-400">Delete?</span>
+              </span>
+            {:else}
+              <button
+                type="button"
+                class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-red-400"
+                title="Delete task"
+                onclick={() => { showDeleteConfirm = true; }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            {/if}
           {/if}
         </div>
 
@@ -880,39 +869,6 @@
                   {/if}
                 </div>
               </div>
-            {/if}
-
-            <!-- Delete (inline confirm) -->
-            {#if showDeleteConfirm}
-              <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-                <span class="text-red-400">Delete?</span>
-                <button
-                  type="button"
-                  class="rounded-[4px] border border-border/60 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
-                  onclick={confirmDelete}
-                >
-                  Yes
-                </button>
-                <button
-                  type="button"
-                  class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
-                  onclick={() => { showDeleteConfirm = false; }}
-                >
-                  No
-                </button>
-              </span>
-            {:else}
-              <button
-                type="button"
-                class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-red-400"
-                title="Delete task"
-                onclick={() => { showDeleteConfirm = true; }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
             {/if}
           </div>
         {/if}
