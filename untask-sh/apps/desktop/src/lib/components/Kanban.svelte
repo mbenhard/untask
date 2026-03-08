@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Progress } from "bits-ui";
-  import { addTask, updateTask, type ColumnDto, type TaskDto } from "$lib/api";
+  import { addTask, updateTask, attachFileBytes, type ColumnDto, type TaskDto } from "$lib/api";
+  import CardThumbnail from "$lib/components/CardThumbnail.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import { tagColor } from "$lib/tagColor";
   import { resolveStatus } from "$lib/utils";
@@ -29,6 +30,10 @@
   let quickAddTitle = $state("");
   let quickAddError = $state<string | null>(null);
   let quickAddErrorFlash = $state(false);
+
+  // ── Quick-add paste buffer ─────────────────────────────────────
+  type PastedImage = { data: number[]; filename: string; mimeType: string };
+  let quickAddPastedImages = $state<PastedImage[]>([]);
 
   // ── Drag state ───────────────────────────────────────────────────
   let draggedTask = $state<TaskDto | null>(null);
@@ -89,15 +94,27 @@
     quickAddTitle = "";
     quickAddError = null;
     quickAddErrorFlash = false;
+    quickAddPastedImages = [];
   }
 
   async function submitQuickAdd(columnId: string) {
     const title = quickAddTitle.trim();
     if (!title) return;
     try {
-      await addTask(title, columnId);
+      const task = await addTask(title, columnId);
+      // Flush buffered paste images as attachments
+      if (task.id != null && quickAddPastedImages.length > 0) {
+        for (const img of quickAddPastedImages) {
+          try {
+            await attachFileBytes(task.id, img.data, img.filename, img.mimeType);
+          } catch {
+            // Silently skip failed attachments — task was already created
+          }
+        }
+      }
       quickAddTitle = "";
       quickAddError = null;
+      quickAddPastedImages = [];
       addingInColumn = null;
       onTasksChanged();
     } catch {
@@ -114,7 +131,38 @@
       submitQuickAdd(columnId);
     } else if (e.key === "Escape") {
       addingInColumn = null;
+      quickAddPastedImages = [];
     }
+  }
+
+  async function handleQuickAddPaste(e: ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (!item.type.startsWith("image/")) continue;
+
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (!file) continue;
+
+      const buffer = await file.arrayBuffer();
+      const data = Array.from(new Uint8Array(buffer));
+
+      // Check total buffer size (25 MB limit)
+      const totalSize = quickAddPastedImages.reduce((sum, img) => sum + img.data.length, 0) + data.length;
+      if (totalSize > 25 * 1024 * 1024) continue;
+
+      const ext = item.type.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
+      const filename = `paste-${Date.now()}.${ext}`;
+      quickAddPastedImages = [...quickAddPastedImages, { data, filename, mimeType: item.type }];
+      break;
+    }
+  }
+
+  function firstImageAttachment(task: TaskDto): string | null {
+    const img = task.attachments?.find((a) => a.mime_type.startsWith("image/"));
+    return img?.filename ?? null;
   }
 
   // ── Drag-and-drop ────────────────────────────────────────────────
@@ -331,6 +379,16 @@
             tabindex="0"
             title={task.title}
           >
+            <!-- Thumbnail header -->
+            {#if task.id != null}
+              {@const thumb = firstImageAttachment(task)}
+              {#if thumb}
+                <div class="-mx-2.5 -mt-2 mb-1.5">
+                  <CardThumbnail taskId={task.id} filename={thumb} />
+                </div>
+              {/if}
+            {/if}
+
             <!-- Row 1: title -->
             <div class="flex items-start gap-1.5">
               <span class="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
@@ -432,7 +490,8 @@
               <textarea
                 bind:value={quickAddTitle}
                 onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
-                onblur={() => { if (quickAddTitle.trim()) submitQuickAdd(col.id); else addingInColumn = null; }}
+                onblur={() => { if (quickAddTitle.trim()) submitQuickAdd(col.id); else { addingInColumn = null; quickAddPastedImages = []; } }}
+                onpaste={handleQuickAddPaste}
                 oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 placeholder="Task title..."
                 rows="1"
@@ -441,6 +500,14 @@
                 class:border-destructive={quickAddErrorFlash}
                 use:focusOnMount
               ></textarea>
+              {#if quickAddPastedImages.length > 0}
+                <div class="mt-1 flex items-center gap-1 font-mono text-[9px] text-muted-foreground/50">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  {quickAddPastedImages.length} image{quickAddPastedImages.length > 1 ? "s" : ""} pasted
+                </div>
+              {/if}
               {#if quickAddError}
                 <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
               {/if}
@@ -468,7 +535,8 @@
               <textarea
                 bind:value={quickAddTitle}
                 onkeydown={(e) => handleQuickAddKeydown(e, col.id)}
-                onblur={() => { if (quickAddTitle.trim()) submitQuickAdd(col.id); else addingInColumn = null; }}
+                onblur={() => { if (quickAddTitle.trim()) submitQuickAdd(col.id); else { addingInColumn = null; quickAddPastedImages = []; } }}
+                onpaste={handleQuickAddPaste}
                 oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 placeholder="Task title..."
                 rows="1"
@@ -477,6 +545,14 @@
                 class:border-destructive={quickAddErrorFlash}
                 use:focusOnMount
               ></textarea>
+              {#if quickAddPastedImages.length > 0}
+                <div class="mt-1 flex items-center gap-1 font-mono text-[9px] text-muted-foreground/50">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  {quickAddPastedImages.length} image{quickAddPastedImages.length > 1 ? "s" : ""} pasted
+                </div>
+              {/if}
               {#if quickAddError}
                 <p class="mt-1 font-mono text-[10px] text-red-400">{quickAddError}</p>
               {/if}
