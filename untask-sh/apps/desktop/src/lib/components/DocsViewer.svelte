@@ -46,6 +46,7 @@
   let actionPending = $state(false);
   let prdTaskCounts = $state<[number, number] | null>(null);
   let newDocType = $state<"doc" | "prd">("doc");
+  let prdCountsRequestId = 0;
 
   const totalDocs = $derived(countDocs(docs));
   const flatNodes = $derived(flattenNodes(docs, expandedPaths));
@@ -119,16 +120,33 @@
   });
 
   $effect(() => {
+    refreshRevision;
     externalRevision;
-    if (selectedDoc && selectedNode?.doc_type === "prd") {
-      getPrdTaskCounts(selectedDoc.path).then((counts) => {
-        prdTaskCounts = counts;
-      }).catch(() => {
-        prdTaskCounts = null;
-      });
-    } else {
+
+    const prdPath = selectedDoc?.path;
+    const isPrd = selectedNode?.doc_type === "prd";
+    if (!prdPath || !isPrd) {
+      prdCountsRequestId += 1;
       prdTaskCounts = null;
+      return;
     }
+
+    const requestId = ++prdCountsRequestId;
+    getPrdTaskCounts(prdPath)
+      .then((counts) => {
+        if (
+          requestId === prdCountsRequestId &&
+          selectedDoc?.path === prdPath &&
+          selectedNode?.doc_type === "prd"
+        ) {
+          prdTaskCounts = counts;
+        }
+      })
+      .catch(() => {
+        if (requestId === prdCountsRequestId) {
+          prdTaskCounts = null;
+        }
+      });
   });
 
   function onNodeSelect(node: DocNode) {
