@@ -8,12 +8,15 @@
     type Priority,
     type TaskDto,
   } from "$lib/api";
+  import { marked } from "marked";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import type { PriorityTone } from "$lib/components/PriorityDot.svelte";
   import SubtaskList from "$lib/components/SubtaskList.svelte";
+  import TagPicker from "$lib/components/TagPicker.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import MetaTooltip from "$lib/components/ui/MetaTooltip.svelte";
+  import { tagColor } from "$lib/tagColor";
   import { composeBodyWithNotesAndSubtasks, stripSubtasksFromBody } from "$lib/subtasks";
   import { hasKnownStatus } from "$lib/utils";
 
@@ -43,8 +46,6 @@
   let dateIndex = $state(0);
   let copyFeedback = $state(false);
   let showBody = $state(false);
-  let addingTag = $state(false);
-  let tagDraft = $state("");
   let errorFlash = $state<string | null>(null);
   let closing = $state(false);
   let saveErrorText = $state<string | null>(null);
@@ -90,21 +91,19 @@
     showDeleteConfirm = false;
     dateIndex = 0;
     copyFeedback = false;
-    addingTag = false;
-    tagDraft = "";
     bodyFocused = false;
     bodyDirty = false;
     kickBackOpen = false;
     kickBackNotes = "";
     if (id == null) {
       task = snapshot ? { ...snapshot } : null;
-      showBody = (snapshot ? stripSubtasksFromBody(snapshot.body).length : 0) > 0;
+      showBody = snapshot ? hasEditableNotes(snapshot.body) : false;
       loading = false;
       return;
     }
     if (snapshot?.id === id) {
       task = snapshot;
-      showBody = stripSubtasksFromBody(snapshot.body).length > 0;
+      showBody = hasEditableNotes(snapshot.body);
       loading = false;
     }
     void loadTask(id, false);
@@ -125,7 +124,7 @@
       const preserveBodyDraft = preserveDrafts && (bodyFocused || bodyDirty);
       task = preserveBodyDraft && task ? { ...loaded, body: task.body } : loaded;
       if (!preserveBodyDraft) {
-        showBody = stripSubtasksFromBody(loaded.body).length > 0;
+        showBody = hasEditableNotes(loaded.body);
       }
     } catch {
       task = null;
@@ -166,6 +165,15 @@
   // ── Agent section parsing ─────────────────────────────────────────
 
   const AGENT_HEADINGS = ["agent summary", "deferred", "review notes"];
+
+  /** Check if body has editable notes (description portion, excluding agent sections and subtasks). */
+  function hasEditableNotes(body: string): boolean {
+    const parsed = parseBodySections(body);
+    const desc = parsed.agentSummary != null || parsed.deferred != null || parsed.reviewNotes != null
+      ? parsed.description
+      : body;
+    return stripSubtasksFromBody(desc).length > 0;
+  }
 
   type ParsedBody = {
     description: string;
@@ -235,6 +243,12 @@
 
   let isReviewStatus = $derived(task?.status === "review");
 
+  // Configure marked for agent section rendering
+  const markedInstance = new marked.Renderer();
+  const renderMarkdown = (text: string): string => {
+    return marked(text, { renderer: markedInstance, async: false }) as string;
+  };
+
   let doneColumnId = $derived(
     columns.find((c) => c.done)?.id ?? "done",
   );
@@ -244,6 +258,7 @@
   async function approveTask() {
     if (!task?.id) return;
     await saveField({ status: doneColumnId });
+    handleClose();
   }
 
   async function kickBack() {
@@ -258,6 +273,7 @@
     }
     kickBackOpen = false;
     kickBackNotes = "";
+    handleClose();
   }
 
   function replaceOrAppendSection(body: string, heading: string, content: string): string {
@@ -364,32 +380,17 @@
   }
 
   // Tags
-  function removeTag(tag: string) {
+  function toggleTag(tag: string) {
     if (!task || isUnindexed) return;
-    const newTags = task.tags.filter((t) => t !== tag);
+    const has = task.tags.includes(tag);
+    const newTags = has ? task.tags.filter((t) => t !== tag) : [...task.tags, tag];
     saveField({ tags: newTags });
   }
 
-  function addTag() {
-    const trimmed = tagDraft.trim();
-    if (!trimmed || !task) return;
-    if (task.tags.includes(trimmed)) {
-      tagDraft = "";
-      return;
-    }
-    saveField({ tags: [...task.tags, trimmed] });
-    tagDraft = "";
-    addingTag = false;
-  }
-
-  function handleTagKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addTag();
-    } else if (e.key === "Escape") {
-      addingTag = false;
-      tagDraft = "";
-    }
+  function addNewTag(tag: string) {
+    if (!task || isUnindexed) return;
+    if (task.tags.includes(tag)) return;
+    saveField({ tags: [...task.tags, tag] });
   }
 
   // Body
@@ -432,18 +433,44 @@
     }
   }
 
-  // Copy as agent prompt
-  function copyAsPrompt() {
+  // Copy as agent prompt (split button)
+  const PROMPT_MODES = [
+    { id: "implement", label: "Implement", desc: "build it now" },
+    { id: "plan", label: "Plan", desc: "outline the approach" },
+    { id: "explore", label: "Explore", desc: "discuss before acting" },
+  ] as const;
+
+  let promptDropdownOpen = $state(false);
+
+  function copyPrompt(mode: string = "implement") {
     if (!task) return;
-    const parts = [`Work on task #${task.id}: ${task.title}`];
-    if (task.body.trim()) parts.push(task.body.trim());
-    const tags = task.tags.length > 0 ? `Tags: ${task.tags.join(", ")}` : "";
-    const priority = task.priority ? `Priority: ${task.priority}` : "";
-    const meta = [tags, priority].filter(Boolean).join(" | ");
-    if (meta) parts.push(meta);
-    navigator.clipboard.writeText(parts.join("\n\n"));
+
+    const meta = [
+      task.priority ? `Priority: ${task.priority}` : "",
+      task.tags.length > 0 ? `Tags: ${task.tags.join(", ")}` : "",
+    ].filter(Boolean).join(" | ");
+
+    let prompt = "";
+    if (mode === "implement") {
+      prompt = `Implement task #${task.id}: ${task.title}`;
+    } else if (mode === "plan") {
+      prompt = `Create an implementation plan for task #${task.id}: ${task.title}\nDo not implement — outline the approach, key decisions, affected files, and risks.`;
+    } else if (mode === "explore") {
+      prompt = `Analyze task #${task.id}: ${task.title}\nExplore the problem space, surface questions, tradeoffs, and considerations before taking action.`;
+    } else {
+      prompt = `Implement task #${task.id}: ${task.title}`;
+    }
+    if (task.body.trim()) prompt += `\n\n${task.body.trim()}`;
+    if (meta) prompt += `\n\n${meta}`;
+
+    navigator.clipboard.writeText(prompt);
     copyFeedback = true;
     setTimeout(() => { copyFeedback = false; }, 1200);
+  }
+
+  function pickPromptMode(mode: string) {
+    promptDropdownOpen = false;
+    copyPrompt(mode);
   }
 
   // Delete
@@ -485,7 +512,7 @@
       onEscapeKeydown={(e) => {
         e.preventDefault();
         if (editingTitle) { cancelTitle(); }
-        else if (addingTag) { addingTag = false; tagDraft = ""; }
+        else if (promptDropdownOpen) { promptDropdownOpen = false; }
         else if (!closing) { handleClose(); }
       }}
     >
@@ -516,7 +543,7 @@
 
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <!-- Title -->
-        <div class="px-4 pt-3 pb-1">
+        <div class="shrink-0 px-4 pt-3 pb-1">
           {#if isUnindexed}
             <div class="mb-2 rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 bg-accent/60 px-2.5 py-2">
               <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Unindexed</p>
@@ -557,7 +584,7 @@
         </div>
 
         <!-- Metadata row: status, priority, tags -->
-        <div class="flex max-h-[80px] flex-wrap items-center gap-x-4 gap-y-1.5 overflow-y-auto border-b border-border/40 px-4 pb-3">
+        <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border/40 px-4 pb-3">
           <!-- Status -->
           <div class="flex items-center gap-1.5">
             <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Status</span>
@@ -605,36 +632,48 @@
               {#each task.tags as tag}
                 <button
                   type="button"
-                  class="inline-flex h-6 items-center rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
+                  class="inline-flex h-6 items-center gap-1 rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
                   disabled={isUnindexed}
-                  onclick={() => removeTag(tag)}
+                  onclick={() => toggleTag(tag)}
                   title={isUnindexed ? tag : "Click to remove"}
                 >
+                  <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {tagColor(tag)}"></span>
                   {tag}
                 </button>
               {/each}
 
               {#if !isUnindexed}
-                {#if addingTag}
-                  <input
-                    type="text"
-                    bind:value={tagDraft}
-                    onblur={() => { if (!tagDraft.trim()) addingTag = false; else addTag(); }}
-                    onkeydown={handleTagKeydown}
-                    placeholder="tag..."
-                    class="h-6 w-[80px] rounded-[4px] border border-dashed border-border/60 bg-transparent px-2 font-mono text-[10px] leading-none text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
-                    use:focusOnMount
-                  />
-                {:else}
-                  <button
-                    type="button"
-                    class="inline-flex h-6 items-center rounded-[4px] border border-dashed border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
-                    onclick={() => { addingTag = true; }}
-                  >
-                    + tag
-                  </button>
-                {/if}
+                <TagPicker
+                  currentTags={task.tags}
+                  onToggle={toggleTag}
+                  onAdd={addNewTag}
+                />
               {/if}
+            </div>
+          {/if}
+
+          <!-- Owner -->
+          {#if !isUnindexed}
+            <div class="flex items-center gap-1.5">
+              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Owner</span>
+              <button
+                type="button"
+                class="inline-flex h-6 items-center gap-1 rounded-[4px] border px-2 font-mono text-[10px] leading-none transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none {task?.owner === 'user' ? 'border-foreground/30 text-foreground' : 'border-border/60 text-muted-foreground'}"
+                onclick={() => {
+                  const newOwner = task?.owner === "user" ? null : "user";
+                  saveField({ owner: newOwner });
+                }}
+              >
+                {#if task?.owner === "user"}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  User
+                {:else}
+                  AI
+                {/if}
+              </button>
             </div>
           {/if}
         </div>
@@ -667,19 +706,19 @@
             {#if parsedBody.agentSummary != null}
               <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Agent Summary</p>
-                <p class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{parsedBody.agentSummary}</p>
+                <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.agentSummary)}</div>
               </div>
             {/if}
             {#if parsedBody.deferred != null}
               <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Deferred</p>
-                <p class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{parsedBody.deferred}</p>
+                <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.deferred)}</div>
               </div>
             {/if}
             {#if parsedBody.reviewNotes != null}
               <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Review Notes</p>
-                <p class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{parsedBody.reviewNotes}</p>
+                <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.reviewNotes)}</div>
               </div>
             {/if}
           </div>
@@ -791,25 +830,57 @@
               </button>
               <span class="mx-0.5 h-3 w-px bg-border/60"></span>
             {/if}
-            <!-- Copy as agent prompt -->
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
-              onclick={copyAsPrompt}
-            >
-              {#if copyFeedback}
+            <!-- Copy as agent prompt (split button) -->
+            {#if copyFeedback}
+              <span class="inline-flex items-center gap-1 rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
                 Copied
-              {:else}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                Copy as prompt
-              {/if}
-            </button>
+              </span>
+            {:else}
+              <div class="inline-flex items-stretch">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                  onclick={() => copyPrompt()}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copy for AI
+                </button>
+                <div class="relative flex">
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-r-[4px] border border-border/60 px-2 py-1 text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                    onclick={() => { promptDropdownOpen = !promptDropdownOpen; }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  {#if promptDropdownOpen}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div
+                      class="absolute bottom-full right-0 mb-1 w-[200px] rounded-[6px] border border-border/60 bg-popover py-0.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)]"
+                      onmouseleave={() => { promptDropdownOpen = false; }}
+                    >
+                      {#each PROMPT_MODES as mode}
+                        <button
+                          type="button"
+                          class="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground transition-colors duration-[80ms] hover:bg-accent hover:text-foreground"
+                          onclick={() => pickPromptMode(mode.id)}
+                        >
+                          <span>{mode.label}<span class="text-muted-foreground/40"> — {mode.desc}</span></span>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/if}
 
             <!-- Delete (inline confirm) -->
             {#if showDeleteConfirm}
@@ -924,5 +995,62 @@
     outline: none;
     border-color: transparent;
     box-shadow: none;
+  }
+
+  /* Agent section rendered markdown */
+  :global(.agent-md p) {
+    margin: 0.2em 0;
+  }
+
+  :global(.agent-md ul),
+  :global(.agent-md ol) {
+    padding-left: 1.25em;
+    margin: 0.2em 0;
+  }
+
+  :global(.agent-md li) {
+    margin: 0.1em 0;
+  }
+
+  :global(.agent-md code) {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: var(--color-accent);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    padding: 1px 3px;
+  }
+
+  :global(.agent-md pre) {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: var(--color-accent);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin: 0.3em 0;
+    overflow-x: auto;
+  }
+
+  :global(.agent-md pre code) {
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  :global(.agent-md strong) {
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+
+  :global(.agent-md a) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  :global(.agent-md blockquote) {
+    border-left: 2px solid var(--color-border);
+    padding-left: 8px;
+    margin: 0.3em 0;
   }
 </style>
