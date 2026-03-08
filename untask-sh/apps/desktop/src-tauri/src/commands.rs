@@ -39,6 +39,7 @@ pub struct TaskDto {
     pub subtask_total: u32,
     pub position: Option<f64>,
     pub prd: Option<String>,
+    pub confidence: Option<String>,
 }
 
 impl From<Task> for TaskDto {
@@ -57,6 +58,7 @@ impl From<Task> for TaskDto {
             subtask_total: task.subtask_progress.1,
             position: task.position,
             prd: task.prd,
+            confidence: task.confidence,
         }
     }
 }

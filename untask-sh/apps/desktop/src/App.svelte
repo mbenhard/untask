@@ -15,6 +15,7 @@
   import DocsViewer from "$lib/components/DocsViewer.svelte";
   import Kanban from "$lib/components/Kanban.svelte";
   import ProjectPicker from "$lib/components/ProjectPicker.svelte";
+  import ReviewView from "$lib/components/ReviewView.svelte";
   import SidebarNav from "$lib/components/SidebarNav.svelte";
   import TaskList from "$lib/components/TaskList.svelte";
   import TaskModal from "$lib/components/TaskModal.svelte";
@@ -240,7 +241,7 @@
     "1": "board",
     "2": "list",
     "3": "docs",
-    "4": "next",
+    "4": "review",
   };
 
   onMount(() => {
@@ -304,6 +305,7 @@
       >
         <SidebarNav
           activeView={$activeView}
+          reviewCount={$tasks.filter((t) => t.status === "review").length}
           onSelect={selectView}
         />
         <main class="flex min-w-0 flex-1 flex-col bg-background/80">
@@ -361,10 +363,13 @@
                   externalPaths={docsExternalPaths}
                   onDocsChanged={refreshDocs}
                 />
-              {:else if $activeView === "next"}
-                <div class="flex flex-1 items-center justify-center">
-                  <p class="font-mono text-[11px] text-muted-foreground">Next view — coming soon</p>
-                </div>
+              {:else if $activeView === "review"}
+                <ReviewView
+                  tasks={$tasks}
+                  columns={$columns}
+                  onTaskClick={onTaskClick}
+                  onTasksChanged={refreshTasks}
+                />
               {/if}
             </div>
           {/key}

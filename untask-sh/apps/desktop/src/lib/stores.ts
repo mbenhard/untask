@@ -2,7 +2,7 @@ import { writable } from "svelte/store";
 
 import type { ColumnDto, DocNode, TaskDto } from "$lib/api";
 
-export type ShellView = "board" | "list" | "docs" | "next";
+export type ShellView = "board" | "list" | "docs" | "review";
 
 export const theme = writable<"light" | "dark">("dark");
 export const activeView = writable<ShellView>("board");

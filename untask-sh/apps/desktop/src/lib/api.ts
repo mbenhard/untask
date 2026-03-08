@@ -18,6 +18,7 @@ export interface TaskDto {
   subtask_total: number;
   position: number | null;
   prd: string | null;
+  confidence: string | null;
 }
 
 export interface ColumnDto {

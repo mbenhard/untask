@@ -25,6 +25,8 @@ pub struct Task {
     pub completed: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<String>,
     #[serde(skip)]
     pub body: String,
     #[serde(skip)]
@@ -62,6 +64,8 @@ struct TaskFrontmatter {
     completed: Option<DateTime<Utc>>,
     #[serde(default)]
     position: Option<f64>,
+    #[serde(default)]
+    confidence: Option<String>,
 }
 
 impl From<TaskFrontmatter> for Task {
@@ -77,6 +81,7 @@ impl From<TaskFrontmatter> for Task {
             updated: frontmatter.updated,
             completed: frontmatter.completed,
             position: frontmatter.position,
+            confidence: frontmatter.confidence,
             ..Self::default()
         }
     }

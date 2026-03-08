@@ -793,8 +793,7 @@ fn skill_install_prints_fallback_instructions_when_path_not_found() {
         &[("HOME", home_env)],
     );
     assert!(ok);
-    assert!(stdout.contains("No supported agent config directory found."));
-    assert!(stdout.contains("mkdir -p ~/.claude/commands"));
+    assert!(stdout.contains("No supported agent config found"));
 }
 
 #[test]
@@ -814,12 +813,16 @@ fn skill_install_copies_bundled_skill_when_supported_path_exists() {
     assert!(ok);
     assert!(stdout.contains("Installed skill"));
 
-    let installed = home.path().join(".claude/commands/untask.md");
-    assert!(installed.exists());
-    let content = fs::read_to_string(installed).unwrap();
+    // All four skill files should be installed
+    let commands_dir = home.path().join(".claude/commands");
+    assert!(commands_dir.join("untask.md").exists());
+    assert!(commands_dir.join("untask-finish.md").exists());
+    assert!(commands_dir.join("untask-docs.md").exists());
+    assert!(commands_dir.join("untask-batch.md").exists());
+
+    let content = fs::read_to_string(commands_dir.join("untask.md")).unwrap();
     assert!(content.contains("untask next --json"));
     assert!(content.contains("status <id> in-progress"));
-    assert!(content.contains("docs/plans/"));
 }
 
 #[test]

@@ -12,14 +12,16 @@
     { id: "board", label: "Board", shortcut: "1", icon: "board" },
     { id: "list", label: "List", shortcut: "2", icon: "list" },
     { id: "docs", label: "Docs", shortcut: "3", icon: "docs" },
-    { id: "next", label: "Next", shortcut: "4", icon: "next" },
+    { id: "review", label: "Review", shortcut: "4", icon: "review" },
   ];
 
   let {
     activeView,
+    reviewCount = 0,
     onSelect,
   }: {
     activeView: ShellView;
+    reviewCount?: number;
     onSelect: (view: ShellView) => void;
   } = $props();
 </script>
@@ -57,16 +59,22 @@
           <path d="M9 1.5H3.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6L9 1.5Z" />
           <polyline points="9,1.5 9,6 13.5,6" />
         </svg>
-      {:else if item.icon === "next"}
+      {:else if item.icon === "review"}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="8" cy="8" r="6.5" />
-          <polyline points="8,4.5 8,8 11,9.5" />
+          <path d="M1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z" />
+          <path d="M5.5 8.5 7 10l3.5-4" />
         </svg>
       {/if}
 
-      <span class="absolute -right-0.5 top-0 font-mono text-[10px] leading-none text-muted-foreground/60">
-        {item.shortcut}
-      </span>
+      {#if item.id === "review" && reviewCount > 0}
+        <span class="absolute -right-1 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-foreground/80 px-[3px] font-mono text-[8px] leading-none text-background">
+          {reviewCount}
+        </span>
+      {:else}
+        <span class="absolute -right-0.5 top-0 font-mono text-[10px] leading-none text-muted-foreground/60">
+          {item.shortcut}
+        </span>
+      {/if}
     </button>
   {/each}
 </aside>

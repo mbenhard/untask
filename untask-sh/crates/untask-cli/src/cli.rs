@@ -227,7 +227,11 @@ pub enum ColumnCommands {
 #[derive(Debug, Subcommand)]
 pub enum SkillCommands {
     /// Install the untask skill for an AI agent
-    Install,
+    Install {
+        /// Target agent provider
+        #[arg(long, default_value = "claude-code")]
+        provider: String,
+    },
 }
 
 #[cfg(test)]
@@ -265,7 +269,7 @@ mod tests {
         assert!(matches!(
             skill.command,
             Some(Commands::Skill {
-                cmd: SkillCommands::Install
+                cmd: SkillCommands::Install { .. }
             })
         ));
     }

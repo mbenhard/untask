@@ -1,24 +1,13 @@
 # untask — project companion skill
 
-Use this skill at the start of every session and before/after completing work.
+Use this skill at the start of every work session.
 
 ## Session start
 
 1. Run `untask next --json` to see open tasks, recent completions, git state, and cleanup hints.
 2. Pick a task to work on and run `untask status <id> in-progress`.
-
-## During work
-
-- Keep long-lived project docs in `.untask/docs/`.
-- Write plans and review notes into tracked repo locations such as `docs/plans/` when the project already uses them.
-- Use `untask search <query>` to find relevant tasks or docs.
-- Use `untask docs show <name>` to read project documentation.
-
-## After completing work
-
-1. Run `untask done <id>` to mark the task as done.
-2. Run `untask repair --check` to verify project integrity.
-3. If issues are found, run `untask repair --write` to fix them.
+3. Use `untask search <query>` to find relevant tasks or docs.
+4. Use `untask list --status <status> --json` to see tasks in a specific column.
 
 ## Commands reference
 
@@ -26,6 +15,7 @@ Use this skill at the start of every session and before/after completing work.
 |---------|-------------|
 | `untask next` | Show next actions summary |
 | `untask list` | List all tasks |
+| `untask list --status <status>` | List tasks in a specific column |
 | `untask show <id>` | Show task details |
 | `untask status <id> <status>` | Change task status |
 | `untask done <id>` | Mark task as done |

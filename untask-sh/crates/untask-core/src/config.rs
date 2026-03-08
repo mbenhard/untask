@@ -17,6 +17,27 @@ pub struct Column {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    #[serde(default)]
+    pub auto_done: bool,
+    #[serde(default = "default_max_parallel")]
+    pub max_parallel: u32,
+}
+
+fn default_max_parallel() -> u32 {
+    3
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            auto_done: false,
+            max_parallel: default_max_parallel(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default = "default_columns")]
     pub columns: Vec<Column>,
@@ -24,6 +45,8 @@ pub struct Config {
     pub docs: Vec<String>,
     #[serde(default)]
     pub theme: Theme,
+    #[serde(default)]
+    pub agent: AgentConfig,
 }
 
 fn default_columns() -> Vec<Column> {
@@ -88,6 +111,7 @@ impl Default for Config {
             columns: default_columns(),
             docs: default_docs(),
             theme: Theme::default(),
+            agent: AgentConfig::default(),
         }
     }
 }
@@ -228,6 +252,9 @@ impl Config {
         Ok(())
     }
 
+    /// Required column IDs that cannot be deleted.
+    const REQUIRED_COLUMNS: &'static [&'static str] = &["backlog", "todo", "in-progress", "review", "done"];
+
     /// Delete a column. Returns the list of task statuses that need migration.
     /// Caller must handle task migration/deletion before calling this.
     pub fn column_delete(&mut self, name: &str) -> Result<()> {
@@ -237,6 +264,12 @@ impl Config {
             ));
         }
         let idx = self.find_column_index(name)?;
+        let col_id = &self.columns[idx].id;
+        if Self::REQUIRED_COLUMNS.contains(&col_id.as_str()) {
+            return Err(UntaskError::InvalidConfig(
+                format!("cannot delete required column: {col_id}"),
+            ));
+        }
         self.columns.remove(idx);
         Ok(())
     }

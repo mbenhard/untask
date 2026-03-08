@@ -146,7 +146,9 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                         commands::column::delete(&mut store, &root, name, move_to.as_deref(), *delete_tasks, cli.json)
                     }
                 },
-                Commands::Skill { cmd: _ } => commands::skill_install(cli.json),
+                Commands::Skill { cmd: cli::SkillCommands::Install { provider } } => {
+                    commands::skill_install(&provider, cli.json)
+                }
                 Commands::Open => commands::open(&root),
             }
         }

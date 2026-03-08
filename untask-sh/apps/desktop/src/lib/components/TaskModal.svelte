@@ -50,6 +50,8 @@
   let bodyDirty = $state(false);
   let lastTaskId = $state<number | null | undefined>(undefined);
   let lastRefreshRevision = $state(-1);
+  let kickBackOpen = $state(false);
+  let kickBackNotes = $state("");
   const closeAnimationMs = 220;
   let overlayClass = $derived(
     `task-modal-shell fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]${
@@ -89,6 +91,8 @@
     tagDraft = "";
     bodyFocused = false;
     bodyDirty = false;
+    kickBackOpen = false;
+    kickBackNotes = "";
     if (id == null) {
       task = snapshot ? { ...snapshot } : null;
       showBody = (snapshot?.body.trim().length ?? 0) > 0;
@@ -153,6 +157,126 @@
     } catch {
       return "";
     }
+  }
+
+  // ── Agent section parsing ─────────────────────────────────────────
+
+  const AGENT_HEADINGS = ["agent summary", "deferred", "review notes"];
+
+  type ParsedBody = {
+    description: string;
+    agentSummary: string | null;
+    deferred: string | null;
+    reviewNotes: string | null;
+  };
+
+  function parseBodySections(body: string): ParsedBody {
+    const lines = body.split("\n");
+    const sections: { heading: string; startLine: number }[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(/^##\s+(.+)$/);
+      if (match) {
+        const heading = match[1].trim().toLowerCase();
+        if (AGENT_HEADINGS.includes(heading)) {
+          sections.push({ heading, startLine: i });
+        }
+      }
+    }
+
+    if (sections.length === 0) {
+      return { description: body, agentSummary: null, deferred: null, reviewNotes: null };
+    }
+
+    // Everything before the first agent section is the description
+    const firstSectionLine = Math.min(...sections.map((s) => s.startLine));
+    const description = lines.slice(0, firstSectionLine).join("\n").trimEnd();
+
+    // Extract each section's content
+    function extractSection(heading: string): string | null {
+      const section = sections.find((s) => s.heading === heading);
+      if (!section) return null;
+      const nextSection = sections
+        .filter((s) => s.startLine > section.startLine)
+        .sort((a, b) => a.startLine - b.startLine)[0];
+      const endLine = nextSection ? nextSection.startLine : lines.length;
+      return lines
+        .slice(section.startLine + 1, endLine)
+        .join("\n")
+        .trim();
+    }
+
+    return {
+      description,
+      agentSummary: extractSection("agent summary"),
+      deferred: extractSection("deferred"),
+      reviewNotes: extractSection("review notes"),
+    };
+  }
+
+  let parsedBody = $derived.by(() => {
+    if (!task) return { description: "", agentSummary: null, deferred: null, reviewNotes: null };
+    return parseBodySections(task.body);
+  });
+
+  let hasAgentSections = $derived(
+    parsedBody.agentSummary != null || parsedBody.deferred != null || parsedBody.reviewNotes != null,
+  );
+
+  let isReviewStatus = $derived(task?.status === "review");
+
+  let doneColumnId = $derived(
+    columns.find((c) => c.done)?.id ?? "done",
+  );
+
+  // ── Review actions ──────────────────────────────────────────────
+
+  async function approveTask() {
+    if (!task?.id) return;
+    await saveField({ status: doneColumnId });
+  }
+
+  async function kickBack() {
+    if (!task?.id) return;
+    const notes = kickBackNotes.trim();
+    if (notes) {
+      // Append or replace ## Review Notes in the body
+      const body = replaceOrAppendSection(task.body, "Review Notes", notes);
+      await saveField({ status: "in-progress", body });
+    } else {
+      await saveField({ status: "in-progress" });
+    }
+    kickBackOpen = false;
+    kickBackNotes = "";
+  }
+
+  function replaceOrAppendSection(body: string, heading: string, content: string): string {
+    const lines = body.split("\n");
+    const headingLower = heading.toLowerCase();
+    let sectionStart = -1;
+    let sectionEnd = lines.length;
+
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(/^##\s+(.+)$/);
+      if (match) {
+        const h = match[1].trim().toLowerCase();
+        if (h === headingLower) {
+          sectionStart = i;
+        } else if (sectionStart >= 0 && sectionEnd === lines.length) {
+          sectionEnd = i;
+        }
+      }
+    }
+
+    const newSection = `## ${heading}\n${content}`;
+
+    if (sectionStart >= 0) {
+      const before = lines.slice(0, sectionStart).join("\n");
+      const after = lines.slice(sectionEnd).join("\n");
+      return [before, newSection, after].filter(Boolean).join("\n");
+    }
+
+    return body.trimEnd() + "\n\n" + newSection + "\n";
   }
 
   // ── Field updates ────────────────────────────────────────────────
@@ -260,7 +384,23 @@
 
   // Body
   function saveBody(markdown: string) {
-    saveField({ body: markdown });
+    if (!task || !hasAgentSections) {
+      saveField({ body: markdown });
+      return;
+    }
+    // Reconstruct full body: edited description + preserved agent sections
+    let full = markdown.trimEnd();
+    if (parsedBody.agentSummary != null) {
+      full += "\n\n## Agent Summary\n" + parsedBody.agentSummary;
+    }
+    if (parsedBody.deferred != null) {
+      full += "\n\n## Deferred\n" + parsedBody.deferred;
+    }
+    if (parsedBody.reviewNotes != null) {
+      full += "\n\n## Review Notes\n" + parsedBody.reviewNotes;
+    }
+    full += "\n";
+    saveField({ body: full });
   }
 
   // Copy as agent prompt
@@ -405,6 +545,16 @@
             />
           </div>
 
+          <!-- Confidence (review only) -->
+          {#if task.confidence}
+            <div class="flex items-center gap-1.5">
+              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Confidence</span>
+              <span class="inline-flex h-5 items-center rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground">
+                {task.confidence}
+              </span>
+            </div>
+          {/if}
+
           <!-- Priority -->
           <div class="flex items-center gap-1.5">
             <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Priority</span>
@@ -494,11 +644,35 @@
           </div>
         {/if}
 
+        <!-- Agent sections (rendered above editor when present) -->
+        {#if hasAgentSections}
+          <div class="border-t border-border/60">
+            {#if parsedBody.agentSummary != null}
+              <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
+                <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Agent Summary</p>
+                <p class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{parsedBody.agentSummary}</p>
+              </div>
+            {/if}
+            {#if parsedBody.deferred != null}
+              <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
+                <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Deferred</p>
+                <p class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{parsedBody.deferred}</p>
+              </div>
+            {/if}
+            {#if parsedBody.reviewNotes != null}
+              <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
+                <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Review Notes</p>
+                <p class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{parsedBody.reviewNotes}</p>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <!-- Body / description -->
         <div class="border-t border-border/60">
           {#if showBody}
             <MilkdownEditor
-              content={task.body}
+              content={hasAgentSections ? parsedBody.description : task.body}
               readonly={isUnindexed}
               saveOnBlur={true}
               onSave={saveBody}
@@ -518,6 +692,40 @@
         </div>
 
       </div>
+
+      <!-- Kick-back notes input -->
+      {#if kickBackOpen}
+        <div class="border-t border-border/60 px-3 py-2">
+          <p class="mb-1.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">What needs fixing?</p>
+          <textarea
+            bind:value={kickBackNotes}
+            placeholder="Optional — describe what needs to change..."
+            rows="2"
+            class="w-full resize-none rounded-[4px] border border-border/60 bg-transparent px-2.5 py-1.5 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
+            use:focusOnMount
+            onkeydown={(e) => {
+              if (e.key === "Enter" && e.metaKey) { e.preventDefault(); kickBack(); }
+              else if (e.key === "Escape") { kickBackOpen = false; kickBackNotes = ""; }
+            }}
+          ></textarea>
+          <div class="mt-1.5 flex justify-end gap-1.5">
+            <button
+              type="button"
+              class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+              onclick={() => { kickBackOpen = false; kickBackNotes = ""; }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+              onclick={kickBack}
+            >
+              Kick back
+            </button>
+          </div>
+        </div>
+      {/if}
 
       <!-- Footer: date cycling left, actions right -->
       <div class="flex items-center justify-between border-t border-border/60 px-3 py-1.5">
@@ -548,6 +756,24 @@
 
         {#if !isUnindexed}
           <div class="flex items-center gap-0.5">
+            <!-- Review actions -->
+            {#if isReviewStatus}
+              <button
+                type="button"
+                class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                onclick={() => { kickBackOpen = !kickBackOpen; }}
+              >
+                Kick back
+              </button>
+              <button
+                type="button"
+                class="rounded-[4px] border border-border/60 bg-foreground/5 px-2 py-0.5 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-foreground/10"
+                onclick={approveTask}
+              >
+                Approve
+              </button>
+              <span class="mx-0.5 h-3 w-px bg-border/60"></span>
+            {/if}
             <!-- Copy as agent prompt -->
             <MetaTooltip text="Copy as agent prompt">
               {#snippet children({ props })}
