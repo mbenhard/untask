@@ -44,11 +44,7 @@ pub enum Commands {
         #[arg(short, long)]
         tag: Option<String>,
 
-        /// Filter by priority (low, medium, high, urgent)
-        #[arg(short, long)]
-        priority: Option<String>,
-
-        /// Sort by field (priority, updated, created, title)
+        /// Sort by field (updated, created, title)
         #[arg(long, default_value = "id")]
         sort: String,
     },
@@ -249,7 +245,6 @@ mod tests {
             Some(Commands::List {
                 status: None,
                 tag: None,
-                priority: None,
                 ..
             })
         ));

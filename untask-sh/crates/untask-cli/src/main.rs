@@ -87,16 +87,10 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                 Commands::Add { title, status, prd } => {
                     commands::add(&store, title, status.as_deref(), prd.as_deref(), cli.json)
                 }
-                Commands::List {
-                    status,
-                    tag,
-                    priority,
-                    sort,
-                } => commands::list(
+                Commands::List { status, tag, sort } => commands::list(
                     &store,
                     status.as_deref(),
                     tag.as_deref(),
-                    priority.as_deref(),
                     sort,
                     cli.json,
                     fmt,

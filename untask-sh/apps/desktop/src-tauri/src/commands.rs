@@ -10,8 +10,6 @@ use untask_core::docs::{DocNode, DocType, DocsStore};
 use untask_core::search::SearchResultKind;
 use untask_core::store::{AttachmentTextPreview, ListFilter, TaskStore, TaskUpdate};
 use untask_core::task::Task;
-use untask_core::types::Priority;
-
 use crate::state::{self, AppState, RecentProject};
 
 /// Deserialize a double-option so that a missing field → None (don't update)
@@ -58,7 +56,6 @@ pub struct TaskDto {
     pub id: Option<u32>,
     pub title: String,
     pub status: String,
-    pub priority: Option<Priority>,
     pub tags: Vec<String>,
     pub created: Option<NaiveDate>,
     pub updated: Option<DateTime<Utc>>,
@@ -79,7 +76,6 @@ impl From<Task> for TaskDto {
             id: task.id,
             title: task.title,
             status: task.status,
-            priority: task.priority,
             tags: task.tags,
             created: task.created,
             updated: task.updated,
@@ -163,8 +159,6 @@ pub struct NextDto {
 pub struct TaskUpdateDto {
     pub title: Option<String>,
     pub status: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_double_option")]
-    pub priority: Option<Option<Priority>>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
     pub position: Option<f64>,
@@ -519,7 +513,6 @@ pub fn update_task(
             TaskUpdate {
                 title: updates.title,
                 status: updates.status,
-                priority: updates.priority,
                 tags: updates.tags,
                 body: updates.body,
                 position: updates.position,

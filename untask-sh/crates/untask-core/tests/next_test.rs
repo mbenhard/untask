@@ -5,8 +5,6 @@ use untask_core::git;
 use untask_core::init::init;
 use untask_core::next::{self, CleanupKind};
 use untask_core::store::TaskStore;
-use untask_core::types::Priority;
-
 fn setup() -> (tempfile::TempDir, TaskStore) {
     let tmp = tempfile::TempDir::new().unwrap();
     init(tmp.path(), None).unwrap();
@@ -100,35 +98,18 @@ fn git_summary_handles_empty_history() {
 // ── Next summary ─────────────────────────────────────────────────────
 
 #[test]
-fn next_includes_open_tasks_sorted_by_priority() {
+fn next_includes_open_tasks_sorted_by_updated_descending() {
     let (tmp, store) = setup();
-    store.add("Low priority", None, None).unwrap();
-    store.add("High priority", None, None).unwrap();
-    store.add("Urgent task", None, None).unwrap();
+    store.add("First task", None, None).unwrap();
+    store.add("Second task", None, None).unwrap();
+    store.add("Third task", None, None).unwrap();
 
+    // Touch "First task" last so it becomes most recently updated
     store
         .update(
             1,
             untask_core::store::TaskUpdate {
-                priority: Some(Some(Priority::Low)),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-    store
-        .update(
-            2,
-            untask_core::store::TaskUpdate {
-                priority: Some(Some(Priority::High)),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-    store
-        .update(
-            3,
-            untask_core::store::TaskUpdate {
-                priority: Some(Some(Priority::Urgent)),
+                title: Some("First task".into()),
                 ..Default::default()
             },
         )
@@ -136,9 +117,8 @@ fn next_includes_open_tasks_sorted_by_priority() {
 
     let summary = next::generate_next(tmp.path()).unwrap();
     assert_eq!(summary.open_tasks.len(), 3);
-    assert_eq!(summary.open_tasks[0].title, "Urgent task");
-    assert_eq!(summary.open_tasks[1].title, "High priority");
-    assert_eq!(summary.open_tasks[2].title, "Low priority");
+    // Most recently updated first
+    assert_eq!(summary.open_tasks[0].title, "First task");
 }
 
 #[test]

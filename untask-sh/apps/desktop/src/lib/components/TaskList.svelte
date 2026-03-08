@@ -1,8 +1,7 @@
 <script lang="ts">
   import { Select } from "bits-ui";
-  import { addTask, updateTask, type ColumnDto, type Priority, type TaskDto } from "$lib/api";
+  import { addTask, updateTask, type ColumnDto, type TaskDto } from "$lib/api";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
-  import PriorityDot from "$lib/components/PriorityDot.svelte";
 
   let {
     tasks,
@@ -16,7 +15,7 @@
     onTasksChanged: () => void;
   } = $props();
 
-  type SortKey = "title" | "status" | "priority" | "updated" | "position";
+  type SortKey = "title" | "status" | "updated" | "position";
   type SortDir = "asc" | "desc";
 
   let sortKey = $state<SortKey>("position");
@@ -27,8 +26,6 @@
   let quickAddError = $state<string | null>(null);
   let errorRowId = $state<number | null>(null);
   let focusedTaskId = $state<number | null>(null);
-
-  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
   let defaultStatus = $derived(columns.length > 0 ? columns[0].id : "backlog");
   let statuses = $derived([...new Set(tasks.map((t) => t.status))].sort());
@@ -65,13 +62,6 @@
         case "status":
           cmp = a.status.localeCompare(b.status);
           break;
-        case "priority": {
-          const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
-          const ap = a.priority ? order[a.priority] ?? 4 : 4;
-          const bp = b.priority ? order[b.priority] ?? 4 : 4;
-          cmp = ap - bp;
-          break;
-        }
         case "updated":
           cmp = (a.updated ?? "").localeCompare(b.updated ?? "");
           break;
@@ -91,13 +81,6 @@
     }
   }
 
-  function priorityTone(p: string | null): "low" | "medium" | "high" | "neutral" {
-    if (p === "high" || p === "urgent") return "high";
-    if (p === "medium") return "medium";
-    if (p === "low") return "low";
-    return "neutral";
-  }
-
   function relativeDate(iso: string | null): string {
     if (!iso) return "";
     try {
@@ -115,22 +98,6 @@
       return `${diffMonths}mo`;
     } catch {
       return "";
-    }
-  }
-
-  // ── Inline priority cycling ────────────────────────────────────
-  async function cyclePriority(e: MouseEvent, task: TaskDto) {
-    e.stopPropagation();
-    if (task.id == null) return;
-    const current = task.priority ?? null;
-    const idx = priorityCycle.indexOf(current);
-    const next = priorityCycle[(idx + 1) % priorityCycle.length];
-    try {
-      await updateTask(task.id, { priority: next });
-      onTasksChanged();
-    } catch {
-      errorRowId = task.id;
-      setTimeout(() => { errorRowId = null; }, 800);
     }
   }
 
@@ -170,7 +137,6 @@
   }
 
   const colHeaders: { key: SortKey | null; label: string; width: string }[] = [
-    { key: null, label: "", width: "w-[24px]" },
     { key: "title", label: "Title", width: "flex-1 min-w-0" },
     { key: null, label: "Tags", width: "w-[160px]" },
     { key: "status", label: "Status", width: "w-[100px]" },
@@ -247,18 +213,6 @@
         role="button"
         tabindex="0"
       >
-        <!-- Priority dot (clickable) -->
-        <span class="flex w-[24px] shrink-0 justify-center">
-          <button
-            type="button"
-            class="priority-cycle rounded-full p-1 transition-colors duration-[120ms] hover:bg-accent"
-            onclick={(e) => cyclePriority(e, task)}
-            title="Click to cycle priority"
-          >
-            <PriorityDot tone={priorityTone(task.priority)} />
-          </button>
-        </span>
-
         <!-- Title -->
         <span class="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           <span class="truncate text-[13px] text-foreground" title={task.title}>
@@ -346,7 +300,6 @@
 
     <!-- Permanent quick-add row -->
     <div class="flex h-10 items-center border-b border-border/40 px-3">
-      <span class="w-[24px] shrink-0"></span>
       <input
         type="text"
         bind:value={quickAddTitle}
@@ -378,10 +331,6 @@
   .list-scroll::-webkit-scrollbar-thumb {
     background: rgb(42 42 42 / 0.4);
     border-radius: 3px;
-  }
-
-  .priority-cycle {
-    line-height: 0;
   }
 
   .error-row-flash {

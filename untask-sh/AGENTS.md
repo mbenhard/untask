@@ -7,6 +7,5 @@ For any desktop or visual work, follow `docs/untask-design-language.md`:
 3. Borders and separators over heavy fills.
 4. Restrained motion.
 5. Geist + Geist Mono typography.
-6. Tiny priority dots instead of loud priority badges where the design language applies.
 
 Do not ship generic SaaS styling that conflicts with the design-language doc.

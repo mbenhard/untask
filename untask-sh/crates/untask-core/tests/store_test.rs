@@ -294,37 +294,6 @@ fn update_modifies_fields_and_refreshes_updated() {
     assert!(updated.updated > original_updated);
 }
 
-#[test]
-fn update_can_clear_priority() {
-    let (_tmp, store) = setup();
-    store.add("Priority test", None, None).unwrap();
-
-    let with_priority = store
-        .update(
-            1,
-            TaskUpdate {
-                priority: Some(Some(untask_core::types::Priority::High)),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-    assert_eq!(
-        with_priority.priority,
-        Some(untask_core::types::Priority::High)
-    );
-
-    let cleared = store
-        .update(
-            1,
-            TaskUpdate {
-                priority: Some(None),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-    assert_eq!(cleared.priority, None);
-}
-
 // ── Delete ─────────────────────────────────────────────────────────
 
 #[test]

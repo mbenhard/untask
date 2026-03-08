@@ -2,8 +2,6 @@ use std::fmt::Write;
 
 use colored::Colorize;
 use untask_core::task::Task;
-use untask_core::types::Priority;
-
 /// How to render CLI output depending on terminal capabilities and user preferences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputMode {
@@ -52,8 +50,6 @@ impl Formatter {
             .map(|id| format!("{id:>width$}", width = id_width))
             .unwrap_or_else(|| " ".repeat(id_width));
 
-        let priority_dot = priority_marker(task.priority);
-
         let progress = if task.subtask_progress.1 > 0 {
             format!(" [{}/{}]", task.subtask_progress.0, task.subtask_progress.1)
         } else {
@@ -71,13 +67,13 @@ impl Formatter {
                 let padded_status = format!("{:<12}", task.status);
                 let status_colored = colorize_status(&task.status, &padded_status);
                 format!(
-                    "  {priority_dot} #{id_str}  {status_colored}  {title}{tags}{progress}",
+                    "  #{id_str}  {status_colored}  {title}{tags}{progress}",
                     title = task.title,
                 )
             }
             OutputMode::Monochrome | OutputMode::Plain => {
                 format!(
-                    "  {priority_dot} #{id_str}  {status:<12}  {title}{tags}{progress}",
+                    "  #{id_str}  {status:<12}  {title}{tags}{progress}",
                     status = task.status,
                     title = task.title,
                 )
@@ -109,9 +105,6 @@ impl Formatter {
             }
         }
 
-        if let Some(priority) = task.priority {
-            let _ = writeln!(out, "Priority: {}", format_priority(priority));
-        }
         if !task.tags.is_empty() {
             let _ = writeln!(out, "Tags: {}", task.tags.join(", "));
         }
@@ -233,24 +226,6 @@ impl Formatter {
     }
 }
 
-fn priority_marker(priority: Option<Priority>) -> &'static str {
-    match priority {
-        Some(Priority::Urgent) => "!",
-        Some(Priority::High) => "*",
-        Some(Priority::Medium) => ".",
-        Some(Priority::Low) | None => " ",
-    }
-}
-
-fn format_priority(priority: Priority) -> &'static str {
-    match priority {
-        Priority::Low => "low",
-        Priority::Medium => "medium",
-        Priority::High => "high",
-        Priority::Urgent => "urgent",
-    }
-}
-
 fn colorize_status(status: &str, text: &str) -> String {
     match status {
         "done" => text.green().to_string(),
@@ -317,22 +292,12 @@ mod tests {
     }
 
     #[test]
-    fn priority_marker_mapping() {
-        assert_eq!(priority_marker(Some(Priority::Urgent)), "!");
-        assert_eq!(priority_marker(Some(Priority::High)), "*");
-        assert_eq!(priority_marker(Some(Priority::Medium)), ".");
-        assert_eq!(priority_marker(Some(Priority::Low)), " ");
-        assert_eq!(priority_marker(None), " ");
-    }
-
-    #[test]
     fn color_task_rows_keep_plain_alignment_after_stripping_ansi() {
         let fmt = Formatter::new(OutputMode::Color);
         let task = Task {
             id: Some(7),
             title: "Implement auth".into(),
             status: "in-progress".into(),
-            priority: Some(Priority::High),
             tags: vec!["backend".into()],
             subtask_progress: (1, 2),
             ..Task::default()
@@ -340,7 +305,7 @@ mod tests {
 
         assert_eq!(
             strip_ansi(&fmt.task_row(&task, 2)),
-            "  * # 7  in-progress   Implement auth [backend] [1/2]"
+            "  # 7  in-progress   Implement auth [backend] [1/2]"
         );
     }
 

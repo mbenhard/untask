@@ -314,7 +314,7 @@
               <div class="flex flex-1 flex-wrap items-center gap-2 font-mono text-[10px] text-muted-foreground">
                 {#if taskHealth.unmatchedCount > 0}
                   <span class="flex items-center gap-1 rounded-[6px] border border-border/60 px-1.5 py-0.5">
-                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-priority-medium"></span>
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-border"></span>
                     {taskHealth.unmatchedCount} unmatched
                   </span>
                 {/if}

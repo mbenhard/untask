@@ -1,6 +1,5 @@
 <script lang="ts">
   import { updateTask, type ColumnDto, type TaskDto } from "$lib/api";
-  import PriorityDot from "$lib/components/PriorityDot.svelte";
 
   let {
     tasks,
@@ -31,13 +30,6 @@
   let doneColumnId = $derived(
     columns.find((c) => c.done)?.id ?? "done",
   );
-
-  function priorityTone(p: string | null): "low" | "medium" | "high" | "neutral" {
-    if (p === "high" || p === "urgent") return "high";
-    if (p === "medium") return "medium";
-    if (p === "low") return "low";
-    return "neutral";
-  }
 
   function relativeDate(iso: string | null): string {
     if (!iso) return "";
@@ -104,11 +96,6 @@
         role="button"
         tabindex="0"
       >
-        <!-- Priority dot -->
-        <span class="flex w-[24px] shrink-0 justify-center">
-          <PriorityDot tone={priorityTone(task.priority)} />
-        </span>
-
         <!-- ID -->
         {#if task.id != null}
           <span class="w-[40px] shrink-0 font-mono text-[10px] text-muted-foreground/60">

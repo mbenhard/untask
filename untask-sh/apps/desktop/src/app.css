@@ -13,10 +13,6 @@
   --color-ring: #8a8a8a;
   --color-destructive: #7f1d1d;
 
-  --color-priority-low: #10b981;
-  --color-priority-medium: #f59e0b;
-  --color-priority-high: #f43f5e;
-
   --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
 }

@@ -22,7 +22,6 @@ pub struct TaskStore {
 pub struct TaskUpdate {
     pub title: Option<String>,
     pub status: Option<String>,
-    pub priority: Option<Option<crate::types::Priority>>,
     pub tags: Option<Vec<String>>,
     pub body: Option<String>,
     pub position: Option<f64>,
@@ -453,9 +452,6 @@ impl TaskStore {
         }
         if let Some(status) = updates.status {
             self.apply_status_change(task, &status)?;
-        }
-        if let Some(priority) = updates.priority {
-            task.priority = priority;
         }
         if let Some(tags) = updates.tags {
             task.tags = tags;

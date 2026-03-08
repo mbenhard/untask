@@ -47,12 +47,8 @@ pub fn generate_next(project_root: &Path) -> Result<NextSummary> {
         .filter(|task| task.owner.as_deref() != Some("user"))
         .cloned()
         .collect();
-    // Sort by priority descending, then updated descending
-    open_tasks.sort_by(|a, b| {
-        b.priority
-            .cmp(&a.priority)
-            .then_with(|| b.updated.cmp(&a.updated))
-    });
+    // Sort by updated descending (most recently touched first)
+    open_tasks.sort_by(|a, b| b.updated.cmp(&a.updated));
 
     let cutoff = Utc::now() - Duration::days(7);
     let mut recently_completed: Vec<Task> = all_tasks

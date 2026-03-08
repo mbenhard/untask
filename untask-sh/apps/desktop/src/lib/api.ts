@@ -2,8 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 // ── Types ───────────────────────────────────────────────────────────
 
-export type Priority = "low" | "medium" | "high";
-
 export interface AttachmentRefDto {
   filename: string;
   mime_type: string;
@@ -22,7 +20,6 @@ export interface TaskDto {
   id: number | null;
   title: string;
   status: string;
-  priority: Priority | null;
   tags: string[];
   created: string | null;
   updated: string | null;
@@ -87,7 +84,6 @@ export interface RecentProject {
 export interface TaskUpdateDto {
   title?: string;
   status?: string;
-  priority?: Priority | null;
   tags?: string[];
   body?: string;
   position?: number;

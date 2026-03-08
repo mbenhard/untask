@@ -2,13 +2,11 @@ use crate::output::Formatter;
 use untask_core::error::{Result, UntaskError};
 use untask_core::store::{ListFilter, TaskStore};
 use untask_core::task::Task;
-use untask_core::types::Priority;
 
 pub fn run(
     store: &TaskStore,
     status: Option<&str>,
     tag: Option<&str>,
-    priority: Option<&str>,
     sort: &str,
     json: bool,
     fmt: &Formatter,
@@ -33,12 +31,6 @@ pub fn run(
 
     let mut tasks = store.list(filter)?;
 
-    // Filter by priority (post-filter since store doesn't support it)
-    if let Some(p) = priority {
-        let target = parse_priority(p)?;
-        tasks.retain(|t| t.priority == Some(target));
-    }
-
     // Sort
     sort_tasks(&mut tasks, sort)?;
 
@@ -53,26 +45,15 @@ pub fn run(
     Ok(())
 }
 
-fn parse_priority(s: &str) -> Result<Priority> {
-    match s.to_lowercase().as_str() {
-        "low" => Ok(Priority::Low),
-        "medium" | "med" => Ok(Priority::Medium),
-        "high" => Ok(Priority::High),
-        "urgent" => Ok(Priority::Urgent),
-        _ => Err(UntaskError::InvalidConfig(format!("unknown priority: {s}"))),
-    }
-}
-
 fn sort_tasks(tasks: &mut [Task], field: &str) -> Result<()> {
     match field {
         "id" => {} // already sorted by id from store
-        "priority" => tasks.sort_by(|a, b| a.priority.cmp(&b.priority).reverse()),
         "updated" => tasks.sort_by(|a, b| b.updated.cmp(&a.updated)),
         "created" => tasks.sort_by(|a, b| b.created.cmp(&a.created)),
         "title" => tasks.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase())),
         _ => {
             return Err(UntaskError::InvalidConfig(format!(
-                "unknown sort field: {field} (use: id, priority, updated, created, title)"
+                "unknown sort field: {field} (use: id, updated, created, title)"
             )));
         }
     }

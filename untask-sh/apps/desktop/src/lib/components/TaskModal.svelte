@@ -5,13 +5,10 @@
     getTask,
     updateTask,
     type ColumnDto,
-    type Priority,
     type TaskDto,
   } from "$lib/api";
   import { marked } from "marked";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
-  import PriorityDot from "$lib/components/PriorityDot.svelte";
-  import type { PriorityTone } from "$lib/components/PriorityDot.svelte";
   import AttachmentList from "$lib/components/AttachmentList.svelte";
   import SubtaskList from "$lib/components/SubtaskList.svelte";
   import TagPicker from "$lib/components/TagPicker.svelte";
@@ -74,8 +71,6 @@
       errorFlash ? " error-flash" : ""
     }${closing ? " task-modal-closing" : ""}`,
   );
-
-  const priorityCycle: (Priority | null)[] = [null, "low", "medium", "high"];
 
   function focusOnMount(el: HTMLElement) {
     requestAnimationFrame(() => {
@@ -210,13 +205,6 @@
     if (!task || hasKnownStatus(columns, task.status)) return columns;
     return [{ id: task.status, aliases: [] }, ...columns];
   });
-
-  function priorityTone(p: Priority | null): PriorityTone {
-    if (p === "high") return "high";
-    if (p === "medium") return "medium";
-    if (p === "low") return "low";
-    return "neutral";
-  }
 
   // ── Agent section parsing ─────────────────────────────────────────
 
@@ -427,16 +415,6 @@
     saveField({ status: newStatus });
   }
 
-  // Priority cycling
-  function cyclePriority() {
-    if (isUnindexed || !task) return;
-    const current = task.priority ?? null;
-    const idx = priorityCycle.indexOf(current);
-    const next = priorityCycle[(idx + 1) % priorityCycle.length];
-    task = { ...task, priority: next };
-    saveField({ priority: next });
-  }
-
   // Tags
   function toggleTag(tag: string) {
     if (!task || isUnindexed) return;
@@ -504,7 +482,6 @@
     if (!task) return;
 
     const meta = [
-      task.priority ? `Priority: ${task.priority}` : "",
       task.tags.length > 0 ? `Tags: ${task.tags.join(", ")}` : "",
     ].filter(Boolean).join(" | ");
 
@@ -628,7 +605,7 @@
         <!-- Title -->
         <div class="shrink-0 px-4 pt-3 pb-1">
           {#if isUnindexed}
-            <div class="mb-2 rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 bg-accent/60 px-2.5 py-2">
+            <div class="mb-2 rounded-[6px] border border-border/60 border-l-2 border-l-border bg-accent/60 px-2.5 py-2">
               <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Unindexed</p>
               <p class="mt-0.5 text-[11px] text-muted-foreground">
                 Run '<span class="select-all font-mono">untask reindex</span>' in terminal to fix
@@ -666,7 +643,7 @@
           {/if}
         </div>
 
-        <!-- Metadata row: status, priority, tags -->
+        <!-- Metadata row: status, tags -->
         <div class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border/40 px-4 pb-3">
           <!-- Status -->
           <div class="flex items-center gap-1.5">
@@ -679,25 +656,6 @@
             />
           </div>
 
-
-          <!-- Priority -->
-          <div class="flex items-center gap-1.5">
-            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Priority</span>
-            <MetaTooltip text="Cycle priority">
-              {#snippet children({ props })}
-                <button
-                  {...props}
-                  type="button"
-                  class="inline-flex h-6 items-center gap-1 rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none"
-                  disabled={isUnindexed}
-                  onclick={cyclePriority}
-                >
-                  <PriorityDot tone={priorityTone(task?.priority ?? null)} />
-                  <span>{task?.priority ?? "none"}</span>
-                </button>
-              {/snippet}
-            </MetaTooltip>
-          </div>
 
           <!-- Tags -->
           {#if task.tags.length > 0 || !isUnindexed}

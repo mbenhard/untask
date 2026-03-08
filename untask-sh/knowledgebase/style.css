@@ -24,9 +24,6 @@
   --code-bg: #1E1E1E;
   --selection: rgba(138, 138, 138, 0.2);
   --sidebar-w: 240px;
-  --priority-low: #10B981;
-  --priority-medium: #F59E0B;
-  --priority-high: #F43F5E;
 }
 
 [data-theme="light"] {
@@ -475,23 +472,6 @@ pre code {
 .file-tree .comment {
   color: var(--muted-dim);
 }
-
-/* ── Priority dots ───────────────────────────────── */
-
-.dot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  margin-right: 6px;
-  vertical-align: middle;
-  position: relative;
-  top: -1px;
-}
-
-.dot-low { background: var(--priority-low); }
-.dot-medium { background: var(--priority-medium); }
-.dot-high { background: var(--priority-high); }
 
 /* ── Frontmatter example ─────────────────────────── */
 

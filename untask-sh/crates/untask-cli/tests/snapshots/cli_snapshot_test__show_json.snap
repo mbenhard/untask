@@ -1,6 +1,6 @@
 ---
 source: crates/untask-cli/tests/cli_snapshot_test.rs
-assertion_line: 166
+assertion_line: 155
 expression: redacted
 ---
 {
@@ -8,7 +8,6 @@ expression: redacted
   "created": "[timestamp]",
   "id": 1,
   "position": 1.0,
-  "priority": "high",
   "status": "backlog",
   "subtask_progress": {
     "completed": 1,

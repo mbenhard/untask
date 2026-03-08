@@ -8,7 +8,6 @@
   } from "$lib/api";
   import AttachmentList from "$lib/components/AttachmentList.svelte";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
-  import PriorityDot from "$lib/components/PriorityDot.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import { hasKnownStatus } from "$lib/utils";
 
@@ -72,13 +71,6 @@
     } catch (e) {
       console.error("Failed to change status:", e);
     }
-  }
-
-  function priorityTone(p: string | null): "low" | "medium" | "high" | "neutral" {
-    if (p === "high" || p === "urgent") return "high";
-    if (p === "medium") return "medium";
-    if (p === "low") return "low";
-    return "neutral";
   }
 
   function formatDate(iso: string | null): string {
@@ -157,15 +149,6 @@
               disabled={isUnindexed}
               onValueChange={changeStatus}
             />
-          </div>
-
-          <!-- Priority -->
-          <div class="flex items-center gap-1.5">
-            <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/50">Priority</span>
-            <span class="inline-flex h-5 items-center gap-1 rounded-[4px] border border-border/60 px-1.5 font-mono text-[10px] leading-none text-muted-foreground">
-              <PriorityDot tone={priorityTone(fullTask.priority)} />
-              <span>{fullTask.priority ?? "none"}</span>
-            </span>
           </div>
 
           <!-- Tags -->

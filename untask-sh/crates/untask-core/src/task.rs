@@ -3,8 +3,6 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::types::Priority;
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AttachmentRef {
     pub filename: String,
@@ -19,8 +17,6 @@ pub struct Task {
     pub id: Option<u32>,
     pub title: String,
     pub status: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub priority: Option<Priority>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -63,8 +59,6 @@ struct TaskFrontmatter {
     #[serde(default)]
     status: String,
     #[serde(default)]
-    priority: Option<Priority>,
-    #[serde(default)]
     tags: Vec<String>,
     #[serde(default)]
     prd: Option<String>,
@@ -90,7 +84,6 @@ impl From<TaskFrontmatter> for Task {
             id: frontmatter.id,
             title: frontmatter.title,
             status: frontmatter.status,
-            priority: frontmatter.priority,
             tags: frontmatter.tags,
             prd: frontmatter.prd,
             created: frontmatter.created,

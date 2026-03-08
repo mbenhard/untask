@@ -36,7 +36,6 @@ Need to support Google and GitHub OAuth providers.
     assert_eq!(task.id, Some(2));
     assert_eq!(task.title, "Implement OAuth2 flow");
     assert_eq!(task.status, "in-progress");
-    assert_eq!(task.priority, Some(untask_core::types::Priority::High));
     assert_eq!(task.tags, vec!["auth", "backend"]);
     assert!(task.body.contains("## Description"));
     assert_eq!(task.subtask_progress, (1, 3));

@@ -268,28 +268,6 @@ fn list_filters_by_tag() {
 }
 
 #[test]
-fn list_filters_by_priority() {
-    let tmp = TempDir::new().unwrap();
-    init_project(tmp.path());
-    run_in(tmp.path(), &["add", "Low priority"]);
-    run_in(tmp.path(), &["add", "High priority"]);
-
-    insert_frontmatter_lines(
-        &find_task_file(tmp.path(), "low-priority"),
-        &["priority: low"],
-    );
-    insert_frontmatter_lines(
-        &find_task_file(tmp.path(), "high-priority"),
-        &["priority: high"],
-    );
-
-    let (stdout, _, ok) = run_in(tmp.path(), &["list", "--priority", "high"]);
-    assert!(ok);
-    assert!(stdout.contains("High priority"));
-    assert!(!stdout.contains("Low priority"));
-}
-
-#[test]
 fn list_json_outputs_valid_array() {
     let tmp = TempDir::new().unwrap();
     init_project(tmp.path());
@@ -314,37 +292,6 @@ fn list_sort_by_title() {
     let parsed: Vec<serde_json::Value> = serde_json::from_str(&stdout).unwrap();
     assert_eq!(parsed[0]["title"], "Alpha");
     assert_eq!(parsed[1]["title"], "Zebra");
-}
-
-#[test]
-fn list_sort_by_priority_is_stable() {
-    let tmp = TempDir::new().unwrap();
-    init_project(tmp.path());
-    run_in(tmp.path(), &["add", "Alpha high"]);
-    run_in(tmp.path(), &["add", "Bravo high"]);
-    run_in(tmp.path(), &["add", "Charlie medium"]);
-
-    insert_frontmatter_lines(
-        &find_task_file(tmp.path(), "alpha-high"),
-        &["priority: high"],
-    );
-    insert_frontmatter_lines(
-        &find_task_file(tmp.path(), "bravo-high"),
-        &["priority: high"],
-    );
-    insert_frontmatter_lines(
-        &find_task_file(tmp.path(), "charlie-medium"),
-        &["priority: medium"],
-    );
-
-    let (stdout, _, ok) = run_in(tmp.path(), &["--json", "list", "--sort", "priority"]);
-    assert!(ok);
-    let parsed: Vec<serde_json::Value> = serde_json::from_str(&stdout).unwrap();
-    let titles: Vec<_> = parsed
-        .iter()
-        .map(|task| task["title"].as_str().unwrap())
-        .collect();
-    assert_eq!(titles, vec!["Alpha high", "Bravo high", "Charlie medium"]);
 }
 
 // ── Show ────────────────────────────────────────────────────────────
@@ -698,10 +645,6 @@ fn next_outputs_formatted_sections_and_json() {
 
     run_in(tmp.path(), &["add", "Urgent task"]);
     run_in(tmp.path(), &["add", "Done task", "--status", "done"]);
-    insert_frontmatter_lines(
-        &find_task_file(tmp.path(), "urgent-task"),
-        &["priority: urgent"],
-    );
     write_task_file(
         tmp.path(),
         "loose-note.md",

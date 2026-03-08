@@ -1,7 +1,6 @@
 <script lang="ts">
   import { addTask, updateTask, attachFileBytes, type ColumnDto, type TaskDto } from "$lib/api";
   import CardThumbnail from "$lib/components/CardThumbnail.svelte";
-  import PriorityDot from "$lib/components/PriorityDot.svelte";
   import { tagColor } from "$lib/tagColor";
   import { resolveStatus } from "$lib/utils";
 
@@ -319,14 +318,6 @@
     return dropTarget?.columnId === columnId && dropTarget.index === taskCount;
   }
 
-  // ── Display helpers ──────────────────────────────────────────────
-  function priorityTone(p: string | null): "low" | "medium" | "high" | "neutral" {
-    if (p === "high" || p === "urgent") return "high";
-    if (p === "medium") return "medium";
-    if (p === "low") return "low";
-    return "neutral";
-  }
-
 
 </script>
 
@@ -419,11 +410,9 @@
               </div>
             {/if}
 
-            <!-- Row 3: priority dot + icon cluster -->
-            {#if task.priority || task.body?.trim() || task.subtask_total > 0 || task.owner === "user" || task.attachments?.length > 0}
+            <!-- Row 3: icon cluster -->
+            {#if task.body?.trim() || task.subtask_total > 0 || task.owner === "user" || task.attachments?.length > 0}
               <div class="mt-1.5 flex items-center gap-1.5">
-                <PriorityDot tone={priorityTone(task.priority)} />
-
                 <span class="flex-1"></span>
 
                 {#if task.body?.trim()}

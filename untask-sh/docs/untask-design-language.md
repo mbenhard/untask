@@ -60,7 +60,6 @@ Almost everything is grayscale:
 
 Color only appears when it communicates state:
 
-- priority dots
 - destructive actions
 - macOS traffic lights
 - occasional success checkmarks
@@ -174,15 +173,11 @@ Use color sparingly and only for semantic signals:
 
 | Purpose | Suggested value |
 | --- | --- |
-| low priority | `#10B981` / emerald 500 |
-| medium priority | `#F59E0B` / amber 500 |
-| high priority | `#F43F5E` / rose 500 |
 | destructive text | `#DC2626` light, muted dark red on dark |
 | success check | muted emerald, not neon |
 
 Important:
 
-- priority is usually shown as a tiny 5px dot, not a badge
 - color should rarely fill a large surface
 - do not introduce a brand blue, purple, or gradient palette
 
@@ -423,7 +418,6 @@ This pattern should be reused aggressively in a sister app.
 Task rows have a very specific anatomy:
 
 - checkbox affordance on the left
-- tiny priority dot next to it
 - 13px title
 - right-side metadata chips and action icons
 - hover/focus background only slightly brighter
@@ -432,7 +426,6 @@ Important details:
 
 - the checkbox is light and dashed when incomplete
 - completed state fills with the foreground color
-- priority is not a full tag, only a small dot unless expanded metadata is shown
 - the row itself remains mostly monochrome
 
 ### 8.4 Notes
@@ -826,9 +819,6 @@ If you want a practical starting point, use this:
   --ring: #8A8A8A;
   --destructive: #7F1D1D;
 
-  --priority-low: #10B981;
-  --priority-medium: #F59E0B;
-  --priority-high: #F43F5E;
 }
 ```
 

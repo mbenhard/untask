@@ -118,9 +118,8 @@ fn setup_project_with_tasks(dir: &Path) {
 
     insert_frontmatter_lines(
         &find_task_file(dir, "implement-auth"),
-        &["priority: high", "tags:", "  - backend", "  - security"],
+        &["tags:", "  - backend", "  - security"],
     );
-    insert_frontmatter_lines(&find_task_file(dir, "write-tests"), &["priority: medium"]);
 
     // Add body with subtasks to task 1
     let task_path = find_task_file(dir, "implement-auth");

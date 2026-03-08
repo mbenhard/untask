@@ -9,11 +9,3 @@ pub enum Theme {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Priority {
-    Low,
-    Medium,
-    High,
-    Urgent,
-}

@@ -1,6 +1,6 @@
 ---
 source: crates/untask-cli/tests/cli_snapshot_test.rs
-assertion_line: 156
+assertion_line: 145
 expression: redacted
 ---
 [
@@ -8,7 +8,6 @@ expression: redacted
     "created": "[timestamp]",
     "id": 1,
     "position": 1.0,
-    "priority": "high",
     "status": "backlog",
     "tags": [
       "backend",
@@ -21,7 +20,6 @@ expression: redacted
     "created": "[timestamp]",
     "id": 2,
     "position": 1.0,
-    "priority": "medium",
     "status": "in-progress",
     "title": "Write tests",
     "updated": "[timestamp]"
