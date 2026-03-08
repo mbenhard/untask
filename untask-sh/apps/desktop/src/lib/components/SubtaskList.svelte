@@ -23,7 +23,7 @@
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line.startsWith("  ") || line.startsWith("\t")) continue;
-      const trimmed = line.trim();
+      const trimmed = line.trimStart();
       if (trimmed.startsWith("- [x]") || trimmed.startsWith("- [X]")) {
         result.push({ text: trimmed.slice(6), checked: true, lineIndex: i });
       } else if (trimmed.startsWith("- [ ]")) {
@@ -276,7 +276,7 @@
         role="row"
         tabindex="0"
         class="group flex min-h-[28px] items-center gap-1.5 border-t border-border/40 px-2.5 py-1 outline-none transition-colors duration-[120ms] focus-visible:bg-accent/30 {dragOverIndex === i && dragFromIndex !== i ? 'bg-accent/40' : ''}"
-        draggable={!readonly}
+        draggable={!readonly && editingIndex !== i}
         ondragstart={(e) => onDragStart(e, i)}
         ondragover={(e) => onDragOver(e, i)}
         ondrop={(e) => onDrop(e, i)}
