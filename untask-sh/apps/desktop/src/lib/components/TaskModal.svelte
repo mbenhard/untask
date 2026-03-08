@@ -309,6 +309,8 @@
     columns.find((c) => c.done)?.id ?? "done",
   );
 
+  let isDoneStatus = $derived(task?.status === doneColumnId);
+
   // ── Review actions ──────────────────────────────────────────────
 
   async function approveTask() {
@@ -848,13 +850,12 @@
 
       </div>
 
-      <!-- Kick-back notes input -->
+      <!-- Kick-back notes (inline expand) -->
       {#if kickBackOpen}
         <div class="border-t border-border/60 px-3 py-2">
-          <p class="mb-1.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">What needs fixing?</p>
           <textarea
             bind:value={kickBackNotes}
-            placeholder="Optional — describe what needs to change..."
+            placeholder="What needs fixing? (optional)"
             rows="2"
             class="w-full resize-none rounded-[4px] border border-border/60 bg-transparent px-2.5 py-1.5 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
             use:focusOnMount
@@ -863,32 +864,16 @@
               else if (e.key === "Escape") { kickBackOpen = false; kickBackNotes = ""; }
             }}
           ></textarea>
-          <div class="mt-1.5 flex justify-end gap-1.5">
-            <button
-              type="button"
-              class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
-              onclick={() => { kickBackOpen = false; kickBackNotes = ""; }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
-              onclick={kickBack}
-            >
-              Kick back
-            </button>
-          </div>
         </div>
       {/if}
 
       <!-- Footer: delete left, actions right -->
       <div class="flex items-center justify-between border-t border-border/60 px-3 py-2">
         <div class="flex items-center gap-1.5">
-          {#if bodyDirty}
+          {#if bodyDirty && !kickBackOpen}
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
           {/if}
-          {#if !isUnindexed}
+          {#if !isUnindexed && !kickBackOpen}
             <!-- Delete (inline confirm) -->
             {#if showDeleteConfirm}
               <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
@@ -924,51 +909,51 @@
           {/if}
         </div>
 
-        {#if !isUnindexed}
-          <div class="flex items-center gap-1">
-            <!-- Review actions -->
-            {#if isReviewStatus}
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
-                onclick={() => { kickBackOpen = !kickBackOpen; }}
-              >
-                Kick back
-              </button>
-              <button
-                type="button"
-                class="rounded-[4px] border border-border/60 bg-foreground/5 px-2.5 py-1 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:bg-foreground/10"
-                onclick={approveTask}
-              >
-                Approve
-              </button>
-              <span class="mx-0.5 h-3 w-px bg-border/60"></span>
-            {/if}
-            <!-- Copy as agent prompt (split button) -->
+        {#if kickBackOpen}
+          <!-- Kick-back mode: only Cancel + Send back -->
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              class="rounded-[4px] px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+              onclick={() => { kickBackOpen = false; kickBackNotes = ""; }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-[4px] border border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+              onclick={kickBack}
+            >
+              Send back
+            </button>
+          </div>
+        {:else if !isUnindexed && !isDoneStatus}
+          <div class="flex items-center gap-1.5">
             {#if copyFeedback}
-              <span class="inline-flex items-center gap-1 rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
                 Copied
               </span>
             {:else}
-              <div class="inline-flex items-stretch">
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-                  onclick={() => copyPrompt()}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                  Copy for AI
-                </button>
-                <div class="relative flex">
+              {#if isReviewStatus}
+                <!-- Tertiary: Copy for AI -->
+                <div class="relative inline-flex items-stretch">
                   <button
                     type="button"
-                    class="inline-flex items-center rounded-r-[4px] border border-foreground/20 bg-foreground px-2 py-1 text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+                    class="inline-flex items-center gap-1 rounded-l-[4px] px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+                    onclick={() => copyPrompt()}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy for AI
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center rounded-r-[4px] px-1.5 py-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
                     onclick={() => { promptDropdownOpen = !promptDropdownOpen; }}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -993,7 +978,66 @@
                     </div>
                   {/if}
                 </div>
-              </div>
+                <!-- Secondary: Kick back -->
+                <button
+                  type="button"
+                  class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:border-border"
+                  onclick={() => { kickBackOpen = true; }}
+                >
+                  Kick back
+                </button>
+                <!-- Primary: Approve -->
+                <button
+                  type="button"
+                  class="rounded-[4px] border border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+                  onclick={approveTask}
+                >
+                  Approve
+                </button>
+              {:else}
+                <!-- Default state: Copy for AI as primary -->
+                <div class="inline-flex items-stretch">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+                    onclick={() => copyPrompt()}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy for AI
+                  </button>
+                  <div class="relative flex">
+                    <button
+                      type="button"
+                      class="inline-flex items-center rounded-r-[4px] border border-foreground/20 bg-foreground px-2 py-1 text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+                      onclick={() => { promptDropdownOpen = !promptDropdownOpen; }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                    {#if promptDropdownOpen}
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                      <div
+                        class="absolute bottom-full right-0 mb-1 w-[200px] rounded-[6px] border border-border/60 bg-popover py-0.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)]"
+                        onmouseleave={() => { promptDropdownOpen = false; }}
+                      >
+                        {#each PROMPT_MODES as mode}
+                          <button
+                            type="button"
+                            class="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground transition-colors duration-[80ms] hover:bg-accent hover:text-foreground"
+                            onclick={() => pickPromptMode(mode.id)}
+                          >
+                            <span>{mode.label}<span class="text-muted-foreground/40"> — {mode.desc}</span></span>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
             {/if}
           </div>
         {/if}

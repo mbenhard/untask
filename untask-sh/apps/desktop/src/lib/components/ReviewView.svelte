@@ -85,7 +85,7 @@
     {#if reviewTasks.length > 0}
       <button
         type="button"
-        class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground disabled:opacity-50"
+        class="rounded-[4px] border border-foreground/20 bg-foreground px-2 py-0.5 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85 disabled:opacity-50"
         disabled={approving}
         onclick={approveAll}
       >
