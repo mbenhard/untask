@@ -956,7 +956,7 @@
               <div class="inline-flex items-stretch">
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                  class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
                   onclick={() => copyPrompt()}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -968,7 +968,7 @@
                 <div class="relative flex">
                   <button
                     type="button"
-                    class="inline-flex items-center rounded-r-[4px] border border-border/60 px-2 py-1 text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
+                    class="inline-flex items-center rounded-r-[4px] border border-foreground/20 bg-foreground px-2 py-1 text-background transition-colors duration-[120ms] hover:bg-foreground/85"
                     onclick={() => { promptDropdownOpen = !promptDropdownOpen; }}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
