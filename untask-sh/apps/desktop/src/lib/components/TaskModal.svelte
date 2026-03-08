@@ -56,8 +56,9 @@
   let bodyDirty = $state(false);
   let lastTaskId = $state<number | null | undefined>(undefined);
   let lastRefreshRevision = $state(-1);
-  let kickBackOpen = $state(false);
-  let kickBackNotes = $state("");
+  let reviseOpen = $state(false);
+  let reviseNotes = $state("");
+  let reviseDropdownOpen = $state(false);
   let bodySaveRevision = 0;
   let dropActivateTimer: ReturnType<typeof setTimeout> | null = null;
   const closeAnimationMs = 220;
@@ -154,8 +155,9 @@
     clearDropState();
     bodyFocused = false;
     bodyDirty = false;
-    kickBackOpen = false;
-    kickBackNotes = "";
+    reviseOpen = false;
+    reviseNotes = "";
+    reviseDropdownOpen = false;
     if (id == null) {
       task = snapshot ? { ...snapshot } : null;
       showBody = snapshot ? hasEditableNotes(snapshot.body) : false;
@@ -307,18 +309,21 @@
     handleClose();
   }
 
-  async function kickBack() {
+  async function reviseTask(andCopy: boolean = true) {
     if (!task?.id) return;
-    const notes = kickBackNotes.trim();
+    const notes = reviseNotes.trim();
     if (notes) {
-      // Append or replace ## Review Notes in the body
       const body = replaceOrAppendSection(task.body, "Review Notes", notes);
       await saveField({ status: "in-progress", body });
     } else {
       await saveField({ status: "in-progress" });
     }
-    kickBackOpen = false;
-    kickBackNotes = "";
+    if (andCopy) {
+      copyPrompt("revise", notes);
+    }
+    reviseOpen = false;
+    reviseNotes = "";
+    reviseDropdownOpen = false;
     handleClose();
   }
 
@@ -478,7 +483,7 @@
 
   let promptDropdownOpen = $state(false);
 
-  function copyPrompt(mode: string = "implement") {
+  function copyPrompt(mode: string = "implement", reviewNotes: string = "") {
     if (!task) return;
 
     const meta = [
@@ -500,7 +505,10 @@
       : "";
 
     let prompt = "";
-    if (mode === "implement") {
+    if (mode === "revise") {
+      prompt = `Revise task #${task.id}: ${task.title}\n\nThis task was reviewed and needs changes.`;
+      if (reviewNotes) prompt += `\n\n## Review Notes\n${reviewNotes}`;
+    } else if (mode === "implement") {
       prompt = `Implement task #${task.id}: ${task.title}`;
     } else if (mode === "plan") {
       prompt = `Create an implementation plan for task #${task.id}: ${task.title}\nDo not implement — outline the approach, key decisions, affected files, and risks.`;
@@ -549,6 +557,7 @@
         e.preventDefault();
         if (editingTitle) { cancelTitle(); }
         else if (promptDropdownOpen) { promptDropdownOpen = false; }
+        else if (reviseDropdownOpen) { reviseDropdownOpen = false; }
         else if (!closing) { handleClose(); }
       }}
       ondragenter={handleFileDragEnter}
@@ -810,18 +819,18 @@
 
       </div>
 
-      <!-- Kick-back notes (inline expand) -->
-      {#if kickBackOpen}
+      <!-- Revise notes (inline expand) -->
+      {#if reviseOpen}
         <div class="border-t border-border/60 px-3 py-2">
           <textarea
-            bind:value={kickBackNotes}
+            bind:value={reviseNotes}
             placeholder="What needs fixing? (optional)"
             rows="2"
             class="w-full resize-none rounded-[4px] border border-border/60 bg-transparent px-2.5 py-1.5 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
             use:focusOnMount
             onkeydown={(e) => {
-              if (e.key === "Enter" && e.metaKey) { e.preventDefault(); kickBack(); }
-              else if (e.key === "Escape") { kickBackOpen = false; kickBackNotes = ""; }
+              if (e.key === "Enter" && e.metaKey) { e.preventDefault(); reviseTask(true); }
+              else if (e.key === "Escape") { reviseOpen = false; reviseNotes = ""; }
             }}
           ></textarea>
         </div>
@@ -830,10 +839,10 @@
       <!-- Footer: delete left, actions right -->
       <div class="flex items-center justify-between border-t border-border/60 px-3 py-2">
         <div class="flex items-center gap-1.5">
-          {#if bodyDirty && !kickBackOpen}
+          {#if bodyDirty && !reviseOpen}
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
           {/if}
-          {#if !isUnindexed && !kickBackOpen}
+          {#if !isUnindexed && !reviseOpen}
             <!-- Delete (inline confirm) -->
             {#if showDeleteConfirm}
               <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
@@ -869,23 +878,53 @@
           {/if}
         </div>
 
-        {#if kickBackOpen}
-          <!-- Kick-back mode: only Cancel + Send back -->
+        {#if reviseOpen}
+          <!-- Revise mode: Cancel + split button (Revise & copy / Revise) -->
           <div class="flex items-center gap-1.5">
             <button
               type="button"
               class="rounded-[4px] px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
-              onclick={() => { kickBackOpen = false; kickBackNotes = ""; }}
+              onclick={() => { reviseOpen = false; reviseNotes = ""; }}
             >
               Cancel
             </button>
-            <button
-              type="button"
-              class="rounded-[4px] border border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-              onclick={kickBack}
-            >
-              Send back
-            </button>
+            <div class="relative inline-flex items-stretch">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+                onclick={() => reviseTask(true)}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Revise & copy
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center rounded-r-[4px] border border-foreground/20 bg-foreground px-2 py-1 text-background transition-colors duration-[120ms] hover:bg-foreground/85"
+                onclick={() => { reviseDropdownOpen = !reviseDropdownOpen; }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              {#if reviseDropdownOpen}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  class="absolute bottom-full right-0 mb-1 w-[200px] rounded-[6px] border border-border/60 bg-popover py-0.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)]"
+                  onmouseleave={() => { reviseDropdownOpen = false; }}
+                >
+                  <button
+                    type="button"
+                    class="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground transition-colors duration-[80ms] hover:bg-accent hover:text-foreground"
+                    onclick={() => { reviseDropdownOpen = false; reviseTask(false); }}
+                  >
+                    <span>Revise<span class="text-muted-foreground/40"> — without copying</span></span>
+                  </button>
+                </div>
+              {/if}
+            </div>
           </div>
         {:else if !isUnindexed && !isDoneStatus}
           <div class="flex items-center gap-1.5">
@@ -938,13 +977,13 @@
                     </div>
                   {/if}
                 </div>
-                <!-- Secondary: Kick back -->
+                <!-- Secondary: Revise -->
                 <button
                   type="button"
                   class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:border-border"
-                  onclick={() => { kickBackOpen = true; }}
+                  onclick={() => { reviseOpen = true; }}
                 >
-                  Kick back
+                  Revise
                 </button>
                 <!-- Primary: Approve -->
                 <button
