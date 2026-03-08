@@ -175,7 +175,8 @@ fn relative_relevant_path(project_root: &Path, path: &Path) -> Option<String> {
         return None;
     }
 
-    config.docs
+    config
+        .docs
         .iter()
         .any(|pattern| matches_doc_pattern(relative_path, pattern))
         .then(|| relative_path.display().to_string())

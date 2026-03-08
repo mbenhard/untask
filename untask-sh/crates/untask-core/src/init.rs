@@ -24,7 +24,7 @@ pub fn init(project_root: &Path, columns: Option<Vec<Column>>) -> Result<()> {
     }
 
     let gitignore_path = untask.join(".gitignore");
-    atomic_write(&gitignore_path, b".lock\ncache/\n")?;
+    atomic_write(&gitignore_path, b".lock\ncache/\nattachments/\n")?;
 
     // Write config.yml if it doesn't exist yet
     let config_path = untask.join("config.yml");

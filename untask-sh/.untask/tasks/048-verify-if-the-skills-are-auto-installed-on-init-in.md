@@ -3,9 +3,9 @@ id: 48
 title: Verify if the skills are auto installed on init in
 status: done
 created: 2026-03-08
-updated: 2026-03-08T13:04:39.959114Z
+updated: 2026-03-08T18:30:32.176548Z
 completed: 2026-03-08T13:04:39.959113Z
-position: 2.0
+position: 8.0
 confidence: high
 ---
 

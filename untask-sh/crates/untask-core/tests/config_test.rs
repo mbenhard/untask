@@ -158,7 +158,10 @@ fn cannot_delete_required_columns() {
     let mut config = Config::default();
     let err = config.column_delete("review").unwrap_err();
     assert!(matches!(err, UntaskError::InvalidConfig(_)));
-    assert!(err.to_string().contains("cannot delete required column: review"));
+    assert!(
+        err.to_string()
+            .contains("cannot delete required column: review")
+    );
 }
 
 #[test]
@@ -166,7 +169,10 @@ fn cannot_rename_required_columns() {
     let mut config = Config::default();
     let err = config.column_rename("review", "qa").unwrap_err();
     assert!(matches!(err, UntaskError::InvalidConfig(_)));
-    assert!(err.to_string().contains("cannot rename required column: review"));
+    assert!(
+        err.to_string()
+            .contains("cannot rename required column: review")
+    );
 }
 
 #[test]

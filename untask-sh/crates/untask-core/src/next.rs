@@ -44,6 +44,7 @@ pub fn generate_next(project_root: &Path) -> Result<NextSummary> {
     let mut open_tasks: Vec<Task> = all_tasks
         .iter()
         .filter(|task| !task_is_done(config, task))
+        .filter(|task| task.owner.as_deref() != Some("user"))
         .cloned()
         .collect();
     // Sort by priority descending, then updated descending

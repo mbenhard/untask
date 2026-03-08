@@ -13,10 +13,22 @@ struct SkillFile {
 }
 
 const SKILLS: &[SkillFile] = &[
-    SkillFile { name: "untask", content: SKILL_UNTASK },
-    SkillFile { name: "untask-finish", content: SKILL_FINISH },
-    SkillFile { name: "untask-docs", content: SKILL_DOCS },
-    SkillFile { name: "untask-batch", content: SKILL_BATCH },
+    SkillFile {
+        name: "untask",
+        content: SKILL_UNTASK,
+    },
+    SkillFile {
+        name: "untask-finish",
+        content: SKILL_FINISH,
+    },
+    SkillFile {
+        name: "untask-docs",
+        content: SKILL_DOCS,
+    },
+    SkillFile {
+        name: "untask-batch",
+        content: SKILL_BATCH,
+    },
 ];
 
 pub fn install(provider: &str, json: bool) -> Result<()> {
@@ -28,7 +40,8 @@ pub fn install(provider: &str, json: bool) -> Result<()> {
         "codex" => install_codex(json),
         "generic" => install_generic(json),
         _ => {
-            let msg = format!("unknown provider: {provider}. Use: claude-code, cursor, codex, generic");
+            let msg =
+                format!("unknown provider: {provider}. Use: claude-code, cursor, codex, generic");
             emit_install_result(json, false, &[], Some(&msg))
         }
     }
@@ -37,9 +50,14 @@ pub fn install(provider: &str, json: bool) -> Result<()> {
 fn install_claude_code(home: &Path, json: bool) -> Result<()> {
     let claude_dir = home.join(".claude");
     if !claude_dir.is_dir() {
-        return emit_install_result(json, false, &[], Some(
-            "No supported agent config found. Create ~/.claude/commands/ and run `untask skill install` again."
-        ));
+        return emit_install_result(
+            json,
+            false,
+            &[],
+            Some(
+                "No supported agent config found. Create ~/.claude/commands/ and run `untask skill install` again.",
+            ),
+        );
     }
 
     let commands_dir = home.join(".claude/commands");

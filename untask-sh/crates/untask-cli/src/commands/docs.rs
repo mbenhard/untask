@@ -16,7 +16,7 @@ pub fn list(root: &Path, doc_type: Option<&str>, json: bool) -> Result<()> {
             other => {
                 return Err(UntaskError::InvalidConfig(format!(
                     "unknown doc type: {other}"
-                )))
+                )));
             }
         };
         docs.retain(|d| d.doc_type == filter_type);
@@ -97,7 +97,10 @@ pub fn add_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
 
     if config.docs.iter().any(|p| p == pattern) {
         if json {
-            println!("{}", serde_json::json!({ "status": "already_exists", "pattern": pattern }));
+            println!(
+                "{}",
+                serde_json::json!({ "status": "already_exists", "pattern": pattern })
+            );
         } else {
             println!("Pattern already configured: {pattern}");
         }
@@ -109,7 +112,10 @@ pub fn add_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
     config.save(root)?;
 
     if json {
-        println!("{}", serde_json::json!({ "status": "added", "pattern": pattern, "docs": config.docs }));
+        println!(
+            "{}",
+            serde_json::json!({ "status": "added", "pattern": pattern, "docs": config.docs })
+        );
     } else {
         println!("Added: {pattern}");
     }
@@ -132,7 +138,10 @@ pub fn remove_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
     config.save(root)?;
 
     if json {
-        println!("{}", serde_json::json!({ "status": "removed", "pattern": pattern, "docs": config.docs }));
+        println!(
+            "{}",
+            serde_json::json!({ "status": "removed", "pattern": pattern, "docs": config.docs })
+        );
     } else {
         println!("Removed: {pattern}");
         if config.docs.is_empty() {

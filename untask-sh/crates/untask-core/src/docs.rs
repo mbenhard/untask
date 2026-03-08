@@ -278,12 +278,12 @@ impl DocsStore {
 
     pub fn rename_path(&self, relative_path: &str, new_name: &str) -> Result<PathBuf> {
         let path = normalize_relative_path(Path::new(relative_path))?;
-        let root = self
-            .matching_writable_root(&path)
-            .ok_or_else(|| UntaskError::CommandFailed(format!(
+        let root = self.matching_writable_root(&path).ok_or_else(|| {
+            UntaskError::CommandFailed(format!(
                 "path is not inside a writable docs root: {}",
                 path.display()
-            )))?;
+            ))
+        })?;
         if path == root {
             return Err(UntaskError::CommandFailed(format!(
                 "cannot rename docs root: {}",
@@ -332,12 +332,12 @@ impl DocsStore {
         let destination_parent = normalize_relative_path(Path::new(destination_parent))?;
         self.ensure_writable_path(&destination_parent)?;
 
-        let source_root = self
-            .matching_writable_root(&source)
-            .ok_or_else(|| UntaskError::CommandFailed(format!(
+        let source_root = self.matching_writable_root(&source).ok_or_else(|| {
+            UntaskError::CommandFailed(format!(
                 "path is not inside a writable docs root: {}",
                 source.display()
-            )))?;
+            ))
+        })?;
         if source == source_root {
             return Err(UntaskError::CommandFailed(format!(
                 "cannot move docs root: {}",
@@ -346,10 +346,12 @@ impl DocsStore {
         }
         let destination_root = self
             .matching_writable_root(&destination_parent)
-            .ok_or_else(|| UntaskError::CommandFailed(format!(
-                "destination is not inside a writable docs root: {}",
-                destination_parent.display()
-            )))?;
+            .ok_or_else(|| {
+                UntaskError::CommandFailed(format!(
+                    "destination is not inside a writable docs root: {}",
+                    destination_parent.display()
+                ))
+            })?;
 
         if source_root != destination_root {
             return Err(UntaskError::CommandFailed(format!(
@@ -382,12 +384,9 @@ impl DocsStore {
             )));
         }
 
-        let name = source
-            .file_name()
-            .ok_or_else(|| UntaskError::CommandFailed(format!(
-                "cannot move docs root: {}",
-                source.display()
-            )))?;
+        let name = source.file_name().ok_or_else(|| {
+            UntaskError::CommandFailed(format!("cannot move docs root: {}", source.display()))
+        })?;
         let target_relative = destination_parent.join(name);
         let target_full = self.project_root.join(&target_relative);
 
@@ -420,12 +419,12 @@ impl DocsStore {
 
     pub fn delete_folder(&self, relative_path: &str) -> Result<()> {
         let path = normalize_relative_path(Path::new(relative_path))?;
-        let root = self
-            .matching_writable_root(&path)
-            .ok_or_else(|| UntaskError::CommandFailed(format!(
+        let root = self.matching_writable_root(&path).ok_or_else(|| {
+            UntaskError::CommandFailed(format!(
                 "path is not inside a writable docs root: {}",
                 path.display()
-            )))?;
+            ))
+        })?;
 
         if path == root {
             return Err(UntaskError::CommandFailed(format!(
@@ -472,15 +471,13 @@ impl DocsStore {
             return Some(index);
         }
 
-        roots.iter()
-            .enumerate()
-            .find_map(|(index, root)| {
-                if root.spec.base_dir.is_none() && matches_doc_pattern(relative, &root.spec.pattern) {
-                    Some(index)
-                } else {
-                    None
-                }
-            })
+        roots.iter().enumerate().find_map(|(index, root)| {
+            if root.spec.base_dir.is_none() && matches_doc_pattern(relative, &root.spec.pattern) {
+                Some(index)
+            } else {
+                None
+            }
+        })
     }
 
     fn ensure_writable_path(&self, relative: &Path) -> Result<()> {
@@ -603,7 +600,8 @@ impl RootTree {
     }
 
     fn insert_doc(&mut self, project_relative: &Path, basename: &str, doc_type: DocType) {
-        let (relative_under_root, actual_base) = if let Some(base_dir) = self.spec.base_dir.as_ref() {
+        let (relative_under_root, actual_base) = if let Some(base_dir) = self.spec.base_dir.as_ref()
+        {
             (
                 project_relative
                     .strip_prefix(base_dir)
@@ -614,8 +612,13 @@ impl RootTree {
             (project_relative, Path::new(""))
         };
 
-        self.tree
-            .insert_doc(relative_under_root, actual_base, basename, self.spec.base_dir.is_none(), doc_type);
+        self.tree.insert_doc(
+            relative_under_root,
+            actual_base,
+            basename,
+            self.spec.base_dir.is_none(),
+            doc_type,
+        );
     }
 
     fn into_node(self) -> DocNode {
@@ -741,7 +744,11 @@ impl TreeFolder {
     }
 }
 
-fn collect_directories(base_dir: &Path, current_relative: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+fn collect_directories(
+    base_dir: &Path,
+    current_relative: &Path,
+    out: &mut Vec<PathBuf>,
+) -> Result<()> {
     let current_dir = if current_relative.as_os_str().is_empty() {
         base_dir.to_path_buf()
     } else {
@@ -822,7 +829,10 @@ fn validate_path_segment(name: &str) -> Result<String> {
         )));
     }
 
-    if normalized.chars().any(|c| matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')) {
+    if normalized
+        .chars()
+        .any(|c| matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+    {
         return Err(UntaskError::CommandFailed(format!(
             "invalid filename characters: {name}"
         )));

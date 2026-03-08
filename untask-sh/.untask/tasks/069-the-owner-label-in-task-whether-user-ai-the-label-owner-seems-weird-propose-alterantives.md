@@ -1,10 +1,10 @@
 ---
 id: 69
 title: The “owner” label in task - whether User/AI - the label “owner” seems weird, propose alterantives
-status: review
+status: in-progress
 created: 2026-03-08
-updated: 2026-03-08T15:04:50.741555Z
-position: 3.0
+updated: 2026-03-08T19:19:25.673953Z
+position: 1.0
 ---
 
 ## Context

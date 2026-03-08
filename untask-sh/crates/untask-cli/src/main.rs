@@ -10,8 +10,7 @@ use colored::control::set_override;
 use output::{Formatter, OutputMode};
 use untask_core::store::TaskStore;
 
-const NO_COMMAND_MESSAGE: &str =
-    "Use a CLI subcommand or `untask open` to launch the desktop app.";
+const NO_COMMAND_MESSAGE: &str = "Use a CLI subcommand or `untask open` to launch the desktop app.";
 
 fn main() {
     let cli = Cli::parse();
@@ -51,7 +50,10 @@ fn handle_no_command(cli: &Cli, fmt: &Formatter) -> i32 {
 
     let mut command = Cli::command();
     if let Err(error) = command.print_help() {
-        eprintln!("{}", fmt.error(&format!("error: failed to print help: {error}")));
+        eprintln!(
+            "{}",
+            fmt.error(&format!("error: failed to print help: {error}"))
+        );
         return 1;
     }
 
@@ -139,16 +141,33 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                     ColumnCommands::Rename { old, new } => {
                         commands::column::rename(&mut store, &root, old, new, cli.json)
                     }
-                    ColumnCommands::Move { name, after, before } => {
-                        commands::column::move_column(&root, name, after.as_deref(), before.as_deref(), cli.json)
-                    }
-                    ColumnCommands::Delete { name, move_to, delete_tasks } => {
-                        commands::column::delete(&mut store, &root, name, move_to.as_deref(), *delete_tasks, cli.json)
-                    }
+                    ColumnCommands::Move {
+                        name,
+                        after,
+                        before,
+                    } => commands::column::move_column(
+                        &root,
+                        name,
+                        after.as_deref(),
+                        before.as_deref(),
+                        cli.json,
+                    ),
+                    ColumnCommands::Delete {
+                        name,
+                        move_to,
+                        delete_tasks,
+                    } => commands::column::delete(
+                        &mut store,
+                        &root,
+                        name,
+                        move_to.as_deref(),
+                        *delete_tasks,
+                        cli.json,
+                    ),
                 },
-                Commands::Skill { cmd: cli::SkillCommands::Install { provider } } => {
-                    commands::skill_install(&provider, cli.json)
-                }
+                Commands::Skill {
+                    cmd: cli::SkillCommands::Install { provider },
+                } => commands::skill_install(&provider, cli.json),
                 Commands::Open => commands::open(&root),
             }
         }

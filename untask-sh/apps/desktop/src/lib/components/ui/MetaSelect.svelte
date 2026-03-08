@@ -20,7 +20,7 @@
 
 <Select.Root type="single" bind:value {disabled} {items} onValueChange={onValueChange}>
   <Select.Trigger
-    class="inline-flex h-5 cursor-pointer items-center gap-0.5 rounded-[4px] border border-border/60 pl-1.5 pr-1 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+    class="inline-flex h-6 cursor-pointer items-center gap-1 rounded-[4px] border border-border/60 pl-2 pr-1.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors duration-[120ms] hover:border-border focus-visible:border-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
   >
     {selectedLabel}
     <svg width="8" height="5" viewBox="0 0 8 5" fill="none" class="shrink-0 opacity-60">
@@ -35,7 +35,7 @@
       <Select.Viewport class="p-0.5">
         {#each items as item (item.value)}
           <Select.Item
-            class="cursor-pointer rounded-[4px] px-2 py-1 font-mono text-[11px] outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50"
+            class="cursor-pointer rounded-[4px] px-2.5 py-1.5 font-mono text-[11px] outline-none transition-colors duration-75 data-[highlighted]:bg-accent/50"
             value={item.value}
             label={item.label}
           >

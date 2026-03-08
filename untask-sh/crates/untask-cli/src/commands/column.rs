@@ -50,7 +50,13 @@ pub fn rename(store: &mut TaskStore, root: &Path, old: &str, new: &str, json: bo
     Ok(())
 }
 
-pub fn move_column(root: &Path, name: &str, after: Option<&str>, before: Option<&str>, json: bool) -> Result<()> {
+pub fn move_column(
+    root: &Path,
+    name: &str,
+    after: Option<&str>,
+    before: Option<&str>,
+    json: bool,
+) -> Result<()> {
     let mut config = Config::load(root);
     config.column_move(name, after, before)?;
     config.save(root)?;

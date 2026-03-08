@@ -3,9 +3,9 @@ id: 54
 title: lets add very subtle zoom out/scale down? on the card hover in kanban
 status: done
 created: 2026-03-08
-updated: 2026-03-08T13:03:01.200228Z
+updated: 2026-03-08T14:50:50.618193Z
 completed: 2026-03-08T13:03:01.200227Z
-position: 1.0
+position: 2.0
 confidence: high
 ---
 

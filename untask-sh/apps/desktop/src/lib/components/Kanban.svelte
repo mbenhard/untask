@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Progress } from "bits-ui";
   import { addTask, updateTask, attachFileBytes, type ColumnDto, type TaskDto } from "$lib/api";
   import CardThumbnail from "$lib/components/CardThumbnail.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
@@ -364,7 +363,7 @@
         {#each col.tasks as task, i}
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div
-            class="kanban-card group relative cursor-pointer rounded-[6px] border border-border/60 px-2.5 py-2 transition-all duration-[120ms]"
+            class="kanban-card group relative cursor-pointer rounded-[6px] border border-border/60 bg-card px-2.5 py-2 transition-all duration-[120ms]"
             class:opacity-30={draggedTask?.id === task.id}
             class:dragging={draggedTask?.id === task.id}
             class:drop-before={isDropBeforeTask(col.id, i)}
@@ -401,11 +400,13 @@
               {/if}
             </div>
 
-            <!-- Row 2: tags + body indicator (only if present) -->
-            {#if task.tags.length > 0 || task.body?.trim()}
-              <div class="mt-1 flex items-center gap-1.5">
+            <!-- Row 2: tag pills -->
+            {#if task.tags.length > 0}
+              <div class="mt-1.5 flex flex-wrap items-center gap-1">
                 {#each task.tags.slice(0, 2) as tag}
-                  <span class="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/60">
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full border border-border/40 bg-border/15 px-1.5 py-px font-mono text-[10px] text-muted-foreground/70"
+                  >
                     <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style="background-color: {tagColor(tag)}"></span>
                     {tag}
                   </span>
@@ -415,6 +416,16 @@
                     +{task.tags.length - 2}
                   </span>
                 {/if}
+              </div>
+            {/if}
+
+            <!-- Row 3: priority dot + icon cluster -->
+            {#if task.priority || task.body?.trim() || task.subtask_total > 0 || task.owner === "user" || task.attachments?.length > 0}
+              <div class="mt-1.5 flex items-center gap-1.5">
+                <PriorityDot tone={priorityTone(task.priority)} />
+
+                <span class="flex-1"></span>
+
                 {#if task.body?.trim()}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -436,45 +447,30 @@
                     <polyline points="10 9 9 9 8 9"/>
                   </svg>
                 {/if}
-              </div>
-            {/if}
-
-            <!-- Subtask progress bar -->
-            {#if task.subtask_total > 0}
-              <Progress.Root
-                value={task.subtask_done}
-                max={task.subtask_total}
-                class="mt-1.5 h-[2px] w-full overflow-hidden rounded-full bg-border"
-              >
-                <div
-                  class="h-full rounded-full bg-foreground/60"
-                  style="width: {(task.subtask_done / task.subtask_total) * 100}%"
-                ></div>
-              </Progress.Root>
-            {/if}
-
-            <!-- Bottom row: priority dot + owner icon + attachment count (bottom-left) -->
-            <div class="mt-1.5 flex items-center gap-1">
-              <div class="pointer-events-none flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/50 bg-background/90 transition-colors duration-[120ms] group-hover:border-border/70">
-                <PriorityDot tone={priorityTone(task.priority)} />
-              </div>
-              {#if task.owner === "user"}
-                <div class="pointer-events-none flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/50 bg-background/90 text-muted-foreground/60">
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                {#if task.owner === "user"}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-muted-foreground/40">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                     <circle cx="12" cy="7" r="4"/>
                   </svg>
-                </div>
-              {/if}
-              {#if task.attachments?.length > 0}
-                <span class="inline-flex items-center gap-0.5 font-mono text-[9px] text-muted-foreground/50" title="{task.attachments.length} attachment{task.attachments.length > 1 ? 's' : ''}">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                  </svg>
-                  {task.attachments.length}
-                </span>
-              {/if}
-            </div>
+                {/if}
+                {#if task.attachments?.length > 0}
+                  <span class="inline-flex items-center gap-0.5 font-mono text-[9px] text-muted-foreground/40" title="{task.attachments.length} attachment{task.attachments.length > 1 ? 's' : ''}">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    {task.attachments.length}
+                  </span>
+                {/if}
+                {#if task.subtask_total > 0}
+                  <span class="inline-flex items-center gap-0.5 font-mono text-[9px] text-muted-foreground/40">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                    {task.subtask_done}/{task.subtask_total}
+                  </span>
+                {/if}
+              </div>
+            {/if}
           </div>
         {/each}
 

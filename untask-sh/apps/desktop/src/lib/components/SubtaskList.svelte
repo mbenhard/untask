@@ -160,8 +160,8 @@
 </script>
 
 {#if visible}
-  <div class="mx-4 mb-2 overflow-hidden rounded-[6px] border border-border/60">
-    <div class="flex items-center gap-2 border-b border-border/40 px-2.5 py-1.5">
+  <div class="mx-4 mt-2 mb-3 overflow-hidden rounded-[6px] border border-border/60">
+    <div class="flex items-center gap-2 border-b border-border/40 px-3 py-2">
       <span class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">
         Subtasks
       </span>
@@ -182,7 +182,7 @@
       <div
         role="row"
         tabindex="0"
-        class="group flex min-h-[28px] items-center gap-1.5 border-b border-border/40 px-2 py-1 outline-none transition-colors duration-[120ms] focus-visible:bg-accent/20 {dragOverIndex === i && dragFromIndex !== i ? 'bg-accent/25' : ''} {dragFromIndex === i ? 'opacity-55' : ''}"
+        class="group flex min-h-[32px] items-center gap-1.5 border-b border-border/40 px-3 py-1.5 outline-none transition-colors duration-[120ms] focus-visible:bg-accent/20 {dragOverIndex === i && dragFromIndex !== i ? 'bg-accent/25' : ''} {dragFromIndex === i ? 'opacity-55' : ''}"
         draggable={!readonly && editingIndex !== i}
         ondragstart={(e) => onDragStart(e, i)}
         ondragover={(e) => onDragOver(e, i)}
@@ -228,13 +228,13 @@
               bind:value={editDraft}
               onblur={() => confirmEdit(i)}
               onkeydown={(e) => handleEditKeydown(e, i)}
-              class="w-full bg-transparent text-[12px] leading-[1.35] text-foreground outline-none"
+              class="w-full bg-transparent text-[13px] leading-[1.4] text-foreground outline-none"
               use:focusOnMount
             />
           {:else}
             <button
               type="button"
-              class="w-full text-left text-[12px] leading-[1.35] {subtask.checked ? 'text-muted-foreground/45 line-through' : 'text-foreground/90'} disabled:cursor-default"
+              class="w-full text-left text-[13px] leading-[1.4] {subtask.checked ? 'text-muted-foreground/45 line-through' : 'text-foreground/90'} disabled:cursor-default"
               disabled={readonly}
               ondblclick={() => startEdit(i)}
             >
@@ -261,7 +261,7 @@
 
     {#if !readonly}
       {#if addingSubtask}
-        <div class="px-2 py-1.5">
+        <div class="px-3 py-2">
           <input
             bind:this={addInputEl}
             type="text"
@@ -269,14 +269,14 @@
             placeholder="New subtask..."
             onblur={confirmAdd}
             onkeydown={handleAddKeydown}
-            class="w-full rounded-[4px] border border-dashed border-border/60 bg-transparent px-2 py-1 text-[12px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
+            class="w-full rounded-[4px] border border-dashed border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
           />
         </div>
       {:else}
-        <div class="px-2 py-1.5">
+        <div class="px-3 py-1.5">
           <button
             type="button"
-            class="rounded-[4px] border border-dashed border-border/60 px-2 py-1 font-mono text-[10px] text-muted-foreground/55 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
+            class="px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground/50 transition-colors duration-[120ms] hover:text-muted-foreground"
             onclick={openAddInput}
           >
             + subtask

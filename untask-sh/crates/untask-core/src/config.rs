@@ -6,7 +6,6 @@ use crate::error::{Result, UntaskError};
 use crate::fs::atomic_write;
 use crate::types::Theme;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Column {
     pub id: String,
@@ -72,37 +71,91 @@ impl Preset {
 
 fn preset_simple() -> Vec<Column> {
     vec![
-        Column { id: "todo".into(), aliases: vec!["to-do".into(), "pending".into()], done: false },
-        Column { id: "in-progress".into(), aliases: vec!["wip".into(), "doing".into()], done: false },
-        Column { id: "done".into(), aliases: vec!["complete".into(), "finished".into()], done: true },
+        Column {
+            id: "todo".into(),
+            aliases: vec!["to-do".into(), "pending".into()],
+            done: false,
+        },
+        Column {
+            id: "in-progress".into(),
+            aliases: vec!["wip".into(), "doing".into()],
+            done: false,
+        },
+        Column {
+            id: "done".into(),
+            aliases: vec!["complete".into(), "finished".into()],
+            done: true,
+        },
     ]
 }
 
 fn preset_kanban() -> Vec<Column> {
     vec![
-        Column { id: "backlog".into(), aliases: vec![], done: false },
-        Column { id: "todo".into(), aliases: vec!["to-do".into(), "to do".into(), "pending".into()], done: false },
-        Column { id: "in-progress".into(), aliases: vec!["wip".into(), "in progress".into(), "doing".into(), "working".into()], done: false },
-        Column { id: "review".into(), aliases: vec!["reviewing".into(), "in review".into()], done: false },
-        Column { id: "done".into(), aliases: vec!["complete".into(), "finished".into(), "closed".into()], done: true },
+        Column {
+            id: "backlog".into(),
+            aliases: vec![],
+            done: false,
+        },
+        Column {
+            id: "todo".into(),
+            aliases: vec!["to-do".into(), "to do".into(), "pending".into()],
+            done: false,
+        },
+        Column {
+            id: "in-progress".into(),
+            aliases: vec![
+                "wip".into(),
+                "in progress".into(),
+                "doing".into(),
+                "working".into(),
+            ],
+            done: false,
+        },
+        Column {
+            id: "review".into(),
+            aliases: vec!["reviewing".into(), "in review".into()],
+            done: false,
+        },
+        Column {
+            id: "done".into(),
+            aliases: vec!["complete".into(), "finished".into(), "closed".into()],
+            done: true,
+        },
     ]
 }
 
 fn preset_bug_tracking() -> Vec<Column> {
     vec![
-        Column { id: "reported".into(), aliases: vec!["new".into()], done: false },
-        Column { id: "confirmed".into(), aliases: vec!["triaged".into()], done: false },
-        Column { id: "fixing".into(), aliases: vec!["in-progress".into(), "wip".into()], done: false },
-        Column { id: "testing".into(), aliases: vec!["qa".into(), "verifying".into()], done: false },
-        Column { id: "resolved".into(), aliases: vec!["fixed".into(), "done".into(), "closed".into()], done: true },
+        Column {
+            id: "reported".into(),
+            aliases: vec!["new".into()],
+            done: false,
+        },
+        Column {
+            id: "confirmed".into(),
+            aliases: vec!["triaged".into()],
+            done: false,
+        },
+        Column {
+            id: "fixing".into(),
+            aliases: vec!["in-progress".into(), "wip".into()],
+            done: false,
+        },
+        Column {
+            id: "testing".into(),
+            aliases: vec!["qa".into(), "verifying".into()],
+            done: false,
+        },
+        Column {
+            id: "resolved".into(),
+            aliases: vec!["fixed".into(), "done".into(), "closed".into()],
+            done: true,
+        },
     ]
 }
 
 fn default_docs() -> Vec<String> {
-    vec![
-        ".untask/docs/**/*.md".into(),
-        "docs/**/*.md".into(),
-    ]
+    vec![".untask/docs/**/*.md".into(), "docs/**/*.md".into()]
 }
 
 impl Default for Config {
@@ -118,7 +171,8 @@ impl Default for Config {
 
 impl Config {
     /// Required column IDs that define the core workflow.
-    const REQUIRED_COLUMNS: &'static [&'static str] = &["backlog", "todo", "in-progress", "review", "done"];
+    const REQUIRED_COLUMNS: &'static [&'static str] =
+        &["backlog", "todo", "in-progress", "review", "done"];
 
     /// Create a config with specific columns (and default docs/theme).
     pub fn with_columns(columns: Vec<Column>) -> Self {
@@ -212,7 +266,11 @@ impl Config {
         let id = validate_column_id(name)?;
         self.check_id_available(&id)?;
 
-        let col = Column { id: id.clone(), aliases: vec![], done };
+        let col = Column {
+            id: id.clone(),
+            aliases: vec![],
+            done,
+        };
 
         if let Some(after_id) = after {
             let pos = self.find_column_index(after_id)?;
@@ -238,7 +296,12 @@ impl Config {
     }
 
     /// Move a column before or after another column.
-    pub fn column_move(&mut self, name: &str, after: Option<&str>, before: Option<&str>) -> Result<()> {
+    pub fn column_move(
+        &mut self,
+        name: &str,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> Result<()> {
         let idx = self.find_column_index(name)?;
         let col = self.columns.remove(idx);
 
@@ -321,7 +384,13 @@ fn validate_column_id(name: &str) -> Result<String> {
     let id: String = trimmed
         .to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     // Collapse multiple hyphens and trim leading/trailing hyphens
     let id = id

@@ -3,9 +3,9 @@ id: 55
 title: '"Delete task?” should not be another popup modal on athoer popup modal but something more inline, compact'
 status: done
 created: 2026-03-08
-updated: 2026-03-08T13:03:51.610107Z
+updated: 2026-03-08T14:50:50.638514Z
 completed: 2026-03-08T13:03:51.610106Z
-position: 1.0
+position: 4.0
 confidence: high
 ---
 

@@ -6,6 +6,14 @@ use serde::{Deserialize, Serialize};
 use crate::types::Priority;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AttachmentRef {
+    pub filename: String,
+    pub mime_type: String,
+    pub size: u64,
+    pub created: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Task {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<u32>,
@@ -27,6 +35,10 @@ pub struct Task {
     pub position: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidence: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<AttachmentRef>,
     #[serde(skip)]
     pub body: String,
     #[serde(skip)]
@@ -66,6 +78,10 @@ struct TaskFrontmatter {
     position: Option<f64>,
     #[serde(default)]
     confidence: Option<String>,
+    #[serde(default)]
+    owner: Option<String>,
+    #[serde(default)]
+    attachments: Vec<AttachmentRef>,
 }
 
 impl From<TaskFrontmatter> for Task {
@@ -82,6 +98,8 @@ impl From<TaskFrontmatter> for Task {
             completed: frontmatter.completed,
             position: frontmatter.position,
             confidence: frontmatter.confidence,
+            owner: frontmatter.owner,
+            attachments: frontmatter.attachments,
             ..Self::default()
         }
     }

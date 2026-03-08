@@ -254,7 +254,9 @@ fn create_doc_creates_missing_writable_root_and_appends_md() {
     write_config(&tmp, "docs:\n  - \"specs/**/*.md\"\n");
 
     let store = DocsStore::new(tmp.path().to_path_buf());
-    let created = store.create_doc("specs", "overview", "# Overview\n").unwrap();
+    let created = store
+        .create_doc("specs", "overview", "# Overview\n")
+        .unwrap();
 
     assert_eq!(created.basename, "overview.md");
     assert!(tmp.path().join("specs/overview.md").is_file());
@@ -300,8 +302,16 @@ fn rename_path_rejects_docs_root() {
 #[test]
 fn list_parses_doc_type_from_frontmatter() {
     let tmp = setup();
-    write_doc(&tmp, ".untask/docs/spec.md", "---\ntype: prd\n---\n# My PRD\nBuild this.");
-    write_doc(&tmp, ".untask/docs/notes.md", "# Just notes\nNo frontmatter.");
+    write_doc(
+        &tmp,
+        ".untask/docs/spec.md",
+        "---\ntype: prd\n---\n# My PRD\nBuild this.",
+    );
+    write_doc(
+        &tmp,
+        ".untask/docs/notes.md",
+        "# Just notes\nNo frontmatter.",
+    );
 
     let store = DocsStore::new(tmp.path().to_path_buf());
     let docs = store.list().unwrap();
@@ -317,7 +327,11 @@ fn list_parses_doc_type_from_frontmatter() {
 #[test]
 fn list_parses_doc_type_defaults_to_doc() {
     let tmp = setup();
-    write_doc(&tmp, ".untask/docs/guide.md", "---\ntitle: Guide\n---\n# Guide");
+    write_doc(
+        &tmp,
+        ".untask/docs/guide.md",
+        "---\ntitle: Guide\n---\n# Guide",
+    );
 
     let store = DocsStore::new(tmp.path().to_path_buf());
     let docs = store.list().unwrap();
@@ -328,7 +342,11 @@ fn list_parses_doc_type_defaults_to_doc() {
 #[test]
 fn list_parses_explicit_doc_type() {
     let tmp = setup();
-    write_doc(&tmp, ".untask/docs/notes.md", "---\ntype: doc\n---\n# Notes");
+    write_doc(
+        &tmp,
+        ".untask/docs/notes.md",
+        "---\ntype: doc\n---\n# Notes",
+    );
 
     let store = DocsStore::new(tmp.path().to_path_buf());
     let docs = store.list().unwrap();

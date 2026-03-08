@@ -34,7 +34,9 @@ fn add_creates_file_with_correct_format() {
 #[test]
 fn add_with_status() {
     let (_tmp, store) = setup();
-    let task = store.add("Deploy service", Some("in-progress"), None).unwrap();
+    let task = store
+        .add("Deploy service", Some("in-progress"), None)
+        .unwrap();
     assert_eq!(task.status, "in-progress");
 }
 
@@ -48,7 +50,9 @@ fn add_normalizes_status_alias() {
 #[test]
 fn add_rejects_unknown_status() {
     let (_tmp, store) = setup();
-    let err = store.add("Mystery task", Some("mystery"), None).unwrap_err();
+    let err = store
+        .add("Mystery task", Some("mystery"), None)
+        .unwrap_err();
     assert!(matches!(
         err,
         untask_core::error::UntaskError::InvalidConfig(message)
@@ -190,7 +194,9 @@ fn list_orders_managed_tasks_before_unindexed_files() {
 fn list_filters_by_status() {
     let (_tmp, store) = setup();
     store.add("Backlog task", None, None).unwrap();
-    store.add("In-progress task", Some("in-progress"), None).unwrap();
+    store
+        .add("In-progress task", Some("in-progress"), None)
+        .unwrap();
 
     let tasks = store
         .list(Some(ListFilter {
@@ -487,7 +493,9 @@ fn add_task_preserves_prd_field_through_roundtrip() {
 #[test]
 fn add_task_with_prd_sets_field() {
     let (_tmp, store) = setup();
-    let task = store.add("Task from PRD", None, Some(".untask/docs/spec.md")).unwrap();
+    let task = store
+        .add("Task from PRD", None, Some(".untask/docs/spec.md"))
+        .unwrap();
 
     assert_eq!(task.prd.as_deref(), Some(".untask/docs/spec.md"));
 
@@ -501,9 +509,15 @@ fn add_task_with_prd_sets_field() {
 fn count_by_prd_returns_done_and_total() {
     let (_tmp, store) = setup();
 
-    let t1 = store.add("Task 1", None, Some(".untask/docs/my-project.md")).unwrap();
-    let _t2 = store.add("Task 2", None, Some(".untask/docs/my-project.md")).unwrap();
-    let _t3 = store.add("Task 3", None, Some(".untask/docs/my-project.md")).unwrap();
+    let t1 = store
+        .add("Task 1", None, Some(".untask/docs/my-project.md"))
+        .unwrap();
+    let _t2 = store
+        .add("Task 2", None, Some(".untask/docs/my-project.md"))
+        .unwrap();
+    let _t3 = store
+        .add("Task 3", None, Some(".untask/docs/my-project.md"))
+        .unwrap();
     let _t4 = store.add("Unrelated task", None, None).unwrap();
 
     store.mark_done(t1.id.unwrap()).unwrap();

@@ -3,9 +3,9 @@ id: 63
 title: Somehow assign / differentiate tasks that are for me (user) that AI shouldnt touch and that are for AI ?
 status: done
 created: 2026-03-08
-updated: 2026-03-08T14:28:46.752864Z
+updated: 2026-03-08T14:50:50.628524Z
 completed: 2026-03-08T14:28:46.752864Z
-position: 2.0
+position: 3.0
 confidence: high
 ---
 Add `owner` field to Task struct. null/absent = AI-eligible (default), "user" = user-owned (agent skips). Toggle in modal metadata row, tiny icon on kanban card. `untask next` respects the flag.

@@ -679,15 +679,6 @@
             />
           </div>
 
-          <!-- Confidence (review only) -->
-          {#if task.confidence}
-            <div class="flex items-center gap-1.5">
-              <span class="shrink-0 select-none font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/70">Confidence</span>
-              <span class="inline-flex h-6 items-center rounded-[4px] border border-border/60 px-2 font-mono text-[10px] leading-none text-muted-foreground">
-                {task.confidence}
-              </span>
-            </div>
-          {/if}
 
           <!-- Priority -->
           <div class="flex items-center gap-1.5">
@@ -805,19 +796,30 @@
         {#if hasAgentSections}
           <div class="border-t border-border/60">
             {#if parsedBody.agentSummary != null}
-              <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
-                <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Agent Summary</p>
+              <div class="speech-bubble speech-bubble--agent mx-3 my-2">
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Agent Summary</p>
+                  {#if task?.confidence === "low"}
+                    <span class="inline-flex h-[18px] items-center gap-1 rounded-[3px] bg-rose-500/10 px-1.5 font-mono text-[9px] leading-none text-rose-400/80">
+                      <span class="text-[8px]">!</span> Needs review
+                    </span>
+                  {:else if task?.confidence === "medium"}
+                    <span class="inline-flex h-[18px] items-center gap-1 rounded-[3px] bg-amber-500/10 px-1.5 font-mono text-[9px] leading-none text-amber-400/80">
+                      <span class="text-[8px]">~</span> Spot check
+                    </span>
+                  {/if}
+                </div>
                 <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.agentSummary)}</div>
               </div>
             {/if}
             {#if parsedBody.deferred != null}
-              <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
+              <div class="speech-bubble speech-bubble--agent mx-3 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Deferred</p>
                 <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.deferred)}</div>
               </div>
             {/if}
             {#if parsedBody.reviewNotes != null}
-              <div class="border-l-2 border-l-border px-4 py-2.5 mx-3 my-2">
+              <div class="speech-bubble speech-bubble--user mx-3 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Review Notes</p>
                 <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.reviewNotes)}</div>
               </div>
@@ -1120,6 +1122,24 @@
     outline: none;
     border-color: transparent;
     box-shadow: none;
+  }
+
+  /* Speech bubble for agent sections */
+  .speech-bubble {
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+  }
+
+  .speech-bubble--agent {
+    background: color-mix(in srgb, var(--color-foreground) 8%, var(--color-background));
+    border-radius: 0 10px 10px 10px;
+    margin-right: 24px !important;
+  }
+
+  .speech-bubble--user {
+    background: color-mix(in srgb, var(--color-foreground) 12%, var(--color-background));
+    border-radius: 10px 0 10px 10px;
+    margin-left: 24px !important;
   }
 
   /* Agent section rendered markdown */

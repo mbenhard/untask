@@ -279,7 +279,9 @@ mod tests {
         let paths = Cli::try_parse_from(["untask", "docs", "paths"]).unwrap();
         assert!(matches!(
             paths.command,
-            Some(Commands::Docs { cmd: Some(DocsCommands::Paths) })
+            Some(Commands::Docs {
+                cmd: Some(DocsCommands::Paths)
+            })
         ));
 
         let add = Cli::try_parse_from(["untask", "docs", "add-path", "specs/**/*.md"]).unwrap();
@@ -288,7 +290,8 @@ mod tests {
             Some(Commands::Docs { cmd: Some(DocsCommands::AddPath { pattern }) }) if pattern == "specs/**/*.md"
         ));
 
-        let remove = Cli::try_parse_from(["untask", "docs", "remove-path", "docs/**/*.md"]).unwrap();
+        let remove =
+            Cli::try_parse_from(["untask", "docs", "remove-path", "docs/**/*.md"]).unwrap();
         assert!(matches!(
             remove.command,
             Some(Commands::Docs { cmd: Some(DocsCommands::RemovePath { pattern }) }) if pattern == "docs/**/*.md"

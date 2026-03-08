@@ -3,9 +3,9 @@ id: 10
 title: Can you explain how does the git/github integration between it and untask works?
 status: done
 created: 2026-03-07
-updated: 2026-03-08T13:03:01.415307Z
+updated: 2026-03-08T18:30:32.413207Z
 completed: 2026-03-07T14:20:41.653479Z
-position: 22.0
+position: 31.0
 ---
 
 ## Answer

@@ -3,9 +3,9 @@ id: 51
 title: In the status dropdown, the priority tag and the text placeholder, as well as the button for copying the prompt, it seems that the text size is too big compared to the outline or boundary of the element. We could either make the inner padding bigger or reduce the text size in the labels or text fields or inputs or maybe combination of both.
 status: done
 created: 2026-03-08
-updated: 2026-03-08T13:03:01.259391Z
+updated: 2026-03-08T18:30:32.262355Z
 completed: 2026-03-08T12:50:19.091595Z
-position: 7.0
+position: 16.0
 confidence: high
 ---
 

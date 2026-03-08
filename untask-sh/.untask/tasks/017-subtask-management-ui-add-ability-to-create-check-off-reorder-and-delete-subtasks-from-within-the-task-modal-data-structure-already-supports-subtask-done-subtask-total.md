@@ -4,7 +4,7 @@ title: Subtask management UI - add ability to create, check off, reorder, and de
 status: done
 priority: high
 created: 2026-03-07
-updated: 2026-03-08T13:03:01.220172Z
+updated: 2026-03-08T18:30:32.198546Z
 completed: 2026-03-08T11:43:58.930282Z
-position: 3.0
+position: 10.0
 ---

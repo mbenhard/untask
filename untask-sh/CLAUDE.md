@@ -31,3 +31,13 @@ For any desktop or visual work, follow `docs/untask-design-language.md`:
 6. Tiny priority dots instead of loud priority badges where the design language applies.
 
 Do not ship generic SaaS styling that conflicts with the design-language doc.
+
+## Component Library
+
+Use **Bits UI** (headless, unstyled Svelte 5 components) for all interactive UI primitives:
+
+- Select, Dialog, Alert Dialog, Popover, Tooltip, Combobox, Collapsible, etc.
+- Bits UI provides accessibility (ARIA, keyboard nav, focus trapping) with zero styling opinions.
+- Apply the design language via Tailwind classes directly on Bits UI sub-components.
+- Do NOT use shadcn-svelte or other pre-styled libraries — they fight the design language.
+- For simple elements (buttons, inputs, separators) that don't need headless behavior, plain Tailwind is fine.
