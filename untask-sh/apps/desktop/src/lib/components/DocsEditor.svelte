@@ -179,7 +179,7 @@
   </div>
 
   {#if stale}
-    <div class="mx-4 mt-2 rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 px-3 py-2">
+    <div class="mx-4 mt-2 rounded-[6px] border border-border/60 border-l-2 border-l-border px-3 py-2">
       <div class="flex items-center justify-between gap-3">
         <span class="font-mono text-[10px] text-muted-foreground">{staleMessage}</span>
         <div class="flex items-center gap-1.5">
@@ -219,7 +219,7 @@
   {/if}
 
   {#if saveError}
-    <div class="mx-4 mt-2 flex items-center justify-between rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 px-3 py-1.5">
+    <div class="mx-4 mt-2 flex items-center justify-between rounded-[6px] border border-border/60 border-l-2 border-l-border px-3 py-1.5">
       <span class="font-mono text-[10px] text-muted-foreground">{saveError}</span>
       <button
         type="button"

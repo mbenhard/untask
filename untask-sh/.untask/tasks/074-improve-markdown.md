@@ -2,10 +2,9 @@
 id: 74
 title: Improve Markdown
 status: todo
-priority: medium
 created: 2026-03-08
-updated: 2026-03-08T18:42:08.461291Z
-position: 5.0
+updated: 2026-03-08T20:20:37.336720Z
+position: 2.0
 attachments:
 - filename: paste-1772995328447.png
   mime_type: image/png

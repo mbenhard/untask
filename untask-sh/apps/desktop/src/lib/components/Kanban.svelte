@@ -39,6 +39,22 @@
   let isDragging = $state(false);
   let justDroppedId = $state<number | null>(null);
 
+  // ── Done strip state ──────────────────────────────────────────────
+  let doneExpanded = $state(
+    typeof window !== 'undefined' && localStorage.getItem('kanban-done-expanded') === 'true'
+  );
+  let doneStripDragOver = $state(false);
+  let doneDropFlash = $state(false);
+  let kanbanContainer = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    if (!doneExpanded || !doneColumn || doneColumn.tasks.length > 0) return;
+    doneExpanded = false;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("kanban-done-expanded", "false");
+    }
+  });
+
   function focusOnMount(el: HTMLElement) {
     requestAnimationFrame(() => {
       el.focus();
@@ -84,6 +100,20 @@
     }
 
     return cols;
+  });
+
+  // ── Split active / done columns ───────────────────────────────────
+  let activeColumns = $derived(kanbanColumns.filter(c => !c.done));
+  let doneColumn = $derived.by(() => {
+    const col = kanbanColumns.find(c => c.done);
+    if (!col) return null;
+    const sorted = [...col.tasks].sort((a, b) => {
+      if (!a.completed && !b.completed) return 0;
+      if (!a.completed) return 1;
+      if (!b.completed) return -1;
+      return b.completed.localeCompare(a.completed);
+    });
+    return { ...col, tasks: sorted };
   });
 
   // ── Quick-add ────────────────────────────────────────────────────
@@ -189,6 +219,7 @@
     draggedTask = null;
     dropTarget = null;
     isDragging = false;
+    doneStripDragOver = false;
   }
 
   function handleDragOver(e: DragEvent, columnId: string, index: number) {
@@ -318,23 +349,75 @@
     return dropTarget?.columnId === columnId && dropTarget.index === taskCount;
   }
 
+  // ── Done strip ──────────────────────────────────────────────────
+  function toggleDoneExpanded() {
+    doneExpanded = !doneExpanded;
+    localStorage.setItem('kanban-done-expanded', String(doneExpanded));
+    if (doneExpanded && kanbanContainer) {
+      requestAnimationFrame(() => {
+        kanbanContainer!.scrollLeft = kanbanContainer!.scrollWidth;
+      });
+    }
+  }
 
+  function handleStripDragOver(e: DragEvent) {
+    if (!draggedTask) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    doneStripDragOver = true;
+  }
+
+  function handleStripDragLeave(e: DragEvent) {
+    const related = e.relatedTarget as HTMLElement | null;
+    if (!related || !e.currentTarget || !(e.currentTarget as HTMLElement).contains(related)) {
+      doneStripDragOver = false;
+    }
+  }
+
+  async function handleStripDrop(e: DragEvent) {
+    e.preventDefault();
+    doneStripDragOver = false;
+
+    if (!draggedTask || !doneColumn || draggedTask.id == null) {
+      handleDragEnd();
+      return;
+    }
+
+    const task = draggedTask;
+    const taskId = task.id as number;
+    const sourceColId = resolveColumnId(task);
+    const sourceCol = kanbanColumns.find(c => c.id === sourceColId);
+
+    draggedTask = null;
+    dropTarget = null;
+    isDragging = false;
+
+    if (sourceColId === doneColumn.id) return;
+
+    try {
+      if (sourceCol) {
+        await persistColumnOrder(sourceCol.tasks.filter(t => t.id !== task.id));
+      }
+      await updateTask(taskId, { status: doneColumn.id });
+      doneDropFlash = true;
+      setTimeout(() => { doneDropFlash = false; }, 200);
+      onTasksChanged();
+    } catch (err) {
+      console.error("Failed to complete task:", err);
+    }
+  }
 </script>
 
-<div class="flex min-h-0 flex-1 overflow-x-auto p-0">
-  {#each kanbanColumns as col, colIdx}
+<div bind:this={kanbanContainer} class="flex min-h-0 flex-1 overflow-x-auto p-0">
+  {#each activeColumns as col, colIdx}
     <section
       class={`flex min-w-[240px] max-w-[300px] flex-1 flex-col bg-background/80 ${
-        colIdx < kanbanColumns.length - 1 ? "border-r border-border/40" : ""
+        colIdx < activeColumns.length - 1 ? "border-r border-border/40" : ""
       }`}
     >
       <!-- Column header -->
       <div class="flex items-center justify-between border-b border-border/60 px-3 py-2">
-        <span
-          class={`font-mono text-[11px] uppercase tracking-[0.08em] ${
-            col.done ? "text-muted-foreground/50" : "text-muted-foreground"
-          }`}
-        >
+        <span class="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
           {col.label}
         </span>
         <span class="font-mono text-[10px] text-muted-foreground/60">
@@ -413,8 +496,6 @@
             <!-- Row 3: icon cluster -->
             {#if task.body?.trim() || task.subtask_total > 0 || task.owner === "user" || task.attachments?.length > 0}
               <div class="mt-1.5 flex items-center gap-1.5">
-                <span class="flex-1"></span>
-
                 {#if task.body?.trim()}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -557,6 +638,159 @@
       </div>
     </section>
   {/each}
+
+  <!-- Done strip / expanded done column -->
+  {#if doneColumn}
+    {#if doneExpanded}
+      <!-- Expanded done column -->
+      <section class="flex min-w-[240px] max-w-[300px] flex-1 flex-col border-l border-border/40 bg-background/80">
+        <!-- Header with collapse chevron -->
+        <div class="flex items-center justify-between border-b border-border/60 px-3 py-2">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+            onclick={toggleDoneExpanded}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+            Done
+          </button>
+          <span class="font-mono text-[10px] text-muted-foreground/60">
+            {doneColumn.tasks.length}
+          </span>
+        </div>
+
+        <div class="relative min-h-0 flex-1">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="kanban-scroll flex h-full flex-col gap-1.5 overflow-y-auto p-1.5"
+            ondragover={(e) => handleColumnDragOver(e, doneColumn.id, doneColumn.tasks.length)}
+            ondragleave={handleDragLeave}
+            ondrop={(e) => handleDrop(e, doneColumn.id, doneColumn.tasks.length)}
+          >
+            {#each doneColumn.tasks as task, i}
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+              <div
+                class="kanban-card done-card group relative cursor-pointer rounded-[6px] border border-border/30 bg-card px-2.5 py-2 transition-all duration-[120ms]"
+                class:opacity-30={draggedTask?.id === task.id}
+                class:dragging={draggedTask?.id === task.id}
+                class:drop-before={isDropBeforeTask(doneColumn.id, i)}
+                class:kanban-card-settled={justDroppedId === task.id}
+                draggable={canDrag(task)}
+                ondragstart={(e) => handleDragStart(e, task)}
+                ondragend={handleDragEnd}
+                ondragover={(e) => handleDragOver(e, doneColumn.id, i)}
+                ondrop={(e) => { e.stopPropagation(); handleDrop(e, doneColumn.id, i); }}
+                onclick={() => onTaskClick(task)}
+                role="button"
+                tabindex="0"
+                title={task.title}
+              >
+                <!-- Thumbnail header -->
+                {#if task.id != null}
+                  {@const thumb = firstImageAttachment(task)}
+                  {#if thumb}
+                    <div class="-mx-2.5 -mt-2 mb-1.5 opacity-60">
+                      <CardThumbnail taskId={task.id} filename={thumb} />
+                    </div>
+                  {/if}
+                {/if}
+
+                <!-- Row 1: title -->
+                <div class="flex items-start gap-1.5">
+                  <span class="min-w-0 flex-1 text-[13px] leading-snug text-muted-foreground/60">
+                    {task.title}
+                  </span>
+                </div>
+
+                <!-- Row 2: tag pills -->
+                {#if task.tags.length > 0}
+                  <div class="mt-1.5 flex flex-wrap items-center gap-1">
+                    {#each task.tags.slice(0, 2) as tag}
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full border border-border/30 bg-border/10 px-1.5 py-px font-mono text-[10px] text-muted-foreground/40"
+                      >
+                        <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full opacity-50" style="background-color: {tagColor(tag)}"></span>
+                        {tag}
+                      </span>
+                    {/each}
+                    {#if task.tags.length > 2}
+                      <span class="font-mono text-[10px] text-muted-foreground/30">
+                        +{task.tags.length - 2}
+                      </span>
+                    {/if}
+                  </div>
+                {/if}
+
+                <!-- Row 3: icon cluster (muted) -->
+                {#if task.body?.trim() || task.subtask_total > 0 || task.attachments?.length > 0}
+                  <div class="mt-1.5 flex items-center gap-1.5">
+                    {#if task.body?.trim()}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-muted-foreground/25" aria-label="Has notes">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                      </svg>
+                    {/if}
+                    {#if task.attachments?.length > 0}
+                      <span class="inline-flex items-center gap-0.5 font-mono text-[9px] text-muted-foreground/25">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        {task.attachments.length}
+                      </span>
+                    {/if}
+                    {#if task.subtask_total > 0}
+                      <span class="inline-flex items-center gap-0.5 font-mono text-[9px] text-muted-foreground/25">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                        {task.subtask_done}/{task.subtask_total}
+                      </span>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+
+            <!-- Drop indicator at end -->
+            {#if isDropAtColumnEnd(doneColumn.id, doneColumn.tasks.length) && doneColumn.tasks.length > 0}
+              <div class="drop-indicator-end"></div>
+            {/if}
+          </div>
+          <div class="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background/80 to-transparent"></div>
+        </div>
+      </section>
+    {:else}
+      <!-- Collapsed done strip -->
+      {#if doneColumn.tasks.length > 0 || isDragging}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class={`done-strip sticky right-0 flex shrink-0 flex-col items-center justify-center border-l transition-all duration-200 ${
+            doneDropFlash ? 'border-foreground/50' :
+            doneStripDragOver ? 'border-border' :
+            'border-border/40'
+          } ${doneStripDragOver ? 'done-strip-hover' : ''}`}
+          style="width: {isDragging ? '120px' : '56px'}"
+          ondragover={handleStripDragOver}
+          ondragleave={handleStripDragLeave}
+          ondrop={handleStripDrop}
+        >
+          <button
+            type="button"
+            class="flex flex-col items-center justify-center gap-1 rounded-[4px] px-2 py-2 transition-colors duration-[120ms] hover:bg-accent/30"
+            onclick={toggleDoneExpanded}
+          >
+            <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/40">
+              Done
+            </span>
+            <span class="font-mono text-[10px] text-muted-foreground/30">
+              {doneColumn.tasks.length}
+            </span>
+          </button>
+        </div>
+      {/if}
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -564,6 +798,10 @@
     border-color: var(--color-border);
     box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
     transform: scale(0.98);
+  }
+
+  .kanban-card.done-card:hover {
+    border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
   }
 
   .kanban-card.dragging {
@@ -627,5 +865,10 @@
     outline: none;
     border-color: transparent;
     box-shadow: none;
+  }
+
+  /* Done strip hover fill */
+  .done-strip-hover {
+    background: color-mix(in srgb, var(--color-muted-foreground) 8%, transparent);
   }
 </style>

@@ -1,10 +1,11 @@
 ---
 id: 71
 title: Let’s improve and polish the layout of task card
-status: todo
+status: done
 created: 2026-03-08
-updated: 2026-03-08T18:49:40.180906Z
-position: 3.0
+updated: 2026-03-08T20:20:37.362491Z
+completed: 2026-03-08T20:20:37.362489Z
+position: 2.0
 attachments:
 - filename: paste-1772994838200.png
   mime_type: image/png

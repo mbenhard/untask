@@ -286,7 +286,7 @@
       {/if}
 
       {#if error}
-        <div class="rounded-[6px] border border-border/60 border-l-2 border-l-priority-medium/60 px-3 py-2">
+        <div class="rounded-[6px] border border-border/60 border-l-2 border-l-border px-3 py-2">
           <p class="font-mono text-[10px] text-muted-foreground">{error}</p>
         </div>
       {/if}
