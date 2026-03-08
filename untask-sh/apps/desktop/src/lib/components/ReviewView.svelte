@@ -121,6 +121,28 @@
           {task.title}
         </span>
 
+        {#if task.attachments.length > 0}
+          <span
+            class="mx-2 inline-flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground/45"
+            aria-label={`${task.attachments.length} attachments`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m21.44 11.05-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l8.84-8.84a3.5 3.5 0 1 1 4.95 4.95l-8.49 8.48a1.5 1.5 0 0 1-2.12-2.12l7.78-7.78" />
+            </svg>
+            <span>{task.attachments.length}</span>
+          </span>
+        {/if}
+
         <!-- Confidence -->
         {#if task.confidence}
           <span class="mx-2 shrink-0 font-mono text-[10px] text-muted-foreground/60">

@@ -1,4 +1,6 @@
 use std::cmp::Ordering;
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
@@ -8,7 +10,7 @@ use crate::error::{Result, UntaskError};
 use crate::fs::atomic_write;
 use crate::lock::ProjectLock;
 use crate::slug::generate_slug;
-use crate::task::{Task, TaskKind, parse_filename_id, parse_task, serialize_task};
+use crate::task::{AttachmentRef, Task, TaskKind, parse_filename_id, parse_task, serialize_task};
 
 pub struct TaskStore {
     project_root: PathBuf,
@@ -25,6 +27,8 @@ pub struct TaskUpdate {
     pub body: Option<String>,
     pub position: Option<f64>,
     pub prd: Option<Option<String>>,
+    pub owner: Option<Option<String>>,
+    pub attachments: Option<Vec<crate::task::AttachmentRef>>,
 }
 
 /// Filter for listing tasks.
@@ -32,6 +36,19 @@ pub struct ListFilter {
     pub status: Option<String>,
     pub tag: Option<String>,
 }
+
+#[derive(Debug, Clone)]
+pub struct AttachmentTextPreview {
+    pub filename: String,
+    pub mime_type: String,
+    pub content: String,
+    pub truncated: bool,
+}
+
+const TEXT_PREVIEW_LIMIT_BYTES: usize = 1024 * 1024;
+const TEXT_PREVIEW_EXTENSIONS: &[&str] = &[
+    "txt", "md", "json", "csv", "log", "yaml", "yml", "xml", "html",
+];
 
 impl TaskStore {
     pub fn new(project_root: PathBuf) -> Result<Self> {
@@ -207,40 +224,9 @@ impl TaskStore {
     /// Update a task's fields. Returns the updated task.
     pub fn update(&self, id: u32, updates: TaskUpdate) -> Result<Task> {
         let _lock = ProjectLock::acquire(&self.project_root)?;
-
-        let mut task = self.get(id)?;
-        let path = task
-            .file_path
-            .clone()
-            .ok_or_else(|| UntaskError::TaskNotFound(id.to_string()))?;
-
-        if let Some(title) = updates.title {
-            task.title = title;
-        }
-        if let Some(status) = updates.status {
-            self.apply_status_change(&mut task, &status)?;
-        }
-        if let Some(priority) = updates.priority {
-            task.priority = priority;
-        }
-        if let Some(tags) = updates.tags {
-            task.tags = tags;
-        }
-        if let Some(body) = updates.body {
-            task.body = body;
-        }
-        if let Some(position) = updates.position {
-            task.position = Some(position);
-        }
-        if let Some(prd) = updates.prd {
-            task.prd = prd;
-        }
-
-        task.updated = Some(Utc::now());
-        let content = serialize_task(&task);
-        atomic_write(&path, content.as_bytes())?;
-
-        Ok(task)
+        let (mut task, path) = self.load_task_for_write(id)?;
+        self.apply_updates(&mut task, updates)?;
+        self.persist_task(&mut task, &path)
     }
 
     /// Delete a task by ID.
@@ -252,6 +238,9 @@ impl TaskStore {
             .file_path
             .ok_or_else(|| UntaskError::TaskNotFound(id.to_string()))?;
         std::fs::remove_file(&path)?;
+        if let Some(tid) = task.id {
+            let _ = crate::attachments::remove_all_attachments(&self.project_root, tid);
+        }
         Ok(())
     }
 
@@ -271,6 +260,173 @@ impl TaskStore {
         self.set_status(id, "done")
     }
 
+    pub fn attach_file(&self, id: u32, source_path: &Path) -> Result<Task> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
+        let (mut task, path) = self.load_task_for_write(id)?;
+        let task_id = task.id.unwrap_or(id);
+        let attachment =
+            crate::attachments::add_attachment(&self.project_root, task_id, source_path)?;
+        let attachment_path =
+            crate::attachments::attachment_path(&self.project_root, task_id, &attachment.filename)?;
+
+        task.attachments.push(attachment);
+
+        match self.persist_task(&mut task, &path) {
+            Ok(task) => Ok(task),
+            Err(err) => {
+                let _ = crate::attachments::remove_attachment(
+                    &self.project_root,
+                    task_id,
+                    &attachment_path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or_default(),
+                );
+                Err(err)
+            }
+        }
+    }
+
+    pub fn attach_file_bytes(
+        &self,
+        id: u32,
+        data: &[u8],
+        filename: &str,
+        mime_type: &str,
+    ) -> Result<Task> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
+        let (mut task, path) = self.load_task_for_write(id)?;
+        let task_id = task.id.unwrap_or(id);
+        let attachment = crate::attachments::add_attachment_bytes(
+            &self.project_root,
+            task_id,
+            data,
+            filename,
+            mime_type,
+        )?;
+        let attachment_path =
+            crate::attachments::attachment_path(&self.project_root, task_id, &attachment.filename)?;
+
+        task.attachments.push(attachment);
+
+        match self.persist_task(&mut task, &path) {
+            Ok(task) => Ok(task),
+            Err(err) => {
+                let _ = crate::attachments::remove_attachment(
+                    &self.project_root,
+                    task_id,
+                    &attachment_path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or_default(),
+                );
+                Err(err)
+            }
+        }
+    }
+
+    pub fn delete_attachment(&self, id: u32, filename: &str) -> Result<Task> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
+        let (mut task, path) = self.load_task_for_write(id)?;
+        let task_id = task.id.unwrap_or(id);
+        let removed = remove_attachment_entry(&mut task.attachments, filename)
+            .ok_or_else(|| UntaskError::TaskNotFound(format!("attachment {filename}")))?;
+
+        let valid_filename =
+            crate::attachments::validate_attachment_filename(&removed.filename).ok();
+        let rollback = if let Some(valid_name) = valid_filename.as_deref() {
+            self.stage_attachment_removal(task_id, valid_name)?
+        } else {
+            None
+        };
+
+        match self.persist_task(&mut task, &path) {
+            Ok(task) => {
+                if let Some((_, staged_path)) = rollback {
+                    let _ = std::fs::remove_file(&staged_path);
+                    let _ =
+                        crate::attachments::cleanup_attachments_dir(&self.project_root, task_id);
+                }
+                Ok(task)
+            }
+            Err(err) => {
+                if let Some((original_path, staged_path)) = rollback
+                    && staged_path.exists()
+                {
+                    let _ = std::fs::rename(&staged_path, &original_path);
+                }
+                Err(err)
+            }
+        }
+    }
+
+    pub fn attachment_path(&self, id: u32, filename: &str) -> Result<PathBuf> {
+        crate::attachments::validate_attachment_filename(filename)?;
+        let task = self.get(id)?;
+        let task_id = task.id.unwrap_or(id);
+        let attachment = task
+            .attachments
+            .iter()
+            .find(|attachment| attachment.filename == filename)
+            .ok_or_else(|| UntaskError::TaskNotFound(format!("attachment {filename}")))?;
+        let path =
+            crate::attachments::attachment_path(&self.project_root, task_id, &attachment.filename)?;
+        if !path.is_file() {
+            return Err(UntaskError::TaskNotFound(format!("attachment {filename}")));
+        }
+        Ok(path)
+    }
+
+    pub fn read_attachment_text(&self, id: u32, filename: &str) -> Result<AttachmentTextPreview> {
+        crate::attachments::validate_attachment_filename(filename)?;
+        let task = self.get(id)?;
+        let attachment = task
+            .attachments
+            .iter()
+            .find(|attachment| attachment.filename == filename)
+            .cloned()
+            .ok_or_else(|| UntaskError::TaskNotFound(format!("attachment {filename}")))?;
+        let task_id = task.id.unwrap_or(id);
+        let extension = Path::new(&attachment.filename)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_lowercase())
+            .ok_or_else(|| {
+                UntaskError::InvalidConfig(format!(
+                    "attachment does not support text preview: {}",
+                    attachment.filename
+                ))
+            })?;
+
+        if !TEXT_PREVIEW_EXTENSIONS
+            .iter()
+            .any(|allowed| *allowed == extension)
+        {
+            return Err(UntaskError::InvalidConfig(format!(
+                "attachment does not support text preview: {}",
+                attachment.filename
+            )));
+        }
+
+        let path =
+            crate::attachments::attachment_path(&self.project_root, task_id, &attachment.filename)?;
+        if !path.is_file() {
+            return Err(UntaskError::TaskNotFound(format!(
+                "attachment {}",
+                attachment.filename
+            )));
+        }
+
+        let (content, truncated) = read_utf8_preview(&path, TEXT_PREVIEW_LIMIT_BYTES)?;
+
+        Ok(AttachmentTextPreview {
+            filename: attachment.filename,
+            mime_type: attachment.mime_type,
+            content,
+            truncated,
+        })
+    }
+
     // ── Helpers ────────────────────────────────────────────────────
 
     /// Apply a status change, handling done/undone transitions for `completed`.
@@ -288,6 +444,37 @@ impl TaskStore {
             task.completed = None;
         }
 
+        Ok(())
+    }
+
+    fn apply_updates(&self, task: &mut Task, updates: TaskUpdate) -> Result<()> {
+        if let Some(title) = updates.title {
+            task.title = title;
+        }
+        if let Some(status) = updates.status {
+            self.apply_status_change(task, &status)?;
+        }
+        if let Some(priority) = updates.priority {
+            task.priority = priority;
+        }
+        if let Some(tags) = updates.tags {
+            task.tags = tags;
+        }
+        if let Some(body) = updates.body {
+            task.body = body;
+        }
+        if let Some(position) = updates.position {
+            task.position = Some(position);
+        }
+        if let Some(prd) = updates.prd {
+            task.prd = prd;
+        }
+        if let Some(owner) = updates.owner {
+            task.owner = owner;
+        }
+        if let Some(attachments) = updates.attachments {
+            task.attachments = attachments;
+        }
         Ok(())
     }
 
@@ -321,6 +508,47 @@ impl TaskStore {
         }
 
         Ok(max_position.max(matching_count as f64) + 1.0)
+    }
+
+    fn load_task_for_write(&self, id: u32) -> Result<(Task, PathBuf)> {
+        let task = self.get(id)?;
+        let path = task
+            .file_path
+            .clone()
+            .ok_or_else(|| UntaskError::TaskNotFound(id.to_string()))?;
+        Ok((task, path))
+    }
+
+    fn persist_task(&self, task: &mut Task, path: &Path) -> Result<Task> {
+        task.updated = Some(Utc::now());
+        let content = serialize_task(task);
+        atomic_write(path, content.as_bytes())?;
+        Ok(task.clone())
+    }
+
+    fn stage_attachment_removal(
+        &self,
+        task_id: u32,
+        filename: &str,
+    ) -> Result<Option<(PathBuf, PathBuf)>> {
+        let attachment_path =
+            crate::attachments::attachment_path(&self.project_root, task_id, filename)?;
+        if !attachment_path.exists() {
+            return Ok(None);
+        }
+        if !attachment_path.is_file() {
+            return Err(UntaskError::InvalidConfig(format!(
+                "attachment is not a file: {filename}"
+            )));
+        }
+
+        let staged_path = attachment_path.with_file_name(format!(
+            ".{}.delete-{}",
+            filename,
+            Utc::now().timestamp_millis()
+        ));
+        std::fs::rename(&attachment_path, &staged_path)?;
+        Ok(Some((attachment_path, staged_path)))
     }
 
     // ── Batch operations (for column rename/delete) ─────────────
@@ -361,6 +589,9 @@ impl TaskStore {
                 && let Some(ref path) = task.file_path
             {
                 std::fs::remove_file(path)?;
+                if let Some(tid) = task.id {
+                    let _ = crate::attachments::remove_all_attachments(&self.project_root, tid);
+                }
                 count += 1;
             }
         }
@@ -411,6 +642,48 @@ impl TaskStore {
 
         let content = std::fs::read_to_string(path)?;
         Ok(parse_task(&content).id)
+    }
+}
+
+fn remove_attachment_entry(
+    attachments: &mut Vec<AttachmentRef>,
+    filename: &str,
+) -> Option<AttachmentRef> {
+    let index = attachments
+        .iter()
+        .position(|attachment| attachment.filename == filename)?;
+    Some(attachments.remove(index))
+}
+
+fn read_utf8_preview(path: &Path, limit: usize) -> Result<(String, bool)> {
+    let mut file = File::open(path)?;
+    let mut buffer = Vec::new();
+    file.by_ref()
+        .take((limit + 1) as u64)
+        .read_to_end(&mut buffer)?;
+
+    let truncated = buffer.len() > limit;
+    if truncated {
+        buffer.truncate(limit);
+    }
+
+    decode_utf8_prefix(buffer).map(|content| (content, truncated))
+}
+
+fn decode_utf8_prefix(mut bytes: Vec<u8>) -> Result<String> {
+    loop {
+        match String::from_utf8(bytes.clone()) {
+            Ok(content) => return Ok(content),
+            Err(err) => {
+                let valid_up_to = err.utf8_error().valid_up_to();
+                if valid_up_to == 0 {
+                    return Err(UntaskError::InvalidConfig(
+                        "attachment preview is not valid UTF-8".to_string(),
+                    ));
+                }
+                bytes.truncate(valid_up_to);
+            }
+        }
     }
 }
 

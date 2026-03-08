@@ -131,6 +131,16 @@ impl Formatter {
                 task.subtask_progress.0, task.subtask_progress.1
             );
         }
+        if !task.attachments.is_empty() {
+            let _ = writeln!(out, "Attachments:");
+            for attachment in &task.attachments {
+                let _ = writeln!(
+                    out,
+                    "  - {} ({}, {} bytes)",
+                    attachment.filename, attachment.mime_type, attachment.size
+                );
+            }
+        }
         if !task.body.is_empty() {
             let _ = writeln!(out);
             out.push_str(&task.body);

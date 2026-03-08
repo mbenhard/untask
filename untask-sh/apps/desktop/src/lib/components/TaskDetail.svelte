@@ -6,6 +6,7 @@
     type ColumnDto,
     type TaskDto,
   } from "$lib/api";
+  import AttachmentList from "$lib/components/AttachmentList.svelte";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
@@ -214,6 +215,17 @@
           </div>
         {/if}
 
+        {#if fullTask.id != null && fullTask.attachments.length > 0}
+          <div class="mt-3">
+            <AttachmentList
+              taskId={fullTask.id}
+              attachments={fullTask.attachments}
+              readonly={true}
+              onTaskUpdated={() => {}}
+            />
+          </div>
+        {/if}
+
         {#if isUnindexed || hasUnmatchedStatus}
           <div class="mt-3 rounded-[6px] border border-border/80 bg-card/70 px-2.5 py-2">
             {#if isUnindexed}
@@ -240,4 +252,3 @@
     </div>
   {/if}
 </div>
-

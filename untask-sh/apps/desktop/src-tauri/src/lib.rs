@@ -5,6 +5,7 @@ mod watcher;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(state::AppState {
             current_project: std::sync::Mutex::new(None),
             watcher: std::sync::Mutex::new(None),
@@ -21,6 +22,12 @@ pub fn run() {
             commands::add_task,
             commands::update_task,
             commands::delete_task,
+            commands::attach_file,
+            commands::attach_file_bytes,
+            commands::delete_attachment,
+            commands::get_attachment_path,
+            commands::read_attachment_text,
+            commands::list_all_tags,
             commands::list_docs,
             commands::list_docs_tree,
             commands::read_doc,

@@ -18,6 +18,14 @@ Tasks with `owner: "user"` belong to the human and **must not be worked on by th
 - `untask next` pre-filters these out automatically.
 - `untask list` does **not** filter by owner — it returns all tasks. When processing a list, always check each task's `owner` field and skip any where `owner` is `"user"`.
 
+## Attachments
+
+Task JSON payloads include an `attachments` array with filename, MIME type, size, and created timestamp metadata. Treat attachments as part of the task context.
+
+- If an attached file looks relevant, explicitly mention whether you reviewed it or not.
+- Do not assume the copied desktop prompt contains the file contents; attachment files may need separate inspection.
+- `owner: "user"` still blocks agent action even when attachments are present.
+
 ## Completing a task
 
 When you are done working on a task, you MUST follow these steps before moving on:

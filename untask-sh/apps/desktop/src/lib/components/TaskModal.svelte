@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { Dialog } from "bits-ui";
   import {
     deleteTask,
@@ -12,6 +14,7 @@
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import PriorityDot from "$lib/components/PriorityDot.svelte";
   import type { PriorityTone } from "$lib/components/PriorityDot.svelte";
+  import AttachmentList from "$lib/components/AttachmentList.svelte";
   import SubtaskList from "$lib/components/SubtaskList.svelte";
   import TagPicker from "$lib/components/TagPicker.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
@@ -44,10 +47,15 @@
   let titleDraft = $state("");
   let showDeleteConfirm = $state(false);
   let copyFeedback = $state(false);
+  let dropActive = $state(false);
   let showBody = $state(false);
   let errorFlash = $state<string | null>(null);
   let closing = $state(false);
   let saveErrorText = $state<string | null>(null);
+  let attachmentListRef = $state<{
+    handlePaste: (e: ClipboardEvent) => Promise<void>;
+    handleDroppedFiles: (paths: string[]) => Promise<void>;
+  } | null>(null);
   let bodyFocused = $state(false);
   let bodyDirty = $state(false);
   let lastTaskId = $state<number | null | undefined>(undefined);
@@ -62,7 +70,7 @@
     }`,
   );
   let contentClass = $derived(
-    `task-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
+    `task-modal fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 relative flex min-h-[200px] max-h-[80vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[12px] border border-border/60 bg-card shadow-[0_12px_36px_-8px_rgba(0,0,0,0.5)]${
       errorFlash ? " error-flash" : ""
     }${closing ? " task-modal-closing" : ""}`,
   );
@@ -78,6 +86,54 @@
       }
     });
   }
+
+  onMount(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+
+    void getCurrentWindow()
+      .onDragDropEvent((event) => {
+        if (disposed) return;
+
+        if (event.payload.type === "leave") {
+          dropActive = false;
+          return;
+        }
+
+        if (task?.id == null || !attachmentListRef) {
+          if (event.payload.type === "drop") {
+            dropActive = false;
+          }
+          return;
+        }
+
+        if (event.payload.type === "enter" || event.payload.type === "over") {
+          dropActive = true;
+          return;
+        }
+
+        if (event.payload.type === "drop") {
+          dropActive = false;
+          void attachmentListRef.handleDroppedFiles(event.payload.paths);
+        }
+      })
+      .then((cleanup) => {
+        if (disposed) {
+          cleanup();
+          return;
+        }
+        unlisten = cleanup;
+      })
+      .catch((error) => {
+        console.error("Failed to register drag and drop handler:", error);
+      });
+
+    return () => {
+      disposed = true;
+      dropActive = false;
+      unlisten?.();
+    };
+  });
 
   $effect(() => {
     const id = taskId;
@@ -438,6 +494,20 @@
       task.tags.length > 0 ? `Tags: ${task.tags.join(", ")}` : "",
     ].filter(Boolean).join(" | ");
 
+    const formatAttachmentSize = (bytes: number): string => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    const attachmentManifest = task.attachments.length > 0
+      ? `\n\nAttachments:\n${task.attachments
+        .map((attachment) =>
+          `- ${attachment.filename} (${attachment.mime_type || "application/octet-stream"}, ${formatAttachmentSize(attachment.size)})`,
+        )
+        .join("\n")}\nAttached files exist and should be inspected separately if relevant.`
+      : "";
+
     let prompt = "";
     if (mode === "implement") {
       prompt = `Implement task #${task.id}: ${task.title}`;
@@ -450,6 +520,7 @@
     }
     if (task.body.trim()) prompt += `\n\n${task.body.trim()}`;
     if (meta) prompt += `\n\n${meta}`;
+    prompt += attachmentManifest;
 
     navigator.clipboard.writeText(prompt);
     copyFeedback = true;
@@ -489,7 +560,26 @@
         else if (promptDropdownOpen) { promptDropdownOpen = false; }
         else if (!closing) { handleClose(); }
       }}
+      onpaste={(e) => {
+        if (e.clipboardData?.items) {
+          for (const item of e.clipboardData.items) {
+            if (item.type.startsWith("image/")) {
+              void attachmentListRef?.handlePaste(e);
+              return;
+            }
+          }
+        }
+      }}
     >
+    {#if dropActive && task?.id != null}
+      <div class="pointer-events-none absolute inset-3 z-10 rounded-[10px] border border-dashed border-foreground/25 bg-card/85">
+        <div class="flex h-full items-center justify-center">
+          <div class="rounded-[6px] border border-border/60 bg-card/90 px-3 py-2">
+            <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/55">Drop files to attach</p>
+          </div>
+        </div>
+      </div>
+    {/if}
     {#if loading}
       <div class="flex items-center justify-center py-12">
         <span class="font-mono text-[11px] text-muted-foreground animate-pulse">Loading...</span>
@@ -664,6 +754,24 @@
           readonly={isUnindexed}
           onBodyChange={handleSubtaskBodyChange}
         />
+
+        <!-- Attachments -->
+        {#if task.id != null}
+          <AttachmentList
+            bind:this={attachmentListRef}
+            taskId={task.id}
+            attachments={task.attachments ?? []}
+            readonly={isUnindexed}
+            {dropActive}
+            onTaskUpdated={async () => {
+              if (task?.id) {
+                const loaded = await getTask(task.id);
+                task = loaded;
+              }
+              onTaskUpdated();
+            }}
+          />
+        {/if}
 
         <!-- Unmatched status warning -->
         {#if hasUnmatchedStatus}

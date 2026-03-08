@@ -6,7 +6,7 @@ use tauri::State;
 
 use untask_core::docs::{DocNode, DocType, DocsStore};
 use untask_core::search::SearchResultKind;
-use untask_core::store::{ListFilter, TaskStore, TaskUpdate};
+use untask_core::store::{AttachmentTextPreview, ListFilter, TaskStore, TaskUpdate};
 use untask_core::task::Task;
 use untask_core::types::Priority;
 
@@ -25,6 +25,33 @@ where
 // ── DTOs ────────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
+pub struct AttachmentRefDto {
+    pub filename: String,
+    pub mime_type: String,
+    pub size: u64,
+    pub created: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+pub struct AttachmentTextPreviewDto {
+    pub filename: String,
+    pub mime_type: String,
+    pub content: String,
+    pub truncated: bool,
+}
+
+impl From<AttachmentTextPreview> for AttachmentTextPreviewDto {
+    fn from(preview: AttachmentTextPreview) -> Self {
+        Self {
+            filename: preview.filename,
+            mime_type: preview.mime_type,
+            content: preview.content,
+            truncated: preview.truncated,
+        }
+    }
+}
+
+#[derive(Serialize)]
 pub struct TaskDto {
     pub id: Option<u32>,
     pub title: String,
@@ -40,6 +67,8 @@ pub struct TaskDto {
     pub position: Option<f64>,
     pub prd: Option<String>,
     pub confidence: Option<String>,
+    pub owner: Option<String>,
+    pub attachments: Vec<AttachmentRefDto>,
 }
 
 impl From<Task> for TaskDto {
@@ -59,6 +88,17 @@ impl From<Task> for TaskDto {
             position: task.position,
             prd: task.prd,
             confidence: task.confidence,
+            owner: task.owner,
+            attachments: task
+                .attachments
+                .iter()
+                .map(|a| AttachmentRefDto {
+                    filename: a.filename.clone(),
+                    mime_type: a.mime_type.clone(),
+                    size: a.size,
+                    created: a.created,
+                })
+                .collect(),
         }
     }
 }
@@ -128,6 +168,8 @@ pub struct TaskUpdateDto {
     pub position: Option<f64>,
     #[serde(default, deserialize_with = "deserialize_double_option")]
     pub prd: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub owner: Option<Option<String>>,
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -165,6 +207,24 @@ fn resolve_doc_path(project_root: &Path, reference: &str) -> Result<PathBuf, Str
 fn write_doc(project_root: &Path, reference: &str, content: &str) -> Result<(), String> {
     let full_path = resolve_doc_path(project_root, reference)?;
     std::fs::write(full_path, content).map_err(|e| e.to_string())
+}
+
+fn attachment_path_for_store(store: &TaskStore, id: u32, filename: &str) -> Result<String, String> {
+    let path = store
+        .attachment_path(id, filename)
+        .map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+fn attachment_text_preview_for_store(
+    store: &TaskStore,
+    id: u32,
+    filename: &str,
+) -> Result<AttachmentTextPreviewDto, String> {
+    let preview = store
+        .read_attachment_text(id, filename)
+        .map_err(|e| e.to_string())?;
+    Ok(AttachmentTextPreviewDto::from(preview))
 }
 
 #[derive(Serialize)]
@@ -228,7 +288,9 @@ pub fn column_rename(
 ) -> Result<Vec<ColumnDto>, String> {
     let root = require_project(&state)?;
     let mut config = untask_core::config::Config::load(&root);
-    let (old_id, new_id) = config.column_rename(&old, &new).map_err(|e| e.to_string())?;
+    let (old_id, new_id) = config
+        .column_rename(&old, &new)
+        .map_err(|e| e.to_string())?;
     config.save(&root).map_err(|e| e.to_string())?;
 
     let mut store = TaskStore::new(root).map_err(|e| e.to_string())?;
@@ -269,7 +331,9 @@ pub fn column_delete(
         .ok_or_else(|| format!("column not found: {name}"))?;
 
     let store = TaskStore::new(root.clone()).map_err(|e| e.to_string())?;
-    let task_count = store.count_tasks_in_column(&col_id).map_err(|e| e.to_string())?;
+    let task_count = store
+        .count_tasks_in_column(&col_id)
+        .map_err(|e| e.to_string())?;
 
     if task_count > 0 && move_to.is_none() && !delete_tasks {
         return Err(format!(
@@ -409,6 +473,8 @@ pub fn update_task(
                 body: updates.body,
                 position: updates.position,
                 prd: updates.prd,
+                owner: updates.owner,
+                ..TaskUpdate::default()
             },
         )
         .map_err(|e| e.to_string())?;
@@ -420,6 +486,102 @@ pub fn delete_task(id: u32, state: State<'_, AppState>) -> Result<(), String> {
     let root = require_project(&state)?;
     let store = TaskStore::new(root).map_err(|e| e.to_string())?;
     store.delete(id).map_err(|e| e.to_string())
+}
+
+// ── Attachments ─────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn attach_file(
+    id: u32,
+    file_path: String,
+    state: State<'_, AppState>,
+) -> Result<TaskDto, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    let source = std::path::PathBuf::from(&file_path);
+    let updated = store.attach_file(id, &source).map_err(|e| e.to_string())?;
+    Ok(TaskDto::from(updated))
+}
+
+#[tauri::command]
+pub fn attach_file_bytes(
+    id: u32,
+    data: Vec<u8>,
+    filename: String,
+    mime_type: String,
+    state: State<'_, AppState>,
+) -> Result<TaskDto, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    let updated = store
+        .attach_file_bytes(id, &data, &filename, &mime_type)
+        .map_err(|e| e.to_string())?;
+    Ok(TaskDto::from(updated))
+}
+
+#[tauri::command]
+pub fn delete_attachment(
+    id: u32,
+    filename: String,
+    state: State<'_, AppState>,
+) -> Result<TaskDto, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    let updated = store
+        .delete_attachment(id, &filename)
+        .map_err(|e| e.to_string())?;
+    Ok(TaskDto::from(updated))
+}
+
+#[tauri::command]
+pub fn get_attachment_path(
+    id: u32,
+    filename: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    attachment_path_for_store(&store, id, &filename)
+}
+
+#[tauri::command]
+pub fn read_attachment_text(
+    id: u32,
+    filename: String,
+    state: State<'_, AppState>,
+) -> Result<AttachmentTextPreviewDto, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    attachment_text_preview_for_store(&store, id, &filename)
+}
+
+// ── Tags ────────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct TagInfo {
+    pub name: String,
+    pub count: usize,
+}
+
+#[tauri::command]
+pub fn list_all_tags(state: State<'_, AppState>) -> Result<Vec<TagInfo>, String> {
+    let root = require_project(&state)?;
+    let store = TaskStore::new(root).map_err(|e| e.to_string())?;
+    let tasks = store.list(None).map_err(|e| e.to_string())?;
+
+    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for task in &tasks {
+        for tag in &task.tags {
+            *counts.entry(tag.clone()).or_insert(0) += 1;
+        }
+    }
+
+    let mut tags: Vec<TagInfo> = counts
+        .into_iter()
+        .map(|(name, count)| TagInfo { name, count })
+        .collect();
+    tags.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+    Ok(tags)
 }
 
 // ── Docs ────────────────────────────────────────────────────────────
@@ -621,6 +783,7 @@ pub fn get_repair_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use untask_core::store::TaskUpdate;
 
     fn setup_project() -> tempfile::TempDir {
         let tmp = tempfile::TempDir::new().unwrap();
@@ -666,5 +829,54 @@ mod tests {
             relative_project_path(root, &doc),
             ".untask/docs/guide.md".to_string()
         );
+    }
+
+    #[test]
+    fn attachment_path_helper_rejects_invalid_filename_and_missing_metadata() {
+        let tmp = setup_project();
+        let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+        let task = store.add("Task with attachment", None, None).unwrap();
+        let task_id = task.id.unwrap();
+
+        let invalid = attachment_path_for_store(&store, task_id, "../escape.txt").unwrap_err();
+        assert!(invalid.contains("invalid attachment filename"));
+
+        let missing = attachment_path_for_store(&store, task_id, "missing.txt").unwrap_err();
+        assert!(missing.contains("attachment"));
+        assert!(missing.contains("not found"));
+    }
+
+    #[test]
+    fn attachment_text_preview_helper_returns_content_and_truncation() {
+        let tmp = setup_project();
+        let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+        let task = store.add("Task with preview", None, None).unwrap();
+        let task_id = task.id.unwrap();
+
+        let updated = store
+            .attach_file_bytes(
+                task_id,
+                &vec![b'a'; 1024 * 1024 + 16],
+                "notes.log",
+                "text/plain",
+            )
+            .unwrap();
+        assert_eq!(updated.attachments.len(), 1);
+
+        let preview = attachment_text_preview_for_store(&store, task_id, "notes.log").unwrap();
+        assert_eq!(preview.filename, "notes.log");
+        assert!(preview.truncated);
+        assert_eq!(preview.content.len(), 1024 * 1024);
+
+        let cleared = store
+            .update(
+                task_id,
+                TaskUpdate {
+                    attachments: Some(vec![]),
+                    ..TaskUpdate::default()
+                },
+            )
+            .unwrap();
+        assert!(cleared.attachments.is_empty());
     }
 }

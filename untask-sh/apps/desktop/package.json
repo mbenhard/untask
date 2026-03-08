@@ -30,8 +30,10 @@
     "@milkdown/theme-nord": "^7.19.0",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "bits-ui": "^2.16.3",
     "clsx": "^2.1.1",
+    "marked": "^17.0.4",
     "tailwind-merge": "^3.5.0",
     "tailwind-variants": "^3.2.2"
   }

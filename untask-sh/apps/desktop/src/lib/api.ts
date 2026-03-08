@@ -4,6 +4,20 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Priority = "low" | "medium" | "high";
 
+export interface AttachmentRefDto {
+  filename: string;
+  mime_type: string;
+  size: number;
+  created: string;
+}
+
+export interface AttachmentTextPreviewDto {
+  filename: string;
+  mime_type: string;
+  content: string;
+  truncated: boolean;
+}
+
 export interface TaskDto {
   id: number | null;
   title: string;
@@ -19,6 +33,8 @@ export interface TaskDto {
   position: number | null;
   prd: string | null;
   confidence: string | null;
+  owner: string | null;
+  attachments: AttachmentRefDto[];
 }
 
 export interface ColumnDto {
@@ -76,6 +92,18 @@ export interface TaskUpdateDto {
   body?: string;
   position?: number;
   prd?: string | null;
+  owner?: string | null;
+}
+
+// ── Tags ───────────────────────────────────────────────────────────
+
+export interface TagInfo {
+  name: string;
+  count: number;
+}
+
+export function listAllTags(): Promise<TagInfo[]> {
+  return invoke("list_all_tags");
 }
 
 // ── Config ──────────────────────────────────────────────────────────
@@ -220,4 +248,34 @@ export function getPrdTaskCounts(
   prdPath: string,
 ): Promise<[number, number]> {
   return invoke("get_prd_task_counts", { prdPath });
+}
+
+// ── Attachments ─────────────────────────────────────────────────────
+
+export function attachFile(id: number, filePath: string): Promise<TaskDto> {
+  return invoke("attach_file", { id, filePath });
+}
+
+export function attachFileBytes(
+  id: number,
+  data: number[],
+  filename: string,
+  mimeType: string,
+): Promise<TaskDto> {
+  return invoke("attach_file_bytes", { id, data, filename, mimeType });
+}
+
+export function deleteAttachment(id: number, filename: string): Promise<TaskDto> {
+  return invoke("delete_attachment", { id, filename });
+}
+
+export function getAttachmentPath(id: number, filename: string): Promise<string> {
+  return invoke("get_attachment_path", { id, filename });
+}
+
+export function readAttachmentText(
+  id: number,
+  filename: string,
+): Promise<AttachmentTextPreviewDto> {
+  return invoke("read_attachment_text", { id, filename });
 }
