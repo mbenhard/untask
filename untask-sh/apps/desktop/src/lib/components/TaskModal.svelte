@@ -14,6 +14,7 @@
   import SubtaskList from "$lib/components/SubtaskList.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import MetaTooltip from "$lib/components/ui/MetaTooltip.svelte";
+  import { composeBodyWithNotesAndSubtasks, stripSubtasksFromBody } from "$lib/subtasks";
   import { hasKnownStatus } from "$lib/utils";
 
   let {
@@ -53,6 +54,7 @@
   let lastRefreshRevision = $state(-1);
   let kickBackOpen = $state(false);
   let kickBackNotes = $state("");
+  let bodySaveRevision = 0;
   const closeAnimationMs = 220;
   let overlayClass = $derived(
     `task-modal-shell fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]${
@@ -96,13 +98,13 @@
     kickBackNotes = "";
     if (id == null) {
       task = snapshot ? { ...snapshot } : null;
-      showBody = (snapshot?.body.trim().length ?? 0) > 0;
+      showBody = (snapshot ? stripSubtasksFromBody(snapshot.body).length : 0) > 0;
       loading = false;
       return;
     }
     if (snapshot?.id === id) {
       task = snapshot;
-      showBody = snapshot.body.trim().length > 0;
+      showBody = stripSubtasksFromBody(snapshot.body).length > 0;
     }
     void loadTask(id, false);
   });
@@ -122,7 +124,7 @@
       const preserveBodyDraft = preserveDrafts && (bodyFocused || bodyDirty);
       task = preserveBodyDraft && task ? { ...loaded, body: task.body } : loaded;
       if (!preserveBodyDraft) {
-        showBody = loaded.body.trim().length > 0;
+        showBody = stripSubtasksFromBody(loaded.body).length > 0;
       }
     } catch {
       task = null;
@@ -223,6 +225,12 @@
   let hasAgentSections = $derived(
     parsedBody.agentSummary != null || parsedBody.deferred != null || parsedBody.reviewNotes != null,
   );
+
+  let editableNotesBody = $derived.by(() => {
+    if (!task) return "";
+    const description = hasAgentSections ? parsedBody.description : task.body;
+    return stripSubtasksFromBody(description);
+  });
 
   let isReviewStatus = $derived(task?.status === "review");
 
@@ -385,37 +393,42 @@
 
   // Body
   function saveBody(markdown: string) {
-    if (!task || !hasAgentSections) {
-      saveField({ body: markdown });
-      return;
-    }
-    // Reconstruct full body: edited description + preserved agent sections
-    let full = markdown.trimEnd();
-    if (parsedBody.agentSummary != null) {
-      full += "\n\n## Agent Summary\n" + parsedBody.agentSummary;
-    }
-    if (parsedBody.deferred != null) {
-      full += "\n\n## Deferred\n" + parsedBody.deferred;
-    }
-    if (parsedBody.reviewNotes != null) {
-      full += "\n\n## Review Notes\n" + parsedBody.reviewNotes;
-    }
-    full += "\n";
-    saveField({ body: full });
+    if (!task) return;
+    const description = hasAgentSections ? parsedBody.description : task.body;
+    persistDescription(composeBodyWithNotesAndSubtasks(markdown, description));
   }
 
   function handleSubtaskBodyChange(newDescription: string) {
-    if (!task) return;
-    if (!hasAgentSections) {
-      saveField({ body: newDescription });
-      return;
+    persistDescription(composeBodyWithNotesAndSubtasks(editableNotesBody, newDescription));
+  }
+
+  function composeTaskBody(description: string): string {
+    const sections: string[] = [];
+    const trimmedDescription = description.trimEnd();
+    if (trimmedDescription) sections.push(trimmedDescription);
+    if (parsedBody.agentSummary != null) sections.push(`## Agent Summary\n${parsedBody.agentSummary}`);
+    if (parsedBody.deferred != null) sections.push(`## Deferred\n${parsedBody.deferred}`);
+    if (parsedBody.reviewNotes != null) sections.push(`## Review Notes\n${parsedBody.reviewNotes}`);
+    if (sections.length === 0) return "";
+    return `${sections.join("\n\n")}\n`;
+  }
+
+  async function persistDescription(description: string) {
+    if (!task?.id) return;
+    const body = hasAgentSections ? composeTaskBody(description) : description;
+    const requestRevision = ++bodySaveRevision;
+    const taskId = task.id;
+    task = { ...task, body };
+    try {
+      const loaded = await updateTask(taskId, { body });
+      if (requestRevision !== bodySaveRevision) return;
+      task = loaded;
+      onTaskUpdated();
+    } catch {
+      if (requestRevision !== bodySaveRevision) return;
+      flashError();
+      void loadTask(taskId, false);
     }
-    let full = newDescription.trimEnd();
-    if (parsedBody.agentSummary != null) full += "\n\n## Agent Summary\n" + parsedBody.agentSummary;
-    if (parsedBody.deferred != null) full += "\n\n## Deferred\n" + parsedBody.deferred;
-    if (parsedBody.reviewNotes != null) full += "\n\n## Review Notes\n" + parsedBody.reviewNotes;
-    full += "\n";
-    saveField({ body: full });
   }
 
   // Copy as agent prompt
@@ -680,7 +693,7 @@
         <div class="border-t border-border/60">
           {#if showBody}
             <MilkdownEditor
-              content={hasAgentSections ? parsedBody.description : task.body}
+              content={editableNotesBody}
               readonly={isUnindexed}
               saveOnBlur={true}
               onSave={saveBody}
