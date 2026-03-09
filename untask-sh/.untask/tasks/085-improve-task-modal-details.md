@@ -3,6 +3,6 @@ id: 85
 title: Improve Task Modal details
 status: todo
 created: 2026-03-08
-updated: 2026-03-08T20:21:02.336506Z
-position: 4.0
+updated: 2026-03-09T08:29:28.678494Z
+position: 1.0
 ---

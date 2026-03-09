@@ -27,7 +27,6 @@
     "@fontsource-variable/geist-mono": "^5.2.7",
     "@milkdown/crepe": "^7.19.0",
     "@milkdown/kit": "^7.19.0",
-    "@milkdown/theme-nord": "^7.19.0",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "^2.5.3",

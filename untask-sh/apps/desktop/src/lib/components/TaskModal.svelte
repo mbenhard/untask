@@ -1,12 +1,14 @@
 <script lang="ts">
   import { Dialog } from "bits-ui";
   import {
+    attachFile,
     deleteTask,
     getTask,
     updateTask,
     type ColumnDto,
     type TaskDto,
   } from "$lib/api";
+  import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
   import { marked } from "marked";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import AttachmentList from "$lib/components/AttachmentList.svelte";
@@ -15,7 +17,7 @@
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import MetaTooltip from "$lib/components/ui/MetaTooltip.svelte";
   import { tagColor } from "$lib/tagColor";
-  import { composeBodyWithNotesAndSubtasks, stripSubtasksFromBody } from "$lib/subtasks";
+  import { composeBodyWithNotesAndSubtasks, parseSubtasks, stripSubtasksFromBody } from "$lib/subtasks";
   import { hasKnownStatus } from "$lib/utils";
 
   let {
@@ -51,6 +53,10 @@
   let attachmentListRef = $state<{
     handlePaste: (e: ClipboardEvent) => Promise<void>;
     handleDroppedFiles: (files: File[]) => Promise<void>;
+    handleAttach: () => Promise<void>;
+  } | null>(null);
+  let subtaskListRef = $state<{
+    openAddInput: () => void;
   } | null>(null);
   let bodyFocused = $state(false);
   let bodyDirty = $state(false);
@@ -288,6 +294,26 @@
   });
 
   let isReviewStatus = $derived(task?.status === "review");
+
+  let subtaskBody = $derived(hasAgentSections ? parsedBody.description : (task?.body ?? ""));
+  let hasSubtasks = $derived(parseSubtasks(subtaskBody).length > 0);
+  let hasAttachments = $derived((task?.attachments ?? []).length > 0);
+
+  async function handleInlineAttach() {
+    const id = task?.id;
+    if (id == null) return;
+    if (attachmentListRef) {
+      await attachmentListRef.handleAttach();
+    } else {
+      const selected = await openFileDialog({ multiple: true, title: "Attach files" });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      for (const filePath of paths) {
+        task = await attachFile(id, filePath);
+      }
+      onTaskUpdated();
+    }
+  }
 
   // Configure marked for agent section rendering
   const markedInstance = new marked.Renderer();
@@ -591,7 +617,7 @@
       </div>
     {:else if task}
       <!-- Header: ID left, close right -->
-      <div class="flex items-center justify-between border-b border-border/60 px-3 py-1.5">
+      <div class="flex items-center justify-between border-b border-border/60 p-3">
         <div>
           {#if task.id != null}
             <span class="font-mono text-[10px] text-muted-foreground">#{task.id}</span>
@@ -717,6 +743,26 @@
               </button>
             </div>
           {/if}
+
+          <!-- Inline add buttons (shown when sections are empty) -->
+          {#if !isUnindexed && !hasSubtasks}
+            <button
+              type="button"
+              class="inline-flex h-6 items-center gap-1 rounded-[4px] border border-dashed border-border/40 px-2 font-mono text-[10px] leading-none text-muted-foreground/40 transition-colors duration-[120ms] hover:border-border/60 hover:text-muted-foreground"
+              onclick={() => subtaskListRef?.openAddInput()}
+            >
+              + subtask
+            </button>
+          {/if}
+          {#if !isUnindexed && !hasAttachments}
+            <button
+              type="button"
+              class="inline-flex h-6 items-center gap-1 rounded-[4px] border border-dashed border-border/40 px-2 font-mono text-[10px] leading-none text-muted-foreground/40 transition-colors duration-[120ms] hover:border-border/60 hover:text-muted-foreground"
+              onclick={handleInlineAttach}
+            >
+              + attachment
+            </button>
+          {/if}
         </div>
 
         {#if saveErrorText}
@@ -727,6 +773,7 @@
 
         <!-- Subtask list -->
         <SubtaskList
+          bind:this={subtaskListRef}
           body={hasAgentSections ? parsedBody.description : task.body}
           readonly={isUnindexed}
           onBodyChange={handleSubtaskBodyChange}
@@ -763,7 +810,7 @@
         {#if hasAgentSections}
           <div class="border-t border-border/60">
             {#if parsedBody.agentSummary != null}
-              <div class="speech-bubble speech-bubble--agent mx-3 my-2">
+              <div class="speech-bubble speech-bubble--agent mx-4 my-2">
                 <div class="mb-1 flex items-center justify-between gap-2">
                   <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Agent Summary</p>
                   {#if task?.confidence === "low"}
@@ -780,13 +827,13 @@
               </div>
             {/if}
             {#if parsedBody.deferred != null}
-              <div class="speech-bubble speech-bubble--agent mx-3 my-2">
+              <div class="speech-bubble speech-bubble--agent mx-4 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Deferred</p>
                 <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.deferred)}</div>
               </div>
             {/if}
             {#if parsedBody.reviewNotes != null}
-              <div class="speech-bubble speech-bubble--user mx-3 my-2">
+              <div class="speech-bubble speech-bubble--user mx-4 my-2">
                 <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Review Notes</p>
                 <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.reviewNotes)}</div>
               </div>
@@ -821,7 +868,7 @@
 
       <!-- Revise notes (inline expand) -->
       {#if reviseOpen}
-        <div class="border-t border-border/60 px-3 py-2">
+        <div class="border-t border-border/60 px-4 py-2">
           <textarea
             bind:value={reviseNotes}
             placeholder="What needs fixing? (optional)"
@@ -837,7 +884,7 @@
       {/if}
 
       <!-- Footer: delete left, actions right -->
-      <div class="flex items-center justify-between border-t border-border/60 px-3 py-2">
+      <div class="flex items-center justify-between border-t border-border/60 p-3">
         <div class="flex items-center gap-1.5">
           {#if bodyDirty && !reviseOpen}
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>

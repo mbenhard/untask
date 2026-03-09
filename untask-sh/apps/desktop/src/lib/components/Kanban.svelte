@@ -657,7 +657,7 @@
         doneStripDragOver && !doneExpanded ? 'border-border' :
         'border-border/40'
       } ${!doneExpanded && !doneTransitioning ? 'done-collapsed group/strip' : ''} ${doneStripDragOver && !doneExpanded ? 'done-strip-hover' : ''}`}
-      style="width: {doneExpanded ? '280px' : isDragging ? '120px' : '56px'};"
+      style="width: {doneExpanded ? '280px' : doneStripDragOver ? '120px' : '56px'};"
       onclick={!doneExpanded && !doneTransitioning ? toggleDoneExpanded : undefined}
       onkeydown={!doneExpanded && !doneTransitioning ? (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDoneExpanded(); } } : undefined}
       ondragover={!doneExpanded && !doneTransitioning ? handleStripDragOver : undefined}

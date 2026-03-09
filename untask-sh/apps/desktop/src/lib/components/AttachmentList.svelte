@@ -151,7 +151,7 @@
     }
   }
 
-  async function handleAttach() {
+  export async function handleAttach() {
     const selected = await open({
       multiple: true,
       title: "Attach files",
@@ -353,7 +353,7 @@
     }
   }
 
-  let visible = $derived(!readonly || attachments.length > 0);
+  let visible = $derived(attachments.length > 0);
 
   $effect(() => {
     if (selectedFilename && !attachments.some((attachment) => attachment.filename === selectedFilename)) {
@@ -378,9 +378,7 @@
       <span class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">
         Attachments
       </span>
-      {#if attachments.length > 0}
-        <span class="font-mono text-[10px] text-muted-foreground/50">{attachments.length}</span>
-      {/if}
+      <span class="font-mono text-[10px] text-muted-foreground/50">{attachments.length}</span>
       {#if uploading}
         <span class="animate-pulse font-mono text-[10px] text-muted-foreground/40">syncing...</span>
       {:else if attachFeedback}
@@ -392,14 +390,6 @@
         </span>
       {/if}
     </div>
-
-    {#if attachments.length === 0}
-      <div class="px-3 py-2">
-        <p class="font-mono text-[10px] text-muted-foreground/40">
-          No attachments yet.
-        </p>
-      </div>
-    {/if}
 
     {#each attachments as att (att.filename)}
       {@const resolved = attachmentState[att.filename]}

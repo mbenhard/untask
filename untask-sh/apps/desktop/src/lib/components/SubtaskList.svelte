@@ -95,7 +95,7 @@
     }
   }
 
-  function openAddInput() {
+  export function openAddInput() {
     addingSubtask = true;
     addDraft = "";
     requestAnimationFrame(() => addInputEl?.focus());
@@ -156,7 +156,7 @@
     dragOverIndex = null;
   }
 
-  let visible = $derived(!readonly || total > 0);
+  let visible = $derived(total > 0 || addingSubtask);
 </script>
 
 {#if visible}

@@ -1,11 +1,9 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { Editor, rootCtx, defaultValueCtx } from "@milkdown/kit/core";
-  import { commonmark } from "@milkdown/kit/preset/commonmark";
-  import { gfm } from "@milkdown/kit/preset/gfm";
-  import { history } from "@milkdown/kit/plugin/history";
-  import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
-  import { replaceAll, getMarkdown } from "@milkdown/kit/utils";
+  import { Crepe, CrepeFeature } from "@milkdown/crepe";
+  import { replaceAll } from "@milkdown/kit/utils";
+  import "@milkdown/crepe/theme/common/style.css";
+  import "@milkdown/crepe/theme/classic-dark.css";
 
   let {
     content = "",
@@ -26,11 +24,11 @@
   } = $props();
 
   let editorEl: HTMLDivElement | undefined = $state();
-  let editorInstance: Editor | undefined = $state();
+  let crepeInstance: Crepe | undefined = $state();
   let dirty = $state(false);
   let initialContent = $state("");
 
-  // Create editor once when the DOM element mounts.
+  // Create Crepe editor once when the DOM element mounts.
   // `content` is read via untrack so changes don't recreate the editor.
   $effect(() => {
     if (!editorEl) return;
@@ -39,54 +37,71 @@
     initialContent = startContent;
     let mounted = true;
 
-    Editor.make()
-      .config((ctx) => {
-        ctx.set(rootCtx, editorEl!);
-        ctx.set(defaultValueCtx, startContent);
-        ctx.get(listenerCtx).markdownUpdated((_ctx, md) => {
-          if (!mounted) return;
-          dirty = md !== initialContent;
-          onContentChange?.(md);
-          onDirtyChange?.(dirty);
-        });
-      })
-      .use(commonmark)
-      .use(gfm)
-      .use(history)
-      .use(listener)
-      .create()
-      .then((editor) => {
-        if (!mounted) {
-          editor.destroy();
-          return;
-        }
-        editorInstance = editor;
-        requestAnimationFrame(() => {
-          const pm = editorEl?.querySelector<HTMLElement>('.ProseMirror');
-          pm?.focus();
-        });
+    const crepe = new Crepe({
+      root: editorEl,
+      defaultValue: startContent,
+      features: {
+        [CrepeFeature.CodeMirror]: false,
+        [CrepeFeature.ImageBlock]: false,
+        [CrepeFeature.Latex]: false,
+        [CrepeFeature.Table]: false,
+      },
+      featureConfigs: {
+        [CrepeFeature.Placeholder]: {
+          text: "Type '/' for commands...",
+          mode: "block",
+        },
+      },
+    });
+
+    crepe.on((api) => {
+      api.markdownUpdated((_ctx, md) => {
+        if (!mounted) return;
+        dirty = md !== initialContent;
+        onContentChange?.(md);
+        onDirtyChange?.(dirty);
       });
+    });
+
+    crepe.setReadonly(untrack(() => readonly));
+
+    crepe.create().then(() => {
+      if (!mounted) {
+        crepe.destroy();
+        return;
+      }
+      crepeInstance = crepe;
+      requestAnimationFrame(() => {
+        const pm = editorEl?.querySelector<HTMLElement>(".ProseMirror");
+        pm?.focus();
+      });
+    });
 
     return () => {
       mounted = false;
-      editorInstance?.destroy();
-      editorInstance = undefined;
+      crepeInstance?.destroy();
+      crepeInstance = undefined;
     };
+  });
+
+  // Sync readonly prop changes
+  $effect(() => {
+    crepeInstance?.setReadonly(readonly);
   });
 
   // Update content when prop changes externally (without recreating editor)
   $effect(() => {
-    if (content !== initialContent && editorInstance) {
+    if (content !== initialContent && crepeInstance) {
       initialContent = content;
-      editorInstance.action(replaceAll(content));
+      crepeInstance.editor.action(replaceAll(content));
       dirty = false;
       onDirtyChange?.(false);
     }
   });
 
   function save() {
-    if (onSave && editorInstance) {
-      const md = editorInstance.action(getMarkdown());
+    if (onSave && crepeInstance) {
+      const md = crepeInstance.getMarkdown();
       onSave(md);
       initialContent = md;
       dirty = false;
@@ -120,7 +135,7 @@
 >
   <div
     bind:this={editorEl}
-    class="milkdown-editor prose prose-invert min-h-[120px] px-3 py-2 text-[14px] leading-[1.5] text-foreground outline-none"
+    class="milkdown-editor min-h-[120px] text-[14px] leading-[1.5] text-foreground outline-none"
     class:pointer-events-none={readonly}
     class:opacity-60={readonly}
   ></div>
@@ -134,86 +149,48 @@
   .milkdown-wrap :global(.ProseMirror) {
     outline: none;
     min-height: 80px;
+    padding: 8px 12px;
   }
 
-  .milkdown-wrap :global(.ProseMirror p) {
-    margin: 0.25em 0;
-  }
-
+  /* Dense heading sizes per design language */
   .milkdown-wrap :global(.ProseMirror h1) {
     font-size: 18px;
     font-weight: 500;
-    margin: 0.5em 0 0.25em;
   }
-
   .milkdown-wrap :global(.ProseMirror h2) {
     font-size: 15px;
     font-weight: 500;
-    margin: 0.5em 0 0.25em;
   }
-
   .milkdown-wrap :global(.ProseMirror h3) {
     font-size: 14px;
     font-weight: 500;
-    margin: 0.4em 0 0.2em;
   }
 
-  .milkdown-wrap :global(.ProseMirror ul),
-  .milkdown-wrap :global(.ProseMirror ol) {
-    padding-left: 1.25em;
-    margin: 0.25em 0;
-  }
+  /* Monochrome design-language overrides for Crepe theme */
+  .milkdown-wrap :global(.milkdown) {
+    --crepe-color-background: transparent;
+    --crepe-color-surface: #1a1a1a;
+    --crepe-color-surface-low: #161616;
+    --crepe-color-on-background: #f5f5f5;
+    --crepe-color-on-surface: #f5f5f5;
+    --crepe-color-on-surface-variant: #9c9c9c;
+    --crepe-color-outline: #2a2a2a;
+    --crepe-color-primary: #e5e5e5;
+    --crepe-color-secondary: #1e1e1e;
+    --crepe-color-on-secondary: #f5f5f5;
+    --crepe-color-inverse: #f5f5f5;
+    --crepe-color-on-inverse: #161616;
+    --crepe-color-inline-code: #e5e5e5;
+    --crepe-color-error: #7f1d1d;
+    --crepe-color-hover: #1e1e1e;
+    --crepe-color-selected: #2a2a2a;
+    --crepe-color-inline-area: #2a2a2a;
 
-  .milkdown-wrap :global(.ProseMirror li) {
-    margin: 0.1em 0;
-  }
+    --crepe-font-title: var(--font-sans);
+    --crepe-font-default: var(--font-sans);
+    --crepe-font-code: var(--font-mono);
 
-  .milkdown-wrap :global(.ProseMirror code) {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    background: var(--color-accent);
-    border: 1px solid var(--color-border);
-    border-radius: 3px;
-    padding: 1px 4px;
-  }
-
-  .milkdown-wrap :global(.ProseMirror pre) {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    background: var(--color-accent);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 8px 10px;
-    margin: 0.4em 0;
-    overflow-x: auto;
-  }
-
-  .milkdown-wrap :global(.ProseMirror pre code) {
-    background: none;
-    border: none;
-    padding: 0;
-  }
-
-  .milkdown-wrap :global(.ProseMirror blockquote) {
-    border-left: 2px solid var(--color-border);
-    padding-left: 10px;
-    margin: 0.4em 0;
-    color: var(--color-muted-foreground);
-  }
-
-  .milkdown-wrap :global(.ProseMirror hr) {
-    border: none;
-    border-top: 1px solid var(--color-border);
-    margin: 0.75em 0;
-  }
-
-  .milkdown-wrap :global(.ProseMirror a) {
-    color: var(--color-foreground);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .milkdown-wrap :global(.ProseMirror input[type="checkbox"]) {
-    margin-right: 4px;
+    --crepe-shadow-1: none;
+    --crepe-shadow-2: none;
   }
 </style>
