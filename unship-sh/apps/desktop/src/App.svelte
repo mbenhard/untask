@@ -358,23 +358,17 @@
 
     {#if restoring}
       <div
-        class="content-shell flex min-h-0 flex-1 items-center justify-center"
-        class:content-shell-modal-open={taskModalActive}
-      >
+        class="content-shell flex min-h-0 flex-1 items-center justify-center"      >
         <p class="animate-pulse font-mono text-[11px] text-muted-foreground">Loading...</p>
       </div>
     {:else if !$projectPath}
       <div
-        class="content-shell flex min-h-0 flex-1 overflow-hidden"
-        class:content-shell-modal-open={taskModalActive}
-      >
+        class="content-shell flex min-h-0 flex-1 overflow-hidden"      >
         <ProjectPicker {onProjectOpened} />
       </div>
     {:else}
       <div
-        class="content-shell flex min-h-0 flex-1 overflow-hidden"
-        class:content-shell-modal-open={taskModalActive}
-      >
+        class="content-shell flex min-h-0 flex-1 overflow-hidden"      >
         <SidebarNav
           activeView={$activeView}
           reviewCount={$tasks.filter((t) => t.status === "review").length}
@@ -479,23 +473,6 @@
 
 <style>
   .content-shell {
-    --content-shell-scale: 1;
-    --content-shell-opacity: 1;
-    transform: scale(var(--content-shell-scale));
-    transform-origin: center center;
-    opacity: var(--content-shell-opacity);
-    transition:
-      transform 220ms cubic-bezier(0.18, 0.9, 0.22, 1),
-      opacity 200ms ease;
     overflow: hidden;
-  }
-
-  .content-shell-modal-open {
-    --content-shell-scale: 0.989;
-    --content-shell-opacity: 0.9;
-    transition-duration: 220ms, 160ms;
-    transition-timing-function:
-      cubic-bezier(0.16, 1, 0.3, 1),
-      ease;
   }
 </style>

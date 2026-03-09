@@ -35,11 +35,19 @@
     onDrop: (event: DragEvent) => void;
   } = $props();
 
+  let pressed = $state(false);
+
   const cardClass = $derived(
     `kanban-card group relative cursor-pointer rounded-[6px] border px-2.5 py-2 transition-all duration-[120ms] ${
       muted ? "done-card border-border/30 bg-card" : "border-border/60 bg-card"
     }`,
   );
+
+  function handleClick() {
+    pressed = true;
+    onTaskClick(task);
+    setTimeout(() => (pressed = false), 300);
+  }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -49,12 +57,13 @@
   class:dragging={dragged}
   class:drop-before={dropBefore}
   class:kanban-card-settled={settled}
+  class:pressed
   {draggable}
   ondragstart={(event) => onDragStart(event, task)}
   ondragend={onDragEnd}
   ondragover={onDragOver}
   ondrop={onDrop}
-  onclick={() => onTaskClick(task)}
+  onclick={handleClick}
   role="button"
   tabindex="0"
   title={task.title}
@@ -152,3 +161,48 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .kanban-card:hover {
+    border-color: var(--color-border);
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+    transform: scale(0.98);
+  }
+
+  .kanban-card.pressed {
+    transform: scale(0.96);
+    opacity: 0.7;
+    transition-duration: 80ms;
+  }
+
+  .kanban-card.done-card:hover {
+    border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+
+  .kanban-card.dragging {
+    transform: scale(0.97) rotate(1deg);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
+  }
+
+  .kanban-card.drop-before::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: -6px;
+    height: 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-foreground) 55%, transparent);
+    box-shadow: 0 0 0 1px rgb(245 245 245 / 0.08);
+    pointer-events: none;
+  }
+
+  @keyframes card-settle {
+    0% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
+
+  .kanban-card-settled {
+    animation: card-settle 80ms ease-out;
+  }
+</style>

@@ -2,7 +2,6 @@
   import { PROMPT_MODES } from "$lib/taskPrompt";
 
   let {
-    bodyDirty,
     isUnindexed,
     reviseOpen,
     showDeleteConfirm,
@@ -25,7 +24,6 @@
     onOpenRevise,
     onApprove,
   }: {
-    bodyDirty: boolean;
     isUnindexed: boolean;
     reviseOpen: boolean;
     showDeleteConfirm: boolean;
@@ -52,9 +50,6 @@
 
 <div class="flex items-center justify-between border-t border-border/60 p-3">
   <div class="flex items-center gap-1.5">
-    {#if bodyDirty && !reviseOpen}
-      <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
-    {/if}
     {#if !isUnindexed && !reviseOpen}
       {#if showDeleteConfirm}
         <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
@@ -151,7 +146,7 @@
         <div class="relative inline-flex items-stretch">
           <button
             type="button"
-            class="inline-flex items-center gap-1 rounded-l-[4px] px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+            class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-dashed border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
             onclick={onCopyPrompt}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -163,7 +158,7 @@
           <button
             type="button"
             aria-label="Choose prompt mode"
-            class="inline-flex items-center rounded-r-[4px] px-1.5 py-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
+            class="inline-flex items-center rounded-r-[4px] border border-dashed border-border/60 px-1.5 py-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:border-border hover:text-muted-foreground"
             onclick={onTogglePromptDropdown}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

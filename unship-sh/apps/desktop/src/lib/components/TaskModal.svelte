@@ -721,7 +721,6 @@
 
       <!-- Footer: delete left, actions right -->
       <TaskModalActionBar
-        {bodyDirty}
         {isUnindexed}
         {reviseOpen}
         {showDeleteConfirm}

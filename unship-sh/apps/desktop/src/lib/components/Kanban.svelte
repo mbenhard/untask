@@ -540,34 +540,6 @@
 </div>
 
 <style>
-  .kanban-card:hover {
-    border-color: var(--color-border);
-    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
-    transform: scale(0.98);
-  }
-
-  .kanban-card.done-card:hover {
-    border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
-  }
-
-  .kanban-card.dragging {
-    transform: scale(0.97) rotate(1deg);
-    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
-  }
-
-  .kanban-card.drop-before::before {
-    content: "";
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    top: -6px;
-    height: 2px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--color-foreground) 55%, transparent);
-    box-shadow: 0 0 0 1px rgb(245 245 245 / 0.08);
-    pointer-events: none;
-  }
-
   .drop-indicator-end {
     height: 2px;
     margin: 0 8px 2px;
@@ -576,15 +548,6 @@
     box-shadow: 0 0 0 1px rgb(245 245 245 / 0.08);
     pointer-events: none;
     flex-shrink: 0;
-  }
-
-  @keyframes card-settle {
-    0% { transform: scale(1.02); }
-    100% { transform: scale(1); }
-  }
-
-  .kanban-card-settled {
-    animation: card-settle 80ms ease-out;
   }
 
   .kanban-scroll {

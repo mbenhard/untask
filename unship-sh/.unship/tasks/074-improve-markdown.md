@@ -3,7 +3,7 @@ id: 74
 title: Improve Markdown
 status: in-progress
 created: 2026-03-08
-updated: 2026-03-09T08:29:05.460551Z
+updated: 2026-03-09T14:11:19.495052Z
 position: 2.0
 attachments:
 - filename: paste-1772995328447.png
@@ -31,9 +31,8 @@ I dont actually see the numbers in UI
 or the bulltets/lines like
 
 * this
-* or this
 
- 
+* or this
 
 <br />
 
