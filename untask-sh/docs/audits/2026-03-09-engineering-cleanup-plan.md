@@ -91,6 +91,12 @@ Status: In Progress
 - Update the audit log with completed fixes and deferred work
 - Reassess whether remaining work is still high-value cleanup or mostly churn
 
+### Batch 14: Repository hygiene decision prep
+
+- Inspect tracked live-state, fixture, and archive-heavy paths
+- Record exact recommendations in a repository-boundary proposal
+- Separate “safe cleanup already done” from “needs explicit approval”
+
 ## Outcome
 
 - Batch 1: completed
@@ -106,9 +112,10 @@ Status: In Progress
 - Batch 11: completed
 - Batch 12: completed
 - Batch 13: completed
+- Batch 14: completed
 
 ## Remaining Backlog
 
 - Split the remaining state-heavy parts of `TaskModal.svelte` and the document-action header in `DocsViewer.svelte` only if the additional churn is justified.
 - Decide whether the remaining full-list scan paths in `TaskStore` justify a larger indexing/cache layer.
-- Decide what repository-state and planning artifacts should remain tracked versus moved into explicit fixtures/archive areas.
+- Approve or reject the repository-boundary proposal for `.untask/`, `test-dir/.untask/`, and `docs/plans/`.

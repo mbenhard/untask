@@ -89,6 +89,12 @@ Status: In Progress
 - Added `apps/desktop/src/lib/components/DocsFolderView.svelte` for the folder-only child listing branch.
 - Kept DocsViewer responsible for selection, document actions, and editor orchestration while removing most of the pure sidebar/folder rendering surface.
 
+### Batch 11
+
+- Inspected the remaining repository-hygiene backlog around tracked live project state, fixture state, and planning archives.
+- Added `docs/audits/2026-03-09-repo-hygiene-proposal.md` with exact current paths, sizes, recommended boundary policy, and a controlled migration proposal.
+- Intentionally did not move `.untask/`, `test-dir/.untask/`, or `docs/plans/` yet because that is a repository-organization decision rather than a safe unilateral code cleanup.
+
 ## Verification
 
 - `cargo test --workspace`: passed
@@ -99,4 +105,4 @@ Status: In Progress
 
 - Break up the remaining state-heavy parts of `TaskModal.svelte` and the document-action header in `DocsViewer.svelte` only if the extra churn is justified.
 - Decide whether the remaining aggregate/list scan paths in `TaskStore` justify a larger indexing or cache layer.
-- Decide how much tracked `.untask` project state and archived planning material should remain in the repo.
+- Approve or reject the repository-boundary proposal for `.untask/`, `test-dir/.untask/`, and `docs/plans/`.
