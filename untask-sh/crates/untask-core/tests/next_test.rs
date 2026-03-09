@@ -241,3 +241,32 @@ fn recently_completed_filter_handles_missing_completed_timestamp() {
     let summary = next::generate_next(tmp.path()).unwrap();
     assert!(summary.recently_completed.is_empty());
 }
+
+#[test]
+fn next_respects_custom_done_columns() {
+    let (tmp, _store) = setup();
+    std::fs::write(
+        tmp.path().join(".untask/config.yml"),
+        r#"
+columns:
+  - id: todo
+  - id: shipped
+    done: true
+"#,
+    )
+    .unwrap();
+
+    write_task(
+        tmp.path(),
+        "001-shipped.md",
+        &format!(
+            "---\nid: 1\ntitle: Custom done\nstatus: shipped\ncompleted: \"{}\"\n---\n",
+            Utc::now().to_rfc3339()
+        ),
+    );
+
+    let summary = next::generate_next(tmp.path()).unwrap();
+    assert!(summary.open_tasks.is_empty());
+    assert_eq!(summary.recently_completed.len(), 1);
+    assert_eq!(summary.recently_completed[0].status, "shipped");
+}

@@ -16,7 +16,6 @@ export const columns = writable<ColumnDto[]>([]);
 
 // Tasks
 export const tasks = writable<TaskDto[]>([]);
-export const selectedTask = writable<TaskDto | null>(null);
 
 // Docs
 export const docs = writable<DocNode[]>([]);

@@ -1,11 +1,12 @@
 use std::path::Path;
 
+use untask_core::columns;
 use untask_core::config::Config;
 use untask_core::error::{Result, UntaskError};
 use untask_core::store::TaskStore;
 
 pub fn list(root: &Path, json: bool) -> Result<()> {
-    let config = Config::load(root);
+    let config = Config::load_strict(root)?;
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
     } else {
@@ -19,9 +20,11 @@ pub fn list(root: &Path, json: bool) -> Result<()> {
 }
 
 pub fn add(root: &Path, name: &str, after: Option<&str>, done: bool, json: bool) -> Result<()> {
-    let mut config = Config::load(root);
-    let id = config.column_add(name, after, done)?;
-    config.save(root)?;
+    let result = columns::add_column(root, name, after, done)?;
+    let config = result.config;
+    let id = config
+        .normalize_status(name)
+        .ok_or_else(|| UntaskError::InvalidConfig(format!("column not found: {name}")))?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
@@ -32,12 +35,16 @@ pub fn add(root: &Path, name: &str, after: Option<&str>, done: bool, json: bool)
 }
 
 pub fn rename(store: &mut TaskStore, root: &Path, old: &str, new: &str, json: bool) -> Result<()> {
-    let mut config = Config::load(root);
-    let (old_id, new_id) = config.column_rename(old, new)?;
-    config.save(root)?;
-
+    let old_id = Config::load_strict(root)?
+        .normalize_status(old)
+        .ok_or_else(|| UntaskError::InvalidConfig(format!("column not found: {old}")))?;
+    let result = columns::rename_column(root, old, new)?;
     store.reload_config();
-    let count = store.migrate_tasks_status(&old_id, &new_id)?;
+    let config = result.config;
+    let new_id = config
+        .normalize_status(new)
+        .ok_or_else(|| UntaskError::InvalidConfig(format!("column not found: {new}")))?;
+    let count = result.migrated_tasks;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
@@ -57,9 +64,8 @@ pub fn move_column(
     before: Option<&str>,
     json: bool,
 ) -> Result<()> {
-    let mut config = Config::load(root);
-    config.column_move(name, after, before)?;
-    config.save(root)?;
+    let result = columns::move_column(root, name, after, before)?;
+    let config = result.config;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
@@ -77,40 +83,22 @@ pub fn delete(
     delete_tasks: bool,
     json: bool,
 ) -> Result<()> {
-    let mut config = Config::load(root);
-    let col_id = config
+    let col_id = Config::load_strict(root)?
         .normalize_status(name)
         .ok_or_else(|| UntaskError::InvalidConfig(format!("column not found: {name}")))?;
-
-    let task_count = store.count_tasks_in_column(&col_id)?;
-
-    if task_count > 0 && move_to.is_none() && !delete_tasks {
-        return Err(UntaskError::InvalidConfig(format!(
-            "column '{}' has {} task(s). Use --move-to <column> or --delete-tasks",
-            col_id, task_count
-        )));
-    }
-
-    if let Some(target) = move_to {
-        store.migrate_tasks_status(&col_id, target)?;
-    } else if delete_tasks {
-        store.delete_tasks_by_status(&col_id)?;
-    }
-
-    config.column_delete(&col_id)?;
-    config.save(root)?;
+    let result = columns::delete_column(root, name, move_to, delete_tasks)?;
+    let config = result.config;
     store.reload_config();
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.columns)?);
     } else {
         println!("Deleted column '{}'", col_id);
-        if task_count > 0 {
-            if move_to.is_some() {
-                println!("Moved {} task(s)", task_count);
-            } else {
-                println!("Deleted {} task(s)", task_count);
-            }
+        if result.migrated_tasks > 0 {
+            println!("Moved {} task(s)", result.migrated_tasks);
+        }
+        if result.deleted_tasks > 0 {
+            println!("Deleted {} task(s)", result.deleted_tasks);
         }
     }
     Ok(())

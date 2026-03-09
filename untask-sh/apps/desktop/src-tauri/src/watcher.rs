@@ -142,9 +142,7 @@ fn is_relevant_path(project_root: &Path, path: &Path) -> bool {
 }
 
 fn relative_relevant_path(project_root: &Path, path: &Path) -> Option<String> {
-    let Some(relative_path) = path.strip_prefix(project_root).ok() else {
-        return None;
-    };
+    let relative_path = path.strip_prefix(project_root).ok()?;
 
     let file_name = path
         .file_name()

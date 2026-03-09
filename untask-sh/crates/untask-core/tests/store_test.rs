@@ -245,6 +245,22 @@ fn get_by_id() {
 }
 
 #[test]
+fn get_by_id_reads_legacy_frontmatter_ids() {
+    let (tmp, store) = setup();
+    let legacy_path = tmp.path().join(".untask/tasks/legacy-task.md");
+    std::fs::write(
+        &legacy_path,
+        "---\nid: 42\ntitle: Legacy task\nstatus: backlog\n---\n",
+    )
+    .unwrap();
+
+    let task = store.get(42).unwrap();
+
+    assert_eq!(task.title, "Legacy task");
+    assert_eq!(task.file_path.as_deref(), Some(legacy_path.as_path()));
+}
+
+#[test]
 fn get_by_ref_numeric() {
     let (_tmp, store) = setup();
     store.add("By ref", None, None).unwrap();
@@ -350,6 +366,23 @@ fn moving_out_of_done_clears_completed() {
     assert!(reopened.completed.is_none());
 }
 
+#[test]
+fn mark_done_uses_configured_done_column() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    untask_core::init::init(
+        tmp.path(),
+        Some(untask_core::config::Preset::BugTracking.columns()),
+    )
+    .unwrap();
+    let store = TaskStore::new(tmp.path().to_path_buf()).unwrap();
+
+    store.add("Resolve me", None, None).unwrap();
+
+    let task = store.mark_done(1).unwrap();
+    assert_eq!(task.status, "resolved");
+    assert!(task.completed.is_some());
+}
+
 // ── Concurrency ────────────────────────────────────────────────────
 
 #[test]
@@ -445,7 +478,7 @@ fn concurrent_deletes_remove_all_targets() {
 
 #[test]
 fn add_task_preserves_prd_field_through_roundtrip() {
-    let (tmp, store) = setup();
+    let (_tmp, store) = setup();
     let task = store.add("Setup boilerplate", None, None).unwrap();
 
     let path = task.file_path.unwrap();

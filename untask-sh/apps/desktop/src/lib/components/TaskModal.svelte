@@ -10,14 +10,24 @@
   } from "$lib/api";
   import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
   import { marked } from "marked";
+  import { focusOnMount } from "$lib/actions";
   import MilkdownEditor from "$lib/components/MilkdownEditor.svelte";
   import AttachmentList from "$lib/components/AttachmentList.svelte";
+  import TaskAgentSections from "$lib/components/TaskAgentSections.svelte";
+  import TaskModalActionBar from "$lib/components/TaskModalActionBar.svelte";
   import SubtaskList from "$lib/components/SubtaskList.svelte";
   import TagPicker from "$lib/components/TagPicker.svelte";
   import MetaSelect from "$lib/components/ui/MetaSelect.svelte";
   import MetaTooltip from "$lib/components/ui/MetaTooltip.svelte";
   import { tagColor } from "$lib/tagColor";
   import { composeBodyWithNotesAndSubtasks, parseSubtasks, stripSubtasksFromBody } from "$lib/subtasks";
+  import {
+    composeTaskBodyFromSections,
+    hasEditableTaskNotes,
+    parseTaskBodySections,
+    replaceOrAppendTaskSection,
+  } from "$lib/taskBody";
+  import { buildTaskPrompt } from "$lib/taskPrompt";
   import { hasKnownStatus } from "$lib/utils";
 
   let {
@@ -78,16 +88,6 @@
       errorFlash ? " error-flash" : ""
     }${closing ? " task-modal-closing" : ""}`,
   );
-
-  function focusOnMount(el: HTMLElement) {
-    requestAnimationFrame(() => {
-      el.focus();
-      if (el instanceof HTMLTextAreaElement) {
-        el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
-      }
-    });
-  }
 
   function hasDraggedFiles(e: DragEvent): boolean {
     const types = e.dataTransfer?.types;
@@ -166,13 +166,13 @@
     reviseDropdownOpen = false;
     if (id == null) {
       task = snapshot ? { ...snapshot } : null;
-      showBody = snapshot ? hasEditableNotes(snapshot.body) : false;
+      showBody = snapshot ? hasEditableTaskNotes(snapshot.body) : false;
       loading = false;
       return;
     }
     if (snapshot?.id === id) {
       task = snapshot;
-      showBody = hasEditableNotes(snapshot.body);
+      showBody = hasEditableTaskNotes(snapshot.body);
       loading = false;
     }
     void loadTask(id, false);
@@ -193,7 +193,7 @@
       const preserveBodyDraft = preserveDrafts && (bodyFocused || bodyDirty);
       task = preserveBodyDraft && task ? { ...loaded, body: task.body } : loaded;
       if (!preserveBodyDraft) {
-        showBody = hasEditableNotes(loaded.body);
+        showBody = hasEditableTaskNotes(loaded.body);
       }
     } catch {
       task = null;
@@ -216,71 +216,9 @@
 
   // ── Agent section parsing ─────────────────────────────────────────
 
-  const AGENT_HEADINGS = ["agent summary", "deferred", "review notes"];
-
-  /** Check if body has editable notes (description portion, excluding agent sections and subtasks). */
-  function hasEditableNotes(body: string): boolean {
-    const parsed = parseBodySections(body);
-    const desc = parsed.agentSummary != null || parsed.deferred != null || parsed.reviewNotes != null
-      ? parsed.description
-      : body;
-    return stripSubtasksFromBody(desc).length > 0;
-  }
-
-  type ParsedBody = {
-    description: string;
-    agentSummary: string | null;
-    deferred: string | null;
-    reviewNotes: string | null;
-  };
-
-  function parseBodySections(body: string): ParsedBody {
-    const lines = body.split("\n");
-    const sections: { heading: string; startLine: number }[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(/^##\s+(.+)$/);
-      if (match) {
-        const heading = match[1].trim().toLowerCase();
-        if (AGENT_HEADINGS.includes(heading)) {
-          sections.push({ heading, startLine: i });
-        }
-      }
-    }
-
-    if (sections.length === 0) {
-      return { description: body, agentSummary: null, deferred: null, reviewNotes: null };
-    }
-
-    // Everything before the first agent section is the description
-    const firstSectionLine = Math.min(...sections.map((s) => s.startLine));
-    const description = lines.slice(0, firstSectionLine).join("\n").trimEnd();
-
-    // Extract each section's content
-    function extractSection(heading: string): string | null {
-      const section = sections.find((s) => s.heading === heading);
-      if (!section) return null;
-      const nextSection = sections
-        .filter((s) => s.startLine > section.startLine)
-        .sort((a, b) => a.startLine - b.startLine)[0];
-      const endLine = nextSection ? nextSection.startLine : lines.length;
-      return lines
-        .slice(section.startLine + 1, endLine)
-        .join("\n")
-        .trim();
-    }
-
-    return {
-      description,
-      agentSummary: extractSection("agent summary"),
-      deferred: extractSection("deferred"),
-      reviewNotes: extractSection("review notes"),
-    };
-  }
-
   let parsedBody = $derived.by(() => {
     if (!task) return { description: "", agentSummary: null, deferred: null, reviewNotes: null };
-    return parseBodySections(task.body);
+    return parseTaskBodySections(task.body);
   });
 
   let hasAgentSections = $derived(
@@ -339,7 +277,7 @@
     if (!task?.id) return;
     const notes = reviseNotes.trim();
     if (notes) {
-      const body = replaceOrAppendSection(task.body, "Review Notes", notes);
+      const body = replaceOrAppendTaskSection(task.body, "Review Notes", notes);
       await saveField({ status: "in-progress", body });
     } else {
       await saveField({ status: "in-progress" });
@@ -351,35 +289,6 @@
     reviseNotes = "";
     reviseDropdownOpen = false;
     handleClose();
-  }
-
-  function replaceOrAppendSection(body: string, heading: string, content: string): string {
-    const lines = body.split("\n");
-    const headingLower = heading.toLowerCase();
-    let sectionStart = -1;
-    let sectionEnd = lines.length;
-
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(/^##\s+(.+)$/);
-      if (match) {
-        const h = match[1].trim().toLowerCase();
-        if (h === headingLower) {
-          sectionStart = i;
-        } else if (sectionStart >= 0 && sectionEnd === lines.length) {
-          sectionEnd = i;
-        }
-      }
-    }
-
-    const newSection = `## ${heading}\n${content}`;
-
-    if (sectionStart >= 0) {
-      const before = lines.slice(0, sectionStart).join("\n");
-      const after = lines.slice(sectionEnd).join("\n");
-      return [before, newSection, after].filter(Boolean).join("\n");
-    }
-
-    return body.trimEnd() + "\n\n" + newSection + "\n";
   }
 
   // ── Field updates ────────────────────────────────────────────────
@@ -472,14 +381,7 @@
   }
 
   function composeTaskBody(description: string): string {
-    const sections: string[] = [];
-    const trimmedDescription = description.trimEnd();
-    if (trimmedDescription) sections.push(trimmedDescription);
-    if (parsedBody.agentSummary != null) sections.push(`## Agent Summary\n${parsedBody.agentSummary}`);
-    if (parsedBody.deferred != null) sections.push(`## Deferred\n${parsedBody.deferred}`);
-    if (parsedBody.reviewNotes != null) sections.push(`## Review Notes\n${parsedBody.reviewNotes}`);
-    if (sections.length === 0) return "";
-    return `${sections.join("\n\n")}\n`;
+    return composeTaskBodyFromSections(parsedBody, description);
   }
 
   async function persistDescription(description: string) {
@@ -501,53 +403,11 @@
   }
 
   // Copy as agent prompt (split button)
-  const PROMPT_MODES = [
-    { id: "implement", label: "Implement", desc: "build it now" },
-    { id: "plan", label: "Plan", desc: "outline the approach" },
-    { id: "explore", label: "Explore", desc: "discuss before acting" },
-  ] as const;
-
   let promptDropdownOpen = $state(false);
 
   function copyPrompt(mode: string = "implement", reviewNotes: string = "") {
     if (!task) return;
-
-    const meta = [
-      task.tags.length > 0 ? `Tags: ${task.tags.join(", ")}` : "",
-    ].filter(Boolean).join(" | ");
-
-    const formatAttachmentSize = (bytes: number): string => {
-      if (bytes < 1024) return `${bytes} B`;
-      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
-    const attachmentManifest = task.attachments.length > 0
-      ? `\n\nAttachments:\n${task.attachments
-        .map((attachment) =>
-          `- ${attachment.filename} (${attachment.mime_type || "application/octet-stream"}, ${formatAttachmentSize(attachment.size)})`,
-        )
-        .join("\n")}\nAttached files exist and should be inspected separately if relevant.`
-      : "";
-
-    let prompt = "";
-    if (mode === "revise") {
-      prompt = `Revise task #${task.id}: ${task.title}\n\nThis task was reviewed and needs changes.`;
-      if (reviewNotes) prompt += `\n\n## Review Notes\n${reviewNotes}`;
-    } else if (mode === "implement") {
-      prompt = `Implement task #${task.id}: ${task.title}`;
-    } else if (mode === "plan") {
-      prompt = `Create an implementation plan for task #${task.id}: ${task.title}\nDo not implement — outline the approach, key decisions, affected files, and risks.`;
-    } else if (mode === "explore") {
-      prompt = `Analyze task #${task.id}: ${task.title}\nExplore the problem space, surface questions, tradeoffs, and considerations before taking action.`;
-    } else {
-      prompt = `Implement task #${task.id}: ${task.title}`;
-    }
-    if (task.body.trim()) prompt += `\n\n${task.body.trim()}`;
-    if (meta) prompt += `\n\n${meta}`;
-    prompt += attachmentManifest;
-
-    navigator.clipboard.writeText(prompt);
+    navigator.clipboard.writeText(buildTaskPrompt(task, mode, reviewNotes));
     copyFeedback = true;
     setTimeout(() => { copyFeedback = false; }, 1200);
   }
@@ -658,7 +518,7 @@
                 class="w-full resize-none border-0 bg-transparent p-0 text-[16px] font-medium text-foreground outline-none focus:outline-none focus:ring-0 focus:shadow-none"
                 style="overflow:hidden; box-shadow:none"
                 oninput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
-                use:focusOnMount
+                use:focusOnMount={{ autosize: true }}
               ></textarea>
             </div>
           {:else}
@@ -808,37 +668,13 @@
 
         <!-- Agent sections (rendered above editor when present) -->
         {#if hasAgentSections}
-          <div class="border-t border-border/60">
-            {#if parsedBody.agentSummary != null}
-              <div class="speech-bubble speech-bubble--agent mx-4 my-2">
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <p class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Agent Summary</p>
-                  {#if task?.confidence === "low"}
-                    <span class="inline-flex h-[18px] items-center gap-1 rounded-[3px] bg-rose-500/10 px-1.5 font-mono text-[9px] leading-none text-rose-400/80">
-                      <span class="text-[8px]">!</span> Needs review
-                    </span>
-                  {:else if task?.confidence === "medium"}
-                    <span class="inline-flex h-[18px] items-center gap-1 rounded-[3px] bg-amber-500/10 px-1.5 font-mono text-[9px] leading-none text-amber-400/80">
-                      <span class="text-[8px]">~</span> Spot check
-                    </span>
-                  {/if}
-                </div>
-                <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.agentSummary)}</div>
-              </div>
-            {/if}
-            {#if parsedBody.deferred != null}
-              <div class="speech-bubble speech-bubble--agent mx-4 my-2">
-                <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Deferred</p>
-                <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.deferred)}</div>
-              </div>
-            {/if}
-            {#if parsedBody.reviewNotes != null}
-              <div class="speech-bubble speech-bubble--user mx-4 my-2">
-                <p class="mb-1 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/60">Review Notes</p>
-                <div class="agent-md font-mono text-[11px] leading-relaxed text-muted-foreground">{@html renderMarkdown(parsedBody.reviewNotes)}</div>
-              </div>
-            {/if}
-          </div>
+          <TaskAgentSections
+            agentSummary={parsedBody.agentSummary}
+            deferred={parsedBody.deferred}
+            reviewNotes={parsedBody.reviewNotes}
+            confidence={task?.confidence ?? null}
+            {renderMarkdown}
+          />
         {/if}
 
         <!-- Body / description -->
@@ -874,7 +710,7 @@
             placeholder="What needs fixing? (optional)"
             rows="2"
             class="w-full resize-none rounded-[4px] border border-border/60 bg-transparent px-2.5 py-1.5 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/40 outline-none focus:border-border"
-            use:focusOnMount
+            use:focusOnMount={{ autosize: true }}
             onkeydown={(e) => {
               if (e.key === "Enter" && e.metaKey) { e.preventDefault(); reviseTask(true); }
               else if (e.key === "Escape") { reviseOpen = false; reviseNotes = ""; }
@@ -884,210 +720,48 @@
       {/if}
 
       <!-- Footer: delete left, actions right -->
-      <div class="flex items-center justify-between border-t border-border/60 p-3">
-        <div class="flex items-center gap-1.5">
-          {#if bodyDirty && !reviseOpen}
-            <span class="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/60" title="Unsaved changes"></span>
-          {/if}
-          {#if !isUnindexed && !reviseOpen}
-            <!-- Delete (inline confirm) -->
-            {#if showDeleteConfirm}
-              <span class="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-                <button
-                  type="button"
-                  class="rounded-[4px] border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors duration-[120ms] hover:border-border hover:text-foreground"
-                  onclick={() => { showDeleteConfirm = false; }}
-                >
-                  No
-                </button>
-                <button
-                  type="button"
-                  class="rounded-[4px] border border-border/60 bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-red-400 transition-colors duration-[120ms] hover:bg-destructive hover:text-red-300"
-                  onclick={confirmDelete}
-                >
-                  Yes
-                </button>
-                <span class="text-red-400">Delete?</span>
-              </span>
-            {:else}
-              <button
-                type="button"
-                class="rounded-[4px] p-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:bg-accent hover:text-red-400"
-                title="Delete task"
-                onclick={() => { showDeleteConfirm = true; }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
-            {/if}
-          {/if}
-        </div>
-
-        {#if reviseOpen}
-          <!-- Revise mode: Cancel + split button (Revise & copy / Revise) -->
-          <div class="flex items-center gap-1.5">
-            <button
-              type="button"
-              class="rounded-[4px] px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
-              onclick={() => { reviseOpen = false; reviseNotes = ""; }}
-            >
-              Cancel
-            </button>
-            <div class="relative inline-flex items-stretch">
-              <button
-                type="button"
-                class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-                onclick={() => reviseTask(true)}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                Revise & copy
-              </button>
-              <button
-                type="button"
-                class="inline-flex items-center rounded-r-[4px] border border-foreground/20 bg-foreground px-2 py-1 text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-                onclick={() => { reviseDropdownOpen = !reviseDropdownOpen; }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-              {#if reviseDropdownOpen}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div
-                  class="absolute bottom-full right-0 mb-1 w-[200px] rounded-[6px] border border-border/60 bg-popover py-0.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)]"
-                  onmouseleave={() => { reviseDropdownOpen = false; }}
-                >
-                  <button
-                    type="button"
-                    class="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground transition-colors duration-[80ms] hover:bg-accent hover:text-foreground"
-                    onclick={() => { reviseDropdownOpen = false; reviseTask(false); }}
-                  >
-                    <span>Revise<span class="text-muted-foreground/40"> — without copying</span></span>
-                  </button>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {:else if !isUnindexed && !isDoneStatus}
-          <div class="flex items-center gap-1.5">
-            {#if copyFeedback}
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Copied
-              </span>
-            {:else}
-              {#if isReviewStatus}
-                <!-- Tertiary: Copy for AI -->
-                <div class="relative inline-flex items-stretch">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded-l-[4px] px-2.5 py-1 font-mono text-[10px] text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
-                    onclick={() => copyPrompt()}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    Copy for AI
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center rounded-r-[4px] px-1.5 py-1 text-muted-foreground/60 transition-colors duration-[120ms] hover:text-muted-foreground"
-                    onclick={() => { promptDropdownOpen = !promptDropdownOpen; }}
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                  </button>
-                  {#if promptDropdownOpen}
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <div
-                      class="absolute bottom-full right-0 mb-1 w-[200px] rounded-[6px] border border-border/60 bg-popover py-0.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)]"
-                      onmouseleave={() => { promptDropdownOpen = false; }}
-                    >
-                      {#each PROMPT_MODES as mode}
-                        <button
-                          type="button"
-                          class="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground transition-colors duration-[80ms] hover:bg-accent hover:text-foreground"
-                          onclick={() => pickPromptMode(mode.id)}
-                        >
-                          <span>{mode.label}<span class="text-muted-foreground/40"> — {mode.desc}</span></span>
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-                <!-- Secondary: Revise -->
-                <button
-                  type="button"
-                  class="rounded-[4px] border border-border/60 px-2.5 py-1 font-mono text-[10px] text-foreground transition-colors duration-[120ms] hover:border-border"
-                  onclick={() => { reviseOpen = true; }}
-                >
-                  Revise
-                </button>
-                <!-- Primary: Approve -->
-                <button
-                  type="button"
-                  class="rounded-[4px] border border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-                  onclick={approveTask}
-                >
-                  Approve
-                </button>
-              {:else}
-                <!-- Default state: Copy for AI as primary -->
-                <div class="inline-flex items-stretch">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded-l-[4px] border border-r-0 border-foreground/20 bg-foreground px-2.5 py-1 font-mono text-[10px] text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-                    onclick={() => copyPrompt()}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    Copy for AI
-                  </button>
-                  <div class="relative flex">
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-r-[4px] border border-foreground/20 bg-foreground px-2 py-1 text-background transition-colors duration-[120ms] hover:bg-foreground/85"
-                      onclick={() => { promptDropdownOpen = !promptDropdownOpen; }}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                      </svg>
-                    </button>
-                    {#if promptDropdownOpen}
-                      <!-- svelte-ignore a11y_no_static_element_interactions -->
-                      <div
-                        class="absolute bottom-full right-0 mb-1 w-[200px] rounded-[6px] border border-border/60 bg-popover py-0.5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)]"
-                        onmouseleave={() => { promptDropdownOpen = false; }}
-                      >
-                        {#each PROMPT_MODES as mode}
-                          <button
-                            type="button"
-                            class="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-mono text-[10px] text-muted-foreground transition-colors duration-[80ms] hover:bg-accent hover:text-foreground"
-                            onclick={() => pickPromptMode(mode.id)}
-                          >
-                            <span>{mode.label}<span class="text-muted-foreground/40"> — {mode.desc}</span></span>
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/if}
-            {/if}
-          </div>
-        {/if}
-      </div>
+      <TaskModalActionBar
+        {bodyDirty}
+        {isUnindexed}
+        {reviseOpen}
+        {showDeleteConfirm}
+        {copyFeedback}
+        {isReviewStatus}
+        {isDoneStatus}
+        {reviseDropdownOpen}
+        {promptDropdownOpen}
+        onToggleDeleteConfirm={(value) => {
+          showDeleteConfirm = value;
+        }}
+        onConfirmDelete={confirmDelete}
+        onCancelRevise={() => {
+          reviseOpen = false;
+          reviseNotes = "";
+        }}
+        onReviseWithCopy={() => reviseTask(true)}
+        onToggleReviseDropdown={() => {
+          reviseDropdownOpen = !reviseDropdownOpen;
+        }}
+        onCloseReviseDropdown={() => {
+          reviseDropdownOpen = false;
+        }}
+        onReviseWithoutCopy={() => {
+          reviseDropdownOpen = false;
+          return reviseTask(false);
+        }}
+        onCopyPrompt={() => copyPrompt()}
+        onTogglePromptDropdown={() => {
+          promptDropdownOpen = !promptDropdownOpen;
+        }}
+        onClosePromptDropdown={() => {
+          promptDropdownOpen = false;
+        }}
+        onPickPromptMode={pickPromptMode}
+        onOpenRevise={() => {
+          reviseOpen = true;
+        }}
+        onApprove={approveTask}
+      />
     {/if}
     </Dialog.Content>
   </Dialog.Portal>
@@ -1166,24 +840,6 @@
     outline: none;
     border-color: transparent;
     box-shadow: none;
-  }
-
-  /* Speech bubble for agent sections */
-  .speech-bubble {
-    padding: 10px 14px;
-    border: 1px solid var(--color-border);
-  }
-
-  .speech-bubble--agent {
-    background: color-mix(in srgb, var(--color-foreground) 8%, var(--color-background));
-    border-radius: 0 10px 10px 10px;
-    margin-right: 24px !important;
-  }
-
-  .speech-bubble--user {
-    background: color-mix(in srgb, var(--color-foreground) 12%, var(--color-background));
-    border-radius: 10px 0 10px 10px;
-    margin-left: 24px !important;
   }
 
   /* Agent section rendered markdown */

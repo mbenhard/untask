@@ -6,7 +6,7 @@ use untask_core::docs::DocsStore;
 use untask_core::error::{Result, UntaskError};
 
 pub fn list(root: &Path, doc_type: Option<&str>, json: bool) -> Result<()> {
-    let store = DocsStore::new(root.to_path_buf());
+    let store = DocsStore::new_strict(root.to_path_buf())?;
     let mut docs = store.list()?;
 
     if let Some(type_filter) = doc_type {
@@ -50,7 +50,7 @@ pub fn list(root: &Path, doc_type: Option<&str>, json: bool) -> Result<()> {
 }
 
 pub fn show(root: &Path, name: &str, json: bool) -> Result<()> {
-    let store = DocsStore::new(root.to_path_buf());
+    let store = DocsStore::new_strict(root.to_path_buf())?;
     let doc = store.get(name)?;
 
     if json {
@@ -77,7 +77,7 @@ pub fn show(root: &Path, name: &str, json: bool) -> Result<()> {
 }
 
 pub fn paths(root: &Path, json: bool) -> Result<()> {
-    let config = Config::load(root);
+    let config = Config::load_strict(root)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&config.docs)?);
@@ -93,7 +93,7 @@ pub fn paths(root: &Path, json: bool) -> Result<()> {
 }
 
 pub fn add_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
-    let mut config = Config::load(root);
+    let mut config = Config::load_strict(root)?;
 
     if config.docs.iter().any(|p| p == pattern) {
         if json {
@@ -124,7 +124,7 @@ pub fn add_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
 }
 
 pub fn remove_path(root: &Path, pattern: &str, json: bool) -> Result<()> {
-    let mut config = Config::load(root);
+    let mut config = Config::load_strict(root)?;
 
     let before_len = config.docs.len();
     config.docs.retain(|p| p != pattern);

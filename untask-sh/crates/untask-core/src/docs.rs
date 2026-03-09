@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::error::{Result, UntaskError};
+use crate::fs::atomic_write;
+use crate::lock::ProjectLock;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -92,6 +94,14 @@ impl DocsStore {
             project_root,
             config,
         }
+    }
+
+    pub fn new_strict(project_root: PathBuf) -> Result<Self> {
+        let config = Config::load_strict(&project_root)?;
+        Ok(Self {
+            project_root,
+            config,
+        })
     }
 
     pub fn list(&self) -> Result<Vec<Doc>> {
@@ -219,6 +229,7 @@ impl DocsStore {
     }
 
     pub fn create_doc(&self, parent_relative: &str, name: &str, content: &str) -> Result<DocRef> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
         let parent = normalize_relative_path(Path::new(parent_relative))?;
         self.ensure_writable_path(&parent)?;
 
@@ -241,7 +252,7 @@ impl DocsStore {
             )));
         }
 
-        std::fs::write(&full_path, content)?;
+        atomic_write(&full_path, content.as_bytes())?;
 
         Ok(DocRef {
             basename: filename,
@@ -250,6 +261,7 @@ impl DocsStore {
     }
 
     pub fn create_folder(&self, parent_relative: &str, name: &str) -> Result<PathBuf> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
         let parent = normalize_relative_path(Path::new(parent_relative))?;
         self.ensure_writable_path(&parent)?;
 
@@ -277,6 +289,7 @@ impl DocsStore {
     }
 
     pub fn rename_path(&self, relative_path: &str, new_name: &str) -> Result<PathBuf> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
         let path = normalize_relative_path(Path::new(relative_path))?;
         let root = self.matching_writable_root(&path).ok_or_else(|| {
             UntaskError::CommandFailed(format!(
@@ -328,6 +341,7 @@ impl DocsStore {
     }
 
     pub fn move_path(&self, relative_path: &str, destination_parent: &str) -> Result<PathBuf> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
         let source = normalize_relative_path(Path::new(relative_path))?;
         let destination_parent = normalize_relative_path(Path::new(destination_parent))?;
         self.ensure_writable_path(&destination_parent)?;
@@ -401,7 +415,17 @@ impl DocsStore {
         Ok(target_relative)
     }
 
+    pub fn save_doc(&self, reference: &str, content: &str) -> Result<()> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
+        let doc = self.get(reference)?;
+        let relative = self.relative_path(&doc.path);
+        self.ensure_writable_path(relative)?;
+        atomic_write(&doc.path, content.as_bytes())?;
+        Ok(())
+    }
+
     pub fn delete_doc(&self, relative_path: &str) -> Result<()> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
         let path = normalize_relative_path(Path::new(relative_path))?;
         self.ensure_writable_path(&path)?;
         let full_path = self.project_root.join(&path);
@@ -418,6 +442,7 @@ impl DocsStore {
     }
 
     pub fn delete_folder(&self, relative_path: &str) -> Result<()> {
+        let _lock = ProjectLock::acquire(&self.project_root)?;
         let path = normalize_relative_path(Path::new(relative_path))?;
         let root = self.matching_writable_root(&path).ok_or_else(|| {
             UntaskError::CommandFailed(format!(

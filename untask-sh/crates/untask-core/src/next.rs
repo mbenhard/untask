@@ -68,7 +68,7 @@ pub fn generate_next(project_root: &Path) -> Result<NextSummary> {
 }
 
 fn task_is_done(config: &Config, task: &Task) -> bool {
-    config.normalize_status(&task.status).as_deref() == Some("done")
+    config.is_done_status(&task.status)
 }
 
 fn build_cleanup_hints(project_root: &Path) -> Vec<CleanupHint> {

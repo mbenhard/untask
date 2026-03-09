@@ -80,7 +80,7 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
             // All other commands require an initialized project
             let cwd = std::env::current_dir()?;
             let root = untask_core::project::find_project_root(&cwd)?;
-            let mut store = TaskStore::new(root.clone())?;
+            let mut store = TaskStore::new_strict(root.clone())?;
 
             match cmd {
                 Commands::Init => unreachable!(),
@@ -161,7 +161,7 @@ fn run(cli: &Cli, fmt: &Formatter) -> untask_core::error::Result<()> {
                 },
                 Commands::Skill {
                     cmd: cli::SkillCommands::Install { provider },
-                } => commands::skill_install(&provider, cli.json),
+                } => commands::skill_install(provider, cli.json),
                 Commands::Open => commands::open(&root),
             }
         }

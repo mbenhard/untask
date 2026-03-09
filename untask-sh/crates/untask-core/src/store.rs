@@ -58,6 +58,21 @@ impl TaskStore {
         })
     }
 
+    pub fn new_strict(project_root: PathBuf) -> Result<Self> {
+        let config = Config::load_strict(&project_root)?;
+        Ok(Self {
+            project_root,
+            config,
+        })
+    }
+
+    pub(crate) fn with_config(project_root: PathBuf, config: Config) -> Self {
+        Self {
+            project_root,
+            config,
+        }
+    }
+
     pub fn config(&self) -> &Config {
         &self.config
     }
@@ -66,31 +81,83 @@ impl TaskStore {
         self.project_root.join(".untask/tasks")
     }
 
-    // ── Read operations (no side effects) ──────────────────────────
-
-    /// List all tasks. Never modifies files.
-    pub fn list(&self, filter: Option<ListFilter>) -> Result<Vec<Task>> {
+    fn task_paths(&self) -> Result<Vec<PathBuf>> {
         let tasks_dir = self.tasks_dir();
         if !tasks_dir.is_dir() {
             return Ok(vec![]);
         }
 
-        let mut tasks = Vec::new();
-        for entry in std::fs::read_dir(&tasks_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().is_some_and(|e| e == "md") {
-                let content = std::fs::read_to_string(&path)?;
-                let mut task = parse_task(&content);
-                task.file_path = Some(path);
-                if task.id.is_none()
-                    && let Some(ref fp) = task.file_path
-                {
-                    task.id = parse_filename_id(fp);
-                }
-                tasks.push(task);
+        let mut paths = Vec::new();
+        for entry in std::fs::read_dir(tasks_dir)? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|ext| ext == "md") {
+                paths.push(path);
             }
         }
+        Ok(paths)
+    }
+
+    fn load_task_from_path(&self, path: &Path) -> Result<Task> {
+        let content = std::fs::read_to_string(path)?;
+        let mut task = parse_task(&content);
+        task.file_path = Some(path.to_path_buf());
+        if task.id.is_none() {
+            task.id = parse_filename_id(path);
+        }
+        Ok(task)
+    }
+
+    fn find_task_path_by_id(&self, id: u32) -> Result<Option<PathBuf>> {
+        let expected_prefix = format!("{}-", Self::format_id(id));
+        let task_paths = self.task_paths()?;
+        let mut fallback_paths = Vec::new();
+
+        for path in task_paths {
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(&expected_prefix))
+            {
+                return Ok(Some(path));
+            }
+            fallback_paths.push(path);
+        }
+
+        for path in fallback_paths {
+            if self.read_known_id(&path)? == Some(id) {
+                return Ok(Some(path));
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn load_task_by_id(&self, id: u32) -> Result<Task> {
+        let path = self
+            .find_task_path_by_id(id)?
+            .ok_or_else(|| UntaskError::TaskNotFound(id.to_string()))?;
+        self.load_task_from_path(&path)
+    }
+
+    fn scan_tasks<F>(&self, mut visitor: F) -> Result<()>
+    where
+        F: FnMut(Task) -> Result<()>,
+    {
+        for path in self.task_paths()? {
+            visitor(self.load_task_from_path(&path)?)?;
+        }
+        Ok(())
+    }
+
+    // ── Read operations (no side effects) ──────────────────────────
+
+    /// List all tasks. Never modifies files.
+    pub fn list(&self, filter: Option<ListFilter>) -> Result<Vec<Task>> {
+        let mut tasks = Vec::new();
+        self.scan_tasks(|task| {
+            tasks.push(task);
+            Ok(())
+        })?;
 
         // Sort by ID (managed first), then unindexed
         tasks.sort_by(task_order);
@@ -113,11 +180,7 @@ impl TaskStore {
 
     /// Get a task by numeric ID. Never modifies files.
     pub fn get(&self, id: u32) -> Result<Task> {
-        let tasks = self.list(None)?;
-        tasks
-            .into_iter()
-            .find(|t| t.id == Some(id))
-            .ok_or_else(|| UntaskError::TaskNotFound(id.to_string()))
+        self.load_task_by_id(id)
     }
 
     /// Get a task by reference (numeric ID or slug match). Never modifies files.
@@ -171,9 +234,7 @@ impl TaskStore {
         }
 
         let mut max_id = 0u32;
-        for entry in std::fs::read_dir(&tasks_dir)? {
-            let entry = entry?;
-            let path = entry.path();
+        for path in self.task_paths()? {
             if let Some(id) = self.read_known_id(&path)? {
                 max_id = max_id.max(id);
             }
@@ -256,7 +317,8 @@ impl TaskStore {
 
     /// Mark a task as done. Returns the updated task.
     pub fn mark_done(&self, id: u32) -> Result<Task> {
-        self.set_status(id, "done")
+        let done_status = self.config.done_status();
+        self.set_status(id, &done_status)
     }
 
     pub fn attach_file(&self, id: u32, source_path: &Path) -> Result<Task> {
@@ -276,7 +338,7 @@ impl TaskStore {
                 let _ = crate::attachments::remove_attachment(
                     &self.project_root,
                     task_id,
-                    &attachment_path
+                    attachment_path
                         .file_name()
                         .and_then(|name| name.to_str())
                         .unwrap_or_default(),
@@ -314,7 +376,7 @@ impl TaskStore {
                 let _ = crate::attachments::remove_attachment(
                     &self.project_root,
                     task_id,
-                    &attachment_path
+                    attachment_path
                         .file_name()
                         .and_then(|name| name.to_str())
                         .unwrap_or_default(),
@@ -489,25 +551,25 @@ impl TaskStore {
     }
 
     fn next_position_for_status(&self, status: &str) -> Result<f64> {
-        let tasks = self.list(None)?;
         let mut matching_count = 0usize;
         let mut max_position = 0.0f64;
 
-        for task in tasks {
+        self.scan_tasks(|task| {
             if self.config.normalize_status(&task.status).as_deref() != Some(status) {
-                continue;
+                return Ok(());
             }
             matching_count += 1;
             if let Some(position) = task.position {
                 max_position = max_position.max(position);
             }
-        }
+            Ok(())
+        })?;
 
         Ok(max_position.max(matching_count as f64) + 1.0)
     }
 
     fn load_task_for_write(&self, id: u32) -> Result<(Task, PathBuf)> {
-        let task = self.get(id)?;
+        let task = self.load_task_by_id(id)?;
         let path = task
             .file_path
             .clone()
@@ -553,22 +615,32 @@ impl TaskStore {
     /// Used when renaming a column. Acquires project lock.
     pub fn migrate_tasks_status(&self, old_status: &str, new_status: &str) -> Result<u32> {
         let _lock = ProjectLock::acquire(&self.project_root)?;
-        let tasks = self.list(None)?;
+        self.migrate_tasks_status_locked(old_status, new_status)
+    }
+
+    pub(crate) fn migrate_tasks_status_locked(
+        &self,
+        old_status: &str,
+        new_status: &str,
+    ) -> Result<u32> {
+        let old_status = self.normalize_status(old_status)?;
+        let new_status = self.normalize_status(new_status)?;
         let mut count = 0u32;
 
-        for task in tasks {
+        self.scan_tasks(|task| {
             let canonical = self.config.normalize_status(&task.status);
-            if canonical.as_deref() == Some(old_status)
+            if canonical.as_deref() == Some(old_status.as_str())
                 && let Some(ref path) = task.file_path
             {
                 let mut updated = task.clone();
-                updated.status = new_status.to_string();
+                updated.status = new_status.clone();
                 updated.updated = Some(Utc::now());
                 let content = serialize_task(&updated);
                 atomic_write(path, content.as_bytes())?;
                 count += 1;
             }
-        }
+            Ok(())
+        })?;
         Ok(count)
     }
 
@@ -576,12 +648,16 @@ impl TaskStore {
     /// Acquires project lock.
     pub fn delete_tasks_by_status(&self, status: &str) -> Result<u32> {
         let _lock = ProjectLock::acquire(&self.project_root)?;
-        let tasks = self.list(None)?;
+        self.delete_tasks_by_status_locked(status)
+    }
+
+    pub(crate) fn delete_tasks_by_status_locked(&self, status: &str) -> Result<u32> {
+        let status = self.normalize_status(status)?;
         let mut count = 0u32;
 
-        for task in tasks {
+        self.scan_tasks(|task| {
             let canonical = self.config.normalize_status(&task.status);
-            if canonical.as_deref() == Some(status)
+            if canonical.as_deref() == Some(status.as_str())
                 && let Some(ref path) = task.file_path
             {
                 std::fs::remove_file(path)?;
@@ -590,36 +666,40 @@ impl TaskStore {
                 }
                 count += 1;
             }
-        }
+            Ok(())
+        })?;
         Ok(count)
     }
 
     /// Count tasks linked to a PRD by relative path. Returns (done, total).
     pub fn count_by_prd(&self, prd_path: &str) -> Result<(u32, u32)> {
-        let tasks = self.list(None)?;
         let mut done = 0u32;
         let mut total = 0u32;
 
-        for task in &tasks {
+        self.scan_tasks(|task| {
             if task.prd.as_deref() == Some(prd_path) {
                 total += 1;
                 if self.config.is_done_status(&task.status) {
                     done += 1;
                 }
             }
-        }
+            Ok(())
+        })?;
 
         Ok((done, total))
     }
 
     /// Count tasks in a given column status.
     pub fn count_tasks_in_column(&self, status: &str) -> Result<u32> {
-        let tasks = self.list(None)?;
-        let count = tasks
-            .iter()
-            .filter(|t| self.config.normalize_status(&t.status).as_deref() == Some(status))
-            .count();
-        Ok(count as u32)
+        let status = self.normalize_status(status)?;
+        let mut count = 0u32;
+        self.scan_tasks(|task| {
+            if self.config.normalize_status(&task.status).as_deref() == Some(status.as_str()) {
+                count += 1;
+            }
+            Ok(())
+        })?;
+        Ok(count)
     }
 
     /// Reload config from disk (useful after column operations modify config).

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { Tooltip } from "bits-ui";
   import {
     closeProject,
@@ -39,6 +40,12 @@
   type TaskHealth = {
     unmatchedCount: number;
     unindexedCount: number;
+  };
+
+  type RefreshTargets = {
+    config: boolean;
+    tasks: boolean;
+    docs: boolean;
   };
 
   let healthDismissed = $state(false);
@@ -116,37 +123,97 @@
     restoring = false;
   }
 
-  async function refreshData(options?: { externalPaths?: string[] }) {
-    const [config, taskList, docList] = await Promise.all([
-      getConfig().catch(() => ({ columns: [] })),
-      listTasks().catch(() => []),
-      listDocsTree().catch(() => []),
-    ]);
+  async function loadColumns() {
+    try {
+      const config = await getConfig();
+      columns.set(config.columns);
+      return config.columns;
+    } catch {
+      return get(columns);
+    }
+  }
 
-    columns.set(config.columns);
-    tasks.set(taskList);
-    docs.set(docList);
-    const nextHealth = summarizeTaskHealth(taskList, config.columns);
+  async function loadTasks() {
+    try {
+      const taskList = await listTasks();
+      tasks.set(taskList);
+      return taskList;
+    } catch {
+      return get(tasks);
+    }
+  }
+
+  async function loadDocs() {
+    try {
+      const docList = await listDocsTree();
+      docs.set(docList);
+      return docList;
+    } catch {
+      return get(docs);
+    }
+  }
+
+  function updateTaskHealth(
+    taskList: TaskDto[],
+    configuredColumns: { id: string; aliases: string[] }[],
+  ) {
+    const nextHealth = summarizeTaskHealth(taskList, configuredColumns);
     if (nextHealth.unmatchedCount !== taskHealth.unmatchedCount || nextHealth.unindexedCount !== taskHealth.unindexedCount) {
       healthDismissed = false;
     }
     taskHealth = nextHealth;
+  }
+
+  async function refreshData(options?: {
+    externalPaths?: string[];
+    targets?: RefreshTargets;
+  }) {
+    const targets = options?.targets ?? { config: true, tasks: true, docs: true };
+    const currentColumns = get(columns);
+    const currentTasks = get(tasks);
+
+    const configuredColumns = targets.config ? await loadColumns() : currentColumns;
+    const taskList = targets.tasks ? await loadTasks() : currentTasks;
+
+    if (targets.docs) {
+      await loadDocs();
+    }
+
+    updateTaskHealth(taskList, configuredColumns);
     refreshRevision += 1;
 
-    if (options?.externalPaths && affectsDocsExternally(options.externalPaths)) {
+    if ((targets.docs || targets.config) && options?.externalPaths && affectsDocsExternally(options.externalPaths)) {
       docsExternalPaths = options.externalPaths;
       docsExternalRevision += 1;
     }
   }
 
   async function refreshDocs() {
-    const docList = await listDocsTree().catch(() => []);
-    docs.set(docList);
-    refreshRevision += 1;
+    await refreshData({ targets: { config: false, tasks: false, docs: true } });
   }
 
   async function refreshTasks() {
-    await refreshData();
+    await refreshData({ targets: { config: false, tasks: true, docs: false } });
+  }
+
+  function classifyRefreshTargets(changedPaths: string[]): RefreshTargets {
+    const configChanged = changedPaths.includes(".untask/config.yml");
+    if (configChanged) {
+      return { config: true, tasks: true, docs: true };
+    }
+
+    const tasksChanged = changedPaths.some((path) => path.startsWith(".untask/tasks/"));
+    const docsChanged = changedPaths.some((path) => !path.startsWith(".untask/tasks/"));
+
+    return {
+      config: false,
+      tasks: tasksChanged,
+      docs: docsChanged,
+    };
+  }
+
+  function shouldRefresh(targets: RefreshTargets) {
+    return targets.config || targets.tasks || targets.docs;
   }
 
   function scheduleRefresh(changedPaths: string[]) {
@@ -164,7 +231,12 @@
       refreshTimeout = null;
       const externalPaths = [...pendingRefreshPaths];
       pendingRefreshPaths = new Set();
-      void refreshData(externalPaths.length ? { externalPaths } : undefined);
+      const targets = classifyRefreshTargets(externalPaths);
+      if (!shouldRefresh(targets)) return;
+      void refreshData({
+        externalPaths: externalPaths.length ? externalPaths : undefined,
+        targets,
+      });
     }, 120);
   }
 

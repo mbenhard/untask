@@ -194,10 +194,6 @@ export function deleteTask(id: number): Promise<void> {
 
 // ── Docs ────────────────────────────────────────────────────────────
 
-export function listDocs(): Promise<DocInfo[]> {
-  return invoke("list_docs");
-}
-
 export function listDocsTree(): Promise<DocNode[]> {
   return invoke("list_docs_tree");
 }

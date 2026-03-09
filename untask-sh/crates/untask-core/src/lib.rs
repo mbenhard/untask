@@ -1,4 +1,5 @@
 pub mod attachments;
+pub mod columns;
 pub mod config;
 pub mod docs;
 pub mod error;

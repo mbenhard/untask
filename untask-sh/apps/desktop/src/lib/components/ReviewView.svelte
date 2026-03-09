@@ -1,5 +1,6 @@
 <script lang="ts">
   import { updateTask, type ColumnDto, type TaskDto } from "$lib/api";
+  import { relativeDate } from "$lib/format";
 
   let {
     tasks,
@@ -30,26 +31,6 @@
   let doneColumnId = $derived(
     columns.find((c) => c.done)?.id ?? "done",
   );
-
-  function relativeDate(iso: string | null): string {
-    if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      const now = new Date();
-      const diffMs = now.getTime() - d.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      if (diffMins < 1) return "now";
-      if (diffMins < 60) return `${diffMins}m`;
-      const diffHours = Math.floor(diffMins / 60);
-      if (diffHours < 24) return `${diffHours}h`;
-      const diffDays = Math.floor(diffHours / 24);
-      if (diffDays < 30) return `${diffDays}d`;
-      const diffMonths = Math.floor(diffDays / 30);
-      return `${diffMonths}mo`;
-    } catch {
-      return "";
-    }
-  }
 
   async function approveAll() {
     if (approving || reviewTasks.length === 0) return;

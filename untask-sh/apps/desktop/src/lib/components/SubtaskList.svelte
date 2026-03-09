@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Checkbox } from "bits-ui";
+  import { focusOnMount } from "$lib/actions";
   import {
     addSubtaskToBody,
     deleteSubtaskFromBody,
@@ -49,15 +50,6 @@
 
   let dragFromIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
-
-  function focusOnMount(el: HTMLElement) {
-    requestAnimationFrame(() => {
-      el.focus();
-      if (el instanceof HTMLInputElement) {
-        el.select();
-      }
-    });
-  }
 
   function startEdit(index: number) {
     if (readonly) return;
@@ -229,7 +221,7 @@
               onblur={() => confirmEdit(i)}
               onkeydown={(e) => handleEditKeydown(e, i)}
               class="w-full bg-transparent text-[13px] leading-[1.4] text-foreground outline-none"
-              use:focusOnMount
+              use:focusOnMount={{ select: true }}
             />
           {:else}
             <button

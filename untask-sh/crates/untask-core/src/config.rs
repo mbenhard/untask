@@ -182,18 +182,24 @@ impl Config {
         }
     }
 
-    /// Load config from `.untask/config.yml`. Falls back to defaults on missing or invalid file.
+    /// Load config from `.untask/config.yml`.
+    /// Missing config falls back to defaults; invalid config also falls back for compatibility.
     pub fn load(project_root: &Path) -> Self {
+        Self::load_strict(project_root).unwrap_or_default()
+    }
+
+    /// Load config from `.untask/config.yml`, surfacing invalid config as an error.
+    pub fn load_strict(project_root: &Path) -> Result<Self> {
         let config_path = project_root.join(".untask/config.yml");
         let content = match std::fs::read_to_string(&config_path) {
             Ok(c) => c,
-            Err(_) => return Self::default(),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Self::default()),
+            Err(err) => return Err(err.into()),
         };
 
-        match serde_yaml::from_str::<Config>(&content) {
-            Ok(config) if config.validate_doc_globs().is_ok() => config,
-            Ok(_) | Err(_) => Self::default(),
-        }
+        let config = serde_yaml::from_str::<Config>(&content)?;
+        config.validate_doc_globs()?;
+        Ok(config)
     }
 
     /// Validate doc globs: reject absolute paths and `../` traversal.
@@ -240,6 +246,15 @@ impl Config {
             .first()
             .map(|c| c.id.clone())
             .unwrap_or_else(|| "backlog".into())
+    }
+
+    /// Return the first terminal (done) column ID.
+    pub fn done_status(&self) -> String {
+        self.columns
+            .iter()
+            .find(|column| column.done)
+            .map(|column| column.id.clone())
+            .unwrap_or_else(|| "done".into())
     }
 
     /// Check if a status resolves to a terminal (done) column.
