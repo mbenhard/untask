@@ -1,9 +1,9 @@
 ---
 id: 69
-title: The “owner” label in task - whether User/AI - the label “owner” seems weird, propose alterantives
+title: The “owner” label in task > User/AI - the label “owner” seems weird, propose alterantives nigga
 status: in-progress
 created: 2026-03-08
-updated: 2026-03-08T19:19:25.673953Z
+updated: 2026-03-08T21:14:49.224168Z
 position: 1.0
 ---
 

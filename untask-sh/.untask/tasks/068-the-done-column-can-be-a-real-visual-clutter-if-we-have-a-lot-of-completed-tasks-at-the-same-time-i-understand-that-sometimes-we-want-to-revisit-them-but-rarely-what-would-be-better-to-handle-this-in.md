@@ -1,10 +1,11 @@
 ---
 id: 68
 title: the “Done” column can be a real visual clutter if we have a lot of completed tasks. at the same time I understand that sometimes we want to revisit them but rarely. what would be better to handle this in UI while keeping amazing UX?
-status: in-progress
+status: done
 created: 2026-03-08
-updated: 2026-03-08T20:19:07.317086Z
-position: 2.0
+updated: 2026-03-08T21:09:12.667648Z
+completed: 2026-03-08T21:09:12.667647Z
+position: 1.0
 ---
 ## Current state
 

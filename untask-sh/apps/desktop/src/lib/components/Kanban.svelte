@@ -43,6 +43,7 @@
   let doneExpanded = $state(
     typeof window !== 'undefined' && localStorage.getItem('kanban-done-expanded') === 'true'
   );
+  let doneTransitioning = $state(false);
   let doneStripDragOver = $state(false);
   let doneDropFlash = $state(false);
   let kanbanContainer = $state<HTMLElement | null>(null);
@@ -351,7 +352,15 @@
 
   // ── Done strip ──────────────────────────────────────────────────
   function toggleDoneExpanded() {
-    doneExpanded = !doneExpanded;
+    if (doneExpanded) {
+      // Collapsing: shrink first, swap content after transition
+      doneExpanded = false;
+      doneTransitioning = true;
+      setTimeout(() => { doneTransitioning = false; }, 200);
+    } else {
+      // Expanding: content appears at collapsed width, then widens
+      doneExpanded = true;
+    }
     localStorage.setItem('kanban-done-expanded', String(doneExpanded));
     if (doneExpanded && kanbanContainer) {
       requestAnimationFrame(() => {
@@ -411,7 +420,7 @@
 <div bind:this={kanbanContainer} class="flex min-h-0 flex-1 overflow-x-auto p-0">
   {#each activeColumns as col, colIdx}
     <section
-      class={`flex min-w-[240px] max-w-[300px] flex-1 flex-col bg-background/80 ${
+      class={`flex min-w-[240px] flex-1 flex-col bg-background/80 ${
         colIdx < activeColumns.length - 1 ? "border-r border-border/40" : ""
       }`}
     >
@@ -640,26 +649,42 @@
   {/each}
 
   <!-- Done strip / expanded done column -->
-  {#if doneColumn}
-    {#if doneExpanded}
-      <!-- Expanded done column -->
-      <section class="flex min-w-[240px] max-w-[300px] flex-1 flex-col border-l border-border/40 bg-background/80">
-        <!-- Header with collapse chevron -->
-        <div class="flex items-center justify-between border-b border-border/60 px-3 py-2">
-          <button
-            type="button"
-            class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground/50 transition-colors hover:text-muted-foreground"
-            onclick={toggleDoneExpanded}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+  {#if doneColumn && (doneExpanded || doneColumn.tasks.length > 0 || isDragging)}
+    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events a11y_no_noninteractive_tabindex -->
+    <section
+      class={`done-area flex shrink-0 flex-col overflow-hidden border-l bg-background/80 ${
+        doneDropFlash ? 'border-foreground/50' :
+        doneStripDragOver && !doneExpanded ? 'border-border' :
+        'border-border/40'
+      } ${!doneExpanded && !doneTransitioning ? 'done-collapsed group/strip' : ''} ${doneStripDragOver && !doneExpanded ? 'done-strip-hover' : ''}`}
+      style="width: {doneExpanded ? '280px' : isDragging ? '120px' : '56px'};"
+      onclick={!doneExpanded && !doneTransitioning ? toggleDoneExpanded : undefined}
+      onkeydown={!doneExpanded && !doneTransitioning ? (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDoneExpanded(); } } : undefined}
+      ondragover={!doneExpanded && !doneTransitioning ? handleStripDragOver : undefined}
+      ondragleave={!doneExpanded && !doneTransitioning ? handleStripDragLeave : undefined}
+      ondrop={!doneExpanded && !doneTransitioning ? handleStripDrop : undefined}
+    >
+      {#if doneExpanded || doneTransitioning}
+        <!-- Fixed-width inner wrapper — stays 280px while container clips it -->
+        <div class="flex min-h-0 w-[280px] min-w-[280px] shrink-0 flex-1 flex-col">
+        <!-- Header — entire row collapses on click -->
+        <button
+          type="button"
+          class="flex w-full cursor-pointer items-center justify-between border-b border-border/60 px-3 py-2 transition-colors hover:bg-accent/20"
+          onclick={(e: MouseEvent) => { e.stopPropagation(); toggleDoneExpanded(); }}
+        >
+          <span class="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            Done
+          </span>
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-[10px] text-muted-foreground/60">
+              {doneColumn.tasks.length}
+            </span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/40">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
-            Done
-          </button>
-          <span class="font-mono text-[10px] text-muted-foreground/60">
-            {doneColumn.tasks.length}
-          </span>
-        </div>
+          </div>
+        </button>
 
         <div class="relative min-h-0 flex-1">
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -759,37 +784,19 @@
           </div>
           <div class="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-background/80 to-transparent"></div>
         </div>
-      </section>
-    {:else}
-      <!-- Collapsed done strip -->
-      {#if doneColumn.tasks.length > 0 || isDragging}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          class={`done-strip sticky right-0 flex shrink-0 flex-col items-center justify-center border-l transition-all duration-200 ${
-            doneDropFlash ? 'border-foreground/50' :
-            doneStripDragOver ? 'border-border' :
-            'border-border/40'
-          } ${doneStripDragOver ? 'done-strip-hover' : ''}`}
-          style="width: {isDragging ? '120px' : '56px'}"
-          ondragover={handleStripDragOver}
-          ondragleave={handleStripDragLeave}
-          ondrop={handleStripDrop}
-        >
-          <button
-            type="button"
-            class="flex flex-col items-center justify-center gap-1 rounded-[4px] px-2 py-2 transition-colors duration-[120ms] hover:bg-accent/30"
-            onclick={toggleDoneExpanded}
-          >
-            <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/40">
-              Done
-            </span>
-            <span class="font-mono text-[10px] text-muted-foreground/30">
-              {doneColumn.tasks.length}
-            </span>
-          </button>
+        </div>
+      {:else}
+        <!-- Collapsed strip content -->
+        <div class="flex h-full flex-col items-center justify-center gap-1">
+          <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/40 transition-colors group-hover/strip:text-muted-foreground/70">
+            Done
+          </span>
+          <span class="font-mono text-[10px] text-muted-foreground/30 transition-colors group-hover/strip:text-muted-foreground/50">
+            {doneColumn.tasks.length}
+          </span>
         </div>
       {/if}
-    {/if}
+    </section>
   {/if}
 </div>
 
@@ -867,7 +874,22 @@
     box-shadow: none;
   }
 
-  /* Done strip hover fill */
+  /* Done area expand/collapse transition */
+  .done-area {
+    transition: width 200ms ease, border-color 200ms ease;
+  }
+
+  /* Collapsed strip hover */
+  .done-collapsed {
+    cursor: pointer;
+  }
+
+  .done-collapsed:hover {
+    background: color-mix(in srgb, var(--color-muted-foreground) 5%, transparent);
+    border-color: color-mix(in srgb, var(--color-border) 80%, transparent);
+  }
+
+  /* Done strip drag-over fill */
   .done-strip-hover {
     background: color-mix(in srgb, var(--color-muted-foreground) 8%, transparent);
   }
