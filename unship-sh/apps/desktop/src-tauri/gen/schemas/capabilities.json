@@ -1,1 +1,0 @@
-{"main-capability":{"identifier":"main-capability","description":"Capability for the main window","local":true,"windows":["main"],"permissions":["core:path:default","core:event:default","core:webview:default","core:window:default","core:window:allow-start-dragging","core:app:default","dialog:default","opener:default","opener:allow-open-path"]}}

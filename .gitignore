@@ -125,8 +125,12 @@ package-lock.json
 
 # Private / not published to GitHub
 website/
+website-cms/
 docs/plans/
 untask/
+unship-sh/
 offbrand-website/
 .claude/
 .vercel/
+.agents/
+.github/
